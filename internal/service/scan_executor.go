@@ -13,7 +13,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
-	appViewer "github.com/go-tangra/go-tangra-ipam/pkg/viewer"
+	appViewer "github.com/go-tangra/go-tangra-common/viewer"
 )
 
 const (

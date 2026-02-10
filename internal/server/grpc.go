@@ -17,7 +17,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/service"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 
-	appViewer "github.com/go-tangra/go-tangra-ipam/pkg/viewer"
+	appViewer "github.com/go-tangra/go-tangra-common/viewer"
 	"github.com/go-tangra/go-tangra-common/middleware/audit"
 	"github.com/go-tangra/go-tangra-common/middleware/mtls"
 )
