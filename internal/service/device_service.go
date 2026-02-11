@@ -202,6 +202,18 @@ func (s *DeviceService) UpdateDevice(ctx context.Context, req *ipamV1.UpdateDevi
 		if req.Data.Notes != nil {
 			updates["notes"] = *req.Data.Notes
 		}
+		if req.Data.LocationId != nil {
+			updates["location_id"] = *req.Data.LocationId
+		}
+		if req.Data.RackId != nil {
+			updates["rack_id"] = *req.Data.RackId
+		}
+		if req.Data.RackPosition != nil {
+			updates["rack_position"] = *req.Data.RackPosition
+		}
+		if req.Data.DeviceHeightU != nil {
+			updates["device_height_u"] = *req.Data.DeviceHeightU
+		}
 	}
 
 	entity, err := s.deviceRepo.Update(ctx, req.GetId(), updates)

@@ -149,6 +149,18 @@ func (r *DeviceRepo) Update(ctx context.Context, id string, updates map[string]i
 	if notes, ok := updates["notes"].(string); ok {
 		update = update.SetNotes(notes)
 	}
+	if locationID, ok := updates["location_id"].(string); ok {
+		update = update.SetLocationID(locationID)
+	}
+	if rackID, ok := updates["rack_id"].(string); ok {
+		update = update.SetRackID(rackID)
+	}
+	if rackPosition, ok := updates["rack_position"].(int32); ok {
+		update = update.SetRackPosition(rackPosition)
+	}
+	if deviceHeightU, ok := updates["device_height_u"].(int32); ok {
+		update = update.SetDeviceHeightU(deviceHeightU)
+	}
 
 	update = update.SetUpdateTime(time.Now())
 
