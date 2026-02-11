@@ -107,6 +107,18 @@ func (r *LocationRepo) Update(ctx context.Context, id string, updates map[string
 	if status, ok := updates["status"].(int32); ok {
 		update = update.SetStatus(status)
 	}
+	if locationType, ok := updates["location_type"].(int32); ok {
+		update = update.SetLocationType(locationType)
+	}
+	if address, ok := updates["address"].(string); ok {
+		update = update.SetAddress(address)
+	}
+	if parentID, ok := updates["parent_id"].(string); ok {
+		update = update.SetParentID(parentID)
+	}
+	if rackSizeU, ok := updates["rack_size_u"].(int32); ok {
+		update = update.SetRackSizeU(rackSizeU)
+	}
 
 	update = update.SetUpdateTime(time.Now())
 

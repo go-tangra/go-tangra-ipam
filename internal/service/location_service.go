@@ -127,6 +127,18 @@ func (s *LocationService) UpdateLocation(ctx context.Context, req *ipamV1.Update
 		if req.Data.Status != nil {
 			updates["status"] = int32(*req.Data.Status)
 		}
+		if req.Data.LocationType != nil {
+			updates["location_type"] = int32(*req.Data.LocationType)
+		}
+		if req.Data.Address != nil {
+			updates["address"] = *req.Data.Address
+		}
+		if req.Data.ParentId != nil {
+			updates["parent_id"] = *req.Data.ParentId
+		}
+		if req.Data.RackSizeU != nil {
+			updates["rack_size_u"] = *req.Data.RackSizeU
+		}
 	}
 
 	entity, err := s.locationRepo.Update(ctx, req.GetId(), updates)
