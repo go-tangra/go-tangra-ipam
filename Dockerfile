@@ -60,13 +60,14 @@ COPY --from=builder /src/bin/ipam-server /app/bin/ipam-server
 # Copy configuration files
 COPY --from=builder /src/configs/ /app/configs/
 
-# Grant NET_RAW capability for ICMP ping scanning
-RUN setcap cap_net_raw+ep /app/bin/ipam-server
-
 # Create non-root user
 RUN addgroup -g 1000 ipam && \
     adduser -D -u 1000 -G ipam ipam && \
     chown -R ipam:ipam /app
+
+# Grant NET_RAW capability for ICMP ping scanning
+# NOTE: must run AFTER chown, as chown strips file capabilities
+RUN setcap cap_net_raw+ep /app/bin/ipam-server
 
 # Switch to non-root user
 USER ipam:ipam
