@@ -89,7 +89,6 @@ func (r *IpAddressRepo) GetByAddress(ctx context.Context, tenantID uint32, addre
 
 // ipAddressSortFields maps API field names to Ent By* functions
 var ipAddressSortFields = map[string]func(opts ...sql.OrderTermOption) ipaddress.OrderOption{
-	"address":     ipaddress.ByAddress,
 	"hostname":    ipaddress.ByHostname,
 	"status":      ipaddress.ByStatus,
 	"macAddress":  ipaddress.ByMACAddress,
@@ -99,6 +98,17 @@ var ipAddressSortFields = map[string]func(opts ...sql.OrderTermOption) ipaddress
 	"last_seen":   ipaddress.ByLastSeen,
 	"create_time": ipaddress.ByCreateTime,
 	"update_time": ipaddress.ByUpdateTime,
+}
+
+// orderByAddressInet returns an OrderOption that sorts by address::inet (numeric IP order)
+func orderByAddressInet(desc bool) ipaddress.OrderOption {
+	return func(s *sql.Selector) {
+		if desc {
+			s.OrderExpr(sql.Expr("address::inet DESC"))
+		} else {
+			s.OrderExpr(sql.Expr("address::inet ASC"))
+		}
+	}
 }
 
 // ipAddressOrderBy parses orderBy strings (e.g. "-address" for desc, "hostname" for asc)
@@ -112,6 +122,11 @@ func ipAddressOrderBy(orderBy []string) []ipaddress.OrderOption {
 			desc = true
 			field = field[1:]
 		}
+		// Special handling for address field: use PostgreSQL inet cast for numeric sort
+		if field == "address" {
+			orders = append(orders, orderByAddressInet(desc))
+			continue
+		}
 		byFn, ok := ipAddressSortFields[field]
 		if !ok {
 			continue
@@ -123,7 +138,7 @@ func ipAddressOrderBy(orderBy []string) []ipaddress.OrderOption {
 		}
 	}
 	if len(orders) == 0 {
-		orders = append(orders, ipaddress.ByAddress())
+		orders = append(orders, orderByAddressInet(false))
 	}
 	return orders
 }
