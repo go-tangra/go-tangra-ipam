@@ -257,7 +257,7 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 
 	// Progress callback
 	progressCb := func(progress biz.ScanProgress) {
-		_ = e.scanJobRepo.UpdateProgress(
+		if err := e.scanJobRepo.UpdateProgress(
 			e.ctx,
 			job.ID,
 			progress.ScannedCount,
@@ -266,7 +266,9 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 			progress.UpdatedCount,
 			progress.Progress,
 			"Scanning...",
-		)
+		); err != nil {
+			e.log.Warnf("Failed to update scan progress for job %s: %v", job.ID, err)
+		}
 	}
 
 	// Execute the scan
@@ -275,7 +277,9 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 	if err != nil {
 		if e.ctx.Err() != nil {
 			// Cancelled
-			_, _ = e.scanJobRepo.UpdateStatus(e.ctx, job.ID, ipscanjob.StatusCANCELLED, "Cancelled", job.Progress)
+			if _, statusErr := e.scanJobRepo.UpdateStatus(e.ctx, job.ID, ipscanjob.StatusCANCELLED, "Cancelled", job.Progress); statusErr != nil {
+				e.log.Warnf("Failed to update cancelled status for job %s: %v", job.ID, statusErr)
+			}
 			return nil
 		}
 
@@ -350,7 +354,7 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 	}
 
 	// Update final progress
-	_ = e.scanJobRepo.UpdateProgress(
+	if err := e.scanJobRepo.UpdateProgress(
 		e.ctx,
 		job.ID,
 		int64(len(results)),
@@ -359,7 +363,9 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 		updatedCount,
 		100,
 		"Completed",
-	)
+	); err != nil {
+		e.log.Warnf("Failed to update final progress for job %s: %v", job.ID, err)
+	}
 
 	// Mark as completed
 	message := "Scan completed"

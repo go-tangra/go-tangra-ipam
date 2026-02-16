@@ -4,6 +4,7 @@ package kratos.api;
 option go_package = "go-wind-admin/app/ipam/service/internal/conf;conf";
 
 import "google/protobuf/duration.proto";
+import "redact/v3/redact.proto";
 
 message Bootstrap {
   Server server = 1;
@@ -50,7 +51,7 @@ message Server {
 message Data {
   message Database {
     string driver = 1;
-    string source = 2;
+    string source = 2 [(redact.v3.value).string = ""];
     bool migrate = 3;
     bool debug = 4;
     bool enable_trace = 5;
@@ -63,7 +64,7 @@ message Data {
   message Redis {
     string network = 1;
     string addr = 2;
-    string password = 3;
+    string password = 3 [(redact.v3.value).string = ""];
     int32 db = 4;
     google.protobuf.Duration dial_timeout = 5;
     google.protobuf.Duration read_timeout = 6;

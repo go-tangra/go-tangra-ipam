@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-kratos/kratos/v2/middleware"
-	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/selector"
 	"github.com/go-kratos/kratos/v2/middleware/validate"
@@ -13,6 +12,7 @@ import (
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
 	"github.com/go-tangra/go-tangra-ipam/internal/cert"
+	customLogging "github.com/go-tangra/go-tangra-ipam/internal/middleware/logging"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/service"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
@@ -92,7 +92,7 @@ func NewGRPCServer(
 	var ms []middleware.Middleware
 	ms = append(ms, recovery.Recovery())
 	ms = append(ms, systemViewerMiddleware()) // Inject system viewer for ENT privacy
-	ms = append(ms, logging.Server(logger))
+	ms = append(ms, customLogging.RedactedServer(logger))
 
 	// Add mTLS middleware only when TLS is enabled
 	// When TLS is disabled (e.g., for dynamic routing from admin gateway), skip cert validation
@@ -129,16 +129,16 @@ func NewGRPCServer(
 
 	srv := grpc.NewServer(opts...)
 
-	// Register services
-	ipamV1.RegisterSystemServiceServer(srv, systemSvc)
-	ipamV1.RegisterSubnetServiceServer(srv, subnetSvc)
-	ipamV1.RegisterVlanServiceServer(srv, vlanSvc)
-	ipamV1.RegisterDeviceServiceServer(srv, deviceSvc)
-	ipamV1.RegisterLocationServiceServer(srv, locationSvc)
-	ipamV1.RegisterIpAddressServiceServer(srv, ipAddressSvc)
-	ipamV1.RegisterIpScanServiceServer(srv, ipScanSvc)
-	ipamV1.RegisterIpGroupServiceServer(srv, ipGroupSvc)
-	ipamV1.RegisterHostGroupServiceServer(srv, hostGroupSvc)
+	// Register services with redacted wrappers to prevent sensitive data from leaking in logs
+	ipamV1.RegisterRedactedSystemServiceServer(srv, systemSvc, nil)
+	ipamV1.RegisterRedactedSubnetServiceServer(srv, subnetSvc, nil)
+	ipamV1.RegisterRedactedVlanServiceServer(srv, vlanSvc, nil)
+	ipamV1.RegisterRedactedDeviceServiceServer(srv, deviceSvc, nil)
+	ipamV1.RegisterRedactedLocationServiceServer(srv, locationSvc, nil)
+	ipamV1.RegisterRedactedIpAddressServiceServer(srv, ipAddressSvc, nil)
+	ipamV1.RegisterRedactedIpScanServiceServer(srv, ipScanSvc, nil)
+	ipamV1.RegisterRedactedIpGroupServiceServer(srv, ipGroupSvc, nil)
+	ipamV1.RegisterRedactedHostGroupServiceServer(srv, hostGroupSvc, nil)
 
 	return srv
 }

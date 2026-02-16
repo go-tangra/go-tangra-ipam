@@ -8,6 +8,7 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
+import "redact/v3/redact.proto";
 
 // Location represents a physical site/datacenter/building
 message Location {
@@ -57,13 +58,13 @@ message Location {
   optional double longitude = 15 [json_name = "longitude"];
 
   // Contact person
-  optional string contact = 16 [json_name = "contact"];
+  optional string contact = 16 [(redact.v3.value).string = "", json_name = "contact"];
 
   // Contact phone
-  optional string phone = 17 [json_name = "phone"];
+  optional string phone = 17 [(redact.v3.value).string = "", json_name = "phone"];
 
   // Contact email
-  optional string email = 18 [json_name = "email"];
+  optional string email = 18 [(redact.v3.value).string = "", json_name = "email"];
 
   // Number of child locations
   optional int32 child_count = 20 [json_name = "childCount"];
@@ -148,9 +149,9 @@ message CreateLocationRequest {
   optional string postal_code = 11 [json_name = "postalCode"];
   optional double latitude = 12 [json_name = "latitude"];
   optional double longitude = 13 [json_name = "longitude"];
-  optional string contact = 14 [json_name = "contact"];
-  optional string phone = 15 [json_name = "phone"];
-  optional string email = 16 [json_name = "email"];
+  optional string contact = 14 [(redact.v3.value).string = "", json_name = "contact"];
+  optional string phone = 15 [(redact.v3.value).string = "", json_name = "phone"];
+  optional string email = 16 [(redact.v3.value).string = "", json_name = "email"];
   optional LocationStatus status = 17 [json_name = "status"];
   optional string tags = 18 [json_name = "tags"];
   optional string metadata = 19 [json_name = "metadata"];

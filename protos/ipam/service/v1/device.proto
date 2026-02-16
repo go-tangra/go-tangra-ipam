@@ -8,6 +8,7 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
+import "redact/v3/redact.proto";
 
 // Device represents a network device
 message Device {
@@ -78,7 +79,7 @@ message Device {
   optional int32 address_count = 21 [json_name = "addressCount"];
 
   // Contact person
-  optional string contact = 22 [json_name = "contact"];
+  optional string contact = 22 [(redact.v3.value).string = "", json_name = "contact"];
 
   // Custom tags (JSON)
   optional string tags = 25 [json_name = "tags"];
@@ -174,7 +175,7 @@ message CreateDeviceRequest {
   optional string management_ip = 14 [json_name = "managementIp"];
   optional string os_type = 15 [json_name = "osType"];
   optional string os_version = 16 [json_name = "osVersion"];
-  optional string contact = 17 [json_name = "contact"];
+  optional string contact = 17 [(redact.v3.value).string = "", json_name = "contact"];
   optional string tags = 18 [json_name = "tags"];
   optional string metadata = 19 [json_name = "metadata"];
   optional string notes = 20 [json_name = "notes"];

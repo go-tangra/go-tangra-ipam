@@ -8,6 +8,7 @@ package ipampb
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	_ "github.com/menta2k/protoc-gen-redact/v3/redact/v3"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -1544,7 +1545,7 @@ var File_ipam_service_v1_ip_address_proto protoreflect.FileDescriptor
 
 const file_ipam_service_v1_ip_address_proto_rawDesc = "" +
 	"\n" +
-	" ipam/service/v1/ip_address.proto\x12\x0fipam.service.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\"\xef\n" +
+	" ipam/service/v1/ip_address.proto\x12\x0fipam.service.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x16redact/v3/redact.proto\"\xf7\n" +
 	"\n" +
 	"\tIpAddress\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
@@ -1565,8 +1566,8 @@ const file_ipam_service_v1_ip_address_proto_rawDesc = "" +
 	"is_primary\x18\f \x01(\bH\vR\tisPrimary\x88\x01\x01\x12\"\n" +
 	"\n" +
 	"ptr_record\x18\r \x01(\tH\fR\tptrRecord\x88\x01\x01\x12\x1e\n" +
-	"\bdns_name\x18\x0e \x01(\tH\rR\adnsName\x88\x01\x01\x12\x19\n" +
-	"\x05owner\x18\x0f \x01(\tH\x0eR\x05owner\x88\x01\x01\x12<\n" +
+	"\bdns_name\x18\x0e \x01(\tH\rR\adnsName\x88\x01\x01\x12!\n" +
+	"\x05owner\x18\x0f \x01(\tB\x06ڶ\x1a\x02z\x00H\x0eR\x05owner\x88\x01\x01\x12<\n" +
 	"\tlast_seen\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampH\x0fR\blastSeen\x88\x01\x01\x12B\n" +
 	"\flease_expiry\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampH\x10R\vleaseExpiry\x88\x01\x01\x12+\n" +
 	"\x0fhas_reverse_dns\x18\x12 \x01(\bH\x11R\rhasReverseDns\x88\x01\x01\x12\x17\n" +
@@ -1610,7 +1611,7 @@ const file_ipam_service_v1_ip_address_proto_rawDesc = "" +
 	"\v_created_atB\r\n" +
 	"\v_updated_atB\r\n" +
 	"\v_created_byB\r\n" +
-	"\v_updated_by\"\x97\a\n" +
+	"\v_updated_by\"\x9f\a\n" +
 	"\x16CreateIpAddressRequest\x12%\n" +
 	"\ttenant_id\x18\x01 \x01(\rB\x03\xe0A\x02H\x00R\btenantId\x88\x01\x01\x12)\n" +
 	"\aaddress\x18\x02 \x01(\tB\n" +
@@ -1631,8 +1632,8 @@ const file_ipam_service_v1_ip_address_proto_rawDesc = "" +
 	"R\tisPrimary\x88\x01\x01\x12\"\n" +
 	"\n" +
 	"ptr_record\x18\f \x01(\tH\vR\tptrRecord\x88\x01\x01\x12\x1e\n" +
-	"\bdns_name\x18\r \x01(\tH\fR\adnsName\x88\x01\x01\x12\x19\n" +
-	"\x05owner\x18\x0e \x01(\tH\rR\x05owner\x88\x01\x01\x12\x17\n" +
+	"\bdns_name\x18\r \x01(\tH\fR\adnsName\x88\x01\x01\x12!\n" +
+	"\x05owner\x18\x0e \x01(\tB\x06ڶ\x1a\x02z\x00H\rR\x05owner\x88\x01\x01\x12\x17\n" +
 	"\x04tags\x18\x0f \x01(\tH\x0eR\x04tags\x88\x01\x01\x12\x1f\n" +
 	"\bmetadata\x18\x10 \x01(\tH\x0fR\bmetadata\x88\x01\x01\x12\x17\n" +
 	"\x04note\x18\x11 \x01(\tH\x10R\x04note\x88\x01\x01B\f\n" +
@@ -1716,7 +1717,7 @@ const file_ipam_service_v1_ip_address_proto_rawDesc = "" +
 	"ip_address\x18\x01 \x01(\v2\x1a.ipam.service.v1.IpAddressR\tipAddress\"4\n" +
 	"\x16DeleteIpAddressRequest\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
-	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x02id\"\xd8\x03\n" +
+	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x02id\"\xe0\x03\n" +
 	"\x1aAllocateNextAddressRequest\x12%\n" +
 	"\ttenant_id\x18\x01 \x01(\rB\x03\xe0A\x02H\x00R\btenantId\x88\x01\x01\x12'\n" +
 	"\tsubnet_id\x18\x02 \x01(\tB\n" +
@@ -1724,8 +1725,8 @@ const file_ipam_service_v1_ip_address_proto_rawDesc = "" +
 	"\bhostname\x18\x03 \x01(\tH\x01R\bhostname\x88\x01\x01\x12%\n" +
 	"\vdescription\x18\x04 \x01(\tH\x02R\vdescription\x88\x01\x01\x12 \n" +
 	"\tdevice_id\x18\x05 \x01(\tH\x03R\bdeviceId\x88\x01\x01\x12=\n" +
-	"\x06status\x18\x06 \x01(\x0e2 .ipam.service.v1.IpAddressStatusH\x04R\x06status\x88\x01\x01\x12\x19\n" +
-	"\x05owner\x18\a \x01(\tH\x05R\x05owner\x88\x01\x01\x12%\n" +
+	"\x06status\x18\x06 \x01(\x0e2 .ipam.service.v1.IpAddressStatusH\x04R\x06status\x88\x01\x01\x12!\n" +
+	"\x05owner\x18\a \x01(\tB\x06ڶ\x1a\x02z\x00H\x05R\x05owner\x88\x01\x01\x12%\n" +
 	"\x0eskip_addresses\x18\n" +
 	" \x03(\tR\rskipAddresses\x12\"\n" +
 	"\n" +

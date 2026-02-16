@@ -28,6 +28,7 @@ var (
 	_ timestamppb.Timestamp
 	_ emptypb.Empty
 	_ fieldmaskpb.FieldMask
+	_ redact.FieldRules
 )
 
 // RegisterRedactedIpAddressServiceServer wraps the IpAddressServiceServer with the redacted server and registers the service in GRPC
@@ -181,7 +182,9 @@ func (x *IpAddress) Redact() string {
 
 	// Safe field: DnsName
 
-	// Safe field: Owner
+	// Redacting field: Owner
+	OwnerTmp := ``
+	x.Owner = &OwnerTmp
 
 	// Safe field: LastSeen
 
@@ -237,7 +240,9 @@ func (x *CreateIpAddressRequest) Redact() string {
 
 	// Safe field: DnsName
 
-	// Safe field: Owner
+	// Redacting field: Owner
+	OwnerTmp := ``
+	x.Owner = &OwnerTmp
 
 	// Safe field: Tags
 
@@ -375,7 +380,9 @@ func (x *AllocateNextAddressRequest) Redact() string {
 
 	// Safe field: Status
 
-	// Safe field: Owner
+	// Redacting field: Owner
+	OwnerTmp := ``
+	x.Owner = &OwnerTmp
 
 	// Safe field: SkipAddresses
 

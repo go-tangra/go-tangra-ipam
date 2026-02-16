@@ -103,6 +103,93 @@ menus:
       - platform:admin
       - tenant:manager
 
+dashboard_widgets:
+  - id: ipam.addresses_total
+    name: IP Addresses
+    description: Used and total IP address counts
+    icon: lucide:hash
+    widget_type: stat_card
+    data_source:
+      endpoint: /admin/v1/modules/ipam/v1/stats
+      method: GET
+    data_mapping:
+      value_path: usedAddresses
+      total_path: totalAddresses
+      label: IP Addresses
+    default_size:
+      width: 3
+      height: 1
+    tags: [ipam, overview]
+    authority: [platform:admin, tenant:manager]
+
+  - id: ipam.utilization_gauge
+    name: IP Utilization
+    description: Gauge showing overall IP address utilization
+    icon: lucide:gauge
+    widget_type: gauge
+    data_source:
+      endpoint: /admin/v1/modules/ipam/v1/stats
+      method: GET
+    data_mapping:
+      value_path: overallUtilization
+      label: IP Utilization
+    default_size:
+      width: 4
+      height: 2
+    tags: [ipam, chart]
+    authority: [platform:admin, tenant:manager]
+
+  - id: ipam.subnet_count
+    name: Total Subnets
+    description: Number of managed subnets
+    icon: lucide:git-branch
+    widget_type: stat_card
+    data_source:
+      endpoint: /admin/v1/modules/ipam/v1/stats
+      method: GET
+    data_mapping:
+      value_path: totalSubnets
+      label: Subnets
+    default_size:
+      width: 3
+      height: 1
+    tags: [ipam, overview]
+    authority: [platform:admin, tenant:manager]
+
+  - id: ipam.device_count
+    name: Total Devices
+    description: Number of managed network devices
+    icon: lucide:server
+    widget_type: stat_card
+    data_source:
+      endpoint: /admin/v1/modules/ipam/v1/stats
+      method: GET
+    data_mapping:
+      value_path: totalDevices
+      label: Devices
+    default_size:
+      width: 3
+      height: 1
+    tags: [ipam, overview]
+    authority: [platform:admin, tenant:manager]
+
+  - id: ipam.vlan_count
+    name: Total VLANs
+    description: Number of managed VLANs
+    icon: lucide:layers
+    widget_type: stat_card
+    data_source:
+      endpoint: /admin/v1/modules/ipam/v1/stats
+      method: GET
+    data_mapping:
+      value_path: totalVlans
+      label: VLANs
+    default_size:
+      width: 3
+      height: 1
+    tags: [ipam, overview]
+    authority: [platform:admin, tenant:manager]
+
 permission_groups:
   - name: IPAM
     module: ipam
