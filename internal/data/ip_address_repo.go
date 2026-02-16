@@ -3,8 +3,10 @@ package data
 import (
 	"context"
 	"net"
+	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	entCrud "github.com/tx7do/go-crud/entgo"
@@ -85,8 +87,50 @@ func (r *IpAddressRepo) GetByAddress(ctx context.Context, tenantID uint32, addre
 	return entity, nil
 }
 
-func (r *IpAddressRepo) List(ctx context.Context, tenantID uint32, page, pageSize int, filters map[string]interface{}) ([]*ent.IpAddress, int, error) {
+// ipAddressSortFields maps API field names to Ent By* functions
+var ipAddressSortFields = map[string]func(opts ...sql.OrderTermOption) ipaddress.OrderOption{
+	"address":     ipaddress.ByAddress,
+	"hostname":    ipaddress.ByHostname,
+	"status":      ipaddress.ByStatus,
+	"macAddress":  ipaddress.ByMACAddress,
+	"mac_address": ipaddress.ByMACAddress,
+	"description": ipaddress.ByDescription,
+	"lastSeen":    ipaddress.ByLastSeen,
+	"last_seen":   ipaddress.ByLastSeen,
+	"create_time": ipaddress.ByCreateTime,
+	"update_time": ipaddress.ByUpdateTime,
+}
+
+// ipAddressOrderBy parses orderBy strings (e.g. "-address" for desc, "hostname" for asc)
+// and returns Ent order options. Falls back to ascending by address if none are valid.
+func ipAddressOrderBy(orderBy []string) []ipaddress.OrderOption {
+	var orders []ipaddress.OrderOption
+	for _, o := range orderBy {
+		desc := false
+		field := o
+		if strings.HasPrefix(field, "-") {
+			desc = true
+			field = field[1:]
+		}
+		byFn, ok := ipAddressSortFields[field]
+		if !ok {
+			continue
+		}
+		if desc {
+			orders = append(orders, byFn(sql.OrderDesc()))
+		} else {
+			orders = append(orders, byFn())
+		}
+	}
+	if len(orders) == 0 {
+		orders = append(orders, ipaddress.ByAddress())
+	}
+	return orders
+}
+
+func (r *IpAddressRepo) List(ctx context.Context, tenantID uint32, page, pageSize int, filters map[string]interface{}, orderBy []string) ([]*ent.IpAddress, int, error) {
 	query := r.entClient.Client().IpAddress.Query().Where(ipaddress.TenantID(tenantID))
+	orders := ipAddressOrderBy(orderBy)
 
 	// Check if we should filter by CIDR range (includes orphaned IPs)
 	if cidr, ok := filters["cidr"].(string); ok && cidr != "" {
@@ -95,7 +139,6 @@ func (r *IpAddressRepo) List(ctx context.Context, tenantID uint32, page, pageSiz
 		if err == nil {
 			// Get all IPs and filter in memory by CIDR range
 			// This is necessary because SQL doesn't have built-in CIDR matching
-			// For large datasets, consider using database-specific IP range functions
 			allQuery := r.entClient.Client().IpAddress.Query().Where(ipaddress.TenantID(tenantID))
 
 			if deviceID, ok := filters["device_id"].(string); ok && deviceID != "" {
@@ -105,7 +148,7 @@ func (r *IpAddressRepo) List(ctx context.Context, tenantID uint32, page, pageSiz
 				allQuery = allQuery.Where(ipaddress.Status(status))
 			}
 
-			allEntities, err := allQuery.Order(ent.Asc(ipaddress.FieldAddress)).All(ctx)
+			allEntities, err := allQuery.Order(orders...).All(ctx)
 			if err != nil {
 				r.log.Errorf("list ip addresses failed: %s", err.Error())
 				return nil, 0, ipamV1.ErrorInternalServerError("list ip addresses failed")
@@ -160,7 +203,7 @@ func (r *IpAddressRepo) List(ctx context.Context, tenantID uint32, page, pageSiz
 		query = query.Offset((page - 1) * pageSize).Limit(pageSize)
 	}
 
-	entities, err := query.Order(ent.Asc(ipaddress.FieldAddress)).All(ctx)
+	entities, err := query.Order(orders...).All(ctx)
 	if err != nil {
 		r.log.Errorf("list ip addresses failed: %s", err.Error())
 		return nil, 0, ipamV1.ErrorInternalServerError("list ip addresses failed")

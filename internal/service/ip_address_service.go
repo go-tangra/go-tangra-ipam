@@ -109,7 +109,7 @@ func (s *IpAddressService) ListIpAddresses(ctx context.Context, req *ipamV1.List
 		pageSize = 0
 	}
 
-	entities, total, err := s.ipAddressRepo.List(ctx, req.GetTenantId(), page, pageSize, filters)
+	entities, total, err := s.ipAddressRepo.List(ctx, req.GetTenantId(), page, pageSize, filters, req.GetOrderBy())
 	if err != nil {
 		return nil, err
 	}
