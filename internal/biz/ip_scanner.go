@@ -4,26 +4,27 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"math/rand/v2"
 	"net"
-	"strconv"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
 )
 
 const (
 	// MaxScanAddresses is the maximum number of addresses that can be scanned
 	MaxScanAddresses = 1024
 
-	// DefaultTimeout is the default TCP probe timeout
+	// DefaultTimeout is the default ICMP ping timeout
 	DefaultTimeout = 1000 * time.Millisecond
 
 	// DefaultConcurrency is the default number of parallel probes
 	DefaultConcurrency = 50
-
-	// DefaultPorts are the default ports to probe
-	DefaultPorts = "22,80,443,3389,445"
 )
 
 // ScanConfig holds configuration for a scan
@@ -31,7 +32,7 @@ type ScanConfig struct {
 	TimeoutMs            int32
 	Concurrency          int32
 	SkipReverseDNS       bool
-	TCPProbePorts        string
+	TCPProbePorts        string   // Deprecated: kept for backward compatibility, ignored
 	DNSServers           []string // Custom DNS servers for reverse lookup
 	DNSTimeoutMs         int32    // Timeout for DNS queries
 	UseSystemDNSFallback bool     // Whether to use system DNS as fallback
@@ -42,7 +43,7 @@ type ScanResult struct {
 	Address  string
 	Alive    bool
 	Hostname string
-	Ports    []int // Ports that responded
+	Ports    []int // Deprecated: kept for backward compatibility, always empty
 }
 
 // ScanProgress represents the current progress of a scan
@@ -58,43 +59,16 @@ type ScanProgress struct {
 // ProgressCallback is called during scanning to report progress
 type ProgressCallback func(progress ScanProgress)
 
-// Scanner performs network scanning
+// Scanner performs network scanning using ICMP ping
 type Scanner struct {
 	config ScanConfig
-	ports  []int
 }
 
 // NewScanner creates a new Scanner with the given config
 func NewScanner(config ScanConfig) *Scanner {
-	s := &Scanner{
+	return &Scanner{
 		config: config,
 	}
-
-	// Parse ports
-	portsStr := config.TCPProbePorts
-	if portsStr == "" {
-		portsStr = DefaultPorts
-	}
-	s.ports = parsePorts(portsStr)
-
-	return s
-}
-
-// parsePorts parses a comma-separated port string
-func parsePorts(portsStr string) []int {
-	parts := strings.Split(portsStr, ",")
-	ports := make([]int, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if port, err := strconv.Atoi(p); err == nil && port > 0 && port < 65536 {
-			ports = append(ports, port)
-		}
-	}
-	if len(ports) == 0 {
-		// Default ports
-		ports = []int{22, 80, 443, 3389, 445}
-	}
-	return ports
 }
 
 // GenerateIPs generates all host IPs in a CIDR range
@@ -273,30 +247,15 @@ func (s *Scanner) ScanSubnet(ctx context.Context, cidr string, progressCb Progre
 	return results, nil
 }
 
-// scanIP scans a single IP address
+// scanIP scans a single IP address using ICMP ping
 func (s *Scanner) scanIP(ctx context.Context, ip net.IP, timeout time.Duration) ScanResult {
 	address := ip.String()
 	result := ScanResult{
 		Address: address,
 		Alive:   false,
-		Ports:   []int{},
 	}
 
-	// Probe each port
-	for _, port := range s.ports {
-		select {
-		case <-ctx.Done():
-			return result
-		default:
-		}
-
-		if s.probePort(ctx, address, port, timeout) {
-			result.Alive = true
-			result.Ports = append(result.Ports, port)
-			// Once we find one open port, we know it's alive
-			// Continue to find other open ports for information
-		}
-	}
+	result.Alive = pingICMP(ctx, address, timeout)
 
 	// If alive and not skipping DNS, do reverse lookup
 	if result.Alive && !s.config.SkipReverseDNS {
@@ -306,22 +265,92 @@ func (s *Scanner) scanIP(ctx context.Context, ip net.IP, timeout time.Duration) 
 	return result
 }
 
-// probePort attempts to connect to a specific port
-func (s *Scanner) probePort(ctx context.Context, address string, port int, timeout time.Duration) bool {
-	target := fmt.Sprintf("%s:%d", address, port)
+// pingICMP sends an ICMP echo request and waits for a reply.
+// Uses unprivileged UDP datagram sockets (no root required on Linux).
+func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
+	// Use "udp4" for unprivileged ICMP (SOCK_DGRAM)
+	conn, err := icmp.ListenPacket("udp4", "")
+	if err != nil {
+		// Fallback: if unprivileged ICMP not available, try privileged
+		conn, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+		if err != nil {
+			return false
+		}
+	}
+	defer conn.Close()
 
-	// Create a context with timeout
-	dialCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	// Use DialContext for cancellation support
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(dialCtx, "tcp", target)
+	dst, err := net.ResolveIPAddr("ip4", address)
 	if err != nil {
 		return false
 	}
-	conn.Close()
-	return true
+
+	// Build ICMP echo request
+	id := os.Getpid() & 0xffff
+	seq := rand.IntN(0xffff)
+	msg := icmp.Message{
+		Type: ipv4.ICMPTypeEcho,
+		Code: 0,
+		Body: &icmp.Echo{
+			ID:   id,
+			Seq:  seq,
+			Data: []byte("ping"),
+		},
+	}
+
+	msgBytes, err := msg.Marshal(nil)
+	if err != nil {
+		return false
+	}
+
+	// Set deadline
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(timeout)
+	}
+	if dl := time.Now().Add(timeout); dl.Before(deadline) {
+		deadline = dl
+	}
+	_ = conn.SetDeadline(deadline)
+
+	// Send
+	var dstAddr net.Addr
+	if conn.LocalAddr().Network() == "udp4" {
+		dstAddr = &net.UDPAddr{IP: dst.IP}
+	} else {
+		dstAddr = dst
+	}
+
+	if _, err := conn.WriteTo(msgBytes, dstAddr); err != nil {
+		return false
+	}
+
+	// Read reply
+	buf := make([]byte, 1500)
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+		}
+
+		n, _, err := conn.ReadFrom(buf)
+		if err != nil {
+			return false
+		}
+
+		reply, err := icmp.ParseMessage(1, buf[:n]) // proto 1 = ICMPv4
+		if err != nil {
+			continue
+		}
+
+		if reply.Type == ipv4.ICMPTypeEchoReply {
+			if echo, ok := reply.Body.(*icmp.Echo); ok {
+				if echo.ID == id && echo.Seq == seq {
+					return true
+				}
+			}
+		}
+	}
 }
 
 // reverseDNS performs a reverse DNS lookup using custom DNS servers if configured
@@ -386,26 +415,9 @@ func (s *Scanner) reverseDNSWithServers(address string, servers []string, timeou
 	return resolver.LookupAddr(ctx, address)
 }
 
-// QuickScan performs a quick scan to just check if an IP is alive
+// QuickScan performs a quick scan to just check if an IP is alive using ICMP ping
 func QuickScan(ctx context.Context, address string, timeout time.Duration) bool {
-	ports := []int{22, 80, 443, 3389, 445}
-
-	for _, port := range ports {
-		select {
-		case <-ctx.Done():
-			return false
-		default:
-		}
-
-		target := net.JoinHostPort(address, strconv.Itoa(port))
-		conn, err := net.DialTimeout("tcp", target, timeout)
-		if err == nil {
-			conn.Close()
-			return true
-		}
-	}
-
-	return false
+	return pingICMP(ctx, address, timeout)
 }
 
 // GetHostAddressCount returns the number of host addresses in a CIDR
