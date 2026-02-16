@@ -266,18 +266,11 @@ func (s *Scanner) scanIP(ctx context.Context, ip net.IP, timeout time.Duration) 
 }
 
 // pingICMP sends an ICMP echo request and waits for a reply.
-// Tries unprivileged UDP datagram sockets first, falls back to raw ICMP.
+// Requires CAP_NET_RAW capability (set via cap_add in docker-compose).
 func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
-	// Try unprivileged ICMP first (udp4 = SOCK_DGRAM, no root needed)
-	conn, err := icmp.ListenPacket("udp4", "")
-	privileged := false
+	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
-		// Fallback to privileged raw ICMP (requires CAP_NET_RAW)
-		conn, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-		if err != nil {
-			return false
-		}
-		privileged = true
+		return false
 	}
 	defer conn.Close()
 
@@ -314,19 +307,11 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 	}
 	_ = conn.SetDeadline(deadline)
 
-	// Send — udp4 needs UDPAddr, raw needs IPAddr
-	var dstAddr net.Addr
-	if privileged {
-		dstAddr = dst
-	} else {
-		dstAddr = &net.UDPAddr{IP: dst.IP}
-	}
-
-	if _, err := conn.WriteTo(msgBytes, dstAddr); err != nil {
+	if _, err := conn.WriteTo(msgBytes, dst); err != nil {
 		return false
 	}
 
-	// Read reply
+	// Read replies until we find ours or timeout
 	buf := make([]byte, 1500)
 	for {
 		select {
@@ -340,19 +325,12 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 			return false
 		}
 
-		reply, err := icmp.ParseMessage(1, buf[:n]) // proto 1 = ICMPv4
+		reply, err := icmp.ParseMessage(1, buf[:n])
 		if err != nil {
 			continue
 		}
 
 		if reply.Type == ipv4.ICMPTypeEchoReply {
-			// In unprivileged mode (udp4), the kernel mangles the echo ID
-			// to an internal port number and demuxes replies per-socket,
-			// so any EchoReply on this socket is ours.
-			if !privileged {
-				return true
-			}
-			// In privileged mode, verify ID/Seq since all replies come to one socket
 			if echo, ok := reply.Body.(*icmp.Echo); ok {
 				if echo.ID == id && echo.Seq == seq {
 					return true
