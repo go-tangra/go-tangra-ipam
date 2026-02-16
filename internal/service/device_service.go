@@ -123,6 +123,9 @@ func (s *DeviceService) ListDevices(ctx context.Context, req *ipamV1.ListDevices
 	if req.LocationId != nil {
 		filters["location_id"] = *req.LocationId
 	}
+	if req.Query != nil {
+		filters["query"] = *req.Query
+	}
 
 	page := int(req.GetPage())
 	pageSize := int(req.GetPageSize())

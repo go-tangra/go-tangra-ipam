@@ -75,6 +75,13 @@ func (r *DeviceRepo) List(ctx context.Context, tenantID uint32, page, pageSize i
 	if locationID, ok := filters["location_id"].(string); ok && locationID != "" {
 		query = query.Where(device.LocationID(locationID))
 	}
+	if queryStr, ok := filters["query"].(string); ok && queryStr != "" {
+		query = query.Where(device.Or(
+			device.NameContainsFold(queryStr),
+			device.PrimaryIPContainsFold(queryStr),
+			device.ManagementIPContainsFold(queryStr),
+		))
+	}
 
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
