@@ -266,16 +266,18 @@ func (s *Scanner) scanIP(ctx context.Context, ip net.IP, timeout time.Duration) 
 }
 
 // pingICMP sends an ICMP echo request and waits for a reply.
-// Uses unprivileged UDP datagram sockets (no root required on Linux).
+// Tries unprivileged UDP datagram sockets first, falls back to raw ICMP.
 func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
-	// Use "udp4" for unprivileged ICMP (SOCK_DGRAM)
+	// Try unprivileged ICMP first (udp4 = SOCK_DGRAM, no root needed)
 	conn, err := icmp.ListenPacket("udp4", "")
+	privileged := false
 	if err != nil {
-		// Fallback: if unprivileged ICMP not available, try privileged
+		// Fallback to privileged raw ICMP (requires CAP_NET_RAW)
 		conn, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 		if err != nil {
 			return false
 		}
+		privileged = true
 	}
 	defer conn.Close()
 
@@ -312,12 +314,12 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 	}
 	_ = conn.SetDeadline(deadline)
 
-	// Send
+	// Send — udp4 needs UDPAddr, raw needs IPAddr
 	var dstAddr net.Addr
-	if conn.LocalAddr().Network() == "udp4" {
-		dstAddr = &net.UDPAddr{IP: dst.IP}
-	} else {
+	if privileged {
 		dstAddr = dst
+	} else {
+		dstAddr = &net.UDPAddr{IP: dst.IP}
 	}
 
 	if _, err := conn.WriteTo(msgBytes, dstAddr); err != nil {
@@ -344,6 +346,13 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 		}
 
 		if reply.Type == ipv4.ICMPTypeEchoReply {
+			// In unprivileged mode (udp4), the kernel mangles the echo ID
+			// to an internal port number and demuxes replies per-socket,
+			// so any EchoReply on this socket is ours.
+			if !privileged {
+				return true
+			}
+			// In privileged mode, verify ID/Seq since all replies come to one socket
 			if echo, ok := reply.Body.(*icmp.Echo); ok {
 				if echo.ID == id && echo.Seq == seq {
 					return true
