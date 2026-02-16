@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"math/rand/v2"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -149,9 +147,8 @@ func ValidateCIDRForScanning(cidr string) error {
 	return nil
 }
 
-// ScanSubnet scans all IPs in the given CIDR range
+// ScanSubnet scans all IPs in the given CIDR range using a shared ICMP connection.
 func (s *Scanner) ScanSubnet(ctx context.Context, cidr string, progressCb ProgressCallback) ([]ScanResult, error) {
-	// Generate IPs
 	ips, err := GenerateIPs(cidr)
 	if err != nil {
 		return nil, err
@@ -162,7 +159,11 @@ func (s *Scanner) ScanSubnet(ctx context.Context, cidr string, progressCb Progre
 		return []ScanResult{}, nil
 	}
 
-	// Configure concurrency
+	timeout := time.Duration(s.config.TimeoutMs) * time.Millisecond
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+
 	concurrency := int(s.config.Concurrency)
 	if concurrency <= 0 {
 		concurrency = DefaultConcurrency
@@ -171,28 +172,94 @@ func (s *Scanner) ScanSubnet(ctx context.Context, cidr string, progressCb Progre
 		concurrency = len(ips)
 	}
 
-	// Configure timeout
-	timeout := time.Duration(s.config.TimeoutMs) * time.Millisecond
-	if timeout <= 0 {
-		timeout = DefaultTimeout
+	// Open a single shared ICMP connection
+	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open ICMP socket: %w", err)
 	}
+	defer conn.Close()
+
+	// Track which IPs are alive — receiver writes, main reads after done
+	alive := make(map[string]bool, len(ips))
+	aliveMu := sync.Mutex{}
+
+	// Set up waiters: each sender registers a channel keyed by target IP
+	waiters := make(map[string]chan struct{}, len(ips))
+	waitersMu := sync.RWMutex{}
+
+	// Receiver goroutine: reads all ICMP replies and notifies waiters
+	receiverCtx, cancelReceiver := context.WithCancel(ctx)
+	defer cancelReceiver()
+
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			select {
+			case <-receiverCtx.Done():
+				return
+			default:
+			}
+
+			_ = conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			n, peer, err := conn.ReadFrom(buf)
+			if err != nil {
+				continue
+			}
+
+			reply, err := icmp.ParseMessage(1, buf[:n])
+			if err != nil {
+				continue
+			}
+
+			if reply.Type != ipv4.ICMPTypeEchoReply {
+				continue
+			}
+
+			// Extract source IP from peer address
+			var srcIP string
+			switch addr := peer.(type) {
+			case *net.IPAddr:
+				srcIP = addr.IP.String()
+			case *net.UDPAddr:
+				srcIP = addr.IP.String()
+			default:
+				continue
+			}
+
+			aliveMu.Lock()
+			alive[srcIP] = true
+			aliveMu.Unlock()
+
+			// Notify waiter if one exists
+			waitersMu.RLock()
+			if ch, ok := waiters[srcIP]; ok {
+				select {
+				case ch <- struct{}{}:
+				default:
+				}
+			}
+			waitersMu.RUnlock()
+		}
+	}()
+
+	// Progress tracking
+	var scannedCount int64
+	var aliveCounter int64
 
 	// Results collection
 	results := make([]ScanResult, 0, len(ips))
 	resultsMu := sync.Mutex{}
 
-	// Progress tracking
-	var scannedCount int64
-	var aliveCount int64
+	// Build ICMP echo template
+	echoID := 1
 
-	// Work queue
+	// Worker pool: sends pings and waits for reply or timeout
 	ipChan := make(chan net.IP, len(ips))
 	for _, ip := range ips {
 		ipChan <- ip
 	}
 	close(ipChan)
 
-	// Worker pool
 	var wg sync.WaitGroup
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
@@ -207,27 +274,70 @@ func (s *Scanner) ScanSubnet(ctx context.Context, cidr string, progressCb Progre
 						return
 					}
 
-					result := s.scanIP(ctx, ip, timeout)
+					address := ip.String()
 
-					// Update counters
-					atomic.AddInt64(&scannedCount, 1)
-					if result.Alive {
-						atomic.AddInt64(&aliveCount, 1)
+					// Register waiter
+					ch := make(chan struct{}, 1)
+					waitersMu.Lock()
+					waiters[address] = ch
+					waitersMu.Unlock()
+
+					// Send ICMP echo
+					msg := icmp.Message{
+						Type: ipv4.ICMPTypeEcho,
+						Code: 0,
+						Body: &icmp.Echo{
+							ID:   echoID,
+							Seq:  0,
+							Data: []byte("ping"),
+						},
+					}
+					msgBytes, _ := msg.Marshal(nil)
+					dst := &net.IPAddr{IP: ip}
+					_, _ = conn.WriteTo(msgBytes, dst)
+
+					// Wait for reply or timeout
+					timer := time.NewTimer(timeout)
+					isAlive := false
+					select {
+					case <-ch:
+						isAlive = true
+					case <-timer.C:
+					case <-ctx.Done():
+					}
+					timer.Stop()
+
+					// Clean up waiter
+					waitersMu.Lock()
+					delete(waiters, address)
+					waitersMu.Unlock()
+
+					// Build result
+					result := ScanResult{
+						Address: address,
+						Alive:   isAlive,
 					}
 
-					// Collect result
+					if isAlive && !s.config.SkipReverseDNS {
+						result.Hostname = s.reverseDNS(address)
+					}
+
+					atomic.AddInt64(&scannedCount, 1)
+					if isAlive {
+						atomic.AddInt64(&aliveCounter, 1)
+					}
+
 					resultsMu.Lock()
 					results = append(results, result)
 					resultsMu.Unlock()
 
-					// Report progress
 					if progressCb != nil {
 						current := atomic.LoadInt64(&scannedCount)
 						progress := int32(float64(current) / float64(totalAddresses) * 100)
 						progressCb(ScanProgress{
 							TotalAddresses: totalAddresses,
 							ScannedCount:   current,
-							AliveCount:     atomic.LoadInt64(&aliveCount),
+							AliveCount:     atomic.LoadInt64(&aliveCounter),
 							Progress:       progress,
 						})
 					}
@@ -236,10 +346,9 @@ func (s *Scanner) ScanSubnet(ctx context.Context, cidr string, progressCb Progre
 		}()
 	}
 
-	// Wait for completion
 	wg.Wait()
+	cancelReceiver()
 
-	// Check if cancelled
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -247,26 +356,8 @@ func (s *Scanner) ScanSubnet(ctx context.Context, cidr string, progressCb Progre
 	return results, nil
 }
 
-// scanIP scans a single IP address using ICMP ping
-func (s *Scanner) scanIP(ctx context.Context, ip net.IP, timeout time.Duration) ScanResult {
-	address := ip.String()
-	result := ScanResult{
-		Address: address,
-		Alive:   false,
-	}
-
-	result.Alive = pingICMP(ctx, address, timeout)
-
-	// If alive and not skipping DNS, do reverse lookup
-	if result.Alive && !s.config.SkipReverseDNS {
-		result.Hostname = s.reverseDNS(address)
-	}
-
-	return result
-}
-
-// pingICMP sends an ICMP echo request and waits for a reply.
-// Requires CAP_NET_RAW capability (set via cap_add in docker-compose).
+// pingICMP sends a single ICMP echo request and waits for a reply.
+// Requires CAP_NET_RAW capability (set via setcap + cap_add in docker-compose).
 func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
@@ -279,15 +370,12 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 		return false
 	}
 
-	// Build ICMP echo request
-	id := os.Getpid() & 0xffff
-	seq := rand.IntN(0xffff)
 	msg := icmp.Message{
 		Type: ipv4.ICMPTypeEcho,
 		Code: 0,
 		Body: &icmp.Echo{
-			ID:   id,
-			Seq:  seq,
+			ID:   1,
+			Seq:  0,
 			Data: []byte("ping"),
 		},
 	}
@@ -297,13 +385,9 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 		return false
 	}
 
-	// Set deadline
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(timeout)
-	}
-	if dl := time.Now().Add(timeout); dl.Before(deadline) {
-		deadline = dl
+	deadline := time.Now().Add(timeout)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
 	}
 	_ = conn.SetDeadline(deadline)
 
@@ -311,7 +395,6 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 		return false
 	}
 
-	// Read replies until we find ours or timeout
 	buf := make([]byte, 1500)
 	for {
 		select {
@@ -320,9 +403,21 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 		default:
 		}
 
-		n, _, err := conn.ReadFrom(buf)
+		n, peer, err := conn.ReadFrom(buf)
 		if err != nil {
 			return false
+		}
+
+		// Check source IP matches target
+		var srcIP string
+		switch addr := peer.(type) {
+		case *net.IPAddr:
+			srcIP = addr.IP.String()
+		case *net.UDPAddr:
+			srcIP = addr.IP.String()
+		}
+		if srcIP != address {
+			continue
 		}
 
 		reply, err := icmp.ParseMessage(1, buf[:n])
@@ -331,11 +426,7 @@ func pingICMP(ctx context.Context, address string, timeout time.Duration) bool {
 		}
 
 		if reply.Type == ipv4.ICMPTypeEchoReply {
-			if echo, ok := reply.Body.(*icmp.Echo); ok {
-				if echo.ID == id && echo.Seq == seq {
-					return true
-				}
-			}
+			return true
 		}
 	}
 }
