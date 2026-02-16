@@ -46,7 +46,7 @@ FROM alpine:3.20
 ARG APP_VERSION=1.0.0
 
 # Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata libcap
 
 # Set timezone
 ENV TZ=UTC
@@ -59,6 +59,9 @@ COPY --from=builder /src/bin/ipam-server /app/bin/ipam-server
 
 # Copy configuration files
 COPY --from=builder /src/configs/ /app/configs/
+
+# Grant NET_RAW capability for ICMP ping scanning
+RUN setcap cap_net_raw+ep /app/bin/ipam-server
 
 # Create non-root user
 RUN addgroup -g 1000 ipam && \
