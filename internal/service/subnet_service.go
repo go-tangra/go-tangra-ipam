@@ -54,6 +54,15 @@ func (s *SubnetService) CreateSubnet(ctx context.Context, req *ipamV1.CreateSubn
 		opts = append(opts, func(c *ent.SubnetCreate) { c.SetLocationID(*req.LocationId) })
 	}
 
+	// Check for CIDR overlap with existing subnets
+	overlaps, err := s.subnetRepo.CheckCIDROverlap(ctx, req.GetTenantId(), req.GetCidr(), "")
+	if err != nil {
+		return nil, err
+	}
+	if overlaps {
+		return nil, ipamV1.ErrorSubnetCidrOverlap("subnet CIDR %s overlaps with an existing subnet", req.GetCidr())
+	}
+
 	entity, err := s.subnetRepo.Create(ctx, req.GetTenantId(), req.GetName(), req.GetCidr(), opts...)
 	if err != nil {
 		return nil, err
