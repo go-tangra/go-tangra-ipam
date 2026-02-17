@@ -288,6 +288,27 @@ message PingAddressResponse {
   optional google.protobuf.Timestamp checked_at = 3 [json_name = "checkedAt"];
 }
 
+// SuggestAvailableAddressesRequest requests available IP address suggestions for a subnet
+message SuggestAvailableAddressesRequest {
+  optional uint32 tenant_id = 1 [json_name = "tenantId", (google.api.field_behavior) = REQUIRED];
+  string subnet_id = 2 [json_name = "subnetId", (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+  optional int32 count = 3 [json_name = "count"];
+  repeated string skip_addresses = 4 [json_name = "skipAddresses"];
+}
+
+// SuggestedAddress represents a single suggested available IP address
+message SuggestedAddress {
+  string address = 1 [json_name = "address"];
+  bool ping_free = 2 [json_name = "pingFree"];
+  bool port_scan_free = 3 [json_name = "portScanFree"];
+}
+
+// SuggestAvailableAddressesResponse returns suggested available addresses
+message SuggestAvailableAddressesResponse {
+  repeated SuggestedAddress addresses = 1 [json_name = "addresses"];
+  optional int64 total_unallocated = 2 [json_name = "totalUnallocated"];
+}
+
 // IpAddressService manages IP addresses
 service IpAddressService {
   // Create a new IP address
@@ -354,6 +375,13 @@ service IpAddressService {
   rpc PingAddress(PingAddressRequest) returns (PingAddressResponse) {
     option (google.api.http) = {
       post: "/v1/ip-addresses/{id}/ping"
+    };
+  }
+
+  // Suggest available IP addresses in a subnet (verified via ICMP ping + TCP port scan)
+  rpc SuggestAvailableAddresses(SuggestAvailableAddressesRequest) returns (SuggestAvailableAddressesResponse) {
+    option (google.api.http) = {
+      get: "/v1/ip-addresses/suggest"
     };
   }
 }

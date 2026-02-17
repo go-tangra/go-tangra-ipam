@@ -291,6 +291,24 @@ func (r *IpAddressRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// ListAllocatedAddressesBySubnet returns all address strings allocated in a subnet (optimized for suggest)
+func (r *IpAddressRepo) ListAllocatedAddressesBySubnet(ctx context.Context, tenantID uint32, subnetID string) ([]string, error) {
+	entities, err := r.entClient.Client().IpAddress.Query().
+		Where(ipaddress.TenantID(tenantID), ipaddress.SubnetID(subnetID)).
+		Select(ipaddress.FieldAddress).
+		All(ctx)
+	if err != nil {
+		r.log.Errorf("list allocated addresses by subnet failed: %s", err.Error())
+		return nil, ipamV1.ErrorInternalServerError("list allocated addresses failed")
+	}
+
+	addresses := make([]string, len(entities))
+	for i, e := range entities {
+		addresses[i] = e.Address
+	}
+	return addresses, nil
+}
+
 // AllocateNext finds and allocates the next available IP in a subnet
 func (r *IpAddressRepo) AllocateNext(ctx context.Context, tenantID uint32, subnetID string) (string, error) {
 	// This is a simplified implementation - a real one would need to:

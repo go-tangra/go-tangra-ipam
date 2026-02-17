@@ -498,6 +498,27 @@ func QuickScan(ctx context.Context, address string, timeout time.Duration) bool 
 	return pingICMP(ctx, address, timeout)
 }
 
+// CommonPorts are commonly used TCP ports to check for host presence
+var CommonPorts = []int{22, 80, 443, 3389, 8080}
+
+// QuickPortScan checks if any common TCP ports are open on the given address.
+// Returns true if at least one port is open (address in use).
+func QuickPortScan(ctx context.Context, address string, timeout time.Duration) bool {
+	for _, port := range CommonPorts {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+		}
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", address, port), timeout)
+		if err == nil {
+			conn.Close()
+			return true
+		}
+	}
+	return false
+}
+
 // GetHostAddressCount returns the number of host addresses in a CIDR
 func GetHostAddressCount(cidr string) (int64, error) {
 	_, ipNet, err := net.ParseCIDR(cidr)

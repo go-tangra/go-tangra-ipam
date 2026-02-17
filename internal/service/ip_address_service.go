@@ -2,12 +2,15 @@ package service
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/go-tangra/go-tangra-ipam/internal/biz"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
@@ -200,6 +203,152 @@ func (s *IpAddressService) PingAddress(ctx context.Context, req *ipamV1.PingAddr
 	// TODO: Implement ping functionality
 	return &ipamV1.PingAddressResponse{
 		Reachable: false,
+	}, nil
+}
+
+func (s *IpAddressService) SuggestAvailableAddresses(ctx context.Context, req *ipamV1.SuggestAvailableAddressesRequest) (*ipamV1.SuggestAvailableAddressesResponse, error) {
+	// 1. Get subnet to extract CIDR
+	subnet, err := s.subnetRepo.GetByID(ctx, req.GetSubnetId())
+	if err != nil {
+		return nil, err
+	}
+	if subnet == nil {
+		return nil, ipamV1.ErrorSubnetNotFound("subnet not found")
+	}
+
+	// 2. Validate CIDR is scannable
+	if err := biz.ValidateCIDRForScanning(subnet.Cidr); err != nil {
+		return nil, ipamV1.ErrorBadRequest("subnet too large or invalid for scanning: %v", err)
+	}
+
+	// 3. Generate all host IPs
+	allIPs, err := biz.GenerateIPs(subnet.Cidr)
+	if err != nil {
+		return nil, ipamV1.ErrorInternalServerError("failed to generate IPs: %v", err)
+	}
+
+	// 4. Get allocated addresses from DB
+	allocated, err := s.ipAddressRepo.ListAllocatedAddressesBySubnet(ctx, req.GetTenantId(), req.GetSubnetId())
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. Build exclusion set (allocated + skip_addresses + gateway)
+	excluded := make(map[string]bool, len(allocated)+len(req.GetSkipAddresses())+1)
+	for _, addr := range allocated {
+		excluded[addr] = true
+	}
+	for _, addr := range req.GetSkipAddresses() {
+		excluded[addr] = true
+	}
+	if subnet.Gateway != "" {
+		excluded[subnet.Gateway] = true
+	}
+
+	// 6. Collect unallocated candidates
+	var candidates []string
+	for _, ip := range allIPs {
+		if !excluded[ip.String()] {
+			candidates = append(candidates, ip.String())
+		}
+	}
+
+	totalUnallocated := int64(len(candidates))
+
+	// Determine how many suggestions to return
+	count := int(req.GetCount())
+	if count <= 0 {
+		count = 5
+	}
+
+	// Oversample 3x to account for addresses that may fail verification
+	oversample := count * 3
+	if oversample > len(candidates) {
+		oversample = len(candidates)
+	}
+	candidates = candidates[:oversample]
+
+	if len(candidates) == 0 {
+		return &ipamV1.SuggestAvailableAddressesResponse{
+			Addresses:        []*ipamV1.SuggestedAddress{},
+			TotalUnallocated: &totalUnallocated,
+		}, nil
+	}
+
+	// 7. Ping + port scan in parallel
+	type scanResult struct {
+		address      string
+		pingFree     bool
+		portScanFree bool
+	}
+
+	results := make([]scanResult, len(candidates))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 10) // limit concurrency to 10
+
+	scanCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	for i, addr := range candidates {
+		wg.Add(1)
+		go func(idx int, address string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			pingFree := !biz.QuickScan(scanCtx, address, 1500*time.Millisecond)
+			portScanFree := !biz.QuickPortScan(scanCtx, address, 500*time.Millisecond)
+
+			results[idx] = scanResult{
+				address:      address,
+				pingFree:     pingFree,
+				portScanFree: portScanFree,
+			}
+		}(i, addr)
+	}
+
+	wg.Wait()
+
+	// 8. Return first N confirmed-free addresses (no ping reply AND no open ports)
+	var suggestions []*ipamV1.SuggestedAddress
+	for _, r := range results {
+		if r.address == "" {
+			continue
+		}
+		if r.pingFree && r.portScanFree {
+			suggestions = append(suggestions, &ipamV1.SuggestedAddress{
+				Address:      r.address,
+				PingFree:     r.pingFree,
+				PortScanFree: r.portScanFree,
+			})
+			if len(suggestions) >= count {
+				break
+			}
+		}
+	}
+
+	// If not enough fully-free addresses, include partially-free ones
+	if len(suggestions) < count {
+		for _, r := range results {
+			if r.address == "" {
+				continue
+			}
+			if !r.pingFree || !r.portScanFree {
+				suggestions = append(suggestions, &ipamV1.SuggestedAddress{
+					Address:      r.address,
+					PingFree:     r.pingFree,
+					PortScanFree: r.portScanFree,
+				})
+				if len(suggestions) >= count {
+					break
+				}
+			}
+		}
+	}
+
+	return &ipamV1.SuggestAvailableAddressesResponse{
+		Addresses:        suggestions,
+		TotalUnallocated: &totalUnallocated,
 	}, nil
 }
 
