@@ -162,6 +162,13 @@ func (r *IpAddressRepo) List(ctx context.Context, tenantID uint32, page, pageSiz
 			if status, ok := filters["status"].(int32); ok && status > 0 {
 				allQuery = allQuery.Where(ipaddress.Status(status))
 			}
+			if queryStr, ok := filters["query"].(string); ok && queryStr != "" {
+				allQuery = allQuery.Where(ipaddress.Or(
+					ipaddress.AddressContainsFold(queryStr),
+					ipaddress.HostnameContainsFold(queryStr),
+					ipaddress.DescriptionContainsFold(queryStr),
+				))
+			}
 
 			allEntities, err := allQuery.Order(orders...).All(ctx)
 			if err != nil {
@@ -206,6 +213,13 @@ func (r *IpAddressRepo) List(ctx context.Context, tenantID uint32, page, pageSiz
 	}
 	if status, ok := filters["status"].(int32); ok && status > 0 {
 		query = query.Where(ipaddress.Status(status))
+	}
+	if queryStr, ok := filters["query"].(string); ok && queryStr != "" {
+		query = query.Where(ipaddress.Or(
+			ipaddress.AddressContainsFold(queryStr),
+			ipaddress.HostnameContainsFold(queryStr),
+			ipaddress.DescriptionContainsFold(queryStr),
+		))
 	}
 
 	total, err := query.Clone().Count(ctx)

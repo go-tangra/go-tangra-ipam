@@ -101,6 +101,9 @@ func (s *IpAddressService) ListIpAddresses(ctx context.Context, req *ipamV1.List
 	if req.Status != nil {
 		filters["status"] = int32(*req.Status)
 	}
+	if req.Query != nil {
+		filters["query"] = *req.Query
+	}
 
 	page := int(req.GetPage())
 	pageSize := int(req.GetPageSize())
