@@ -2,8 +2,10 @@ package data
 
 import (
 	"context"
+	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	entCrud "github.com/tx7do/go-crud/entgo"
@@ -63,7 +65,46 @@ func (r *DeviceRepo) GetByID(ctx context.Context, id string) (*ent.Device, error
 	return entity, nil
 }
 
-func (r *DeviceRepo) List(ctx context.Context, tenantID uint32, page, pageSize int, filters map[string]interface{}) ([]*ent.Device, int, error) {
+var deviceSortFields = map[string]func(opts ...sql.OrderTermOption) device.OrderOption{
+	"name":          device.ByName,
+	"deviceType":    device.ByDeviceType,
+	"status":        device.ByStatus,
+	"primaryIp":     device.ByPrimaryIP,
+	"managementIp":  device.ByManagementIP,
+	"osVersion":     device.ByOsVersion,
+	"manufacturer":  device.ByManufacturer,
+	"model":         device.ByModel,
+	"notes":         device.ByNotes,
+	"create_time":   device.ByCreateTime,
+	"update_time":   device.ByUpdateTime,
+}
+
+func deviceOrderBy(orderBy []string) []device.OrderOption {
+	var orders []device.OrderOption
+	for _, o := range orderBy {
+		desc := false
+		field := o
+		if strings.HasPrefix(field, "-") {
+			desc = true
+			field = field[1:]
+		}
+		byFn, ok := deviceSortFields[field]
+		if !ok {
+			continue
+		}
+		if desc {
+			orders = append(orders, byFn(sql.OrderDesc()))
+		} else {
+			orders = append(orders, byFn())
+		}
+	}
+	if len(orders) == 0 {
+		orders = append(orders, device.ByName())
+	}
+	return orders
+}
+
+func (r *DeviceRepo) List(ctx context.Context, tenantID uint32, page, pageSize int, filters map[string]interface{}, orderBy []string) ([]*ent.Device, int, error) {
 	query := r.entClient.Client().Device.Query().Where(device.TenantID(tenantID))
 
 	if deviceType, ok := filters["device_type"].(int32); ok && deviceType > 0 {
@@ -93,7 +134,8 @@ func (r *DeviceRepo) List(ctx context.Context, tenantID uint32, page, pageSize i
 		query = query.Offset((page - 1) * pageSize).Limit(pageSize)
 	}
 
-	entities, err := query.Order(ent.Asc(device.FieldName)).All(ctx)
+	orders := deviceOrderBy(orderBy)
+	entities, err := query.Order(orders...).All(ctx)
 	if err != nil {
 		r.log.Errorf("list devices failed: %s", err.Error())
 		return nil, 0, ipamV1.ErrorInternalServerError("list devices failed")

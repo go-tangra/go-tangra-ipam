@@ -134,7 +134,7 @@ func (s *DeviceService) ListDevices(ctx context.Context, req *ipamV1.ListDevices
 		pageSize = 0
 	}
 
-	entities, total, err := s.deviceRepo.List(ctx, req.GetTenantId(), page, pageSize, filters)
+	entities, total, err := s.deviceRepo.List(ctx, req.GetTenantId(), page, pageSize, filters, req.GetOrderBy())
 	if err != nil {
 		return nil, err
 	}
