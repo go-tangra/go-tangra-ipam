@@ -60,6 +60,7 @@ func NewGRPCServer(
 	ipScanSvc *service.IpScanService,
 	ipGroupSvc *service.IpGroupService,
 	hostGroupSvc *service.HostGroupService,
+	backupSvc *service.BackupService,
 ) *grpc.Server {
 	cfg := ctx.GetConfig()
 	logger := ctx.GetLogger()
@@ -120,6 +121,8 @@ func NewGRPCServer(
 			"/grpc.health.v1.Health/Check",
 			"/grpc.health.v1.Health/Watch",
 			"/ipam.service.v1.SystemService/HealthCheck",
+			"/ipam.service.v1.BackupService/ExportBackup",
+			"/ipam.service.v1.BackupService/ImportBackup",
 		),
 	))
 
@@ -139,6 +142,7 @@ func NewGRPCServer(
 	ipamV1.RegisterRedactedIpScanServiceServer(srv, ipScanSvc, nil)
 	ipamV1.RegisterRedactedIpGroupServiceServer(srv, ipGroupSvc, nil)
 	ipamV1.RegisterRedactedHostGroupServiceServer(srv, hostGroupSvc, nil)
+	ipamV1.RegisterRedactedBackupServiceServer(srv, backupSvc, nil)
 
 	return srv
 }

@@ -17,4 +17,5 @@ var ProviderSet = wire.NewSet(
 	service.NewScanExecutor,
 	service.NewIpGroupService,
 	service.NewHostGroupService,
+	service.NewBackupService,
 )
