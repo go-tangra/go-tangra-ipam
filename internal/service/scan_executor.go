@@ -311,7 +311,9 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 				"last_seen": time.Now(),
 			}
 			if result.Hostname != "" {
-				updates["hostname"] = result.Hostname
+				if existing.Hostname != result.Hostname {
+					updates["hostname"] = result.Hostname
+				}
 				updates["has_reverse_dns"] = true
 			}
 			_, err := e.ipAddressRepo.Update(e.ctx, existing.ID, updates)
