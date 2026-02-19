@@ -11,6 +11,10 @@ import (
 
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/migrate"
 
+	"entgo.io/ent"
+	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
@@ -24,11 +28,6 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
-
-	"entgo.io/ent"
-	"entgo.io/ent/dialect"
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 // Client is the client that holds all ent builders.

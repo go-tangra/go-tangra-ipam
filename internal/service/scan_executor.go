@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -37,11 +38,13 @@ type ScanExecutorConfig struct {
 
 // ScanExecutor is a background worker that processes scan jobs
 type ScanExecutor struct {
-	log           *log.Helper
-	scanJobRepo   *data.IpScanJobRepo
-	subnetRepo    *data.SubnetRepo
-	ipAddressRepo *data.IpAddressRepo
-	config        ScanExecutorConfig
+	log                 *log.Helper
+	scanJobRepo         *data.IpScanJobRepo
+	subnetRepo          *data.SubnetRepo
+	ipAddressRepo       *data.IpAddressRepo
+	deviceRepo          *data.DeviceRepo
+	deviceInterfaceRepo *data.DeviceInterfaceRepo
+	config              ScanExecutorConfig
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -56,6 +59,8 @@ func NewScanExecutor(
 	scanJobRepo *data.IpScanJobRepo,
 	subnetRepo *data.SubnetRepo,
 	ipAddressRepo *data.IpAddressRepo,
+	deviceRepo *data.DeviceRepo,
+	deviceInterfaceRepo *data.DeviceInterfaceRepo,
 ) *ScanExecutor {
 	// Use default config
 	config := ScanExecutorConfig{
@@ -67,11 +72,13 @@ func NewScanExecutor(
 	}
 
 	return &ScanExecutor{
-		log:           ctx.NewLoggerHelper("ipam/scan-executor"),
-		scanJobRepo:   scanJobRepo,
-		subnetRepo:    subnetRepo,
-		ipAddressRepo: ipAddressRepo,
-		config:        config,
+		log:                 ctx.NewLoggerHelper("ipam/scan-executor"),
+		scanJobRepo:         scanJobRepo,
+		subnetRepo:          subnetRepo,
+		ipAddressRepo:       ipAddressRepo,
+		deviceRepo:          deviceRepo,
+		deviceInterfaceRepo: deviceInterfaceRepo,
+		config:              config,
 	}
 }
 
@@ -349,9 +356,43 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 
 	// Calculate alive count
 	var aliveCount int64
+	var aliveIPs []string
 	for _, r := range results {
 		if r.Alive {
 			aliveCount++
+			aliveIPs = append(aliveIPs, r.Address)
+		}
+	}
+
+	// SNMP discovery phase
+	var snmpDiscovered int64
+	if job.EnableSnmp && len(aliveIPs) > 0 && subnet.SnmpVersion > 0 {
+		snmpConfig := biz.SNMPConfig{
+			Version:      int(subnet.SnmpVersion),
+			Community:    subnet.SnmpCommunity,
+			User:         subnet.SnmpUser,
+			AuthPassword: subnet.SnmpAuthPassword,
+			PrivPassword: subnet.SnmpPrivPassword,
+			AuthProtocol: subnet.SnmpAuthProtocol,
+			PrivProtocol: subnet.SnmpPrivProtocol,
+		}
+
+		if err := e.scanJobRepo.UpdateProgress(e.ctx, job.ID, int64(len(results)), aliveCount, newCount, updatedCount, 80, "SNMP discovery..."); err != nil {
+			e.log.Warnf("Failed to update SNMP progress for job %s: %v", job.ID, err)
+		}
+
+		snmpResults, snmpErr := biz.ScanSubnetSNMP(e.ctx, aliveIPs, snmpConfig, 10, func(scanned, discovered int) {
+			// Progress callback for SNMP phase
+		})
+		if snmpErr != nil {
+			e.log.Warnf("SNMP scan failed for job %s: %v", job.ID, snmpErr)
+		} else {
+			snmpDiscovered = int64(len(snmpResults))
+			e.processSNMPResults(jobTenantID, job.SubnetID, snmpResults)
+		}
+
+		if err := e.scanJobRepo.UpdateSNMPCount(e.ctx, job.ID, snmpDiscovered); err != nil {
+			e.log.Warnf("Failed to update SNMP count for job %s: %v", job.ID, err)
 		}
 	}
 
@@ -370,17 +411,17 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 	}
 
 	// Mark as completed
-	message := "Scan completed"
-	if aliveCount > 0 {
-		message = "Scan completed: found " + string(rune(aliveCount)) + " alive hosts"
+	message := fmt.Sprintf("Scan completed: %d alive hosts", aliveCount)
+	if snmpDiscovered > 0 {
+		message = fmt.Sprintf("Scan completed: %d alive hosts, %d SNMP devices", aliveCount, snmpDiscovered)
 	}
 	_, err = e.scanJobRepo.UpdateStatus(e.ctx, job.ID, ipscanjob.StatusCOMPLETED, message, 100)
 	if err != nil {
 		return err
 	}
 
-	e.log.Infof("Scan job %s completed: %d scanned, %d alive, %d new, %d updated",
-		job.ID, len(results), aliveCount, newCount, updatedCount)
+	e.log.Infof("Scan job %s completed: %d scanned, %d alive, %d new, %d updated, %d SNMP devices",
+		job.ID, len(results), aliveCount, newCount, updatedCount, snmpDiscovered)
 
 	return nil
 }
@@ -450,5 +491,163 @@ func (e *ScanExecutor) runCleanup() {
 
 	if deleted > 0 {
 		e.log.Infof("Cleaned up %d old scan jobs", deleted)
+	}
+}
+
+// processSNMPResults creates or updates devices and their interfaces from SNMP scan results
+func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []biz.SNMPDeviceInfo) {
+	for _, info := range results {
+		// Try to find existing device by primary IP
+		existing, err := e.deviceRepo.GetByPrimaryIP(e.ctx, tenantID, info.Address)
+		if err != nil {
+			e.log.Warnf("Failed to lookup device by IP %s: %v", info.Address, err)
+			continue
+		}
+
+		// If not found by IP, try by name
+		if existing == nil && info.SysName != "" {
+			existing, err = e.deviceRepo.GetByTenantAndName(e.ctx, tenantID, info.SysName)
+			if err != nil {
+				e.log.Warnf("Failed to lookup device by name %s: %v", info.SysName, err)
+			}
+		}
+
+		var deviceID string
+
+		if existing != nil {
+			// Update existing device
+			deviceID = existing.ID
+			updates := map[string]interface{}{
+				"last_seen": time.Now(),
+			}
+			if info.SysDescr != "" {
+				updates["description"] = info.SysDescr
+			}
+			if info.Manufacturer != "" {
+				updates["manufacturer"] = info.Manufacturer
+			}
+			if info.Model != "" {
+				updates["model"] = info.Model
+			}
+			if info.OsVersion != "" {
+				updates["os_version"] = info.OsVersion
+			}
+			if info.DeviceType > 0 && info.DeviceType != 99 {
+				updates["device_type"] = info.DeviceType
+			}
+			if info.SysContact != "" {
+				updates["contact"] = info.SysContact
+			}
+			if info.SysLocation != "" && existing.LocationID == "" {
+				updates["notes"] = "SNMP Location: " + info.SysLocation
+			}
+			_, err = e.deviceRepo.Update(e.ctx, deviceID, updates)
+			if err != nil {
+				e.log.Warnf("Failed to update device %s: %v", deviceID, err)
+			}
+		} else {
+			// Create new device
+			name := info.SysName
+			if name == "" {
+				name = info.Address
+			}
+			opts := []func(*ent.DeviceCreate){
+				func(c *ent.DeviceCreate) { c.SetPrimaryIP(info.Address) },
+				func(c *ent.DeviceCreate) { c.SetDeviceType(info.DeviceType) },
+				func(c *ent.DeviceCreate) { c.SetLastSeen(time.Now()) },
+			}
+			if info.SysDescr != "" {
+				opts = append(opts, func(c *ent.DeviceCreate) { c.SetDescription(info.SysDescr) })
+			}
+			if info.Manufacturer != "" {
+				opts = append(opts, func(c *ent.DeviceCreate) { c.SetManufacturer(info.Manufacturer) })
+			}
+			if info.Model != "" {
+				opts = append(opts, func(c *ent.DeviceCreate) { c.SetModel(info.Model) })
+			}
+			if info.OsVersion != "" {
+				opts = append(opts, func(c *ent.DeviceCreate) { c.SetOsVersion(info.OsVersion) })
+			}
+			if info.SysContact != "" {
+				opts = append(opts, func(c *ent.DeviceCreate) { c.SetContact(info.SysContact) })
+			}
+
+			newDevice, err := e.deviceRepo.Create(e.ctx, tenantID, name, opts...)
+			if err != nil {
+				e.log.Warnf("Failed to create device for %s: %v", info.Address, err)
+				continue
+			}
+			deviceID = newDevice.ID
+		}
+
+		// Link IP address to device
+		if deviceID != "" {
+			ipAddr, err := e.ipAddressRepo.GetByAddress(e.ctx, tenantID, info.Address)
+			if err == nil && ipAddr != nil {
+				_, _ = e.ipAddressRepo.Update(e.ctx, ipAddr.ID, map[string]interface{}{
+					"device_id": deviceID,
+				})
+			}
+		}
+
+		// Sync interfaces
+		e.syncDeviceInterfaces(deviceID, info.Interfaces)
+	}
+}
+
+// syncDeviceInterfaces creates or updates device interfaces from SNMP data
+func (e *ScanExecutor) syncDeviceInterfaces(deviceID string, interfaces []biz.SNMPInterface) {
+	for _, iface := range interfaces {
+		if iface.Name == "" {
+			continue
+		}
+
+		existing, err := e.deviceInterfaceRepo.GetByDeviceAndName(e.ctx, deviceID, iface.Name)
+		if err != nil {
+			e.log.Warnf("Failed to lookup interface %s on device %s: %v", iface.Name, deviceID, err)
+			continue
+		}
+
+		if existing != nil {
+			// Update existing interface
+			updates := map[string]any{}
+			if iface.MAC != "" {
+				updates["mac_address"] = iface.MAC
+			}
+			if iface.SpeedMbps > 0 {
+				updates["speed_mbps"] = iface.SpeedMbps
+			}
+			updates["enabled"] = iface.Enabled
+			if iface.Type != "" {
+				updates["interface_type"] = iface.Type
+			}
+			if iface.Description != "" {
+				updates["description"] = iface.Description
+			}
+			_, err = e.deviceInterfaceRepo.Update(e.ctx, existing.ID, updates)
+			if err != nil {
+				e.log.Warnf("Failed to update interface %s: %v", iface.Name, err)
+			}
+		} else {
+			// Create new interface
+			opts := []func(*ent.DeviceInterfaceCreate){}
+			if iface.MAC != "" {
+				opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetMACAddress(iface.MAC) })
+			}
+			if iface.SpeedMbps > 0 {
+				opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetSpeedMbps(iface.SpeedMbps) })
+			}
+			opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetEnabled(iface.Enabled) })
+			if iface.Type != "" {
+				opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetInterfaceType(iface.Type) })
+			}
+			if iface.Description != "" {
+				opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetDescription(iface.Description) })
+			}
+			_, err = e.deviceInterfaceRepo.Create(e.ctx, deviceID, iface.Name, opts...)
+			if err != nil {
+				e.log.Warnf("Failed to create interface %s on device %s: %v", iface.Name, deviceID, err)
+			}
+		}
 	}
 }

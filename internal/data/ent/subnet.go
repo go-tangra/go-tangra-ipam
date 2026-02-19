@@ -7,12 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/sql"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
-
-	"entgo.io/ent"
-	"entgo.io/ent/dialect/sql"
 )
 
 // Subnet is the model entity for the Subnet schema.
@@ -67,6 +66,20 @@ type Subnet struct {
 	Tags string `json:"tags,omitempty"`
 	// Custom metadata (JSON)
 	Metadata string `json:"metadata,omitempty"`
+	// SNMPv2c community string
+	SnmpCommunity string `json:"snmp_community,omitempty"`
+	// SNMP version: 0=none, 2=v2c, 3=v3
+	SnmpVersion int32 `json:"snmp_version,omitempty"`
+	// SNMPv3 USM username
+	SnmpUser string `json:"snmp_user,omitempty"`
+	// SNMPv3 auth password
+	SnmpAuthPassword string `json:"-"`
+	// SNMPv3 privacy password
+	SnmpPrivPassword string `json:"-"`
+	// SNMPv3 auth protocol (MD5/SHA)
+	SnmpAuthProtocol string `json:"snmp_auth_protocol,omitempty"`
+	// SNMPv3 priv protocol (DES/AES)
+	SnmpPrivProtocol string `json:"snmp_priv_protocol,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the SubnetQuery when eager-loading is set.
 	Edges        SubnetEdges `json:"edges"`
@@ -157,9 +170,9 @@ func (*Subnet) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case subnet.FieldCreateBy, subnet.FieldUpdateBy, subnet.FieldTenantID, subnet.FieldStatus, subnet.FieldIPVersion, subnet.FieldPrefixLength, subnet.FieldTotalAddresses:
+		case subnet.FieldCreateBy, subnet.FieldUpdateBy, subnet.FieldTenantID, subnet.FieldStatus, subnet.FieldIPVersion, subnet.FieldPrefixLength, subnet.FieldTotalAddresses, subnet.FieldSnmpVersion:
 			values[i] = new(sql.NullInt64)
-		case subnet.FieldID, subnet.FieldName, subnet.FieldCidr, subnet.FieldDescription, subnet.FieldGateway, subnet.FieldDNSServers, subnet.FieldVlanID, subnet.FieldParentID, subnet.FieldLocationID, subnet.FieldNetworkAddress, subnet.FieldBroadcastAddress, subnet.FieldMask, subnet.FieldTags, subnet.FieldMetadata:
+		case subnet.FieldID, subnet.FieldName, subnet.FieldCidr, subnet.FieldDescription, subnet.FieldGateway, subnet.FieldDNSServers, subnet.FieldVlanID, subnet.FieldParentID, subnet.FieldLocationID, subnet.FieldNetworkAddress, subnet.FieldBroadcastAddress, subnet.FieldMask, subnet.FieldTags, subnet.FieldMetadata, subnet.FieldSnmpCommunity, subnet.FieldSnmpUser, subnet.FieldSnmpAuthPassword, subnet.FieldSnmpPrivPassword, subnet.FieldSnmpAuthProtocol, subnet.FieldSnmpPrivProtocol:
 			values[i] = new(sql.NullString)
 		case subnet.FieldCreateTime, subnet.FieldUpdateTime, subnet.FieldDeleteTime:
 			values[i] = new(sql.NullTime)
@@ -328,6 +341,48 @@ func (_m *Subnet) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Metadata = value.String
 			}
+		case subnet.FieldSnmpCommunity:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field snmp_community", values[i])
+			} else if value.Valid {
+				_m.SnmpCommunity = value.String
+			}
+		case subnet.FieldSnmpVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field snmp_version", values[i])
+			} else if value.Valid {
+				_m.SnmpVersion = int32(value.Int64)
+			}
+		case subnet.FieldSnmpUser:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field snmp_user", values[i])
+			} else if value.Valid {
+				_m.SnmpUser = value.String
+			}
+		case subnet.FieldSnmpAuthPassword:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field snmp_auth_password", values[i])
+			} else if value.Valid {
+				_m.SnmpAuthPassword = value.String
+			}
+		case subnet.FieldSnmpPrivPassword:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field snmp_priv_password", values[i])
+			} else if value.Valid {
+				_m.SnmpPrivPassword = value.String
+			}
+		case subnet.FieldSnmpAuthProtocol:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field snmp_auth_protocol", values[i])
+			} else if value.Valid {
+				_m.SnmpAuthProtocol = value.String
+			}
+		case subnet.FieldSnmpPrivProtocol:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field snmp_priv_protocol", values[i])
+			} else if value.Valid {
+				_m.SnmpPrivProtocol = value.String
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -474,6 +529,25 @@ func (_m *Subnet) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("metadata=")
 	builder.WriteString(_m.Metadata)
+	builder.WriteString(", ")
+	builder.WriteString("snmp_community=")
+	builder.WriteString(_m.SnmpCommunity)
+	builder.WriteString(", ")
+	builder.WriteString("snmp_version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SnmpVersion))
+	builder.WriteString(", ")
+	builder.WriteString("snmp_user=")
+	builder.WriteString(_m.SnmpUser)
+	builder.WriteString(", ")
+	builder.WriteString("snmp_auth_password=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("snmp_priv_password=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("snmp_auth_protocol=")
+	builder.WriteString(_m.SnmpAuthProtocol)
+	builder.WriteString(", ")
+	builder.WriteString("snmp_priv_protocol=")
+	builder.WriteString(_m.SnmpPrivProtocol)
 	builder.WriteByte(')')
 	return builder.String()
 }

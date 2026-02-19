@@ -8,16 +8,15 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/schema/field"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipaddress"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
-
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/schema/field"
 )
 
 // SubnetUpdate is the builder for updating Subnet entities.
@@ -466,6 +465,147 @@ func (_u *SubnetUpdate) ClearMetadata() *SubnetUpdate {
 	return _u
 }
 
+// SetSnmpCommunity sets the "snmp_community" field.
+func (_u *SubnetUpdate) SetSnmpCommunity(v string) *SubnetUpdate {
+	_u.mutation.SetSnmpCommunity(v)
+	return _u
+}
+
+// SetNillableSnmpCommunity sets the "snmp_community" field if the given value is not nil.
+func (_u *SubnetUpdate) SetNillableSnmpCommunity(v *string) *SubnetUpdate {
+	if v != nil {
+		_u.SetSnmpCommunity(*v)
+	}
+	return _u
+}
+
+// ClearSnmpCommunity clears the value of the "snmp_community" field.
+func (_u *SubnetUpdate) ClearSnmpCommunity() *SubnetUpdate {
+	_u.mutation.ClearSnmpCommunity()
+	return _u
+}
+
+// SetSnmpVersion sets the "snmp_version" field.
+func (_u *SubnetUpdate) SetSnmpVersion(v int32) *SubnetUpdate {
+	_u.mutation.ResetSnmpVersion()
+	_u.mutation.SetSnmpVersion(v)
+	return _u
+}
+
+// SetNillableSnmpVersion sets the "snmp_version" field if the given value is not nil.
+func (_u *SubnetUpdate) SetNillableSnmpVersion(v *int32) *SubnetUpdate {
+	if v != nil {
+		_u.SetSnmpVersion(*v)
+	}
+	return _u
+}
+
+// AddSnmpVersion adds value to the "snmp_version" field.
+func (_u *SubnetUpdate) AddSnmpVersion(v int32) *SubnetUpdate {
+	_u.mutation.AddSnmpVersion(v)
+	return _u
+}
+
+// SetSnmpUser sets the "snmp_user" field.
+func (_u *SubnetUpdate) SetSnmpUser(v string) *SubnetUpdate {
+	_u.mutation.SetSnmpUser(v)
+	return _u
+}
+
+// SetNillableSnmpUser sets the "snmp_user" field if the given value is not nil.
+func (_u *SubnetUpdate) SetNillableSnmpUser(v *string) *SubnetUpdate {
+	if v != nil {
+		_u.SetSnmpUser(*v)
+	}
+	return _u
+}
+
+// ClearSnmpUser clears the value of the "snmp_user" field.
+func (_u *SubnetUpdate) ClearSnmpUser() *SubnetUpdate {
+	_u.mutation.ClearSnmpUser()
+	return _u
+}
+
+// SetSnmpAuthPassword sets the "snmp_auth_password" field.
+func (_u *SubnetUpdate) SetSnmpAuthPassword(v string) *SubnetUpdate {
+	_u.mutation.SetSnmpAuthPassword(v)
+	return _u
+}
+
+// SetNillableSnmpAuthPassword sets the "snmp_auth_password" field if the given value is not nil.
+func (_u *SubnetUpdate) SetNillableSnmpAuthPassword(v *string) *SubnetUpdate {
+	if v != nil {
+		_u.SetSnmpAuthPassword(*v)
+	}
+	return _u
+}
+
+// ClearSnmpAuthPassword clears the value of the "snmp_auth_password" field.
+func (_u *SubnetUpdate) ClearSnmpAuthPassword() *SubnetUpdate {
+	_u.mutation.ClearSnmpAuthPassword()
+	return _u
+}
+
+// SetSnmpPrivPassword sets the "snmp_priv_password" field.
+func (_u *SubnetUpdate) SetSnmpPrivPassword(v string) *SubnetUpdate {
+	_u.mutation.SetSnmpPrivPassword(v)
+	return _u
+}
+
+// SetNillableSnmpPrivPassword sets the "snmp_priv_password" field if the given value is not nil.
+func (_u *SubnetUpdate) SetNillableSnmpPrivPassword(v *string) *SubnetUpdate {
+	if v != nil {
+		_u.SetSnmpPrivPassword(*v)
+	}
+	return _u
+}
+
+// ClearSnmpPrivPassword clears the value of the "snmp_priv_password" field.
+func (_u *SubnetUpdate) ClearSnmpPrivPassword() *SubnetUpdate {
+	_u.mutation.ClearSnmpPrivPassword()
+	return _u
+}
+
+// SetSnmpAuthProtocol sets the "snmp_auth_protocol" field.
+func (_u *SubnetUpdate) SetSnmpAuthProtocol(v string) *SubnetUpdate {
+	_u.mutation.SetSnmpAuthProtocol(v)
+	return _u
+}
+
+// SetNillableSnmpAuthProtocol sets the "snmp_auth_protocol" field if the given value is not nil.
+func (_u *SubnetUpdate) SetNillableSnmpAuthProtocol(v *string) *SubnetUpdate {
+	if v != nil {
+		_u.SetSnmpAuthProtocol(*v)
+	}
+	return _u
+}
+
+// ClearSnmpAuthProtocol clears the value of the "snmp_auth_protocol" field.
+func (_u *SubnetUpdate) ClearSnmpAuthProtocol() *SubnetUpdate {
+	_u.mutation.ClearSnmpAuthProtocol()
+	return _u
+}
+
+// SetSnmpPrivProtocol sets the "snmp_priv_protocol" field.
+func (_u *SubnetUpdate) SetSnmpPrivProtocol(v string) *SubnetUpdate {
+	_u.mutation.SetSnmpPrivProtocol(v)
+	return _u
+}
+
+// SetNillableSnmpPrivProtocol sets the "snmp_priv_protocol" field if the given value is not nil.
+func (_u *SubnetUpdate) SetNillableSnmpPrivProtocol(v *string) *SubnetUpdate {
+	if v != nil {
+		_u.SetSnmpPrivProtocol(*v)
+	}
+	return _u
+}
+
+// ClearSnmpPrivProtocol clears the value of the "snmp_priv_protocol" field.
+func (_u *SubnetUpdate) ClearSnmpPrivProtocol() *SubnetUpdate {
+	_u.mutation.ClearSnmpPrivProtocol()
+	return _u
+}
+
 // AddAddressIDs adds the "addresses" edge to the IpAddress entity by IDs.
 func (_u *SubnetUpdate) AddAddressIDs(ids ...string) *SubnetUpdate {
 	_u.mutation.AddAddressIDs(ids...)
@@ -788,6 +928,48 @@ func (_u *SubnetUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.MetadataCleared() {
 		_spec.ClearField(subnet.FieldMetadata, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpCommunity(); ok {
+		_spec.SetField(subnet.FieldSnmpCommunity, field.TypeString, value)
+	}
+	if _u.mutation.SnmpCommunityCleared() {
+		_spec.ClearField(subnet.FieldSnmpCommunity, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpVersion(); ok {
+		_spec.SetField(subnet.FieldSnmpVersion, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedSnmpVersion(); ok {
+		_spec.AddField(subnet.FieldSnmpVersion, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.SnmpUser(); ok {
+		_spec.SetField(subnet.FieldSnmpUser, field.TypeString, value)
+	}
+	if _u.mutation.SnmpUserCleared() {
+		_spec.ClearField(subnet.FieldSnmpUser, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpAuthPassword(); ok {
+		_spec.SetField(subnet.FieldSnmpAuthPassword, field.TypeString, value)
+	}
+	if _u.mutation.SnmpAuthPasswordCleared() {
+		_spec.ClearField(subnet.FieldSnmpAuthPassword, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpPrivPassword(); ok {
+		_spec.SetField(subnet.FieldSnmpPrivPassword, field.TypeString, value)
+	}
+	if _u.mutation.SnmpPrivPasswordCleared() {
+		_spec.ClearField(subnet.FieldSnmpPrivPassword, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpAuthProtocol(); ok {
+		_spec.SetField(subnet.FieldSnmpAuthProtocol, field.TypeString, value)
+	}
+	if _u.mutation.SnmpAuthProtocolCleared() {
+		_spec.ClearField(subnet.FieldSnmpAuthProtocol, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpPrivProtocol(); ok {
+		_spec.SetField(subnet.FieldSnmpPrivProtocol, field.TypeString, value)
+	}
+	if _u.mutation.SnmpPrivProtocolCleared() {
+		_spec.ClearField(subnet.FieldSnmpPrivProtocol, field.TypeString)
 	}
 	if _u.mutation.AddressesCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1465,6 +1647,147 @@ func (_u *SubnetUpdateOne) ClearMetadata() *SubnetUpdateOne {
 	return _u
 }
 
+// SetSnmpCommunity sets the "snmp_community" field.
+func (_u *SubnetUpdateOne) SetSnmpCommunity(v string) *SubnetUpdateOne {
+	_u.mutation.SetSnmpCommunity(v)
+	return _u
+}
+
+// SetNillableSnmpCommunity sets the "snmp_community" field if the given value is not nil.
+func (_u *SubnetUpdateOne) SetNillableSnmpCommunity(v *string) *SubnetUpdateOne {
+	if v != nil {
+		_u.SetSnmpCommunity(*v)
+	}
+	return _u
+}
+
+// ClearSnmpCommunity clears the value of the "snmp_community" field.
+func (_u *SubnetUpdateOne) ClearSnmpCommunity() *SubnetUpdateOne {
+	_u.mutation.ClearSnmpCommunity()
+	return _u
+}
+
+// SetSnmpVersion sets the "snmp_version" field.
+func (_u *SubnetUpdateOne) SetSnmpVersion(v int32) *SubnetUpdateOne {
+	_u.mutation.ResetSnmpVersion()
+	_u.mutation.SetSnmpVersion(v)
+	return _u
+}
+
+// SetNillableSnmpVersion sets the "snmp_version" field if the given value is not nil.
+func (_u *SubnetUpdateOne) SetNillableSnmpVersion(v *int32) *SubnetUpdateOne {
+	if v != nil {
+		_u.SetSnmpVersion(*v)
+	}
+	return _u
+}
+
+// AddSnmpVersion adds value to the "snmp_version" field.
+func (_u *SubnetUpdateOne) AddSnmpVersion(v int32) *SubnetUpdateOne {
+	_u.mutation.AddSnmpVersion(v)
+	return _u
+}
+
+// SetSnmpUser sets the "snmp_user" field.
+func (_u *SubnetUpdateOne) SetSnmpUser(v string) *SubnetUpdateOne {
+	_u.mutation.SetSnmpUser(v)
+	return _u
+}
+
+// SetNillableSnmpUser sets the "snmp_user" field if the given value is not nil.
+func (_u *SubnetUpdateOne) SetNillableSnmpUser(v *string) *SubnetUpdateOne {
+	if v != nil {
+		_u.SetSnmpUser(*v)
+	}
+	return _u
+}
+
+// ClearSnmpUser clears the value of the "snmp_user" field.
+func (_u *SubnetUpdateOne) ClearSnmpUser() *SubnetUpdateOne {
+	_u.mutation.ClearSnmpUser()
+	return _u
+}
+
+// SetSnmpAuthPassword sets the "snmp_auth_password" field.
+func (_u *SubnetUpdateOne) SetSnmpAuthPassword(v string) *SubnetUpdateOne {
+	_u.mutation.SetSnmpAuthPassword(v)
+	return _u
+}
+
+// SetNillableSnmpAuthPassword sets the "snmp_auth_password" field if the given value is not nil.
+func (_u *SubnetUpdateOne) SetNillableSnmpAuthPassword(v *string) *SubnetUpdateOne {
+	if v != nil {
+		_u.SetSnmpAuthPassword(*v)
+	}
+	return _u
+}
+
+// ClearSnmpAuthPassword clears the value of the "snmp_auth_password" field.
+func (_u *SubnetUpdateOne) ClearSnmpAuthPassword() *SubnetUpdateOne {
+	_u.mutation.ClearSnmpAuthPassword()
+	return _u
+}
+
+// SetSnmpPrivPassword sets the "snmp_priv_password" field.
+func (_u *SubnetUpdateOne) SetSnmpPrivPassword(v string) *SubnetUpdateOne {
+	_u.mutation.SetSnmpPrivPassword(v)
+	return _u
+}
+
+// SetNillableSnmpPrivPassword sets the "snmp_priv_password" field if the given value is not nil.
+func (_u *SubnetUpdateOne) SetNillableSnmpPrivPassword(v *string) *SubnetUpdateOne {
+	if v != nil {
+		_u.SetSnmpPrivPassword(*v)
+	}
+	return _u
+}
+
+// ClearSnmpPrivPassword clears the value of the "snmp_priv_password" field.
+func (_u *SubnetUpdateOne) ClearSnmpPrivPassword() *SubnetUpdateOne {
+	_u.mutation.ClearSnmpPrivPassword()
+	return _u
+}
+
+// SetSnmpAuthProtocol sets the "snmp_auth_protocol" field.
+func (_u *SubnetUpdateOne) SetSnmpAuthProtocol(v string) *SubnetUpdateOne {
+	_u.mutation.SetSnmpAuthProtocol(v)
+	return _u
+}
+
+// SetNillableSnmpAuthProtocol sets the "snmp_auth_protocol" field if the given value is not nil.
+func (_u *SubnetUpdateOne) SetNillableSnmpAuthProtocol(v *string) *SubnetUpdateOne {
+	if v != nil {
+		_u.SetSnmpAuthProtocol(*v)
+	}
+	return _u
+}
+
+// ClearSnmpAuthProtocol clears the value of the "snmp_auth_protocol" field.
+func (_u *SubnetUpdateOne) ClearSnmpAuthProtocol() *SubnetUpdateOne {
+	_u.mutation.ClearSnmpAuthProtocol()
+	return _u
+}
+
+// SetSnmpPrivProtocol sets the "snmp_priv_protocol" field.
+func (_u *SubnetUpdateOne) SetSnmpPrivProtocol(v string) *SubnetUpdateOne {
+	_u.mutation.SetSnmpPrivProtocol(v)
+	return _u
+}
+
+// SetNillableSnmpPrivProtocol sets the "snmp_priv_protocol" field if the given value is not nil.
+func (_u *SubnetUpdateOne) SetNillableSnmpPrivProtocol(v *string) *SubnetUpdateOne {
+	if v != nil {
+		_u.SetSnmpPrivProtocol(*v)
+	}
+	return _u
+}
+
+// ClearSnmpPrivProtocol clears the value of the "snmp_priv_protocol" field.
+func (_u *SubnetUpdateOne) ClearSnmpPrivProtocol() *SubnetUpdateOne {
+	_u.mutation.ClearSnmpPrivProtocol()
+	return _u
+}
+
 // AddAddressIDs adds the "addresses" edge to the IpAddress entity by IDs.
 func (_u *SubnetUpdateOne) AddAddressIDs(ids ...string) *SubnetUpdateOne {
 	_u.mutation.AddAddressIDs(ids...)
@@ -1817,6 +2140,48 @@ func (_u *SubnetUpdateOne) sqlSave(ctx context.Context) (_node *Subnet, err erro
 	}
 	if _u.mutation.MetadataCleared() {
 		_spec.ClearField(subnet.FieldMetadata, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpCommunity(); ok {
+		_spec.SetField(subnet.FieldSnmpCommunity, field.TypeString, value)
+	}
+	if _u.mutation.SnmpCommunityCleared() {
+		_spec.ClearField(subnet.FieldSnmpCommunity, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpVersion(); ok {
+		_spec.SetField(subnet.FieldSnmpVersion, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedSnmpVersion(); ok {
+		_spec.AddField(subnet.FieldSnmpVersion, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.SnmpUser(); ok {
+		_spec.SetField(subnet.FieldSnmpUser, field.TypeString, value)
+	}
+	if _u.mutation.SnmpUserCleared() {
+		_spec.ClearField(subnet.FieldSnmpUser, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpAuthPassword(); ok {
+		_spec.SetField(subnet.FieldSnmpAuthPassword, field.TypeString, value)
+	}
+	if _u.mutation.SnmpAuthPasswordCleared() {
+		_spec.ClearField(subnet.FieldSnmpAuthPassword, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpPrivPassword(); ok {
+		_spec.SetField(subnet.FieldSnmpPrivPassword, field.TypeString, value)
+	}
+	if _u.mutation.SnmpPrivPasswordCleared() {
+		_spec.ClearField(subnet.FieldSnmpPrivPassword, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpAuthProtocol(); ok {
+		_spec.SetField(subnet.FieldSnmpAuthProtocol, field.TypeString, value)
+	}
+	if _u.mutation.SnmpAuthProtocolCleared() {
+		_spec.ClearField(subnet.FieldSnmpAuthProtocol, field.TypeString)
+	}
+	if value, ok := _u.mutation.SnmpPrivProtocol(); ok {
+		_spec.SetField(subnet.FieldSnmpPrivProtocol, field.TypeString, value)
+	}
+	if _u.mutation.SnmpPrivProtocolCleared() {
+		_spec.ClearField(subnet.FieldSnmpPrivProtocol, field.TypeString)
 	}
 	if _u.mutation.AddressesCleared() {
 		edge := &sqlgraph.EdgeSpec{

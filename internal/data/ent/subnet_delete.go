@@ -5,12 +5,11 @@ package ent
 import (
 	"context"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
-
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 )
 
 // SubnetDelete is the builder for deleting a Subnet entity.

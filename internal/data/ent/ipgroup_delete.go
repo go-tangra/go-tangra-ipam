@@ -5,12 +5,11 @@ package ent
 import (
 	"context"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
 // IpGroupDelete is the builder for deleting a IpGroup entity.

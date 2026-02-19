@@ -35,6 +35,7 @@ type ScanConfig struct {
 	SkipReverseDNS bool
 	TCPProbePorts  string
 	MaxRetries     int32
+	EnableSNMP     bool
 }
 
 // Create creates a new scan job
@@ -67,6 +68,9 @@ func (r *IpScanJobRepo) Create(ctx context.Context, tenantID uint32, subnetID st
 		}
 		if config.MaxRetries > 0 {
 			create = create.SetMaxRetries(config.MaxRetries)
+		}
+		if config.EnableSNMP {
+			create = create.SetEnableSnmp(config.EnableSNMP)
 		}
 	}
 
@@ -324,6 +328,19 @@ func (r *IpScanJobRepo) GetLatestBySubnet(ctx context.Context, tenantID uint32, 
 		return nil, ipamV1.ErrorInternalServerError("get latest scan job failed")
 	}
 	return entity, nil
+}
+
+// UpdateSNMPCount updates the SNMP discovered count on a scan job
+func (r *IpScanJobRepo) UpdateSNMPCount(ctx context.Context, id string, count int64) error {
+	_, err := r.entClient.Client().IpScanJob.UpdateOneID(id).
+		SetSnmpDiscoveredCount(count).
+		SetUpdateTime(time.Now()).
+		Save(ctx)
+	if err != nil {
+		r.log.Errorf("update SNMP count failed: %s", err.Error())
+		return ipamV1.ErrorInternalServerError("update SNMP count failed")
+	}
+	return nil
 }
 
 // HasActiveScan checks if there's an active (pending/scanning) scan for the subnet

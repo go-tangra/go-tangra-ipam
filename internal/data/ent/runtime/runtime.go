@@ -438,6 +438,14 @@ func init() {
 	ipscanjobDescTCPProbePorts := ipscanjobFields[17].Descriptor()
 	// ipscanjob.DefaultTCPProbePorts holds the default value on creation for the tcp_probe_ports field.
 	ipscanjob.DefaultTCPProbePorts = ipscanjobDescTCPProbePorts.Default.(string)
+	// ipscanjobDescEnableSnmp is the schema descriptor for enable_snmp field.
+	ipscanjobDescEnableSnmp := ipscanjobFields[18].Descriptor()
+	// ipscanjob.DefaultEnableSnmp holds the default value on creation for the enable_snmp field.
+	ipscanjob.DefaultEnableSnmp = ipscanjobDescEnableSnmp.Default.(bool)
+	// ipscanjobDescSnmpDiscoveredCount is the schema descriptor for snmp_discovered_count field.
+	ipscanjobDescSnmpDiscoveredCount := ipscanjobFields[19].Descriptor()
+	// ipscanjob.DefaultSnmpDiscoveredCount holds the default value on creation for the snmp_discovered_count field.
+	ipscanjob.DefaultSnmpDiscoveredCount = ipscanjobDescSnmpDiscoveredCount.Default.(int64)
 	// ipscanjobDescID is the schema descriptor for id field.
 	ipscanjobDescID := ipscanjobFields[0].Descriptor()
 	// ipscanjob.IDValidator is a validator for the "id" field. It is called by the builders before save.
@@ -546,6 +554,10 @@ func init() {
 	subnetDescTotalAddresses := subnetFields[15].Descriptor()
 	// subnet.DefaultTotalAddresses holds the default value on creation for the total_addresses field.
 	subnet.DefaultTotalAddresses = subnetDescTotalAddresses.Default.(int64)
+	// subnetDescSnmpVersion is the schema descriptor for snmp_version field.
+	subnetDescSnmpVersion := subnetFields[19].Descriptor()
+	// subnet.DefaultSnmpVersion holds the default value on creation for the snmp_version field.
+	subnet.DefaultSnmpVersion = subnetDescSnmpVersion.Default.(int32)
 	// subnetDescID is the schema descriptor for id field.
 	subnetDescID := subnetFields[0].Descriptor()
 	// subnet.IDValidator is a validator for the "id" field. It is called by the builders before save.

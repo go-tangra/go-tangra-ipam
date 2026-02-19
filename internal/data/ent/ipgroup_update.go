@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
 // IpGroupUpdate is the builder for updating IpGroup entities.

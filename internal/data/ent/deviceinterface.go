@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
 )
 
 // DeviceInterface is the model entity for the DeviceInterface schema.

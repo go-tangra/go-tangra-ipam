@@ -61,6 +61,10 @@ const (
 	FieldSkipReverseDNS = "skip_reverse_dns"
 	// FieldTCPProbePorts holds the string denoting the tcp_probe_ports field in the database.
 	FieldTCPProbePorts = "tcp_probe_ports"
+	// FieldEnableSnmp holds the string denoting the enable_snmp field in the database.
+	FieldEnableSnmp = "enable_snmp"
+	// FieldSnmpDiscoveredCount holds the string denoting the snmp_discovered_count field in the database.
+	FieldSnmpDiscoveredCount = "snmp_discovered_count"
 	// FieldStartedAt holds the string denoting the started_at field in the database.
 	FieldStartedAt = "started_at"
 	// FieldCompletedAt holds the string denoting the completed_at field in the database.
@@ -104,6 +108,8 @@ var Columns = []string{
 	FieldConcurrency,
 	FieldSkipReverseDNS,
 	FieldTCPProbePorts,
+	FieldEnableSnmp,
+	FieldSnmpDiscoveredCount,
 	FieldStartedAt,
 	FieldCompletedAt,
 }
@@ -154,6 +160,10 @@ var (
 	DefaultSkipReverseDNS bool
 	// DefaultTCPProbePorts holds the default value on creation for the "tcp_probe_ports" field.
 	DefaultTCPProbePorts string
+	// DefaultEnableSnmp holds the default value on creation for the "enable_snmp" field.
+	DefaultEnableSnmp bool
+	// DefaultSnmpDiscoveredCount holds the default value on creation for the "snmp_discovered_count" field.
+	DefaultSnmpDiscoveredCount int64
 	// IDValidator is a validator for the "id" field. It is called by the builders before save.
 	IDValidator func(string) error
 )
@@ -334,6 +344,16 @@ func BySkipReverseDNS(opts ...sql.OrderTermOption) OrderOption {
 // ByTCPProbePorts orders the results by the tcp_probe_ports field.
 func ByTCPProbePorts(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTCPProbePorts, opts...).ToFunc()
+}
+
+// ByEnableSnmp orders the results by the enable_snmp field.
+func ByEnableSnmp(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnableSnmp, opts...).ToFunc()
+}
+
+// BySnmpDiscoveredCount orders the results by the snmp_discovered_count field.
+func BySnmpDiscoveredCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSnmpDiscoveredCount, opts...).ToFunc()
 }
 
 // ByStartedAt orders the results by the started_at field.

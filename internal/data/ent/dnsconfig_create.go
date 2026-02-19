@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
-
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 )
 
 // DnsConfigCreate is the builder for creating a DnsConfig entity.

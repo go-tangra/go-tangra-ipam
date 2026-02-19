@@ -7,12 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/sql"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
-
-	"entgo.io/ent"
-	"entgo.io/ent/dialect/sql"
 )
 
 // HostGroupMember is the model entity for the HostGroupMember schema.

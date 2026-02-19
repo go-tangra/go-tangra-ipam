@@ -8,6 +8,7 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
+import "redact/v3/redact.proto";
 
 // Subnet represents a network subnet (CIDR block)
 message Subnet {
@@ -77,6 +78,28 @@ message Subnet {
   // Custom metadata (JSON)
   optional string metadata = 22 [json_name = "metadata"];
 
+  // SNMP Configuration
+  // SNMPv2c community string
+  optional string snmp_community = 40 [json_name = "snmpCommunity"];
+
+  // SNMP version: 0=none, 2=v2c, 3=v3
+  optional int32 snmp_version = 41 [json_name = "snmpVersion"];
+
+  // SNMPv3 USM username
+  optional string snmp_user = 42 [json_name = "snmpUser"];
+
+  // SNMPv3 auth password
+  optional string snmp_auth_password = 43 [(redact.v3.value).string = "", json_name = "snmpAuthPassword"];
+
+  // SNMPv3 privacy password
+  optional string snmp_priv_password = 44 [(redact.v3.value).string = "", json_name = "snmpPrivPassword"];
+
+  // SNMPv3 auth protocol (MD5/SHA)
+  optional string snmp_auth_protocol = 45 [json_name = "snmpAuthProtocol"];
+
+  // SNMPv3 priv protocol (DES/AES)
+  optional string snmp_priv_protocol = 46 [json_name = "snmpPrivProtocol"];
+
   // Creation timestamp
   optional google.protobuf.Timestamp created_at = 30 [json_name = "createdAt"];
 
@@ -142,6 +165,15 @@ message CreateSubnetRequest {
   optional SubnetStatus status = 10 [json_name = "status"];
   optional string tags = 11 [json_name = "tags"];
   optional string metadata = 12 [json_name = "metadata"];
+
+  // SNMP Configuration
+  optional string snmp_community = 30 [json_name = "snmpCommunity"];
+  optional int32 snmp_version = 31 [json_name = "snmpVersion"];
+  optional string snmp_user = 32 [json_name = "snmpUser"];
+  optional string snmp_auth_password = 33 [(redact.v3.value).string = "", json_name = "snmpAuthPassword"];
+  optional string snmp_priv_password = 34 [(redact.v3.value).string = "", json_name = "snmpPrivPassword"];
+  optional string snmp_auth_protocol = 35 [json_name = "snmpAuthProtocol"];
+  optional string snmp_priv_protocol = 36 [json_name = "snmpPrivProtocol"];
 
   // Auto-scan the subnet for active hosts after creation
   optional bool auto_scan = 20 [json_name = "autoScan"];

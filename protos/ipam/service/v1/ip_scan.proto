@@ -82,6 +82,12 @@ message IpScanJob {
   // Comma-separated list of TCP ports to probe
   optional string tcp_probe_ports = 23 [json_name = "tcpProbePorts"];
 
+  // Enable SNMP device discovery
+  optional bool enable_snmp = 24 [json_name = "enableSnmp"];
+
+  // Number of SNMP devices discovered
+  optional int64 snmp_discovered_count = 25 [json_name = "snmpDiscoveredCount"];
+
   // When the scan started
   optional google.protobuf.Timestamp started_at = 30 [json_name = "startedAt"];
 
@@ -113,6 +119,9 @@ message StartScanRequest {
 
   // Scan configuration
   optional ScanConfig scan_config = 3 [json_name = "scanConfig"];
+
+  // Enable SNMP device discovery during scan
+  optional bool enable_snmp = 4 [json_name = "enableSnmp"];
 }
 
 message StartScanResponse {

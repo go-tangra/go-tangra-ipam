@@ -104,6 +104,14 @@ func (IpScanJob) Fields() []ent.Field {
 			Default("22,80,443,3389,445").
 			Comment("Comma-separated list of TCP ports to probe"),
 
+		field.Bool("enable_snmp").
+			Default(false).
+			Comment("Enable SNMP device discovery"),
+
+		field.Int64("snmp_discovered_count").
+			Default(0).
+			Comment("Number of SNMP devices discovered"),
+
 		// Timing
 		field.Time("started_at").
 			Optional().

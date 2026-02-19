@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
 )
 
 // Device is the model entity for the Device schema.

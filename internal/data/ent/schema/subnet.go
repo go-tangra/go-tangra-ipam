@@ -98,6 +98,36 @@ func (Subnet) Fields() []ent.Field {
 		field.Text("metadata").
 			Optional().
 			Comment("Custom metadata (JSON)"),
+
+		field.String("snmp_community").
+			Optional().
+			Comment("SNMPv2c community string"),
+
+		field.Int32("snmp_version").
+			Default(0).
+			Comment("SNMP version: 0=none, 2=v2c, 3=v3"),
+
+		field.String("snmp_user").
+			Optional().
+			Comment("SNMPv3 USM username"),
+
+		field.String("snmp_auth_password").
+			Optional().
+			Sensitive().
+			Comment("SNMPv3 auth password"),
+
+		field.String("snmp_priv_password").
+			Optional().
+			Sensitive().
+			Comment("SNMPv3 privacy password"),
+
+		field.String("snmp_auth_protocol").
+			Optional().
+			Comment("SNMPv3 auth protocol (MD5/SHA)"),
+
+		field.String("snmp_priv_protocol").
+			Optional().
+			Comment("SNMPv3 priv protocol (DES/AES)"),
 	}
 }
 

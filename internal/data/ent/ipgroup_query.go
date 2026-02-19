@@ -9,15 +9,14 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
 // IpGroupQuery is the builder for querying IpGroup entities.

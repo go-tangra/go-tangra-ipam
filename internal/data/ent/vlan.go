@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
 )
 
 // Vlan is the model entity for the Vlan schema.

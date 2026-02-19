@@ -7,16 +7,15 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
 // HostGroupMemberQuery is the builder for querying HostGroupMember entities.

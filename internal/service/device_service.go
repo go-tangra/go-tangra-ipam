@@ -16,14 +16,18 @@ import (
 type DeviceService struct {
 	ipamV1.UnimplementedDeviceServiceServer
 
-	log        *log.Helper
-	deviceRepo *data.DeviceRepo
+	log                 *log.Helper
+	deviceRepo          *data.DeviceRepo
+	deviceInterfaceRepo *data.DeviceInterfaceRepo
+	ipAddressRepo       *data.IpAddressRepo
 }
 
-func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo) *DeviceService {
+func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo) *DeviceService {
 	return &DeviceService{
-		log:        ctx.NewLoggerHelper("ipam/service/device"),
-		deviceRepo: deviceRepo,
+		log:                 ctx.NewLoggerHelper("ipam/service/device"),
+		deviceRepo:          deviceRepo,
+		deviceInterfaceRepo: deviceInterfaceRepo,
+		ipAddressRepo:       ipAddressRepo,
 	}
 }
 
@@ -238,27 +242,97 @@ func (s *DeviceService) DeleteDevice(ctx context.Context, req *ipamV1.DeleteDevi
 }
 
 func (s *DeviceService) GetDeviceAddresses(ctx context.Context, req *ipamV1.GetDeviceAddressesRequest) (*ipamV1.GetDeviceAddressesResponse, error) {
-	// TODO: Implement GetDeviceAddresses - requires querying ip_addresses by device_id
+	// Query IP addresses by device_id
+	addresses, _, err := s.ipAddressRepo.List(ctx, 0, 0, 0, map[string]interface{}{
+		"device_id": req.GetId(),
+	}, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, len(addresses))
+	for i, addr := range addresses {
+		ids[i] = addr.ID
+	}
+
 	return &ipamV1.GetDeviceAddressesResponse{
-		AddressIds: []string{},
+		AddressIds: ids,
 	}, nil
 }
 
 func (s *DeviceService) GetDeviceInterfaces(ctx context.Context, req *ipamV1.GetDeviceInterfacesRequest) (*ipamV1.GetDeviceInterfacesResponse, error) {
-	// TODO: Implement GetDeviceInterfaces - requires interface entity
+	entities, err := s.deviceInterfaceRepo.ListByDeviceID(ctx, req.GetDeviceId())
+	if err != nil {
+		return nil, err
+	}
+
+	interfaces := make([]*ipamV1.DeviceInterface, len(entities))
+	for i, e := range entities {
+		interfaces[i] = deviceInterfaceToProto(e)
+	}
+
 	return &ipamV1.GetDeviceInterfacesResponse{
-		Interfaces: []*ipamV1.DeviceInterface{},
+		Interfaces: interfaces,
 	}, nil
 }
 
 func (s *DeviceService) CreateDeviceInterface(ctx context.Context, req *ipamV1.CreateDeviceInterfaceRequest) (*ipamV1.CreateDeviceInterfaceResponse, error) {
-	// TODO: Implement CreateDeviceInterface - requires interface entity
-	return nil, ipamV1.ErrorInternalServerError("not implemented")
+	opts := []func(*ent.DeviceInterfaceCreate){}
+	if req.MacAddress != nil {
+		opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetMACAddress(*req.MacAddress) })
+	}
+	if req.InterfaceType != nil {
+		opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetInterfaceType(*req.InterfaceType) })
+	}
+	if req.Enabled != nil {
+		opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetEnabled(*req.Enabled) })
+	}
+	if req.SpeedMbps != nil {
+		opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetSpeedMbps(*req.SpeedMbps) })
+	}
+	if req.Description != nil {
+		opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetDescription(*req.Description) })
+	}
+
+	entity, err := s.deviceInterfaceRepo.Create(ctx, req.GetDeviceId(), req.GetName(), opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ipamV1.CreateDeviceInterfaceResponse{
+		Interface: deviceInterfaceToProto(entity),
+	}, nil
 }
 
 func (s *DeviceService) DeleteDeviceInterface(ctx context.Context, req *ipamV1.DeleteDeviceInterfaceRequest) (*emptypb.Empty, error) {
-	// TODO: Implement DeleteDeviceInterface - requires interface entity
-	return nil, ipamV1.ErrorInternalServerError("not implemented")
+	err := s.deviceInterfaceRepo.Delete(ctx, req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func deviceInterfaceToProto(e *ent.DeviceInterface) *ipamV1.DeviceInterface {
+	if e == nil {
+		return nil
+	}
+	result := &ipamV1.DeviceInterface{
+		Id:            &e.ID,
+		DeviceId:      &e.DeviceID,
+		Name:          &e.Name,
+		MacAddress:    ptrString(e.MACAddress),
+		InterfaceType: ptrString(e.InterfaceType),
+		Enabled:       &e.Enabled,
+		SpeedMbps:     e.SpeedMbps,
+		Description:   ptrString(e.Description),
+	}
+	if e.CreateTime != nil {
+		result.CreatedAt = timestamppb.New(*e.CreateTime)
+	}
+	if e.UpdateTime != nil {
+		result.UpdatedAt = timestamppb.New(*e.UpdateTime)
+	}
+	return result
 }
 
 // Helper function

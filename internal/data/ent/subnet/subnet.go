@@ -59,6 +59,20 @@ const (
 	FieldTags = "tags"
 	// FieldMetadata holds the string denoting the metadata field in the database.
 	FieldMetadata = "metadata"
+	// FieldSnmpCommunity holds the string denoting the snmp_community field in the database.
+	FieldSnmpCommunity = "snmp_community"
+	// FieldSnmpVersion holds the string denoting the snmp_version field in the database.
+	FieldSnmpVersion = "snmp_version"
+	// FieldSnmpUser holds the string denoting the snmp_user field in the database.
+	FieldSnmpUser = "snmp_user"
+	// FieldSnmpAuthPassword holds the string denoting the snmp_auth_password field in the database.
+	FieldSnmpAuthPassword = "snmp_auth_password"
+	// FieldSnmpPrivPassword holds the string denoting the snmp_priv_password field in the database.
+	FieldSnmpPrivPassword = "snmp_priv_password"
+	// FieldSnmpAuthProtocol holds the string denoting the snmp_auth_protocol field in the database.
+	FieldSnmpAuthProtocol = "snmp_auth_protocol"
+	// FieldSnmpPrivProtocol holds the string denoting the snmp_priv_protocol field in the database.
+	FieldSnmpPrivProtocol = "snmp_priv_protocol"
 	// EdgeAddresses holds the string denoting the addresses edge name in mutations.
 	EdgeAddresses = "addresses"
 	// EdgeParent holds the string denoting the parent edge name in mutations.
@@ -137,6 +151,13 @@ var Columns = []string{
 	FieldTotalAddresses,
 	FieldTags,
 	FieldMetadata,
+	FieldSnmpCommunity,
+	FieldSnmpVersion,
+	FieldSnmpUser,
+	FieldSnmpAuthPassword,
+	FieldSnmpPrivPassword,
+	FieldSnmpAuthProtocol,
+	FieldSnmpPrivProtocol,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -169,6 +190,8 @@ var (
 	DefaultIPVersion int32
 	// DefaultTotalAddresses holds the default value on creation for the "total_addresses" field.
 	DefaultTotalAddresses int64
+	// DefaultSnmpVersion holds the default value on creation for the "snmp_version" field.
+	DefaultSnmpVersion int32
 	// IDValidator is a validator for the "id" field. It is called by the builders before save.
 	IDValidator func(string) error
 )
@@ -294,6 +317,41 @@ func ByTags(opts ...sql.OrderTermOption) OrderOption {
 // ByMetadata orders the results by the metadata field.
 func ByMetadata(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMetadata, opts...).ToFunc()
+}
+
+// BySnmpCommunity orders the results by the snmp_community field.
+func BySnmpCommunity(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSnmpCommunity, opts...).ToFunc()
+}
+
+// BySnmpVersion orders the results by the snmp_version field.
+func BySnmpVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSnmpVersion, opts...).ToFunc()
+}
+
+// BySnmpUser orders the results by the snmp_user field.
+func BySnmpUser(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSnmpUser, opts...).ToFunc()
+}
+
+// BySnmpAuthPassword orders the results by the snmp_auth_password field.
+func BySnmpAuthPassword(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSnmpAuthPassword, opts...).ToFunc()
+}
+
+// BySnmpPrivPassword orders the results by the snmp_priv_password field.
+func BySnmpPrivPassword(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSnmpPrivPassword, opts...).ToFunc()
+}
+
+// BySnmpAuthProtocol orders the results by the snmp_auth_protocol field.
+func BySnmpAuthProtocol(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSnmpAuthProtocol, opts...).ToFunc()
+}
+
+// BySnmpPrivProtocol orders the results by the snmp_priv_protocol field.
+func BySnmpPrivProtocol(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSnmpPrivProtocol, opts...).ToFunc()
 }
 
 // ByAddressesCount orders the results by addresses count.

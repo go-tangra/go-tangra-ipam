@@ -53,6 +53,42 @@ func (r *DeviceRepo) Create(ctx context.Context, tenantID uint32, name string, o
 	return entity, nil
 }
 
+// GetByPrimaryIP retrieves a device by tenant ID and primary IP
+func (r *DeviceRepo) GetByPrimaryIP(ctx context.Context, tenantID uint32, ip string) (*ent.Device, error) {
+	entity, err := r.entClient.Client().Device.Query().
+		Where(
+			device.TenantID(tenantID),
+			device.PrimaryIP(ip),
+		).
+		First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil
+		}
+		r.log.Errorf("get device by primary IP failed: %s", err.Error())
+		return nil, ipamV1.ErrorInternalServerError("get device by primary IP failed")
+	}
+	return entity, nil
+}
+
+// GetByTenantAndName retrieves a device by tenant ID and name
+func (r *DeviceRepo) GetByTenantAndName(ctx context.Context, tenantID uint32, name string) (*ent.Device, error) {
+	entity, err := r.entClient.Client().Device.Query().
+		Where(
+			device.TenantID(tenantID),
+			device.Name(name),
+		).
+		First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil
+		}
+		r.log.Errorf("get device by name failed: %s", err.Error())
+		return nil, ipamV1.ErrorInternalServerError("get device by name failed")
+	}
+	return entity, nil
+}
+
 func (r *DeviceRepo) GetByID(ctx context.Context, id string) (*ent.Device, error) {
 	entity, err := r.entClient.Client().Device.Get(ctx, id)
 	if err != nil {
@@ -209,6 +245,12 @@ func (r *DeviceRepo) Update(ctx context.Context, id string, updates map[string]i
 	}
 	if deviceHeightU, ok := updates["device_height_u"].(int32); ok {
 		update = update.SetDeviceHeightU(deviceHeightU)
+	}
+	if lastSeen, ok := updates["last_seen"].(time.Time); ok {
+		update = update.SetLastSeen(lastSeen)
+	}
+	if assetTag, ok := updates["asset_tag"].(string); ok {
+		update = update.SetAssetTag(assetTag)
 	}
 
 	update = update.SetUpdateTime(time.Now())

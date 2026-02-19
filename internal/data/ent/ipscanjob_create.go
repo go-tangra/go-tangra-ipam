@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
-
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 )
 
 // IpScanJobCreate is the builder for creating a IpScanJob entity.
@@ -339,6 +338,34 @@ func (_c *IpScanJobCreate) SetNillableTCPProbePorts(v *string) *IpScanJobCreate 
 	return _c
 }
 
+// SetEnableSnmp sets the "enable_snmp" field.
+func (_c *IpScanJobCreate) SetEnableSnmp(v bool) *IpScanJobCreate {
+	_c.mutation.SetEnableSnmp(v)
+	return _c
+}
+
+// SetNillableEnableSnmp sets the "enable_snmp" field if the given value is not nil.
+func (_c *IpScanJobCreate) SetNillableEnableSnmp(v *bool) *IpScanJobCreate {
+	if v != nil {
+		_c.SetEnableSnmp(*v)
+	}
+	return _c
+}
+
+// SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
+func (_c *IpScanJobCreate) SetSnmpDiscoveredCount(v int64) *IpScanJobCreate {
+	_c.mutation.SetSnmpDiscoveredCount(v)
+	return _c
+}
+
+// SetNillableSnmpDiscoveredCount sets the "snmp_discovered_count" field if the given value is not nil.
+func (_c *IpScanJobCreate) SetNillableSnmpDiscoveredCount(v *int64) *IpScanJobCreate {
+	if v != nil {
+		_c.SetSnmpDiscoveredCount(*v)
+	}
+	return _c
+}
+
 // SetStartedAt sets the "started_at" field.
 func (_c *IpScanJobCreate) SetStartedAt(v time.Time) *IpScanJobCreate {
 	_c.mutation.SetStartedAt(v)
@@ -475,6 +502,14 @@ func (_c *IpScanJobCreate) defaults() error {
 		v := ipscanjob.DefaultTCPProbePorts
 		_c.mutation.SetTCPProbePorts(v)
 	}
+	if _, ok := _c.mutation.EnableSnmp(); !ok {
+		v := ipscanjob.DefaultEnableSnmp
+		_c.mutation.SetEnableSnmp(v)
+	}
+	if _, ok := _c.mutation.SnmpDiscoveredCount(); !ok {
+		v := ipscanjob.DefaultSnmpDiscoveredCount
+		_c.mutation.SetSnmpDiscoveredCount(v)
+	}
 	return nil
 }
 
@@ -539,6 +574,12 @@ func (_c *IpScanJobCreate) check() error {
 	}
 	if _, ok := _c.mutation.TCPProbePorts(); !ok {
 		return &ValidationError{Name: "tcp_probe_ports", err: errors.New(`ent: missing required field "IpScanJob.tcp_probe_ports"`)}
+	}
+	if _, ok := _c.mutation.EnableSnmp(); !ok {
+		return &ValidationError{Name: "enable_snmp", err: errors.New(`ent: missing required field "IpScanJob.enable_snmp"`)}
+	}
+	if _, ok := _c.mutation.SnmpDiscoveredCount(); !ok {
+		return &ValidationError{Name: "snmp_discovered_count", err: errors.New(`ent: missing required field "IpScanJob.snmp_discovered_count"`)}
 	}
 	if v, ok := _c.mutation.ID(); ok {
 		if err := ipscanjob.IDValidator(v); err != nil {
@@ -671,6 +712,14 @@ func (_c *IpScanJobCreate) createSpec() (*IpScanJob, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.TCPProbePorts(); ok {
 		_spec.SetField(ipscanjob.FieldTCPProbePorts, field.TypeString, value)
 		_node.TCPProbePorts = value
+	}
+	if value, ok := _c.mutation.EnableSnmp(); ok {
+		_spec.SetField(ipscanjob.FieldEnableSnmp, field.TypeBool, value)
+		_node.EnableSnmp = value
+	}
+	if value, ok := _c.mutation.SnmpDiscoveredCount(); ok {
+		_spec.SetField(ipscanjob.FieldSnmpDiscoveredCount, field.TypeInt64, value)
+		_node.SnmpDiscoveredCount = value
 	}
 	if value, ok := _c.mutation.StartedAt(); ok {
 		_spec.SetField(ipscanjob.FieldStartedAt, field.TypeTime, value)
@@ -1106,6 +1155,36 @@ func (u *IpScanJobUpsert) SetTCPProbePorts(v string) *IpScanJobUpsert {
 // UpdateTCPProbePorts sets the "tcp_probe_ports" field to the value that was provided on create.
 func (u *IpScanJobUpsert) UpdateTCPProbePorts() *IpScanJobUpsert {
 	u.SetExcluded(ipscanjob.FieldTCPProbePorts)
+	return u
+}
+
+// SetEnableSnmp sets the "enable_snmp" field.
+func (u *IpScanJobUpsert) SetEnableSnmp(v bool) *IpScanJobUpsert {
+	u.Set(ipscanjob.FieldEnableSnmp, v)
+	return u
+}
+
+// UpdateEnableSnmp sets the "enable_snmp" field to the value that was provided on create.
+func (u *IpScanJobUpsert) UpdateEnableSnmp() *IpScanJobUpsert {
+	u.SetExcluded(ipscanjob.FieldEnableSnmp)
+	return u
+}
+
+// SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
+func (u *IpScanJobUpsert) SetSnmpDiscoveredCount(v int64) *IpScanJobUpsert {
+	u.Set(ipscanjob.FieldSnmpDiscoveredCount, v)
+	return u
+}
+
+// UpdateSnmpDiscoveredCount sets the "snmp_discovered_count" field to the value that was provided on create.
+func (u *IpScanJobUpsert) UpdateSnmpDiscoveredCount() *IpScanJobUpsert {
+	u.SetExcluded(ipscanjob.FieldSnmpDiscoveredCount)
+	return u
+}
+
+// AddSnmpDiscoveredCount adds v to the "snmp_discovered_count" field.
+func (u *IpScanJobUpsert) AddSnmpDiscoveredCount(v int64) *IpScanJobUpsert {
+	u.Add(ipscanjob.FieldSnmpDiscoveredCount, v)
 	return u
 }
 
@@ -1616,6 +1695,41 @@ func (u *IpScanJobUpsertOne) SetTCPProbePorts(v string) *IpScanJobUpsertOne {
 func (u *IpScanJobUpsertOne) UpdateTCPProbePorts() *IpScanJobUpsertOne {
 	return u.Update(func(s *IpScanJobUpsert) {
 		s.UpdateTCPProbePorts()
+	})
+}
+
+// SetEnableSnmp sets the "enable_snmp" field.
+func (u *IpScanJobUpsertOne) SetEnableSnmp(v bool) *IpScanJobUpsertOne {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.SetEnableSnmp(v)
+	})
+}
+
+// UpdateEnableSnmp sets the "enable_snmp" field to the value that was provided on create.
+func (u *IpScanJobUpsertOne) UpdateEnableSnmp() *IpScanJobUpsertOne {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.UpdateEnableSnmp()
+	})
+}
+
+// SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
+func (u *IpScanJobUpsertOne) SetSnmpDiscoveredCount(v int64) *IpScanJobUpsertOne {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.SetSnmpDiscoveredCount(v)
+	})
+}
+
+// AddSnmpDiscoveredCount adds v to the "snmp_discovered_count" field.
+func (u *IpScanJobUpsertOne) AddSnmpDiscoveredCount(v int64) *IpScanJobUpsertOne {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.AddSnmpDiscoveredCount(v)
+	})
+}
+
+// UpdateSnmpDiscoveredCount sets the "snmp_discovered_count" field to the value that was provided on create.
+func (u *IpScanJobUpsertOne) UpdateSnmpDiscoveredCount() *IpScanJobUpsertOne {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.UpdateSnmpDiscoveredCount()
 	})
 }
 
@@ -2299,6 +2413,41 @@ func (u *IpScanJobUpsertBulk) SetTCPProbePorts(v string) *IpScanJobUpsertBulk {
 func (u *IpScanJobUpsertBulk) UpdateTCPProbePorts() *IpScanJobUpsertBulk {
 	return u.Update(func(s *IpScanJobUpsert) {
 		s.UpdateTCPProbePorts()
+	})
+}
+
+// SetEnableSnmp sets the "enable_snmp" field.
+func (u *IpScanJobUpsertBulk) SetEnableSnmp(v bool) *IpScanJobUpsertBulk {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.SetEnableSnmp(v)
+	})
+}
+
+// UpdateEnableSnmp sets the "enable_snmp" field to the value that was provided on create.
+func (u *IpScanJobUpsertBulk) UpdateEnableSnmp() *IpScanJobUpsertBulk {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.UpdateEnableSnmp()
+	})
+}
+
+// SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
+func (u *IpScanJobUpsertBulk) SetSnmpDiscoveredCount(v int64) *IpScanJobUpsertBulk {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.SetSnmpDiscoveredCount(v)
+	})
+}
+
+// AddSnmpDiscoveredCount adds v to the "snmp_discovered_count" field.
+func (u *IpScanJobUpsertBulk) AddSnmpDiscoveredCount(v int64) *IpScanJobUpsertBulk {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.AddSnmpDiscoveredCount(v)
+	})
+}
+
+// UpdateSnmpDiscoveredCount sets the "snmp_discovered_count" field to the value that was provided on create.
+func (u *IpScanJobUpsertBulk) UpdateSnmpDiscoveredCount() *IpScanJobUpsertBulk {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.UpdateSnmpDiscoveredCount()
 	})
 }
 

@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 )
 
 // IpScanJob is the model entity for the IpScanJob schema.
@@ -66,6 +65,10 @@ type IpScanJob struct {
 	SkipReverseDNS bool `json:"skip_reverse_dns,omitempty"`
 	// Comma-separated list of TCP ports to probe
 	TCPProbePorts string `json:"tcp_probe_ports,omitempty"`
+	// Enable SNMP device discovery
+	EnableSnmp bool `json:"enable_snmp,omitempty"`
+	// Number of SNMP devices discovered
+	SnmpDiscoveredCount int64 `json:"snmp_discovered_count,omitempty"`
 	// When the scan started
 	StartedAt *time.Time `json:"started_at,omitempty"`
 	// When the scan completed
@@ -101,9 +104,9 @@ func (*IpScanJob) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case ipscanjob.FieldSkipReverseDNS:
+		case ipscanjob.FieldSkipReverseDNS, ipscanjob.FieldEnableSnmp:
 			values[i] = new(sql.NullBool)
-		case ipscanjob.FieldCreateBy, ipscanjob.FieldUpdateBy, ipscanjob.FieldTenantID, ipscanjob.FieldProgress, ipscanjob.FieldTotalAddresses, ipscanjob.FieldScannedCount, ipscanjob.FieldAliveCount, ipscanjob.FieldNewCount, ipscanjob.FieldUpdatedCount, ipscanjob.FieldRetryCount, ipscanjob.FieldMaxRetries, ipscanjob.FieldTimeoutMs, ipscanjob.FieldConcurrency:
+		case ipscanjob.FieldCreateBy, ipscanjob.FieldUpdateBy, ipscanjob.FieldTenantID, ipscanjob.FieldProgress, ipscanjob.FieldTotalAddresses, ipscanjob.FieldScannedCount, ipscanjob.FieldAliveCount, ipscanjob.FieldNewCount, ipscanjob.FieldUpdatedCount, ipscanjob.FieldRetryCount, ipscanjob.FieldMaxRetries, ipscanjob.FieldTimeoutMs, ipscanjob.FieldConcurrency, ipscanjob.FieldSnmpDiscoveredCount:
 			values[i] = new(sql.NullInt64)
 		case ipscanjob.FieldID, ipscanjob.FieldSubnetID, ipscanjob.FieldStatus, ipscanjob.FieldStatusMessage, ipscanjob.FieldTriggeredBy, ipscanjob.FieldTCPProbePorts:
 			values[i] = new(sql.NullString)
@@ -275,6 +278,18 @@ func (_m *IpScanJob) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.TCPProbePorts = value.String
 			}
+		case ipscanjob.FieldEnableSnmp:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field enable_snmp", values[i])
+			} else if value.Valid {
+				_m.EnableSnmp = value.Bool
+			}
+		case ipscanjob.FieldSnmpDiscoveredCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field snmp_discovered_count", values[i])
+			} else if value.Valid {
+				_m.SnmpDiscoveredCount = value.Int64
+			}
 		case ipscanjob.FieldStartedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field started_at", values[i])
@@ -412,6 +427,12 @@ func (_m *IpScanJob) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("tcp_probe_ports=")
 	builder.WriteString(_m.TCPProbePorts)
+	builder.WriteString(", ")
+	builder.WriteString("enable_snmp=")
+	builder.WriteString(fmt.Sprintf("%v", _m.EnableSnmp))
+	builder.WriteString(", ")
+	builder.WriteString("snmp_discovered_count=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SnmpDiscoveredCount))
 	builder.WriteString(", ")
 	if v := _m.StartedAt; v != nil {
 		builder.WriteString("started_at=")

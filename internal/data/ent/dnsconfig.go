@@ -8,10 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 )
 
 // DnsConfig is the model entity for the DnsConfig schema.

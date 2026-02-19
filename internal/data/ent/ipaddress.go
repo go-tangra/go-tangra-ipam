@@ -7,12 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/sql"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipaddress"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
-
-	"entgo.io/ent"
-	"entgo.io/ent/dialect/sql"
 )
 
 // IpAddress is the model entity for the IpAddress schema.

@@ -9,17 +9,16 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipaddress"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipaddress"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
 // DeviceQuery is the builder for querying Device entities.

@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
-
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 )
 
 // IpScanJobUpdate is the builder for updating IpScanJob entities.
@@ -445,6 +444,41 @@ func (_u *IpScanJobUpdate) SetNillableTCPProbePorts(v *string) *IpScanJobUpdate 
 	return _u
 }
 
+// SetEnableSnmp sets the "enable_snmp" field.
+func (_u *IpScanJobUpdate) SetEnableSnmp(v bool) *IpScanJobUpdate {
+	_u.mutation.SetEnableSnmp(v)
+	return _u
+}
+
+// SetNillableEnableSnmp sets the "enable_snmp" field if the given value is not nil.
+func (_u *IpScanJobUpdate) SetNillableEnableSnmp(v *bool) *IpScanJobUpdate {
+	if v != nil {
+		_u.SetEnableSnmp(*v)
+	}
+	return _u
+}
+
+// SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
+func (_u *IpScanJobUpdate) SetSnmpDiscoveredCount(v int64) *IpScanJobUpdate {
+	_u.mutation.ResetSnmpDiscoveredCount()
+	_u.mutation.SetSnmpDiscoveredCount(v)
+	return _u
+}
+
+// SetNillableSnmpDiscoveredCount sets the "snmp_discovered_count" field if the given value is not nil.
+func (_u *IpScanJobUpdate) SetNillableSnmpDiscoveredCount(v *int64) *IpScanJobUpdate {
+	if v != nil {
+		_u.SetSnmpDiscoveredCount(*v)
+	}
+	return _u
+}
+
+// AddSnmpDiscoveredCount adds value to the "snmp_discovered_count" field.
+func (_u *IpScanJobUpdate) AddSnmpDiscoveredCount(v int64) *IpScanJobUpdate {
+	_u.mutation.AddSnmpDiscoveredCount(v)
+	return _u
+}
+
 // SetStartedAt sets the "started_at" field.
 func (_u *IpScanJobUpdate) SetStartedAt(v time.Time) *IpScanJobUpdate {
 	_u.mutation.SetStartedAt(v)
@@ -688,6 +722,15 @@ func (_u *IpScanJobUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.TCPProbePorts(); ok {
 		_spec.SetField(ipscanjob.FieldTCPProbePorts, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.EnableSnmp(); ok {
+		_spec.SetField(ipscanjob.FieldEnableSnmp, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.SnmpDiscoveredCount(); ok {
+		_spec.SetField(ipscanjob.FieldSnmpDiscoveredCount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedSnmpDiscoveredCount(); ok {
+		_spec.AddField(ipscanjob.FieldSnmpDiscoveredCount, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.StartedAt(); ok {
 		_spec.SetField(ipscanjob.FieldStartedAt, field.TypeTime, value)
@@ -1166,6 +1209,41 @@ func (_u *IpScanJobUpdateOne) SetNillableTCPProbePorts(v *string) *IpScanJobUpda
 	return _u
 }
 
+// SetEnableSnmp sets the "enable_snmp" field.
+func (_u *IpScanJobUpdateOne) SetEnableSnmp(v bool) *IpScanJobUpdateOne {
+	_u.mutation.SetEnableSnmp(v)
+	return _u
+}
+
+// SetNillableEnableSnmp sets the "enable_snmp" field if the given value is not nil.
+func (_u *IpScanJobUpdateOne) SetNillableEnableSnmp(v *bool) *IpScanJobUpdateOne {
+	if v != nil {
+		_u.SetEnableSnmp(*v)
+	}
+	return _u
+}
+
+// SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
+func (_u *IpScanJobUpdateOne) SetSnmpDiscoveredCount(v int64) *IpScanJobUpdateOne {
+	_u.mutation.ResetSnmpDiscoveredCount()
+	_u.mutation.SetSnmpDiscoveredCount(v)
+	return _u
+}
+
+// SetNillableSnmpDiscoveredCount sets the "snmp_discovered_count" field if the given value is not nil.
+func (_u *IpScanJobUpdateOne) SetNillableSnmpDiscoveredCount(v *int64) *IpScanJobUpdateOne {
+	if v != nil {
+		_u.SetSnmpDiscoveredCount(*v)
+	}
+	return _u
+}
+
+// AddSnmpDiscoveredCount adds value to the "snmp_discovered_count" field.
+func (_u *IpScanJobUpdateOne) AddSnmpDiscoveredCount(v int64) *IpScanJobUpdateOne {
+	_u.mutation.AddSnmpDiscoveredCount(v)
+	return _u
+}
+
 // SetStartedAt sets the "started_at" field.
 func (_u *IpScanJobUpdateOne) SetStartedAt(v time.Time) *IpScanJobUpdateOne {
 	_u.mutation.SetStartedAt(v)
@@ -1439,6 +1517,15 @@ func (_u *IpScanJobUpdateOne) sqlSave(ctx context.Context) (_node *IpScanJob, er
 	}
 	if value, ok := _u.mutation.TCPProbePorts(); ok {
 		_spec.SetField(ipscanjob.FieldTCPProbePorts, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.EnableSnmp(); ok {
+		_spec.SetField(ipscanjob.FieldEnableSnmp, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.SnmpDiscoveredCount(); ok {
+		_spec.SetField(ipscanjob.FieldSnmpDiscoveredCount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedSnmpDiscoveredCount(); ok {
+		_spec.AddField(ipscanjob.FieldSnmpDiscoveredCount, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.StartedAt(); ok {
 		_spec.SetField(ipscanjob.FieldStartedAt, field.TypeTime, value)

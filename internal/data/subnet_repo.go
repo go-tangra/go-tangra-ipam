@@ -211,6 +211,27 @@ func (r *SubnetRepo) Update(ctx context.Context, id string, updates map[string]i
 	if metadata, ok := updates["metadata"].(string); ok {
 		update = update.SetMetadata(metadata)
 	}
+	if v, ok := updates["snmp_community"].(string); ok {
+		update = update.SetSnmpCommunity(v)
+	}
+	if v, ok := updates["snmp_version"].(int32); ok {
+		update = update.SetSnmpVersion(v)
+	}
+	if v, ok := updates["snmp_user"].(string); ok {
+		update = update.SetSnmpUser(v)
+	}
+	if v, ok := updates["snmp_auth_password"].(string); ok {
+		update = update.SetSnmpAuthPassword(v)
+	}
+	if v, ok := updates["snmp_priv_password"].(string); ok {
+		update = update.SetSnmpPrivPassword(v)
+	}
+	if v, ok := updates["snmp_auth_protocol"].(string); ok {
+		update = update.SetSnmpAuthProtocol(v)
+	}
+	if v, ok := updates["snmp_priv_protocol"].(string); ok {
+		update = update.SetSnmpPrivProtocol(v)
+	}
 
 	update = update.SetUpdateTime(time.Now())
 

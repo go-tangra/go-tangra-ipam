@@ -5,10 +5,9 @@ package subnet
 import (
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
 // ID filters vertices based on their ID field.
@@ -179,6 +178,41 @@ func Tags(v string) predicate.Subnet {
 // Metadata applies equality check predicate on the "metadata" field. It's identical to MetadataEQ.
 func Metadata(v string) predicate.Subnet {
 	return predicate.Subnet(sql.FieldEQ(FieldMetadata, v))
+}
+
+// SnmpCommunity applies equality check predicate on the "snmp_community" field. It's identical to SnmpCommunityEQ.
+func SnmpCommunity(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpCommunity, v))
+}
+
+// SnmpVersion applies equality check predicate on the "snmp_version" field. It's identical to SnmpVersionEQ.
+func SnmpVersion(v int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpVersion, v))
+}
+
+// SnmpUser applies equality check predicate on the "snmp_user" field. It's identical to SnmpUserEQ.
+func SnmpUser(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpUser, v))
+}
+
+// SnmpAuthPassword applies equality check predicate on the "snmp_auth_password" field. It's identical to SnmpAuthPasswordEQ.
+func SnmpAuthPassword(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpAuthPassword, v))
+}
+
+// SnmpPrivPassword applies equality check predicate on the "snmp_priv_password" field. It's identical to SnmpPrivPasswordEQ.
+func SnmpPrivPassword(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpPrivPassword, v))
+}
+
+// SnmpAuthProtocol applies equality check predicate on the "snmp_auth_protocol" field. It's identical to SnmpAuthProtocolEQ.
+func SnmpAuthProtocol(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpPrivProtocol applies equality check predicate on the "snmp_priv_protocol" field. It's identical to SnmpPrivProtocolEQ.
+func SnmpPrivProtocol(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpPrivProtocol, v))
 }
 
 // CreateByEQ applies the EQ predicate on the "create_by" field.
@@ -1604,6 +1638,496 @@ func MetadataEqualFold(v string) predicate.Subnet {
 // MetadataContainsFold applies the ContainsFold predicate on the "metadata" field.
 func MetadataContainsFold(v string) predicate.Subnet {
 	return predicate.Subnet(sql.FieldContainsFold(FieldMetadata, v))
+}
+
+// SnmpCommunityEQ applies the EQ predicate on the "snmp_community" field.
+func SnmpCommunityEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityNEQ applies the NEQ predicate on the "snmp_community" field.
+func SnmpCommunityNEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNEQ(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityIn applies the In predicate on the "snmp_community" field.
+func SnmpCommunityIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldIn(FieldSnmpCommunity, vs...))
+}
+
+// SnmpCommunityNotIn applies the NotIn predicate on the "snmp_community" field.
+func SnmpCommunityNotIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotIn(FieldSnmpCommunity, vs...))
+}
+
+// SnmpCommunityGT applies the GT predicate on the "snmp_community" field.
+func SnmpCommunityGT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGT(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityGTE applies the GTE predicate on the "snmp_community" field.
+func SnmpCommunityGTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGTE(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityLT applies the LT predicate on the "snmp_community" field.
+func SnmpCommunityLT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLT(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityLTE applies the LTE predicate on the "snmp_community" field.
+func SnmpCommunityLTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLTE(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityContains applies the Contains predicate on the "snmp_community" field.
+func SnmpCommunityContains(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContains(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityHasPrefix applies the HasPrefix predicate on the "snmp_community" field.
+func SnmpCommunityHasPrefix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasPrefix(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityHasSuffix applies the HasSuffix predicate on the "snmp_community" field.
+func SnmpCommunityHasSuffix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasSuffix(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityIsNil applies the IsNil predicate on the "snmp_community" field.
+func SnmpCommunityIsNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldIsNull(FieldSnmpCommunity))
+}
+
+// SnmpCommunityNotNil applies the NotNil predicate on the "snmp_community" field.
+func SnmpCommunityNotNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotNull(FieldSnmpCommunity))
+}
+
+// SnmpCommunityEqualFold applies the EqualFold predicate on the "snmp_community" field.
+func SnmpCommunityEqualFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEqualFold(FieldSnmpCommunity, v))
+}
+
+// SnmpCommunityContainsFold applies the ContainsFold predicate on the "snmp_community" field.
+func SnmpCommunityContainsFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContainsFold(FieldSnmpCommunity, v))
+}
+
+// SnmpVersionEQ applies the EQ predicate on the "snmp_version" field.
+func SnmpVersionEQ(v int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpVersion, v))
+}
+
+// SnmpVersionNEQ applies the NEQ predicate on the "snmp_version" field.
+func SnmpVersionNEQ(v int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNEQ(FieldSnmpVersion, v))
+}
+
+// SnmpVersionIn applies the In predicate on the "snmp_version" field.
+func SnmpVersionIn(vs ...int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldIn(FieldSnmpVersion, vs...))
+}
+
+// SnmpVersionNotIn applies the NotIn predicate on the "snmp_version" field.
+func SnmpVersionNotIn(vs ...int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotIn(FieldSnmpVersion, vs...))
+}
+
+// SnmpVersionGT applies the GT predicate on the "snmp_version" field.
+func SnmpVersionGT(v int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGT(FieldSnmpVersion, v))
+}
+
+// SnmpVersionGTE applies the GTE predicate on the "snmp_version" field.
+func SnmpVersionGTE(v int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGTE(FieldSnmpVersion, v))
+}
+
+// SnmpVersionLT applies the LT predicate on the "snmp_version" field.
+func SnmpVersionLT(v int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLT(FieldSnmpVersion, v))
+}
+
+// SnmpVersionLTE applies the LTE predicate on the "snmp_version" field.
+func SnmpVersionLTE(v int32) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLTE(FieldSnmpVersion, v))
+}
+
+// SnmpUserEQ applies the EQ predicate on the "snmp_user" field.
+func SnmpUserEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpUser, v))
+}
+
+// SnmpUserNEQ applies the NEQ predicate on the "snmp_user" field.
+func SnmpUserNEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNEQ(FieldSnmpUser, v))
+}
+
+// SnmpUserIn applies the In predicate on the "snmp_user" field.
+func SnmpUserIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldIn(FieldSnmpUser, vs...))
+}
+
+// SnmpUserNotIn applies the NotIn predicate on the "snmp_user" field.
+func SnmpUserNotIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotIn(FieldSnmpUser, vs...))
+}
+
+// SnmpUserGT applies the GT predicate on the "snmp_user" field.
+func SnmpUserGT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGT(FieldSnmpUser, v))
+}
+
+// SnmpUserGTE applies the GTE predicate on the "snmp_user" field.
+func SnmpUserGTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGTE(FieldSnmpUser, v))
+}
+
+// SnmpUserLT applies the LT predicate on the "snmp_user" field.
+func SnmpUserLT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLT(FieldSnmpUser, v))
+}
+
+// SnmpUserLTE applies the LTE predicate on the "snmp_user" field.
+func SnmpUserLTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLTE(FieldSnmpUser, v))
+}
+
+// SnmpUserContains applies the Contains predicate on the "snmp_user" field.
+func SnmpUserContains(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContains(FieldSnmpUser, v))
+}
+
+// SnmpUserHasPrefix applies the HasPrefix predicate on the "snmp_user" field.
+func SnmpUserHasPrefix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasPrefix(FieldSnmpUser, v))
+}
+
+// SnmpUserHasSuffix applies the HasSuffix predicate on the "snmp_user" field.
+func SnmpUserHasSuffix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasSuffix(FieldSnmpUser, v))
+}
+
+// SnmpUserIsNil applies the IsNil predicate on the "snmp_user" field.
+func SnmpUserIsNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldIsNull(FieldSnmpUser))
+}
+
+// SnmpUserNotNil applies the NotNil predicate on the "snmp_user" field.
+func SnmpUserNotNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotNull(FieldSnmpUser))
+}
+
+// SnmpUserEqualFold applies the EqualFold predicate on the "snmp_user" field.
+func SnmpUserEqualFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEqualFold(FieldSnmpUser, v))
+}
+
+// SnmpUserContainsFold applies the ContainsFold predicate on the "snmp_user" field.
+func SnmpUserContainsFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContainsFold(FieldSnmpUser, v))
+}
+
+// SnmpAuthPasswordEQ applies the EQ predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordNEQ applies the NEQ predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordNEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNEQ(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordIn applies the In predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldIn(FieldSnmpAuthPassword, vs...))
+}
+
+// SnmpAuthPasswordNotIn applies the NotIn predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordNotIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotIn(FieldSnmpAuthPassword, vs...))
+}
+
+// SnmpAuthPasswordGT applies the GT predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordGT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGT(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordGTE applies the GTE predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordGTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGTE(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordLT applies the LT predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordLT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLT(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordLTE applies the LTE predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordLTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLTE(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordContains applies the Contains predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordContains(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContains(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordHasPrefix applies the HasPrefix predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordHasPrefix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasPrefix(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordHasSuffix applies the HasSuffix predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordHasSuffix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasSuffix(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordIsNil applies the IsNil predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordIsNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldIsNull(FieldSnmpAuthPassword))
+}
+
+// SnmpAuthPasswordNotNil applies the NotNil predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordNotNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotNull(FieldSnmpAuthPassword))
+}
+
+// SnmpAuthPasswordEqualFold applies the EqualFold predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordEqualFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEqualFold(FieldSnmpAuthPassword, v))
+}
+
+// SnmpAuthPasswordContainsFold applies the ContainsFold predicate on the "snmp_auth_password" field.
+func SnmpAuthPasswordContainsFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContainsFold(FieldSnmpAuthPassword, v))
+}
+
+// SnmpPrivPasswordEQ applies the EQ predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordNEQ applies the NEQ predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordNEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNEQ(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordIn applies the In predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldIn(FieldSnmpPrivPassword, vs...))
+}
+
+// SnmpPrivPasswordNotIn applies the NotIn predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordNotIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotIn(FieldSnmpPrivPassword, vs...))
+}
+
+// SnmpPrivPasswordGT applies the GT predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordGT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGT(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordGTE applies the GTE predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordGTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGTE(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordLT applies the LT predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordLT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLT(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordLTE applies the LTE predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordLTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLTE(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordContains applies the Contains predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordContains(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContains(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordHasPrefix applies the HasPrefix predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordHasPrefix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasPrefix(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordHasSuffix applies the HasSuffix predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordHasSuffix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasSuffix(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordIsNil applies the IsNil predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordIsNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldIsNull(FieldSnmpPrivPassword))
+}
+
+// SnmpPrivPasswordNotNil applies the NotNil predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordNotNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotNull(FieldSnmpPrivPassword))
+}
+
+// SnmpPrivPasswordEqualFold applies the EqualFold predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordEqualFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEqualFold(FieldSnmpPrivPassword, v))
+}
+
+// SnmpPrivPasswordContainsFold applies the ContainsFold predicate on the "snmp_priv_password" field.
+func SnmpPrivPasswordContainsFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContainsFold(FieldSnmpPrivPassword, v))
+}
+
+// SnmpAuthProtocolEQ applies the EQ predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolNEQ applies the NEQ predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolNEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNEQ(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolIn applies the In predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldIn(FieldSnmpAuthProtocol, vs...))
+}
+
+// SnmpAuthProtocolNotIn applies the NotIn predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolNotIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotIn(FieldSnmpAuthProtocol, vs...))
+}
+
+// SnmpAuthProtocolGT applies the GT predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolGT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGT(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolGTE applies the GTE predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolGTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGTE(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolLT applies the LT predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolLT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLT(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolLTE applies the LTE predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolLTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLTE(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolContains applies the Contains predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolContains(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContains(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolHasPrefix applies the HasPrefix predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolHasPrefix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasPrefix(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolHasSuffix applies the HasSuffix predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolHasSuffix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasSuffix(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolIsNil applies the IsNil predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolIsNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldIsNull(FieldSnmpAuthProtocol))
+}
+
+// SnmpAuthProtocolNotNil applies the NotNil predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolNotNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotNull(FieldSnmpAuthProtocol))
+}
+
+// SnmpAuthProtocolEqualFold applies the EqualFold predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolEqualFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEqualFold(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpAuthProtocolContainsFold applies the ContainsFold predicate on the "snmp_auth_protocol" field.
+func SnmpAuthProtocolContainsFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContainsFold(FieldSnmpAuthProtocol, v))
+}
+
+// SnmpPrivProtocolEQ applies the EQ predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEQ(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolNEQ applies the NEQ predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolNEQ(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNEQ(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolIn applies the In predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldIn(FieldSnmpPrivProtocol, vs...))
+}
+
+// SnmpPrivProtocolNotIn applies the NotIn predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolNotIn(vs ...string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotIn(FieldSnmpPrivProtocol, vs...))
+}
+
+// SnmpPrivProtocolGT applies the GT predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolGT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGT(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolGTE applies the GTE predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolGTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldGTE(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolLT applies the LT predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolLT(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLT(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolLTE applies the LTE predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolLTE(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldLTE(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolContains applies the Contains predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolContains(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContains(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolHasPrefix applies the HasPrefix predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolHasPrefix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasPrefix(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolHasSuffix applies the HasSuffix predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolHasSuffix(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldHasSuffix(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolIsNil applies the IsNil predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolIsNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldIsNull(FieldSnmpPrivProtocol))
+}
+
+// SnmpPrivProtocolNotNil applies the NotNil predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolNotNil() predicate.Subnet {
+	return predicate.Subnet(sql.FieldNotNull(FieldSnmpPrivProtocol))
+}
+
+// SnmpPrivProtocolEqualFold applies the EqualFold predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolEqualFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldEqualFold(FieldSnmpPrivProtocol, v))
+}
+
+// SnmpPrivProtocolContainsFold applies the ContainsFold predicate on the "snmp_priv_protocol" field.
+func SnmpPrivProtocolContainsFold(v string) predicate.Subnet {
+	return predicate.Subnet(sql.FieldContainsFold(FieldSnmpPrivProtocol, v))
 }
 
 // HasAddresses applies the HasEdge predicate on the "addresses" edge.

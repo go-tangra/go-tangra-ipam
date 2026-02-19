@@ -8,16 +8,15 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/schema/field"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipaddress"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
-
-	"entgo.io/ent/dialect"
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/schema/field"
 )
 
 // SubnetCreate is the builder for creating a Subnet entity.
@@ -334,6 +333,104 @@ func (_c *SubnetCreate) SetNillableMetadata(v *string) *SubnetCreate {
 	return _c
 }
 
+// SetSnmpCommunity sets the "snmp_community" field.
+func (_c *SubnetCreate) SetSnmpCommunity(v string) *SubnetCreate {
+	_c.mutation.SetSnmpCommunity(v)
+	return _c
+}
+
+// SetNillableSnmpCommunity sets the "snmp_community" field if the given value is not nil.
+func (_c *SubnetCreate) SetNillableSnmpCommunity(v *string) *SubnetCreate {
+	if v != nil {
+		_c.SetSnmpCommunity(*v)
+	}
+	return _c
+}
+
+// SetSnmpVersion sets the "snmp_version" field.
+func (_c *SubnetCreate) SetSnmpVersion(v int32) *SubnetCreate {
+	_c.mutation.SetSnmpVersion(v)
+	return _c
+}
+
+// SetNillableSnmpVersion sets the "snmp_version" field if the given value is not nil.
+func (_c *SubnetCreate) SetNillableSnmpVersion(v *int32) *SubnetCreate {
+	if v != nil {
+		_c.SetSnmpVersion(*v)
+	}
+	return _c
+}
+
+// SetSnmpUser sets the "snmp_user" field.
+func (_c *SubnetCreate) SetSnmpUser(v string) *SubnetCreate {
+	_c.mutation.SetSnmpUser(v)
+	return _c
+}
+
+// SetNillableSnmpUser sets the "snmp_user" field if the given value is not nil.
+func (_c *SubnetCreate) SetNillableSnmpUser(v *string) *SubnetCreate {
+	if v != nil {
+		_c.SetSnmpUser(*v)
+	}
+	return _c
+}
+
+// SetSnmpAuthPassword sets the "snmp_auth_password" field.
+func (_c *SubnetCreate) SetSnmpAuthPassword(v string) *SubnetCreate {
+	_c.mutation.SetSnmpAuthPassword(v)
+	return _c
+}
+
+// SetNillableSnmpAuthPassword sets the "snmp_auth_password" field if the given value is not nil.
+func (_c *SubnetCreate) SetNillableSnmpAuthPassword(v *string) *SubnetCreate {
+	if v != nil {
+		_c.SetSnmpAuthPassword(*v)
+	}
+	return _c
+}
+
+// SetSnmpPrivPassword sets the "snmp_priv_password" field.
+func (_c *SubnetCreate) SetSnmpPrivPassword(v string) *SubnetCreate {
+	_c.mutation.SetSnmpPrivPassword(v)
+	return _c
+}
+
+// SetNillableSnmpPrivPassword sets the "snmp_priv_password" field if the given value is not nil.
+func (_c *SubnetCreate) SetNillableSnmpPrivPassword(v *string) *SubnetCreate {
+	if v != nil {
+		_c.SetSnmpPrivPassword(*v)
+	}
+	return _c
+}
+
+// SetSnmpAuthProtocol sets the "snmp_auth_protocol" field.
+func (_c *SubnetCreate) SetSnmpAuthProtocol(v string) *SubnetCreate {
+	_c.mutation.SetSnmpAuthProtocol(v)
+	return _c
+}
+
+// SetNillableSnmpAuthProtocol sets the "snmp_auth_protocol" field if the given value is not nil.
+func (_c *SubnetCreate) SetNillableSnmpAuthProtocol(v *string) *SubnetCreate {
+	if v != nil {
+		_c.SetSnmpAuthProtocol(*v)
+	}
+	return _c
+}
+
+// SetSnmpPrivProtocol sets the "snmp_priv_protocol" field.
+func (_c *SubnetCreate) SetSnmpPrivProtocol(v string) *SubnetCreate {
+	_c.mutation.SetSnmpPrivProtocol(v)
+	return _c
+}
+
+// SetNillableSnmpPrivProtocol sets the "snmp_priv_protocol" field if the given value is not nil.
+func (_c *SubnetCreate) SetNillableSnmpPrivProtocol(v *string) *SubnetCreate {
+	if v != nil {
+		_c.SetSnmpPrivProtocol(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *SubnetCreate) SetID(v string) *SubnetCreate {
 	_c.mutation.SetID(v)
@@ -453,6 +550,10 @@ func (_c *SubnetCreate) defaults() error {
 		v := subnet.DefaultTotalAddresses
 		_c.mutation.SetTotalAddresses(v)
 	}
+	if _, ok := _c.mutation.SnmpVersion(); !ok {
+		v := subnet.DefaultSnmpVersion
+		_c.mutation.SetSnmpVersion(v)
+	}
 	return nil
 }
 
@@ -482,6 +583,9 @@ func (_c *SubnetCreate) check() error {
 	}
 	if _, ok := _c.mutation.TotalAddresses(); !ok {
 		return &ValidationError{Name: "total_addresses", err: errors.New(`ent: missing required field "Subnet.total_addresses"`)}
+	}
+	if _, ok := _c.mutation.SnmpVersion(); !ok {
+		return &ValidationError{Name: "snmp_version", err: errors.New(`ent: missing required field "Subnet.snmp_version"`)}
 	}
 	if v, ok := _c.mutation.ID(); ok {
 		if err := subnet.IDValidator(v); err != nil {
@@ -603,6 +707,34 @@ func (_c *SubnetCreate) createSpec() (*Subnet, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Metadata(); ok {
 		_spec.SetField(subnet.FieldMetadata, field.TypeString, value)
 		_node.Metadata = value
+	}
+	if value, ok := _c.mutation.SnmpCommunity(); ok {
+		_spec.SetField(subnet.FieldSnmpCommunity, field.TypeString, value)
+		_node.SnmpCommunity = value
+	}
+	if value, ok := _c.mutation.SnmpVersion(); ok {
+		_spec.SetField(subnet.FieldSnmpVersion, field.TypeInt32, value)
+		_node.SnmpVersion = value
+	}
+	if value, ok := _c.mutation.SnmpUser(); ok {
+		_spec.SetField(subnet.FieldSnmpUser, field.TypeString, value)
+		_node.SnmpUser = value
+	}
+	if value, ok := _c.mutation.SnmpAuthPassword(); ok {
+		_spec.SetField(subnet.FieldSnmpAuthPassword, field.TypeString, value)
+		_node.SnmpAuthPassword = value
+	}
+	if value, ok := _c.mutation.SnmpPrivPassword(); ok {
+		_spec.SetField(subnet.FieldSnmpPrivPassword, field.TypeString, value)
+		_node.SnmpPrivPassword = value
+	}
+	if value, ok := _c.mutation.SnmpAuthProtocol(); ok {
+		_spec.SetField(subnet.FieldSnmpAuthProtocol, field.TypeString, value)
+		_node.SnmpAuthProtocol = value
+	}
+	if value, ok := _c.mutation.SnmpPrivProtocol(); ok {
+		_spec.SetField(subnet.FieldSnmpPrivProtocol, field.TypeString, value)
+		_node.SnmpPrivProtocol = value
 	}
 	if nodes := _c.mutation.AddressesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -1139,6 +1271,132 @@ func (u *SubnetUpsert) ClearMetadata() *SubnetUpsert {
 	return u
 }
 
+// SetSnmpCommunity sets the "snmp_community" field.
+func (u *SubnetUpsert) SetSnmpCommunity(v string) *SubnetUpsert {
+	u.Set(subnet.FieldSnmpCommunity, v)
+	return u
+}
+
+// UpdateSnmpCommunity sets the "snmp_community" field to the value that was provided on create.
+func (u *SubnetUpsert) UpdateSnmpCommunity() *SubnetUpsert {
+	u.SetExcluded(subnet.FieldSnmpCommunity)
+	return u
+}
+
+// ClearSnmpCommunity clears the value of the "snmp_community" field.
+func (u *SubnetUpsert) ClearSnmpCommunity() *SubnetUpsert {
+	u.SetNull(subnet.FieldSnmpCommunity)
+	return u
+}
+
+// SetSnmpVersion sets the "snmp_version" field.
+func (u *SubnetUpsert) SetSnmpVersion(v int32) *SubnetUpsert {
+	u.Set(subnet.FieldSnmpVersion, v)
+	return u
+}
+
+// UpdateSnmpVersion sets the "snmp_version" field to the value that was provided on create.
+func (u *SubnetUpsert) UpdateSnmpVersion() *SubnetUpsert {
+	u.SetExcluded(subnet.FieldSnmpVersion)
+	return u
+}
+
+// AddSnmpVersion adds v to the "snmp_version" field.
+func (u *SubnetUpsert) AddSnmpVersion(v int32) *SubnetUpsert {
+	u.Add(subnet.FieldSnmpVersion, v)
+	return u
+}
+
+// SetSnmpUser sets the "snmp_user" field.
+func (u *SubnetUpsert) SetSnmpUser(v string) *SubnetUpsert {
+	u.Set(subnet.FieldSnmpUser, v)
+	return u
+}
+
+// UpdateSnmpUser sets the "snmp_user" field to the value that was provided on create.
+func (u *SubnetUpsert) UpdateSnmpUser() *SubnetUpsert {
+	u.SetExcluded(subnet.FieldSnmpUser)
+	return u
+}
+
+// ClearSnmpUser clears the value of the "snmp_user" field.
+func (u *SubnetUpsert) ClearSnmpUser() *SubnetUpsert {
+	u.SetNull(subnet.FieldSnmpUser)
+	return u
+}
+
+// SetSnmpAuthPassword sets the "snmp_auth_password" field.
+func (u *SubnetUpsert) SetSnmpAuthPassword(v string) *SubnetUpsert {
+	u.Set(subnet.FieldSnmpAuthPassword, v)
+	return u
+}
+
+// UpdateSnmpAuthPassword sets the "snmp_auth_password" field to the value that was provided on create.
+func (u *SubnetUpsert) UpdateSnmpAuthPassword() *SubnetUpsert {
+	u.SetExcluded(subnet.FieldSnmpAuthPassword)
+	return u
+}
+
+// ClearSnmpAuthPassword clears the value of the "snmp_auth_password" field.
+func (u *SubnetUpsert) ClearSnmpAuthPassword() *SubnetUpsert {
+	u.SetNull(subnet.FieldSnmpAuthPassword)
+	return u
+}
+
+// SetSnmpPrivPassword sets the "snmp_priv_password" field.
+func (u *SubnetUpsert) SetSnmpPrivPassword(v string) *SubnetUpsert {
+	u.Set(subnet.FieldSnmpPrivPassword, v)
+	return u
+}
+
+// UpdateSnmpPrivPassword sets the "snmp_priv_password" field to the value that was provided on create.
+func (u *SubnetUpsert) UpdateSnmpPrivPassword() *SubnetUpsert {
+	u.SetExcluded(subnet.FieldSnmpPrivPassword)
+	return u
+}
+
+// ClearSnmpPrivPassword clears the value of the "snmp_priv_password" field.
+func (u *SubnetUpsert) ClearSnmpPrivPassword() *SubnetUpsert {
+	u.SetNull(subnet.FieldSnmpPrivPassword)
+	return u
+}
+
+// SetSnmpAuthProtocol sets the "snmp_auth_protocol" field.
+func (u *SubnetUpsert) SetSnmpAuthProtocol(v string) *SubnetUpsert {
+	u.Set(subnet.FieldSnmpAuthProtocol, v)
+	return u
+}
+
+// UpdateSnmpAuthProtocol sets the "snmp_auth_protocol" field to the value that was provided on create.
+func (u *SubnetUpsert) UpdateSnmpAuthProtocol() *SubnetUpsert {
+	u.SetExcluded(subnet.FieldSnmpAuthProtocol)
+	return u
+}
+
+// ClearSnmpAuthProtocol clears the value of the "snmp_auth_protocol" field.
+func (u *SubnetUpsert) ClearSnmpAuthProtocol() *SubnetUpsert {
+	u.SetNull(subnet.FieldSnmpAuthProtocol)
+	return u
+}
+
+// SetSnmpPrivProtocol sets the "snmp_priv_protocol" field.
+func (u *SubnetUpsert) SetSnmpPrivProtocol(v string) *SubnetUpsert {
+	u.Set(subnet.FieldSnmpPrivProtocol, v)
+	return u
+}
+
+// UpdateSnmpPrivProtocol sets the "snmp_priv_protocol" field to the value that was provided on create.
+func (u *SubnetUpsert) UpdateSnmpPrivProtocol() *SubnetUpsert {
+	u.SetExcluded(subnet.FieldSnmpPrivProtocol)
+	return u
+}
+
+// ClearSnmpPrivProtocol clears the value of the "snmp_priv_protocol" field.
+func (u *SubnetUpsert) ClearSnmpPrivProtocol() *SubnetUpsert {
+	u.SetNull(subnet.FieldSnmpPrivProtocol)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -1638,6 +1896,153 @@ func (u *SubnetUpsertOne) UpdateMetadata() *SubnetUpsertOne {
 func (u *SubnetUpsertOne) ClearMetadata() *SubnetUpsertOne {
 	return u.Update(func(s *SubnetUpsert) {
 		s.ClearMetadata()
+	})
+}
+
+// SetSnmpCommunity sets the "snmp_community" field.
+func (u *SubnetUpsertOne) SetSnmpCommunity(v string) *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpCommunity(v)
+	})
+}
+
+// UpdateSnmpCommunity sets the "snmp_community" field to the value that was provided on create.
+func (u *SubnetUpsertOne) UpdateSnmpCommunity() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpCommunity()
+	})
+}
+
+// ClearSnmpCommunity clears the value of the "snmp_community" field.
+func (u *SubnetUpsertOne) ClearSnmpCommunity() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpCommunity()
+	})
+}
+
+// SetSnmpVersion sets the "snmp_version" field.
+func (u *SubnetUpsertOne) SetSnmpVersion(v int32) *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpVersion(v)
+	})
+}
+
+// AddSnmpVersion adds v to the "snmp_version" field.
+func (u *SubnetUpsertOne) AddSnmpVersion(v int32) *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.AddSnmpVersion(v)
+	})
+}
+
+// UpdateSnmpVersion sets the "snmp_version" field to the value that was provided on create.
+func (u *SubnetUpsertOne) UpdateSnmpVersion() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpVersion()
+	})
+}
+
+// SetSnmpUser sets the "snmp_user" field.
+func (u *SubnetUpsertOne) SetSnmpUser(v string) *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpUser(v)
+	})
+}
+
+// UpdateSnmpUser sets the "snmp_user" field to the value that was provided on create.
+func (u *SubnetUpsertOne) UpdateSnmpUser() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpUser()
+	})
+}
+
+// ClearSnmpUser clears the value of the "snmp_user" field.
+func (u *SubnetUpsertOne) ClearSnmpUser() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpUser()
+	})
+}
+
+// SetSnmpAuthPassword sets the "snmp_auth_password" field.
+func (u *SubnetUpsertOne) SetSnmpAuthPassword(v string) *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpAuthPassword(v)
+	})
+}
+
+// UpdateSnmpAuthPassword sets the "snmp_auth_password" field to the value that was provided on create.
+func (u *SubnetUpsertOne) UpdateSnmpAuthPassword() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpAuthPassword()
+	})
+}
+
+// ClearSnmpAuthPassword clears the value of the "snmp_auth_password" field.
+func (u *SubnetUpsertOne) ClearSnmpAuthPassword() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpAuthPassword()
+	})
+}
+
+// SetSnmpPrivPassword sets the "snmp_priv_password" field.
+func (u *SubnetUpsertOne) SetSnmpPrivPassword(v string) *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpPrivPassword(v)
+	})
+}
+
+// UpdateSnmpPrivPassword sets the "snmp_priv_password" field to the value that was provided on create.
+func (u *SubnetUpsertOne) UpdateSnmpPrivPassword() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpPrivPassword()
+	})
+}
+
+// ClearSnmpPrivPassword clears the value of the "snmp_priv_password" field.
+func (u *SubnetUpsertOne) ClearSnmpPrivPassword() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpPrivPassword()
+	})
+}
+
+// SetSnmpAuthProtocol sets the "snmp_auth_protocol" field.
+func (u *SubnetUpsertOne) SetSnmpAuthProtocol(v string) *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpAuthProtocol(v)
+	})
+}
+
+// UpdateSnmpAuthProtocol sets the "snmp_auth_protocol" field to the value that was provided on create.
+func (u *SubnetUpsertOne) UpdateSnmpAuthProtocol() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpAuthProtocol()
+	})
+}
+
+// ClearSnmpAuthProtocol clears the value of the "snmp_auth_protocol" field.
+func (u *SubnetUpsertOne) ClearSnmpAuthProtocol() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpAuthProtocol()
+	})
+}
+
+// SetSnmpPrivProtocol sets the "snmp_priv_protocol" field.
+func (u *SubnetUpsertOne) SetSnmpPrivProtocol(v string) *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpPrivProtocol(v)
+	})
+}
+
+// UpdateSnmpPrivProtocol sets the "snmp_priv_protocol" field to the value that was provided on create.
+func (u *SubnetUpsertOne) UpdateSnmpPrivProtocol() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpPrivProtocol()
+	})
+}
+
+// ClearSnmpPrivProtocol clears the value of the "snmp_priv_protocol" field.
+func (u *SubnetUpsertOne) ClearSnmpPrivProtocol() *SubnetUpsertOne {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpPrivProtocol()
 	})
 }
 
@@ -2307,6 +2712,153 @@ func (u *SubnetUpsertBulk) UpdateMetadata() *SubnetUpsertBulk {
 func (u *SubnetUpsertBulk) ClearMetadata() *SubnetUpsertBulk {
 	return u.Update(func(s *SubnetUpsert) {
 		s.ClearMetadata()
+	})
+}
+
+// SetSnmpCommunity sets the "snmp_community" field.
+func (u *SubnetUpsertBulk) SetSnmpCommunity(v string) *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpCommunity(v)
+	})
+}
+
+// UpdateSnmpCommunity sets the "snmp_community" field to the value that was provided on create.
+func (u *SubnetUpsertBulk) UpdateSnmpCommunity() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpCommunity()
+	})
+}
+
+// ClearSnmpCommunity clears the value of the "snmp_community" field.
+func (u *SubnetUpsertBulk) ClearSnmpCommunity() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpCommunity()
+	})
+}
+
+// SetSnmpVersion sets the "snmp_version" field.
+func (u *SubnetUpsertBulk) SetSnmpVersion(v int32) *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpVersion(v)
+	})
+}
+
+// AddSnmpVersion adds v to the "snmp_version" field.
+func (u *SubnetUpsertBulk) AddSnmpVersion(v int32) *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.AddSnmpVersion(v)
+	})
+}
+
+// UpdateSnmpVersion sets the "snmp_version" field to the value that was provided on create.
+func (u *SubnetUpsertBulk) UpdateSnmpVersion() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpVersion()
+	})
+}
+
+// SetSnmpUser sets the "snmp_user" field.
+func (u *SubnetUpsertBulk) SetSnmpUser(v string) *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpUser(v)
+	})
+}
+
+// UpdateSnmpUser sets the "snmp_user" field to the value that was provided on create.
+func (u *SubnetUpsertBulk) UpdateSnmpUser() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpUser()
+	})
+}
+
+// ClearSnmpUser clears the value of the "snmp_user" field.
+func (u *SubnetUpsertBulk) ClearSnmpUser() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpUser()
+	})
+}
+
+// SetSnmpAuthPassword sets the "snmp_auth_password" field.
+func (u *SubnetUpsertBulk) SetSnmpAuthPassword(v string) *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpAuthPassword(v)
+	})
+}
+
+// UpdateSnmpAuthPassword sets the "snmp_auth_password" field to the value that was provided on create.
+func (u *SubnetUpsertBulk) UpdateSnmpAuthPassword() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpAuthPassword()
+	})
+}
+
+// ClearSnmpAuthPassword clears the value of the "snmp_auth_password" field.
+func (u *SubnetUpsertBulk) ClearSnmpAuthPassword() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpAuthPassword()
+	})
+}
+
+// SetSnmpPrivPassword sets the "snmp_priv_password" field.
+func (u *SubnetUpsertBulk) SetSnmpPrivPassword(v string) *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpPrivPassword(v)
+	})
+}
+
+// UpdateSnmpPrivPassword sets the "snmp_priv_password" field to the value that was provided on create.
+func (u *SubnetUpsertBulk) UpdateSnmpPrivPassword() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpPrivPassword()
+	})
+}
+
+// ClearSnmpPrivPassword clears the value of the "snmp_priv_password" field.
+func (u *SubnetUpsertBulk) ClearSnmpPrivPassword() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpPrivPassword()
+	})
+}
+
+// SetSnmpAuthProtocol sets the "snmp_auth_protocol" field.
+func (u *SubnetUpsertBulk) SetSnmpAuthProtocol(v string) *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpAuthProtocol(v)
+	})
+}
+
+// UpdateSnmpAuthProtocol sets the "snmp_auth_protocol" field to the value that was provided on create.
+func (u *SubnetUpsertBulk) UpdateSnmpAuthProtocol() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpAuthProtocol()
+	})
+}
+
+// ClearSnmpAuthProtocol clears the value of the "snmp_auth_protocol" field.
+func (u *SubnetUpsertBulk) ClearSnmpAuthProtocol() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpAuthProtocol()
+	})
+}
+
+// SetSnmpPrivProtocol sets the "snmp_priv_protocol" field.
+func (u *SubnetUpsertBulk) SetSnmpPrivProtocol(v string) *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.SetSnmpPrivProtocol(v)
+	})
+}
+
+// UpdateSnmpPrivProtocol sets the "snmp_priv_protocol" field to the value that was provided on create.
+func (u *SubnetUpsertBulk) UpdateSnmpPrivProtocol() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.UpdateSnmpPrivProtocol()
+	})
+}
+
+// ClearSnmpPrivProtocol clears the value of the "snmp_priv_protocol" field.
+func (u *SubnetUpsertBulk) ClearSnmpPrivProtocol() *SubnetUpsertBulk {
+	return u.Update(func(s *SubnetUpsert) {
+		s.ClearSnmpPrivProtocol()
 	})
 }
 

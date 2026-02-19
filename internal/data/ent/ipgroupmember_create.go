@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
-
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
 )
 
 // IpGroupMemberCreate is the builder for creating a IpGroupMember entity.

@@ -514,6 +514,8 @@ var (
 		{Name: "concurrency", Type: field.TypeInt32, Comment: "Number of parallel probes", Default: 50},
 		{Name: "skip_reverse_dns", Type: field.TypeBool, Comment: "Skip reverse DNS lookup", Default: false},
 		{Name: "tcp_probe_ports", Type: field.TypeString, Comment: "Comma-separated list of TCP ports to probe", Default: "22,80,443,3389,445"},
+		{Name: "enable_snmp", Type: field.TypeBool, Comment: "Enable SNMP device discovery", Default: false},
+		{Name: "snmp_discovered_count", Type: field.TypeInt64, Comment: "Number of SNMP devices discovered", Default: 0},
 		{Name: "started_at", Type: field.TypeTime, Nullable: true, Comment: "When the scan started"},
 		{Name: "completed_at", Type: field.TypeTime, Nullable: true, Comment: "When the scan completed"},
 		{Name: "subnet_id", Type: field.TypeString, Comment: "Subnet ID to scan"},
@@ -526,7 +528,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "ipam_ip_scan_jobs_ipam_subnets_scan_jobs",
-				Columns:    []*schema.Column{IpamIPScanJobsColumns[25]},
+				Columns:    []*schema.Column{IpamIPScanJobsColumns[27]},
 				RefColumns: []*schema.Column{IpamSubnetsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -535,7 +537,7 @@ var (
 			{
 				Name:    "ipscanjob_tenant_id_subnet_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamIPScanJobsColumns[6], IpamIPScanJobsColumns[25]},
+				Columns: []*schema.Column{IpamIPScanJobsColumns[6], IpamIPScanJobsColumns[27]},
 			},
 			{
 				Name:    "ipscanjob_tenant_id_status",
@@ -550,7 +552,7 @@ var (
 			{
 				Name:    "ipscanjob_subnet_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamIPScanJobsColumns[25]},
+				Columns: []*schema.Column{IpamIPScanJobsColumns[27]},
 			},
 			{
 				Name:    "ipscanjob_status",
@@ -668,6 +670,13 @@ var (
 		{Name: "total_addresses", Type: field.TypeInt64, Comment: "Total number of addresses", Default: 0},
 		{Name: "tags", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "Custom tags (JSON)"},
 		{Name: "metadata", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "Custom metadata (JSON)"},
+		{Name: "snmp_community", Type: field.TypeString, Nullable: true, Comment: "SNMPv2c community string"},
+		{Name: "snmp_version", Type: field.TypeInt32, Comment: "SNMP version: 0=none, 2=v2c, 3=v3", Default: 0},
+		{Name: "snmp_user", Type: field.TypeString, Nullable: true, Comment: "SNMPv3 USM username"},
+		{Name: "snmp_auth_password", Type: field.TypeString, Nullable: true, Comment: "SNMPv3 auth password"},
+		{Name: "snmp_priv_password", Type: field.TypeString, Nullable: true, Comment: "SNMPv3 privacy password"},
+		{Name: "snmp_auth_protocol", Type: field.TypeString, Nullable: true, Comment: "SNMPv3 auth protocol (MD5/SHA)"},
+		{Name: "snmp_priv_protocol", Type: field.TypeString, Nullable: true, Comment: "SNMPv3 priv protocol (DES/AES)"},
 		{Name: "parent_id", Type: field.TypeString, Nullable: true, Comment: "Parent subnet ID (for hierarchical subnets)"},
 		{Name: "vlan_id", Type: field.TypeString, Nullable: true, Comment: "Associated VLAN ID"},
 		{Name: "location_id", Type: field.TypeString, Nullable: true, Comment: "Location/site ID"},
@@ -680,19 +689,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "ipam_subnets_ipam_subnets_children",
-				Columns:    []*schema.Column{IpamSubnetsColumns[21]},
+				Columns:    []*schema.Column{IpamSubnetsColumns[28]},
 				RefColumns: []*schema.Column{IpamSubnetsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "ipam_subnets_ipam_vlans_vlan",
-				Columns:    []*schema.Column{IpamSubnetsColumns[22]},
+				Columns:    []*schema.Column{IpamSubnetsColumns[29]},
 				RefColumns: []*schema.Column{IpamVlansColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "ipam_subnets_ipam_locations_location",
-				Columns:    []*schema.Column{IpamSubnetsColumns[23]},
+				Columns:    []*schema.Column{IpamSubnetsColumns[30]},
 				RefColumns: []*schema.Column{IpamLocationsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -716,17 +725,17 @@ var (
 			{
 				Name:    "subnet_vlan_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamSubnetsColumns[22]},
+				Columns: []*schema.Column{IpamSubnetsColumns[29]},
 			},
 			{
 				Name:    "subnet_parent_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamSubnetsColumns[21]},
+				Columns: []*schema.Column{IpamSubnetsColumns[28]},
 			},
 			{
 				Name:    "subnet_location_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamSubnetsColumns[23]},
+				Columns: []*schema.Column{IpamSubnetsColumns[30]},
 			},
 			{
 				Name:    "subnet_status",

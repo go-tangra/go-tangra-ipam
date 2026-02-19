@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/sql"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
@@ -23,9 +25,6 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
-
-	"entgo.io/ent"
-	"entgo.io/ent/dialect/sql"
 )
 
 const (
@@ -13295,52 +13294,55 @@ func (m *IpGroupMemberMutation) ResetEdge(name string) error {
 // IpScanJobMutation represents an operation that mutates the IpScanJob nodes in the graph.
 type IpScanJobMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *string
-	create_by          *uint32
-	addcreate_by       *int32
-	update_by          *uint32
-	addupdate_by       *int32
-	create_time        *time.Time
-	update_time        *time.Time
-	delete_time        *time.Time
-	tenant_id          *uint32
-	addtenant_id       *int32
-	status             *ipscanjob.Status
-	progress           *int32
-	addprogress        *int32
-	status_message     *string
-	total_addresses    *int64
-	addtotal_addresses *int64
-	scanned_count      *int64
-	addscanned_count   *int64
-	alive_count        *int64
-	addalive_count     *int64
-	new_count          *int64
-	addnew_count       *int64
-	updated_count      *int64
-	addupdated_count   *int64
-	triggered_by       *ipscanjob.TriggeredBy
-	retry_count        *int32
-	addretry_count     *int32
-	max_retries        *int32
-	addmax_retries     *int32
-	next_retry_at      *time.Time
-	timeout_ms         *int32
-	addtimeout_ms      *int32
-	concurrency        *int32
-	addconcurrency     *int32
-	skip_reverse_dns   *bool
-	tcp_probe_ports    *string
-	started_at         *time.Time
-	completed_at       *time.Time
-	clearedFields      map[string]struct{}
-	subnet             *string
-	clearedsubnet      bool
-	done               bool
-	oldValue           func(context.Context) (*IpScanJob, error)
-	predicates         []predicate.IpScanJob
+	op                       Op
+	typ                      string
+	id                       *string
+	create_by                *uint32
+	addcreate_by             *int32
+	update_by                *uint32
+	addupdate_by             *int32
+	create_time              *time.Time
+	update_time              *time.Time
+	delete_time              *time.Time
+	tenant_id                *uint32
+	addtenant_id             *int32
+	status                   *ipscanjob.Status
+	progress                 *int32
+	addprogress              *int32
+	status_message           *string
+	total_addresses          *int64
+	addtotal_addresses       *int64
+	scanned_count            *int64
+	addscanned_count         *int64
+	alive_count              *int64
+	addalive_count           *int64
+	new_count                *int64
+	addnew_count             *int64
+	updated_count            *int64
+	addupdated_count         *int64
+	triggered_by             *ipscanjob.TriggeredBy
+	retry_count              *int32
+	addretry_count           *int32
+	max_retries              *int32
+	addmax_retries           *int32
+	next_retry_at            *time.Time
+	timeout_ms               *int32
+	addtimeout_ms            *int32
+	concurrency              *int32
+	addconcurrency           *int32
+	skip_reverse_dns         *bool
+	tcp_probe_ports          *string
+	enable_snmp              *bool
+	snmp_discovered_count    *int64
+	addsnmp_discovered_count *int64
+	started_at               *time.Time
+	completed_at             *time.Time
+	clearedFields            map[string]struct{}
+	subnet                   *string
+	clearedsubnet            bool
+	done                     bool
+	oldValue                 func(context.Context) (*IpScanJob, error)
+	predicates               []predicate.IpScanJob
 }
 
 var _ ent.Mutation = (*IpScanJobMutation)(nil)
@@ -14642,6 +14644,98 @@ func (m *IpScanJobMutation) ResetTCPProbePorts() {
 	m.tcp_probe_ports = nil
 }
 
+// SetEnableSnmp sets the "enable_snmp" field.
+func (m *IpScanJobMutation) SetEnableSnmp(b bool) {
+	m.enable_snmp = &b
+}
+
+// EnableSnmp returns the value of the "enable_snmp" field in the mutation.
+func (m *IpScanJobMutation) EnableSnmp() (r bool, exists bool) {
+	v := m.enable_snmp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnableSnmp returns the old "enable_snmp" field's value of the IpScanJob entity.
+// If the IpScanJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *IpScanJobMutation) OldEnableSnmp(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnableSnmp is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnableSnmp requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnableSnmp: %w", err)
+	}
+	return oldValue.EnableSnmp, nil
+}
+
+// ResetEnableSnmp resets all changes to the "enable_snmp" field.
+func (m *IpScanJobMutation) ResetEnableSnmp() {
+	m.enable_snmp = nil
+}
+
+// SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
+func (m *IpScanJobMutation) SetSnmpDiscoveredCount(i int64) {
+	m.snmp_discovered_count = &i
+	m.addsnmp_discovered_count = nil
+}
+
+// SnmpDiscoveredCount returns the value of the "snmp_discovered_count" field in the mutation.
+func (m *IpScanJobMutation) SnmpDiscoveredCount() (r int64, exists bool) {
+	v := m.snmp_discovered_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnmpDiscoveredCount returns the old "snmp_discovered_count" field's value of the IpScanJob entity.
+// If the IpScanJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *IpScanJobMutation) OldSnmpDiscoveredCount(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnmpDiscoveredCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnmpDiscoveredCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnmpDiscoveredCount: %w", err)
+	}
+	return oldValue.SnmpDiscoveredCount, nil
+}
+
+// AddSnmpDiscoveredCount adds i to the "snmp_discovered_count" field.
+func (m *IpScanJobMutation) AddSnmpDiscoveredCount(i int64) {
+	if m.addsnmp_discovered_count != nil {
+		*m.addsnmp_discovered_count += i
+	} else {
+		m.addsnmp_discovered_count = &i
+	}
+}
+
+// AddedSnmpDiscoveredCount returns the value that was added to the "snmp_discovered_count" field in this mutation.
+func (m *IpScanJobMutation) AddedSnmpDiscoveredCount() (r int64, exists bool) {
+	v := m.addsnmp_discovered_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSnmpDiscoveredCount resets all changes to the "snmp_discovered_count" field.
+func (m *IpScanJobMutation) ResetSnmpDiscoveredCount() {
+	m.snmp_discovered_count = nil
+	m.addsnmp_discovered_count = nil
+}
+
 // SetStartedAt sets the "started_at" field.
 func (m *IpScanJobMutation) SetStartedAt(t time.Time) {
 	m.started_at = &t
@@ -14801,7 +14895,7 @@ func (m *IpScanJobMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *IpScanJobMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 27)
 	if m.create_by != nil {
 		fields = append(fields, ipscanjob.FieldCreateBy)
 	}
@@ -14871,6 +14965,12 @@ func (m *IpScanJobMutation) Fields() []string {
 	if m.tcp_probe_ports != nil {
 		fields = append(fields, ipscanjob.FieldTCPProbePorts)
 	}
+	if m.enable_snmp != nil {
+		fields = append(fields, ipscanjob.FieldEnableSnmp)
+	}
+	if m.snmp_discovered_count != nil {
+		fields = append(fields, ipscanjob.FieldSnmpDiscoveredCount)
+	}
 	if m.started_at != nil {
 		fields = append(fields, ipscanjob.FieldStartedAt)
 	}
@@ -14931,6 +15031,10 @@ func (m *IpScanJobMutation) Field(name string) (ent.Value, bool) {
 		return m.SkipReverseDNS()
 	case ipscanjob.FieldTCPProbePorts:
 		return m.TCPProbePorts()
+	case ipscanjob.FieldEnableSnmp:
+		return m.EnableSnmp()
+	case ipscanjob.FieldSnmpDiscoveredCount:
+		return m.SnmpDiscoveredCount()
 	case ipscanjob.FieldStartedAt:
 		return m.StartedAt()
 	case ipscanjob.FieldCompletedAt:
@@ -14990,6 +15094,10 @@ func (m *IpScanJobMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldSkipReverseDNS(ctx)
 	case ipscanjob.FieldTCPProbePorts:
 		return m.OldTCPProbePorts(ctx)
+	case ipscanjob.FieldEnableSnmp:
+		return m.OldEnableSnmp(ctx)
+	case ipscanjob.FieldSnmpDiscoveredCount:
+		return m.OldSnmpDiscoveredCount(ctx)
 	case ipscanjob.FieldStartedAt:
 		return m.OldStartedAt(ctx)
 	case ipscanjob.FieldCompletedAt:
@@ -15164,6 +15272,20 @@ func (m *IpScanJobMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetTCPProbePorts(v)
 		return nil
+	case ipscanjob.FieldEnableSnmp:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnableSnmp(v)
+		return nil
+	case ipscanjob.FieldSnmpDiscoveredCount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnmpDiscoveredCount(v)
+		return nil
 	case ipscanjob.FieldStartedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -15225,6 +15347,9 @@ func (m *IpScanJobMutation) AddedFields() []string {
 	if m.addconcurrency != nil {
 		fields = append(fields, ipscanjob.FieldConcurrency)
 	}
+	if m.addsnmp_discovered_count != nil {
+		fields = append(fields, ipscanjob.FieldSnmpDiscoveredCount)
+	}
 	return fields
 }
 
@@ -15259,6 +15384,8 @@ func (m *IpScanJobMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedTimeoutMs()
 	case ipscanjob.FieldConcurrency:
 		return m.AddedConcurrency()
+	case ipscanjob.FieldSnmpDiscoveredCount:
+		return m.AddedSnmpDiscoveredCount()
 	}
 	return nil, false
 }
@@ -15358,6 +15485,13 @@ func (m *IpScanJobMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddConcurrency(v)
+		return nil
+	case ipscanjob.FieldSnmpDiscoveredCount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSnmpDiscoveredCount(v)
 		return nil
 	}
 	return fmt.Errorf("unknown IpScanJob numeric field %s", name)
@@ -15517,6 +15651,12 @@ func (m *IpScanJobMutation) ResetField(name string) error {
 		return nil
 	case ipscanjob.FieldTCPProbePorts:
 		m.ResetTCPProbePorts()
+		return nil
+	case ipscanjob.FieldEnableSnmp:
+		m.ResetEnableSnmp()
+		return nil
+	case ipscanjob.FieldSnmpDiscoveredCount:
+		m.ResetSnmpDiscoveredCount()
 		return nil
 	case ipscanjob.FieldStartedAt:
 		m.ResetStartedAt()
@@ -18418,6 +18558,14 @@ type SubnetMutation struct {
 	addtotal_addresses *int64
 	tags               *string
 	metadata           *string
+	snmp_community     *string
+	snmp_version       *int32
+	addsnmp_version    *int32
+	snmp_user          *string
+	snmp_auth_password *string
+	snmp_priv_password *string
+	snmp_auth_protocol *string
+	snmp_priv_protocol *string
 	clearedFields      map[string]struct{}
 	addresses          map[string]struct{}
 	removedaddresses   map[string]struct{}
@@ -19749,6 +19897,356 @@ func (m *SubnetMutation) ResetMetadata() {
 	delete(m.clearedFields, subnet.FieldMetadata)
 }
 
+// SetSnmpCommunity sets the "snmp_community" field.
+func (m *SubnetMutation) SetSnmpCommunity(s string) {
+	m.snmp_community = &s
+}
+
+// SnmpCommunity returns the value of the "snmp_community" field in the mutation.
+func (m *SubnetMutation) SnmpCommunity() (r string, exists bool) {
+	v := m.snmp_community
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnmpCommunity returns the old "snmp_community" field's value of the Subnet entity.
+// If the Subnet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubnetMutation) OldSnmpCommunity(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnmpCommunity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnmpCommunity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnmpCommunity: %w", err)
+	}
+	return oldValue.SnmpCommunity, nil
+}
+
+// ClearSnmpCommunity clears the value of the "snmp_community" field.
+func (m *SubnetMutation) ClearSnmpCommunity() {
+	m.snmp_community = nil
+	m.clearedFields[subnet.FieldSnmpCommunity] = struct{}{}
+}
+
+// SnmpCommunityCleared returns if the "snmp_community" field was cleared in this mutation.
+func (m *SubnetMutation) SnmpCommunityCleared() bool {
+	_, ok := m.clearedFields[subnet.FieldSnmpCommunity]
+	return ok
+}
+
+// ResetSnmpCommunity resets all changes to the "snmp_community" field.
+func (m *SubnetMutation) ResetSnmpCommunity() {
+	m.snmp_community = nil
+	delete(m.clearedFields, subnet.FieldSnmpCommunity)
+}
+
+// SetSnmpVersion sets the "snmp_version" field.
+func (m *SubnetMutation) SetSnmpVersion(i int32) {
+	m.snmp_version = &i
+	m.addsnmp_version = nil
+}
+
+// SnmpVersion returns the value of the "snmp_version" field in the mutation.
+func (m *SubnetMutation) SnmpVersion() (r int32, exists bool) {
+	v := m.snmp_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnmpVersion returns the old "snmp_version" field's value of the Subnet entity.
+// If the Subnet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubnetMutation) OldSnmpVersion(ctx context.Context) (v int32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnmpVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnmpVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnmpVersion: %w", err)
+	}
+	return oldValue.SnmpVersion, nil
+}
+
+// AddSnmpVersion adds i to the "snmp_version" field.
+func (m *SubnetMutation) AddSnmpVersion(i int32) {
+	if m.addsnmp_version != nil {
+		*m.addsnmp_version += i
+	} else {
+		m.addsnmp_version = &i
+	}
+}
+
+// AddedSnmpVersion returns the value that was added to the "snmp_version" field in this mutation.
+func (m *SubnetMutation) AddedSnmpVersion() (r int32, exists bool) {
+	v := m.addsnmp_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSnmpVersion resets all changes to the "snmp_version" field.
+func (m *SubnetMutation) ResetSnmpVersion() {
+	m.snmp_version = nil
+	m.addsnmp_version = nil
+}
+
+// SetSnmpUser sets the "snmp_user" field.
+func (m *SubnetMutation) SetSnmpUser(s string) {
+	m.snmp_user = &s
+}
+
+// SnmpUser returns the value of the "snmp_user" field in the mutation.
+func (m *SubnetMutation) SnmpUser() (r string, exists bool) {
+	v := m.snmp_user
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnmpUser returns the old "snmp_user" field's value of the Subnet entity.
+// If the Subnet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubnetMutation) OldSnmpUser(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnmpUser is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnmpUser requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnmpUser: %w", err)
+	}
+	return oldValue.SnmpUser, nil
+}
+
+// ClearSnmpUser clears the value of the "snmp_user" field.
+func (m *SubnetMutation) ClearSnmpUser() {
+	m.snmp_user = nil
+	m.clearedFields[subnet.FieldSnmpUser] = struct{}{}
+}
+
+// SnmpUserCleared returns if the "snmp_user" field was cleared in this mutation.
+func (m *SubnetMutation) SnmpUserCleared() bool {
+	_, ok := m.clearedFields[subnet.FieldSnmpUser]
+	return ok
+}
+
+// ResetSnmpUser resets all changes to the "snmp_user" field.
+func (m *SubnetMutation) ResetSnmpUser() {
+	m.snmp_user = nil
+	delete(m.clearedFields, subnet.FieldSnmpUser)
+}
+
+// SetSnmpAuthPassword sets the "snmp_auth_password" field.
+func (m *SubnetMutation) SetSnmpAuthPassword(s string) {
+	m.snmp_auth_password = &s
+}
+
+// SnmpAuthPassword returns the value of the "snmp_auth_password" field in the mutation.
+func (m *SubnetMutation) SnmpAuthPassword() (r string, exists bool) {
+	v := m.snmp_auth_password
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnmpAuthPassword returns the old "snmp_auth_password" field's value of the Subnet entity.
+// If the Subnet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubnetMutation) OldSnmpAuthPassword(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnmpAuthPassword is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnmpAuthPassword requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnmpAuthPassword: %w", err)
+	}
+	return oldValue.SnmpAuthPassword, nil
+}
+
+// ClearSnmpAuthPassword clears the value of the "snmp_auth_password" field.
+func (m *SubnetMutation) ClearSnmpAuthPassword() {
+	m.snmp_auth_password = nil
+	m.clearedFields[subnet.FieldSnmpAuthPassword] = struct{}{}
+}
+
+// SnmpAuthPasswordCleared returns if the "snmp_auth_password" field was cleared in this mutation.
+func (m *SubnetMutation) SnmpAuthPasswordCleared() bool {
+	_, ok := m.clearedFields[subnet.FieldSnmpAuthPassword]
+	return ok
+}
+
+// ResetSnmpAuthPassword resets all changes to the "snmp_auth_password" field.
+func (m *SubnetMutation) ResetSnmpAuthPassword() {
+	m.snmp_auth_password = nil
+	delete(m.clearedFields, subnet.FieldSnmpAuthPassword)
+}
+
+// SetSnmpPrivPassword sets the "snmp_priv_password" field.
+func (m *SubnetMutation) SetSnmpPrivPassword(s string) {
+	m.snmp_priv_password = &s
+}
+
+// SnmpPrivPassword returns the value of the "snmp_priv_password" field in the mutation.
+func (m *SubnetMutation) SnmpPrivPassword() (r string, exists bool) {
+	v := m.snmp_priv_password
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnmpPrivPassword returns the old "snmp_priv_password" field's value of the Subnet entity.
+// If the Subnet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubnetMutation) OldSnmpPrivPassword(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnmpPrivPassword is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnmpPrivPassword requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnmpPrivPassword: %w", err)
+	}
+	return oldValue.SnmpPrivPassword, nil
+}
+
+// ClearSnmpPrivPassword clears the value of the "snmp_priv_password" field.
+func (m *SubnetMutation) ClearSnmpPrivPassword() {
+	m.snmp_priv_password = nil
+	m.clearedFields[subnet.FieldSnmpPrivPassword] = struct{}{}
+}
+
+// SnmpPrivPasswordCleared returns if the "snmp_priv_password" field was cleared in this mutation.
+func (m *SubnetMutation) SnmpPrivPasswordCleared() bool {
+	_, ok := m.clearedFields[subnet.FieldSnmpPrivPassword]
+	return ok
+}
+
+// ResetSnmpPrivPassword resets all changes to the "snmp_priv_password" field.
+func (m *SubnetMutation) ResetSnmpPrivPassword() {
+	m.snmp_priv_password = nil
+	delete(m.clearedFields, subnet.FieldSnmpPrivPassword)
+}
+
+// SetSnmpAuthProtocol sets the "snmp_auth_protocol" field.
+func (m *SubnetMutation) SetSnmpAuthProtocol(s string) {
+	m.snmp_auth_protocol = &s
+}
+
+// SnmpAuthProtocol returns the value of the "snmp_auth_protocol" field in the mutation.
+func (m *SubnetMutation) SnmpAuthProtocol() (r string, exists bool) {
+	v := m.snmp_auth_protocol
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnmpAuthProtocol returns the old "snmp_auth_protocol" field's value of the Subnet entity.
+// If the Subnet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubnetMutation) OldSnmpAuthProtocol(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnmpAuthProtocol is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnmpAuthProtocol requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnmpAuthProtocol: %w", err)
+	}
+	return oldValue.SnmpAuthProtocol, nil
+}
+
+// ClearSnmpAuthProtocol clears the value of the "snmp_auth_protocol" field.
+func (m *SubnetMutation) ClearSnmpAuthProtocol() {
+	m.snmp_auth_protocol = nil
+	m.clearedFields[subnet.FieldSnmpAuthProtocol] = struct{}{}
+}
+
+// SnmpAuthProtocolCleared returns if the "snmp_auth_protocol" field was cleared in this mutation.
+func (m *SubnetMutation) SnmpAuthProtocolCleared() bool {
+	_, ok := m.clearedFields[subnet.FieldSnmpAuthProtocol]
+	return ok
+}
+
+// ResetSnmpAuthProtocol resets all changes to the "snmp_auth_protocol" field.
+func (m *SubnetMutation) ResetSnmpAuthProtocol() {
+	m.snmp_auth_protocol = nil
+	delete(m.clearedFields, subnet.FieldSnmpAuthProtocol)
+}
+
+// SetSnmpPrivProtocol sets the "snmp_priv_protocol" field.
+func (m *SubnetMutation) SetSnmpPrivProtocol(s string) {
+	m.snmp_priv_protocol = &s
+}
+
+// SnmpPrivProtocol returns the value of the "snmp_priv_protocol" field in the mutation.
+func (m *SubnetMutation) SnmpPrivProtocol() (r string, exists bool) {
+	v := m.snmp_priv_protocol
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnmpPrivProtocol returns the old "snmp_priv_protocol" field's value of the Subnet entity.
+// If the Subnet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubnetMutation) OldSnmpPrivProtocol(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnmpPrivProtocol is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnmpPrivProtocol requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnmpPrivProtocol: %w", err)
+	}
+	return oldValue.SnmpPrivProtocol, nil
+}
+
+// ClearSnmpPrivProtocol clears the value of the "snmp_priv_protocol" field.
+func (m *SubnetMutation) ClearSnmpPrivProtocol() {
+	m.snmp_priv_protocol = nil
+	m.clearedFields[subnet.FieldSnmpPrivProtocol] = struct{}{}
+}
+
+// SnmpPrivProtocolCleared returns if the "snmp_priv_protocol" field was cleared in this mutation.
+func (m *SubnetMutation) SnmpPrivProtocolCleared() bool {
+	_, ok := m.clearedFields[subnet.FieldSnmpPrivProtocol]
+	return ok
+}
+
+// ResetSnmpPrivProtocol resets all changes to the "snmp_priv_protocol" field.
+func (m *SubnetMutation) ResetSnmpPrivProtocol() {
+	m.snmp_priv_protocol = nil
+	delete(m.clearedFields, subnet.FieldSnmpPrivProtocol)
+}
+
 // AddAddressIDs adds the "addresses" edge to the IpAddress entity by ids.
 func (m *SubnetMutation) AddAddressIDs(ids ...string) {
 	if m.addresses == nil {
@@ -20026,7 +20524,7 @@ func (m *SubnetMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SubnetMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 30)
 	if m.create_by != nil {
 		fields = append(fields, subnet.FieldCreateBy)
 	}
@@ -20096,6 +20594,27 @@ func (m *SubnetMutation) Fields() []string {
 	if m.metadata != nil {
 		fields = append(fields, subnet.FieldMetadata)
 	}
+	if m.snmp_community != nil {
+		fields = append(fields, subnet.FieldSnmpCommunity)
+	}
+	if m.snmp_version != nil {
+		fields = append(fields, subnet.FieldSnmpVersion)
+	}
+	if m.snmp_user != nil {
+		fields = append(fields, subnet.FieldSnmpUser)
+	}
+	if m.snmp_auth_password != nil {
+		fields = append(fields, subnet.FieldSnmpAuthPassword)
+	}
+	if m.snmp_priv_password != nil {
+		fields = append(fields, subnet.FieldSnmpPrivPassword)
+	}
+	if m.snmp_auth_protocol != nil {
+		fields = append(fields, subnet.FieldSnmpAuthProtocol)
+	}
+	if m.snmp_priv_protocol != nil {
+		fields = append(fields, subnet.FieldSnmpPrivProtocol)
+	}
 	return fields
 }
 
@@ -20150,6 +20669,20 @@ func (m *SubnetMutation) Field(name string) (ent.Value, bool) {
 		return m.Tags()
 	case subnet.FieldMetadata:
 		return m.Metadata()
+	case subnet.FieldSnmpCommunity:
+		return m.SnmpCommunity()
+	case subnet.FieldSnmpVersion:
+		return m.SnmpVersion()
+	case subnet.FieldSnmpUser:
+		return m.SnmpUser()
+	case subnet.FieldSnmpAuthPassword:
+		return m.SnmpAuthPassword()
+	case subnet.FieldSnmpPrivPassword:
+		return m.SnmpPrivPassword()
+	case subnet.FieldSnmpAuthProtocol:
+		return m.SnmpAuthProtocol()
+	case subnet.FieldSnmpPrivProtocol:
+		return m.SnmpPrivProtocol()
 	}
 	return nil, false
 }
@@ -20205,6 +20738,20 @@ func (m *SubnetMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldTags(ctx)
 	case subnet.FieldMetadata:
 		return m.OldMetadata(ctx)
+	case subnet.FieldSnmpCommunity:
+		return m.OldSnmpCommunity(ctx)
+	case subnet.FieldSnmpVersion:
+		return m.OldSnmpVersion(ctx)
+	case subnet.FieldSnmpUser:
+		return m.OldSnmpUser(ctx)
+	case subnet.FieldSnmpAuthPassword:
+		return m.OldSnmpAuthPassword(ctx)
+	case subnet.FieldSnmpPrivPassword:
+		return m.OldSnmpPrivPassword(ctx)
+	case subnet.FieldSnmpAuthProtocol:
+		return m.OldSnmpAuthProtocol(ctx)
+	case subnet.FieldSnmpPrivProtocol:
+		return m.OldSnmpPrivProtocol(ctx)
 	}
 	return nil, fmt.Errorf("unknown Subnet field %s", name)
 }
@@ -20375,6 +20922,55 @@ func (m *SubnetMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMetadata(v)
 		return nil
+	case subnet.FieldSnmpCommunity:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnmpCommunity(v)
+		return nil
+	case subnet.FieldSnmpVersion:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnmpVersion(v)
+		return nil
+	case subnet.FieldSnmpUser:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnmpUser(v)
+		return nil
+	case subnet.FieldSnmpAuthPassword:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnmpAuthPassword(v)
+		return nil
+	case subnet.FieldSnmpPrivPassword:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnmpPrivPassword(v)
+		return nil
+	case subnet.FieldSnmpAuthProtocol:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnmpAuthProtocol(v)
+		return nil
+	case subnet.FieldSnmpPrivProtocol:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnmpPrivProtocol(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Subnet field %s", name)
 }
@@ -20404,6 +21000,9 @@ func (m *SubnetMutation) AddedFields() []string {
 	if m.addtotal_addresses != nil {
 		fields = append(fields, subnet.FieldTotalAddresses)
 	}
+	if m.addsnmp_version != nil {
+		fields = append(fields, subnet.FieldSnmpVersion)
+	}
 	return fields
 }
 
@@ -20426,6 +21025,8 @@ func (m *SubnetMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedPrefixLength()
 	case subnet.FieldTotalAddresses:
 		return m.AddedTotalAddresses()
+	case subnet.FieldSnmpVersion:
+		return m.AddedSnmpVersion()
 	}
 	return nil, false
 }
@@ -20483,6 +21084,13 @@ func (m *SubnetMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddTotalAddresses(v)
+		return nil
+	case subnet.FieldSnmpVersion:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSnmpVersion(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Subnet numeric field %s", name)
@@ -20545,6 +21153,24 @@ func (m *SubnetMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(subnet.FieldMetadata) {
 		fields = append(fields, subnet.FieldMetadata)
+	}
+	if m.FieldCleared(subnet.FieldSnmpCommunity) {
+		fields = append(fields, subnet.FieldSnmpCommunity)
+	}
+	if m.FieldCleared(subnet.FieldSnmpUser) {
+		fields = append(fields, subnet.FieldSnmpUser)
+	}
+	if m.FieldCleared(subnet.FieldSnmpAuthPassword) {
+		fields = append(fields, subnet.FieldSnmpAuthPassword)
+	}
+	if m.FieldCleared(subnet.FieldSnmpPrivPassword) {
+		fields = append(fields, subnet.FieldSnmpPrivPassword)
+	}
+	if m.FieldCleared(subnet.FieldSnmpAuthProtocol) {
+		fields = append(fields, subnet.FieldSnmpAuthProtocol)
+	}
+	if m.FieldCleared(subnet.FieldSnmpPrivProtocol) {
+		fields = append(fields, subnet.FieldSnmpPrivProtocol)
 	}
 	return fields
 }
@@ -20613,6 +21239,24 @@ func (m *SubnetMutation) ClearField(name string) error {
 		return nil
 	case subnet.FieldMetadata:
 		m.ClearMetadata()
+		return nil
+	case subnet.FieldSnmpCommunity:
+		m.ClearSnmpCommunity()
+		return nil
+	case subnet.FieldSnmpUser:
+		m.ClearSnmpUser()
+		return nil
+	case subnet.FieldSnmpAuthPassword:
+		m.ClearSnmpAuthPassword()
+		return nil
+	case subnet.FieldSnmpPrivPassword:
+		m.ClearSnmpPrivPassword()
+		return nil
+	case subnet.FieldSnmpAuthProtocol:
+		m.ClearSnmpAuthProtocol()
+		return nil
+	case subnet.FieldSnmpPrivProtocol:
+		m.ClearSnmpPrivProtocol()
 		return nil
 	}
 	return fmt.Errorf("unknown Subnet nullable field %s", name)
@@ -20690,6 +21334,27 @@ func (m *SubnetMutation) ResetField(name string) error {
 		return nil
 	case subnet.FieldMetadata:
 		m.ResetMetadata()
+		return nil
+	case subnet.FieldSnmpCommunity:
+		m.ResetSnmpCommunity()
+		return nil
+	case subnet.FieldSnmpVersion:
+		m.ResetSnmpVersion()
+		return nil
+	case subnet.FieldSnmpUser:
+		m.ResetSnmpUser()
+		return nil
+	case subnet.FieldSnmpAuthPassword:
+		m.ResetSnmpAuthPassword()
+		return nil
+	case subnet.FieldSnmpPrivPassword:
+		m.ResetSnmpPrivPassword()
+		return nil
+	case subnet.FieldSnmpAuthProtocol:
+		m.ResetSnmpAuthProtocol()
+		return nil
+	case subnet.FieldSnmpPrivProtocol:
+		m.ResetSnmpPrivProtocol()
 		return nil
 	}
 	return fmt.Errorf("unknown Subnet field %s", name)

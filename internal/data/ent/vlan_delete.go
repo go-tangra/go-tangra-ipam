@@ -5,12 +5,11 @@ package ent
 import (
 	"context"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
-
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
 )
 
 // VlanDelete is the builder for deleting a Vlan entity.

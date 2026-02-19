@@ -5,10 +5,9 @@ package ipscanjob
 import (
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
 // ID filters vertices based on their ID field.
@@ -169,6 +168,16 @@ func SkipReverseDNS(v bool) predicate.IpScanJob {
 // TCPProbePorts applies equality check predicate on the "tcp_probe_ports" field. It's identical to TCPProbePortsEQ.
 func TCPProbePorts(v string) predicate.IpScanJob {
 	return predicate.IpScanJob(sql.FieldEQ(FieldTCPProbePorts, v))
+}
+
+// EnableSnmp applies equality check predicate on the "enable_snmp" field. It's identical to EnableSnmpEQ.
+func EnableSnmp(v bool) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldEQ(FieldEnableSnmp, v))
+}
+
+// SnmpDiscoveredCount applies equality check predicate on the "snmp_discovered_count" field. It's identical to SnmpDiscoveredCountEQ.
+func SnmpDiscoveredCount(v int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldEQ(FieldSnmpDiscoveredCount, v))
 }
 
 // StartedAt applies equality check predicate on the "started_at" field. It's identical to StartedAtEQ.
@@ -1184,6 +1193,56 @@ func TCPProbePortsEqualFold(v string) predicate.IpScanJob {
 // TCPProbePortsContainsFold applies the ContainsFold predicate on the "tcp_probe_ports" field.
 func TCPProbePortsContainsFold(v string) predicate.IpScanJob {
 	return predicate.IpScanJob(sql.FieldContainsFold(FieldTCPProbePorts, v))
+}
+
+// EnableSnmpEQ applies the EQ predicate on the "enable_snmp" field.
+func EnableSnmpEQ(v bool) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldEQ(FieldEnableSnmp, v))
+}
+
+// EnableSnmpNEQ applies the NEQ predicate on the "enable_snmp" field.
+func EnableSnmpNEQ(v bool) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldNEQ(FieldEnableSnmp, v))
+}
+
+// SnmpDiscoveredCountEQ applies the EQ predicate on the "snmp_discovered_count" field.
+func SnmpDiscoveredCountEQ(v int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldEQ(FieldSnmpDiscoveredCount, v))
+}
+
+// SnmpDiscoveredCountNEQ applies the NEQ predicate on the "snmp_discovered_count" field.
+func SnmpDiscoveredCountNEQ(v int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldNEQ(FieldSnmpDiscoveredCount, v))
+}
+
+// SnmpDiscoveredCountIn applies the In predicate on the "snmp_discovered_count" field.
+func SnmpDiscoveredCountIn(vs ...int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldIn(FieldSnmpDiscoveredCount, vs...))
+}
+
+// SnmpDiscoveredCountNotIn applies the NotIn predicate on the "snmp_discovered_count" field.
+func SnmpDiscoveredCountNotIn(vs ...int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldNotIn(FieldSnmpDiscoveredCount, vs...))
+}
+
+// SnmpDiscoveredCountGT applies the GT predicate on the "snmp_discovered_count" field.
+func SnmpDiscoveredCountGT(v int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldGT(FieldSnmpDiscoveredCount, v))
+}
+
+// SnmpDiscoveredCountGTE applies the GTE predicate on the "snmp_discovered_count" field.
+func SnmpDiscoveredCountGTE(v int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldGTE(FieldSnmpDiscoveredCount, v))
+}
+
+// SnmpDiscoveredCountLT applies the LT predicate on the "snmp_discovered_count" field.
+func SnmpDiscoveredCountLT(v int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldLT(FieldSnmpDiscoveredCount, v))
+}
+
+// SnmpDiscoveredCountLTE applies the LTE predicate on the "snmp_discovered_count" field.
+func SnmpDiscoveredCountLTE(v int64) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldLTE(FieldSnmpDiscoveredCount, v))
 }
 
 // StartedAtEQ applies the EQ predicate on the "started_at" field.

@@ -8,16 +8,15 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipaddress"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipaddress"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 )
 
 // IpAddressQuery is the builder for querying IpAddress entities.

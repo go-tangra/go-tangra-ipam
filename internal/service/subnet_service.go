@@ -53,6 +53,27 @@ func (s *SubnetService) CreateSubnet(ctx context.Context, req *ipamV1.CreateSubn
 	if req.LocationId != nil {
 		opts = append(opts, func(c *ent.SubnetCreate) { c.SetLocationID(*req.LocationId) })
 	}
+	if req.SnmpCommunity != nil {
+		opts = append(opts, func(c *ent.SubnetCreate) { c.SetSnmpCommunity(*req.SnmpCommunity) })
+	}
+	if req.SnmpVersion != nil {
+		opts = append(opts, func(c *ent.SubnetCreate) { c.SetSnmpVersion(*req.SnmpVersion) })
+	}
+	if req.SnmpUser != nil {
+		opts = append(opts, func(c *ent.SubnetCreate) { c.SetSnmpUser(*req.SnmpUser) })
+	}
+	if req.SnmpAuthPassword != nil {
+		opts = append(opts, func(c *ent.SubnetCreate) { c.SetSnmpAuthPassword(*req.SnmpAuthPassword) })
+	}
+	if req.SnmpPrivPassword != nil {
+		opts = append(opts, func(c *ent.SubnetCreate) { c.SetSnmpPrivPassword(*req.SnmpPrivPassword) })
+	}
+	if req.SnmpAuthProtocol != nil {
+		opts = append(opts, func(c *ent.SubnetCreate) { c.SetSnmpAuthProtocol(*req.SnmpAuthProtocol) })
+	}
+	if req.SnmpPrivProtocol != nil {
+		opts = append(opts, func(c *ent.SubnetCreate) { c.SetSnmpPrivProtocol(*req.SnmpPrivProtocol) })
+	}
 
 	// Check for CIDR overlap with existing subnets
 	overlaps, err := s.subnetRepo.CheckCIDROverlap(ctx, req.GetTenantId(), req.GetCidr(), "")
@@ -214,6 +235,27 @@ func (s *SubnetService) UpdateSubnet(ctx context.Context, req *ipamV1.UpdateSubn
 		if req.Data.Status != nil {
 			updates["status"] = int32(*req.Data.Status)
 		}
+		if req.Data.SnmpCommunity != nil {
+			updates["snmp_community"] = *req.Data.SnmpCommunity
+		}
+		if req.Data.SnmpVersion != nil {
+			updates["snmp_version"] = *req.Data.SnmpVersion
+		}
+		if req.Data.SnmpUser != nil {
+			updates["snmp_user"] = *req.Data.SnmpUser
+		}
+		if req.Data.SnmpAuthPassword != nil {
+			updates["snmp_auth_password"] = *req.Data.SnmpAuthPassword
+		}
+		if req.Data.SnmpPrivPassword != nil {
+			updates["snmp_priv_password"] = *req.Data.SnmpPrivPassword
+		}
+		if req.Data.SnmpAuthProtocol != nil {
+			updates["snmp_auth_protocol"] = *req.Data.SnmpAuthProtocol
+		}
+		if req.Data.SnmpPrivProtocol != nil {
+			updates["snmp_priv_protocol"] = *req.Data.SnmpPrivProtocol
+		}
 	}
 
 	entity, err := s.subnetRepo.Update(ctx, req.GetId(), updates)
@@ -328,6 +370,13 @@ func subnetToProto(e *ent.Subnet) *ipamV1.Subnet {
 		TotalAddresses:   &e.TotalAddresses,
 		Tags:             ptrString(e.Tags),
 		Metadata:         ptrString(e.Metadata),
+		SnmpCommunity:    ptrString(e.SnmpCommunity),
+		SnmpVersion:      &e.SnmpVersion,
+		SnmpUser:         ptrString(e.SnmpUser),
+		SnmpAuthPassword: ptrString(e.SnmpAuthPassword),
+		SnmpPrivPassword: ptrString(e.SnmpPrivPassword),
+		SnmpAuthProtocol: ptrString(e.SnmpAuthProtocol),
+		SnmpPrivProtocol: ptrString(e.SnmpPrivProtocol),
 		CreatedBy:        e.CreateBy,
 		UpdatedBy:        e.UpdateBy,
 	}

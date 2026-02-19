@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
 )
 
 // IpGroupMember is the model entity for the IpGroupMember schema.
