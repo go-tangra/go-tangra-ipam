@@ -366,6 +366,18 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 
 	// SNMP discovery phase
 	var snmpDiscovered int64
+	e.log.Infof("SNMP check for job %s: enableSnmp=%v, aliveIPs=%d, subnet.SnmpVersion=%d",
+		job.ID, job.EnableSnmp, len(aliveIPs), subnet.SnmpVersion)
+
+	if !job.EnableSnmp {
+		e.log.Infof("SNMP discovery skipped for job %s: enable_snmp is false", job.ID)
+	} else if len(aliveIPs) == 0 {
+		e.log.Infof("SNMP discovery skipped for job %s: no alive hosts found in ICMP scan", job.ID)
+	} else if subnet.SnmpVersion <= 0 {
+		e.log.Warnf("SNMP discovery skipped for job %s: subnet %s has no SNMP configuration (snmp_version=%d). "+
+			"Configure SNMP credentials on the subnet first.", job.ID, subnet.ID, subnet.SnmpVersion)
+	}
+
 	if job.EnableSnmp && len(aliveIPs) > 0 && subnet.SnmpVersion > 0 {
 		snmpConfig := biz.SNMPConfig{
 			Version:      int(subnet.SnmpVersion),
@@ -377,17 +389,31 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 			PrivProtocol: subnet.SnmpPrivProtocol,
 		}
 
+		e.log.Infof("Starting SNMP discovery for job %s: version=%d, community=%q, user=%q, authProto=%q, privProto=%q, targets=%d",
+			job.ID, snmpConfig.Version,
+			maskString(snmpConfig.Community),
+			snmpConfig.User,
+			snmpConfig.AuthProtocol,
+			snmpConfig.PrivProtocol,
+			len(aliveIPs))
+
 		if err := e.scanJobRepo.UpdateProgress(e.ctx, job.ID, int64(len(results)), aliveCount, newCount, updatedCount, 80, "SNMP discovery..."); err != nil {
 			e.log.Warnf("Failed to update SNMP progress for job %s: %v", job.ID, err)
 		}
 
-		snmpResults, snmpErr := biz.ScanSubnetSNMP(e.ctx, aliveIPs, snmpConfig, 10, func(scanned, discovered int) {
+		snmpResults, snmpErr := biz.ScanSubnetSNMP(e.ctx, e.log, aliveIPs, snmpConfig, 10, func(scanned, discovered int) {
 			// Progress callback for SNMP phase
 		})
 		if snmpErr != nil {
-			e.log.Warnf("SNMP scan failed for job %s: %v", job.ID, snmpErr)
+			e.log.Errorf("SNMP scan failed for job %s: %v", job.ID, snmpErr)
 		} else {
 			snmpDiscovered = int64(len(snmpResults))
+			e.log.Infof("SNMP discovery completed for job %s: %d devices found out of %d alive hosts",
+				job.ID, snmpDiscovered, len(aliveIPs))
+			for i, r := range snmpResults {
+				e.log.Infof("  SNMP device [%d]: address=%s, sysName=%q, manufacturer=%q, model=%q, interfaces=%d",
+					i+1, r.Address, r.SysName, r.Manufacturer, r.Model, len(r.Interfaces))
+			}
 			e.processSNMPResults(jobTenantID, job.SubnetID, snmpResults)
 		}
 
@@ -496,8 +522,11 @@ func (e *ScanExecutor) runCleanup() {
 
 // processSNMPResults creates or updates devices and their interfaces from SNMP scan results
 func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []biz.SNMPDeviceInfo) {
+	e.log.Infof("Processing %d SNMP device results for tenant %d", len(results), tenantID)
+
 	for _, info := range results {
 		// Try to find existing device by primary IP
+		e.log.Debugf("Looking up device by primary IP: %s", info.Address)
 		existing, err := e.deviceRepo.GetByPrimaryIP(e.ctx, tenantID, info.Address)
 		if err != nil {
 			e.log.Warnf("Failed to lookup device by IP %s: %v", info.Address, err)
@@ -506,6 +535,7 @@ func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []b
 
 		// If not found by IP, try by name
 		if existing == nil && info.SysName != "" {
+			e.log.Debugf("Device not found by IP %s, trying by name %q", info.Address, info.SysName)
 			existing, err = e.deviceRepo.GetByTenantAndName(e.ctx, tenantID, info.SysName)
 			if err != nil {
 				e.log.Warnf("Failed to lookup device by name %s: %v", info.SysName, err)
@@ -517,6 +547,7 @@ func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []b
 		if existing != nil {
 			// Update existing device
 			deviceID = existing.ID
+			e.log.Infof("Updating existing device %s (%s) from SNMP data at %s", existing.Name, deviceID, info.Address)
 			updates := map[string]interface{}{
 				"last_seen": time.Now(),
 			}
@@ -544,6 +575,8 @@ func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []b
 			_, err = e.deviceRepo.Update(e.ctx, deviceID, updates)
 			if err != nil {
 				e.log.Warnf("Failed to update device %s: %v", deviceID, err)
+			} else {
+				e.log.Infof("Device %s updated successfully with %d fields", deviceID, len(updates))
 			}
 		} else {
 			// Create new device
@@ -572,12 +605,15 @@ func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []b
 				opts = append(opts, func(c *ent.DeviceCreate) { c.SetContact(info.SysContact) })
 			}
 
+			e.log.Infof("Creating new device from SNMP: name=%q, ip=%s, type=%d, manufacturer=%q",
+				name, info.Address, info.DeviceType, info.Manufacturer)
 			newDevice, err := e.deviceRepo.Create(e.ctx, tenantID, name, opts...)
 			if err != nil {
-				e.log.Warnf("Failed to create device for %s: %v", info.Address, err)
+				e.log.Errorf("Failed to create device for %s: %v", info.Address, err)
 				continue
 			}
 			deviceID = newDevice.ID
+			e.log.Infof("Device created successfully: id=%s, name=%s", deviceID, name)
 		}
 
 		// Link IP address to device
@@ -593,6 +629,17 @@ func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []b
 		// Sync interfaces
 		e.syncDeviceInterfaces(deviceID, info.Interfaces)
 	}
+}
+
+// maskString masks a string for logging, showing only first 2 chars
+func maskString(s string) string {
+	if s == "" {
+		return "(empty)"
+	}
+	if len(s) <= 2 {
+		return "***"
+	}
+	return s[:2] + "***"
 }
 
 // syncDeviceInterfaces creates or updates device interfaces from SNMP data

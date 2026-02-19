@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	kratosLog "github.com/go-kratos/kratos/v2/log"
 	"github.com/gosnmp/gosnmp"
 )
 
@@ -75,20 +76,27 @@ type SNMPInterface struct {
 }
 
 // ScanDevice connects to a single IP via SNMP and queries system + interface information
-func ScanDevice(ctx context.Context, address string, config SNMPConfig) (*SNMPDeviceInfo, error) {
+func ScanDevice(ctx context.Context, logger *kratosLog.Helper, address string, config SNMPConfig) (*SNMPDeviceInfo, error) {
+	logger.Debugf("[SNMP] Connecting to %s via SNMPv%d (port %d, timeout %v, retries %d)",
+		address, config.Version, defaultSNMPPort, resolveTimeout(config), resolveRetries(config))
+
 	snmpClient, err := newSNMPClient(address, config)
 	if err != nil {
+		logger.Errorf("Failed to create SNMP client for %s: %v", address, err)
 		return nil, fmt.Errorf("create SNMP client: %w", err)
 	}
 
 	if err := snmpClient.ConnectIPv4(); err != nil {
+		logger.Warnf("SNMP connection failed to %s: %v", address, err)
 		return nil, fmt.Errorf("SNMP connect to %s: %w", address, err)
 	}
 	defer snmpClient.Conn.Close()
+	logger.Debugf("SNMP connection established to %s", address)
 
 	// Check context cancellation
 	select {
 	case <-ctx.Done():
+		logger.Infof("SNMP scan cancelled for %s", address)
 		return nil, ctx.Err()
 	default:
 	}
@@ -97,13 +105,17 @@ func ScanDevice(ctx context.Context, address string, config SNMPConfig) (*SNMPDe
 	info := &SNMPDeviceInfo{Address: address}
 	sysOIDs := []string{oidSysName, oidSysDescr, oidSysContact, oidSysLocation, oidSysObjectID}
 
+	logger.Debugf("Querying system OIDs from %s", address)
 	result, err := snmpClient.Get(sysOIDs)
 	if err != nil {
+		logger.Warnf("SNMP GET system OIDs failed for %s: %v", address, err)
 		return nil, fmt.Errorf("SNMP GET system OIDs from %s: %w", address, err)
 	}
+	logger.Debugf("SNMP GET returned %d variables from %s", len(result.Variables), address)
 
 	for _, variable := range result.Variables {
 		if variable.Type == gosnmp.NoSuchObject || variable.Type == gosnmp.NoSuchInstance {
+			logger.Debugf("OID %s returned NoSuchObject/NoSuchInstance on %s", variable.Name, address)
 			continue
 		}
 		val := extractStringValue(variable)
@@ -121,31 +133,83 @@ func ScanDevice(ctx context.Context, address string, config SNMPConfig) (*SNMPDe
 		}
 	}
 
+	logger.Infof("SNMP device discovered at %s: sysName=%q, sysObjectID=%q, sysDescr=%q",
+		address, info.SysName, info.SysObjectID, truncate(info.SysDescr, 120))
+
 	// Infer device type and manufacturer
 	info.DeviceType = parseDeviceType(info.SysObjectID, info.SysDescr)
 	info.Manufacturer = parseManufacturer(info.SysDescr)
 	info.Model, info.OsVersion = parseModelAndOS(info.SysDescr)
 
+	logger.Debugf("Inferred for %s: type=%d, manufacturer=%q, model=%q, os=%q",
+		address, info.DeviceType, info.Manufacturer, info.Model, info.OsVersion)
+
 	// Query interfaces
 	select {
 	case <-ctx.Done():
+		logger.Infof("SNMP scan cancelled during interface walk for %s", address)
 		return info, ctx.Err()
 	default:
 	}
 
+	logger.Debugf("Walking interface table on %s", address)
 	info.Interfaces, err = walkInterfaces(snmpClient)
 	if err != nil {
-		// Return partial result if interface walk fails
+		logger.Warnf("Interface walk failed for %s (returning partial result): %v", address, err)
 		return info, nil
 	}
+	logger.Infof("Discovered %d interfaces on %s", len(info.Interfaces), address)
 
 	return info, nil
 }
 
+func resolveTimeout(config SNMPConfig) time.Duration {
+	if config.TimeoutMs > 0 {
+		return time.Duration(config.TimeoutMs) * time.Millisecond
+	}
+	return defaultSNMPTimeout
+}
+
+func resolveRetries(config SNMPConfig) int {
+	if config.Retries > 0 {
+		return config.Retries
+	}
+	return defaultSNMPRetries
+}
+
+func truncate(s string, maxLen int) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", "")
+	if len(s) > maxLen {
+		return s[:maxLen] + "..."
+	}
+	return s
+}
+
 // ScanSubnetSNMP scans multiple IPs concurrently via SNMP
-func ScanSubnetSNMP(ctx context.Context, addresses []string, config SNMPConfig, concurrency int, progressCb func(scanned, discovered int)) ([]SNMPDeviceInfo, error) {
+func ScanSubnetSNMP(ctx context.Context, logger *kratosLog.Helper, addresses []string, config SNMPConfig, concurrency int, progressCb func(scanned, discovered int)) ([]SNMPDeviceInfo, error) {
 	if concurrency <= 0 {
 		concurrency = defaultSNMPConcurrency
+	}
+
+	versionStr := fmt.Sprintf("v%d", config.Version)
+	if config.Version == 2 {
+		versionStr = "v2c"
+	}
+
+	logger.Infof("Starting SNMP subnet scan: %d alive hosts to probe, version=%s, concurrency=%d",
+		len(addresses), versionStr, concurrency)
+
+	if config.Version == 2 {
+		if config.Community == "" {
+			logger.Warnf("SNMPv2c community string is empty, will default to 'public'")
+		} else {
+			logger.Debugf("SNMPv2c community string configured (length=%d)", len(config.Community))
+		}
+	} else if config.Version == 3 {
+		logger.Debugf("SNMPv3 config: user=%q, authProto=%s, privProto=%s, hasAuthPwd=%v, hasPrivPwd=%v",
+			config.User, config.AuthProtocol, config.PrivProtocol,
+			config.AuthPassword != "", config.PrivPassword != "")
 	}
 
 	var (
@@ -153,6 +217,7 @@ func ScanSubnetSNMP(ctx context.Context, addresses []string, config SNMPConfig, 
 		results    []SNMPDeviceInfo
 		scanned    int
 		discovered int
+		failed     int
 		wg         sync.WaitGroup
 	)
 
@@ -162,6 +227,8 @@ func ScanSubnetSNMP(ctx context.Context, addresses []string, config SNMPConfig, 
 		select {
 		case <-ctx.Done():
 			wg.Wait()
+			logger.Infof("SNMP scan cancelled: %d/%d scanned, %d discovered, %d failed",
+				scanned, len(addresses), discovered, failed)
 			return results, ctx.Err()
 		case sem <- struct{}{}:
 		}
@@ -171,11 +238,14 @@ func ScanSubnetSNMP(ctx context.Context, addresses []string, config SNMPConfig, 
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			info, err := ScanDevice(ctx, address, config)
+			info, err := ScanDevice(ctx, logger, address, config)
 
 			mu.Lock()
 			scanned++
-			if err == nil && info != nil {
+			if err != nil {
+				failed++
+				logger.Debugf("SNMP probe failed for %s: %v", address, err)
+			} else if info != nil {
 				results = append(results, *info)
 				discovered++
 			}
@@ -187,6 +257,8 @@ func ScanSubnetSNMP(ctx context.Context, addresses []string, config SNMPConfig, 
 	}
 
 	wg.Wait()
+	logger.Infof("SNMP subnet scan completed: %d/%d scanned, %d discovered, %d failed (no SNMP response)",
+		scanned, len(addresses), discovered, failed)
 	return results, nil
 }
 
