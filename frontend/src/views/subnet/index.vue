@@ -455,7 +455,7 @@ onMounted(() => {
             <template #title="{ title, key }">
               <div class="group flex items-center gap-2">
                 <span class="font-mono text-sm">{{ title }}</span>
-                <Space class="invisible group-hover:visible" size="small">
+                <Space class="tree-node-actions" size="small">
                   <Tooltip :title="$t('ipam.page.subnet.scan')">
                     <Button
                       type="link"
@@ -682,3 +682,12 @@ onMounted(() => {
     </Modal>
   </Page>
 </template>
+
+<style scoped>
+.tree-node-actions {
+  visibility: hidden;
+}
+.group:hover > .tree-node-actions {
+  visibility: visible;
+}
+</style>
