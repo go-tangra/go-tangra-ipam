@@ -455,7 +455,7 @@ onMounted(() => {
             <template #title="{ title, key }">
               <div class="group flex items-center gap-2">
                 <span class="font-mono text-sm">{{ title }}</span>
-                <Space class="tree-node-actions" size="small">
+                <Space class="invisible group-hover:visible" size="small">
                   <Tooltip :title="$t('ipam.page.subnet.scan')">
                     <Button
                       type="link"
@@ -510,7 +510,7 @@ onMounted(() => {
         <Grid :table-title="selectedSubnetName || $t('ipam.page.ipAddress.title')">
           <template #address="{ row }">
             <a
-              class="ip-address-link cursor-pointer font-mono"
+              class="cursor-pointer font-mono text-blue-600 hover:text-blue-800 hover:underline"
               @click="handleViewIpDetail(row)"
             >
               {{ row.address }}
@@ -520,10 +520,10 @@ onMounted(() => {
             <div class="flex items-center gap-2">
               <span>{{ row.hostname || '-' }}</span>
               <Tooltip v-if="row.hasReverseDns === false" :title="$t('ipam.page.ipAddress.noReverseDns')">
-                <component :is="LucideXCircle" class="size-4" style="color: #f97316" />
+                <component :is="LucideXCircle" class="size-4 text-orange-500" />
               </Tooltip>
               <Tooltip v-else-if="row.hasReverseDns === true" :title="$t('ipam.page.ipAddress.hasReverseDns')">
-                <component :is="LucideCheckCircle" class="size-4" style="color: #22c55e" />
+                <component :is="LucideCheckCircle" class="size-4 text-green-500" />
               </Tooltip>
             </div>
           </template>
@@ -650,19 +650,19 @@ onMounted(() => {
           </div>
           <div>
             <span class="text-gray-500">{{ $t('ipam.page.subnet.aliveCount') }}:</span>
-            <span class="ml-2 font-medium" style="color: #16a34a">{{ currentScanJob.aliveCount ?? 0 }}</span>
+            <span class="ml-2 font-medium text-green-600">{{ currentScanJob.aliveCount ?? 0 }}</span>
           </div>
           <div>
             <span class="text-gray-500">{{ $t('ipam.page.subnet.newCount') }}:</span>
-            <span class="ml-2 font-medium" style="color: #2563eb">{{ currentScanJob.newCount ?? 0 }}</span>
+            <span class="ml-2 font-medium text-blue-600">{{ currentScanJob.newCount ?? 0 }}</span>
           </div>
           <div v-if="currentScanJob.enableSnmp">
             <span class="text-gray-500">{{ $t('ipam.page.subnet.snmpDiscoveredCount') }}:</span>
-            <span class="ml-2 font-medium" style="color: #9333ea">{{ currentScanJob.snmpDiscoveredCount ?? 0 }}</span>
+            <span class="ml-2 font-medium text-purple-600">{{ currentScanJob.snmpDiscoveredCount ?? 0 }}</span>
           </div>
         </div>
 
-        <div v-if="currentScanJob.statusMessage && (currentScanJob.status === 'IP_SCAN_JOB_STATUS_FAILED')" class="rounded p-3 text-sm" style="background-color: #fef2f2; color: #dc2626">
+        <div v-if="currentScanJob.statusMessage && (currentScanJob.status === 'IP_SCAN_JOB_STATUS_FAILED')" class="rounded bg-red-50 p-3 text-sm text-red-600">
           {{ currentScanJob.statusMessage }}
         </div>
 
@@ -682,19 +682,3 @@ onMounted(() => {
     </Modal>
   </Page>
 </template>
-
-<style scoped>
-.tree-node-actions {
-  visibility: hidden;
-}
-.group:hover > .tree-node-actions {
-  visibility: visible;
-}
-.ip-address-link {
-  color: #2563eb;
-}
-.ip-address-link:hover {
-  color: #1e40af;
-  text-decoration: underline;
-}
-</style>

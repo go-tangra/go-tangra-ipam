@@ -325,7 +325,7 @@ onMounted(() => {
             <template #title="{ title, location }">
               <div class="tree-node-title group flex items-center justify-between pr-1">
                 <span class="truncate flex-1">{{ title }}</span>
-                <span class="tree-actions flex items-center">
+                <span class="tree-actions flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button
                     type="text"
                     size="small"
@@ -447,13 +447,3 @@ onMounted(() => {
     </Drawer>
   </Page>
 </template>
-
-<style scoped>
-.tree-actions {
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.group:hover > .tree-actions {
-  opacity: 1;
-}
-</style>
