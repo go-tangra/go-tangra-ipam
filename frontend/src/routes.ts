@@ -4,7 +4,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/ipam',
     name: 'IPAM',
-    component: () => import('shell/vben/layouts').then((m) => m.BasicLayout),
+    component: () => import('shell/app-layout'),
     redirect: '/ipam/subnet',
     meta: {
       order: 2020,
