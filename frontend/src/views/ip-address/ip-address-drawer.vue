@@ -374,10 +374,9 @@ const ipAddress = computed(() => data.value?.row);
             <div
               v-for="addr in suggestedAddresses"
               :key="addr.address"
-              class="cursor-pointer rounded-md border px-3 py-2 transition-colors hover:border-blue-400 hover:bg-blue-50 dark:hover:border-blue-600 dark:hover:bg-blue-950"
+              class="suggestion-card cursor-pointer rounded-md border px-3 py-2 transition-colors"
               :class="{
-                'border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-950': selectedSuggestion === addr.address,
-                'border-gray-200 dark:border-gray-700': selectedSuggestion !== addr.address,
+                'suggestion-card-selected': selectedSuggestion === addr.address,
               }"
               @click="selectSuggestedAddress(addr)"
             >
@@ -477,3 +476,28 @@ const ipAddress = computed(() => data.value?.row);
     </template>
   </Drawer>
 </template>
+
+<style scoped>
+.suggestion-card {
+  border-color: #e5e7eb;
+}
+.suggestion-card:hover {
+  border-color: #60a5fa;
+  background-color: #eff6ff;
+}
+.suggestion-card-selected {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}
+:global(.dark) .suggestion-card {
+  border-color: #374151;
+}
+:global(.dark) .suggestion-card:hover {
+  border-color: #2563eb;
+  background-color: rgb(23 37 84 / 0.5);
+}
+:global(.dark) .suggestion-card-selected {
+  border-color: #2563eb;
+  background-color: rgb(23 37 84 / 0.5);
+}
+</style>
