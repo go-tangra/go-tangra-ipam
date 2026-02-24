@@ -385,7 +385,7 @@ const ipAddress = computed(() => data.value?.row);
                 <span class="font-mono text-sm font-medium">{{ addr.address }}</span>
                 <LucideCheckCircle
                   v-if="selectedSuggestion === addr.address"
-                  class="size-4 text-blue-500"
+                  class="size-4" style="color: #3b82f6"
                 />
               </div>
               <div class="mt-1 flex gap-1">

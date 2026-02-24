@@ -990,7 +990,7 @@ const networkInfo = computed(() => {
                             <code class="bg-muted rounded px-1.5 py-0.5 text-sm">{{ alloc.cidr }}</code>
                             <span class="text-muted-foreground ml-2 text-xs">
                               {{ formatAddressCount(alloc.usableHosts) }}/{{ alloc.hostsNeeded }} {{ $t('ipam.page.subnet.hostsPerSubnet') }}
-                              <span v-if="alloc.wastedAddresses > 0" class="text-orange-500">
+                              <span v-if="alloc.wastedAddresses > 0" style="color: #f97316">
                                 (+{{ alloc.wastedAddresses }} {{ $t('ipam.page.subnet.wasted') }})
                               </span>
                             </span>
