@@ -17,4 +17,5 @@ import (
 var ProviderSet = wire.NewSet(
 	cert.NewCertManager,
 	server.NewGRPCServer,
+	server.NewHTTPServer,
 )

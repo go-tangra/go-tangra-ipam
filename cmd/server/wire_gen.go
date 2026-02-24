@@ -49,8 +49,9 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	hostGroupService := service.NewHostGroupService(context, hostGroupRepo)
 	backupService := service.NewBackupService(context, entClient)
 	grpcServer := server.NewGRPCServer(context, certManager, auditLogRepo, systemService, subnetService, vlanService, deviceService, locationService, ipAddressService, ipScanService, ipGroupService, hostGroupService, backupService)
+	httpServer := server.NewHTTPServer(context)
 	scanExecutor := service.NewScanExecutor(context, ipScanJobRepo, subnetRepo, ipAddressRepo, deviceRepo, deviceInterfaceRepo)
-	app := newApp(context, grpcServer, scanExecutor)
+	app := newApp(context, grpcServer, httpServer, scanExecutor)
 	return app, func() {
 		cleanup()
 	}, nil
