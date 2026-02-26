@@ -49,10 +49,23 @@ func (r *DevicePackageRepo) SyncPackages(ctx context.Context, tenantID uint32, d
 		return ipamV1.ErrorInternalServerError("sync packages failed")
 	}
 
+	// Deduplicate packages by name (last occurrence wins)
+	seen := make(map[string]int, len(packages))
+	deduped := make([]*ipamV1.DevicePackage, 0, len(packages))
+	for _, pkg := range packages {
+		name := pkg.GetName()
+		if idx, exists := seen[name]; exists {
+			deduped[idx] = pkg
+		} else {
+			seen[name] = len(deduped)
+			deduped = append(deduped, pkg)
+		}
+	}
+
 	// Bulk insert new packages
 	now := time.Now()
-	builders := make([]*ent.DevicePackageCreate, 0, len(packages))
-	for _, pkg := range packages {
+	builders := make([]*ent.DevicePackageCreate, 0, len(deduped))
+	for _, pkg := range deduped {
 		b := tx.DevicePackage.Create().
 			SetID(uuid.New().String()).
 			SetTenantID(tenantID).
