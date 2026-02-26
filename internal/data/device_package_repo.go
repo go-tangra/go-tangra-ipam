@@ -60,7 +60,8 @@ func (r *DevicePackageRepo) SyncPackages(ctx context.Context, tenantID uint32, d
 			SetName(pkg.GetName()).
 			SetNeedsUpdate(pkg.GetNeedsUpdate()).
 			SetIsSecurityUpdate(pkg.GetIsSecurityUpdate()).
-			SetCreateTime(now)
+			SetCreateTime(now).
+			SetUpdateTime(now)
 
 		if pkg.CurrentVersion != nil {
 			b.SetCurrentVersion(*pkg.CurrentVersion)
@@ -98,12 +99,16 @@ func (r *DevicePackageRepo) SyncPackages(ctx context.Context, tenantID uint32, d
 }
 
 var devicePackageSortFields = map[string]func(opts ...sql.OrderTermOption) devicepackage.OrderOption{
-	"name":           devicepackage.ByName,
-	"currentVersion": devicepackage.ByCurrentVersion,
-	"needsUpdate":    devicepackage.ByNeedsUpdate,
-	"packageManager": devicepackage.ByPackageManager,
-	"create_time":    devicepackage.ByCreateTime,
-	"update_time":    devicepackage.ByUpdateTime,
+	"name":             devicepackage.ByName,
+	"currentVersion":   devicepackage.ByCurrentVersion,
+	"availableVersion": devicepackage.ByAvailableVersion,
+	"needsUpdate":      devicepackage.ByNeedsUpdate,
+	"isSecurityUpdate": devicepackage.ByIsSecurityUpdate,
+	"packageManager":   devicepackage.ByPackageManager,
+	"createdAt":        devicepackage.ByCreateTime,
+	"updatedAt":        devicepackage.ByUpdateTime,
+	"create_time":      devicepackage.ByCreateTime,
+	"update_time":      devicepackage.ByUpdateTime,
 }
 
 func devicePackageOrderBy(orderBy []string) []devicepackage.OrderOption {
