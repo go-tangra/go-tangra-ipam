@@ -194,7 +194,7 @@ const gridOptions: VxeGridProps<ipamservicev1_Device> = {
     {
       title: $t('ipam.page.device.name'),
       field: 'name',
-      minWidth: 150,
+      minWidth: 75,
       sortable: true,
       slots: { default: 'name' },
     },
@@ -219,7 +219,7 @@ const gridOptions: VxeGridProps<ipamservicev1_Device> = {
     {
       title: $t('ipam.page.device.updateStatus'),
       field: 'packageUpdateCount',
-      width: 180,
+      minWidth: 250,
       slots: { default: 'updateStatus' },
     },
     {
