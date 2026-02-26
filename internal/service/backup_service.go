@@ -18,6 +18,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
@@ -71,6 +72,7 @@ type backupEntities struct {
 	HostGroups       []json.RawMessage `json:"hostGroups,omitempty"`
 	HostGroupMembers []json.RawMessage `json:"hostGroupMembers,omitempty"`
 	IpScanJobs       []json.RawMessage `json:"ipScanJobs,omitempty"`
+	DevicePackages   []json.RawMessage `json:"devicePackages,omitempty"`
 }
 
 func (s *BackupService) ExportBackup(ctx context.Context, req *ipamV1.ExportBackupRequest) (*ipamV1.ExportBackupResponse, error) {
@@ -137,6 +139,10 @@ func (s *BackupService) ExportBackup(ctx context.Context, req *ipamV1.ExportBack
 	if err != nil {
 		return nil, fmt.Errorf("export ip scan jobs: %w", err)
 	}
+	devicePackages, err := s.exportDevicePackages(ctx, client, tenantID, full)
+	if err != nil {
+		return nil, fmt.Errorf("export device packages: %w", err)
+	}
 
 	backup := backupData{
 		Module:     backupModule,
@@ -157,6 +163,7 @@ func (s *BackupService) ExportBackup(ctx context.Context, req *ipamV1.ExportBack
 			HostGroups:       hostGroups,
 			HostGroupMembers: hostGroupMembers,
 			IpScanJobs:       ipScanJobs,
+			DevicePackages:   devicePackages,
 		},
 	}
 
@@ -178,6 +185,7 @@ func (s *BackupService) ExportBackup(ctx context.Context, req *ipamV1.ExportBack
 		"hostGroups":       int64(len(hostGroups)),
 		"hostGroupMembers": int64(len(hostGroupMembers)),
 		"ipScanJobs":       int64(len(ipScanJobs)),
+		"devicePackages":   int64(len(devicePackages)),
 	}
 
 	s.log.Infof("exported backup: module=%s tenant=%d full=%v entities=%v", backupModule, tenantID, full, entityCounts)
@@ -242,6 +250,7 @@ func (s *BackupService) ImportBackup(ctx context.Context, req *ipamV1.ImportBack
 		{"hostGroups", s.importHostGroups},
 		{"hostGroupMembers", s.importHostGroupMembers},
 		{"ipScanJobs", s.importIpScanJobs},
+		{"devicePackages", s.importDevicePackages},
 	}
 
 	dataMap := map[string][]json.RawMessage{
@@ -257,6 +266,7 @@ func (s *BackupService) ImportBackup(ctx context.Context, req *ipamV1.ImportBack
 		"hostGroups":       backup.Data.HostGroups,
 		"hostGroupMembers": backup.Data.HostGroupMembers,
 		"ipScanJobs":       backup.Data.IpScanJobs,
+		"devicePackages":   backup.Data.DevicePackages,
 	}
 
 	for _, imp := range importFuncs {
@@ -1343,6 +1353,83 @@ func (s *BackupService) importIpScanJobs(ctx context.Context, client *ent.Client
 				Save(ctx)
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf("ipScanJobs: create %s: %v", e.ID, err))
+				result.Failed++
+				continue
+			}
+			result.Created++
+		}
+	}
+
+	return result, warnings
+}
+
+func (s *BackupService) exportDevicePackages(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
+	query := client.DevicePackage.Query()
+	if !full {
+		query = query.Where(devicepackage.TenantID(tenantID))
+	}
+	entities, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return marshalEntities(entities)
+}
+
+func (s *BackupService) importDevicePackages(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
+	result := &ipamV1.EntityImportResult{EntityType: "devicePackages", Total: int64(len(items))}
+	var warnings []string
+
+	for _, raw := range items {
+		var e ent.DevicePackage
+		if err := json.Unmarshal(raw, &e); err != nil {
+			warnings = append(warnings, fmt.Sprintf("devicePackages: unmarshal error: %v", err))
+			result.Failed++
+			continue
+		}
+
+		tid := tenantID
+		if full && e.TenantID != nil {
+			tid = *e.TenantID
+		}
+
+		existing, _ := client.DevicePackage.Get(ctx, e.ID)
+		if existing != nil {
+			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
+				result.Skipped++
+				continue
+			}
+			_, err := client.DevicePackage.UpdateOneID(e.ID).
+				SetDeviceID(e.DeviceID).
+				SetName(e.Name).
+				SetCurrentVersion(e.CurrentVersion).
+				SetAvailableVersion(e.AvailableVersion).
+				SetNeedsUpdate(e.NeedsUpdate).
+				SetIsSecurityUpdate(e.IsSecurityUpdate).
+				SetPackageManager(e.PackageManager).
+				SetDescription(e.Description).
+				Save(ctx)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("devicePackages: update %s: %v", e.ID, err))
+				result.Failed++
+				continue
+			}
+			result.Updated++
+		} else {
+			_, err := client.DevicePackage.Create().
+				SetID(e.ID).
+				SetNillableTenantID(&tid).
+				SetDeviceID(e.DeviceID).
+				SetName(e.Name).
+				SetCurrentVersion(e.CurrentVersion).
+				SetAvailableVersion(e.AvailableVersion).
+				SetNeedsUpdate(e.NeedsUpdate).
+				SetIsSecurityUpdate(e.IsSecurityUpdate).
+				SetPackageManager(e.PackageManager).
+				SetDescription(e.Description).
+				SetNillableCreateTime(e.CreateTime).
+				Save(ctx)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("devicePackages: create %s: %v", e.ID, err))
 				result.Failed++
 				continue
 			}

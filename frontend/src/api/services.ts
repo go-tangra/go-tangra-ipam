@@ -537,6 +537,65 @@ export const HostGroupService = {
   },
 };
 
+// ==================== Device Package Service ====================
+
+export interface DevicePackage {
+  id?: string;
+  deviceId?: string;
+  tenantId?: number;
+  name?: string;
+  currentVersion?: string;
+  availableVersion?: string;
+  needsUpdate?: boolean;
+  isSecurityUpdate?: boolean;
+  packageManager?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ListDevicePackagesResponse {
+  items?: DevicePackage[];
+  total?: number;
+}
+
+export interface GetDevicePackageStatsResponse {
+  total?: number;
+  updatesAvailable?: number;
+  securityUpdates?: number;
+  lastSync?: string;
+}
+
+export const DevicePackageService = {
+  list: async (
+    deviceId: string,
+    params?: {
+      page?: number;
+      pageSize?: number;
+      query?: string;
+      needsUpdate?: boolean;
+      isSecurityUpdate?: boolean;
+      packageManager?: string;
+      orderBy?: string[];
+      noPaging?: boolean;
+    },
+    options?: RequestOptions
+  ): Promise<ListDevicePackagesResponse> => {
+    return ipamApi.get<ListDevicePackagesResponse>(`/devices/${deviceId}/packages${buildQuery(params || {})}`, options);
+  },
+
+  getStats: async (
+    deviceId: string,
+    options?: RequestOptions
+  ): Promise<GetDevicePackageStatsResponse> => {
+    return ipamApi.get<GetDevicePackageStatsResponse>(`/devices/${deviceId}/packages/stats`, options);
+  },
+
+  delete: async (deviceId: string, options?: RequestOptions): Promise<void> => {
+    return ipamApi.delete(`/devices/${deviceId}/packages`, options);
+  },
+};
+
 // ==================== System Service ====================
 
 export const SystemService = {

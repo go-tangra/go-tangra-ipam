@@ -103,6 +103,18 @@ menus:
       - platform:admin
       - tenant:manager
 
+  - id: ipam-packages
+    parent_id: ipam
+    type: MENU
+    name: Packages
+    path: packages
+    component: app/ipam/packages/index.vue
+    icon: lucide:package
+    order: 8
+    authority:
+      - platform:admin
+      - tenant:manager
+
 dashboard_widgets:
   - id: ipam.addresses_total
     name: IP Addresses
@@ -225,6 +237,12 @@ permission_groups:
       - name: Manage Locations
         code: ipam.location.manage
         description: Create, update, and delete locations
+      - name: View Packages
+        code: ipam.package.view
+        description: View device package information
+      - name: Manage Packages
+        code: ipam.package.manage
+        description: Sync and manage device packages
 
 roles:
   - name: IPAM Administrator
@@ -242,6 +260,8 @@ roles:
       - ipam.device.manage
       - ipam.location.view
       - ipam.location.manage
+      - ipam.package.view
+      - ipam.package.manage
 
   - name: IPAM Operator
     code: ipam.operator
@@ -255,6 +275,8 @@ roles:
       - ipam.vlan.view
       - ipam.device.view
       - ipam.location.view
+      - ipam.package.view
+      - ipam.package.manage
 
   - name: IPAM Viewer
     code: ipam.viewer
@@ -266,3 +288,4 @@ roles:
       - ipam.vlan.view
       - ipam.device.view
       - ipam.location.view
+      - ipam.package.view

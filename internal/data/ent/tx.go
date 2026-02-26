@@ -18,6 +18,8 @@ type Tx struct {
 	Device *DeviceClient
 	// DeviceInterface is the client for interacting with the DeviceInterface builders.
 	DeviceInterface *DeviceInterfaceClient
+	// DevicePackage is the client for interacting with the DevicePackage builders.
+	DevicePackage *DevicePackageClient
 	// DnsConfig is the client for interacting with the DnsConfig builders.
 	DnsConfig *DnsConfigClient
 	// HostGroup is the client for interacting with the HostGroup builders.
@@ -172,6 +174,7 @@ func (tx *Tx) init() {
 	tx.AuditLog = NewAuditLogClient(tx.config)
 	tx.Device = NewDeviceClient(tx.config)
 	tx.DeviceInterface = NewDeviceInterfaceClient(tx.config)
+	tx.DevicePackage = NewDevicePackageClient(tx.config)
 	tx.DnsConfig = NewDnsConfigClient(tx.config)
 	tx.HostGroup = NewHostGroupClient(tx.config)
 	tx.HostGroupMember = NewHostGroupMemberClient(tx.config)

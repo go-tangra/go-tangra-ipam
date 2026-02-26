@@ -18,6 +18,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
@@ -41,6 +42,8 @@ type Client struct {
 	Device *DeviceClient
 	// DeviceInterface is the client for interacting with the DeviceInterface builders.
 	DeviceInterface *DeviceInterfaceClient
+	// DevicePackage is the client for interacting with the DevicePackage builders.
+	DevicePackage *DevicePackageClient
 	// DnsConfig is the client for interacting with the DnsConfig builders.
 	DnsConfig *DnsConfigClient
 	// HostGroup is the client for interacting with the HostGroup builders.
@@ -75,6 +78,7 @@ func (c *Client) init() {
 	c.AuditLog = NewAuditLogClient(c.config)
 	c.Device = NewDeviceClient(c.config)
 	c.DeviceInterface = NewDeviceInterfaceClient(c.config)
+	c.DevicePackage = NewDevicePackageClient(c.config)
 	c.DnsConfig = NewDnsConfigClient(c.config)
 	c.HostGroup = NewHostGroupClient(c.config)
 	c.HostGroupMember = NewHostGroupMemberClient(c.config)
@@ -180,6 +184,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AuditLog:        NewAuditLogClient(cfg),
 		Device:          NewDeviceClient(cfg),
 		DeviceInterface: NewDeviceInterfaceClient(cfg),
+		DevicePackage:   NewDevicePackageClient(cfg),
 		DnsConfig:       NewDnsConfigClient(cfg),
 		HostGroup:       NewHostGroupClient(cfg),
 		HostGroupMember: NewHostGroupMemberClient(cfg),
@@ -212,6 +217,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AuditLog:        NewAuditLogClient(cfg),
 		Device:          NewDeviceClient(cfg),
 		DeviceInterface: NewDeviceInterfaceClient(cfg),
+		DevicePackage:   NewDevicePackageClient(cfg),
 		DnsConfig:       NewDnsConfigClient(cfg),
 		HostGroup:       NewHostGroupClient(cfg),
 		HostGroupMember: NewHostGroupMemberClient(cfg),
@@ -251,9 +257,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.AuditLog, c.Device, c.DeviceInterface, c.DnsConfig, c.HostGroup,
-		c.HostGroupMember, c.IpAddress, c.IpGroup, c.IpGroupMember, c.IpScanJob,
-		c.Location, c.Subnet, c.Vlan,
+		c.AuditLog, c.Device, c.DeviceInterface, c.DevicePackage, c.DnsConfig,
+		c.HostGroup, c.HostGroupMember, c.IpAddress, c.IpGroup, c.IpGroupMember,
+		c.IpScanJob, c.Location, c.Subnet, c.Vlan,
 	} {
 		n.Use(hooks...)
 	}
@@ -263,9 +269,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.AuditLog, c.Device, c.DeviceInterface, c.DnsConfig, c.HostGroup,
-		c.HostGroupMember, c.IpAddress, c.IpGroup, c.IpGroupMember, c.IpScanJob,
-		c.Location, c.Subnet, c.Vlan,
+		c.AuditLog, c.Device, c.DeviceInterface, c.DevicePackage, c.DnsConfig,
+		c.HostGroup, c.HostGroupMember, c.IpAddress, c.IpGroup, c.IpGroupMember,
+		c.IpScanJob, c.Location, c.Subnet, c.Vlan,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -280,6 +286,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Device.mutate(ctx, m)
 	case *DeviceInterfaceMutation:
 		return c.DeviceInterface.mutate(ctx, m)
+	case *DevicePackageMutation:
+		return c.DevicePackage.mutate(ctx, m)
 	case *DnsConfigMutation:
 		return c.DnsConfig.mutate(ctx, m)
 	case *HostGroupMutation:
@@ -767,6 +775,140 @@ func (c *DeviceInterfaceClient) mutate(ctx context.Context, m *DeviceInterfaceMu
 		return (&DeviceInterfaceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown DeviceInterface mutation op: %q", m.Op())
+	}
+}
+
+// DevicePackageClient is a client for the DevicePackage schema.
+type DevicePackageClient struct {
+	config
+}
+
+// NewDevicePackageClient returns a client for the DevicePackage from the given config.
+func NewDevicePackageClient(c config) *DevicePackageClient {
+	return &DevicePackageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `devicepackage.Hooks(f(g(h())))`.
+func (c *DevicePackageClient) Use(hooks ...Hook) {
+	c.hooks.DevicePackage = append(c.hooks.DevicePackage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `devicepackage.Intercept(f(g(h())))`.
+func (c *DevicePackageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DevicePackage = append(c.inters.DevicePackage, interceptors...)
+}
+
+// Create returns a builder for creating a DevicePackage entity.
+func (c *DevicePackageClient) Create() *DevicePackageCreate {
+	mutation := newDevicePackageMutation(c.config, OpCreate)
+	return &DevicePackageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DevicePackage entities.
+func (c *DevicePackageClient) CreateBulk(builders ...*DevicePackageCreate) *DevicePackageCreateBulk {
+	return &DevicePackageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DevicePackageClient) MapCreateBulk(slice any, setFunc func(*DevicePackageCreate, int)) *DevicePackageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DevicePackageCreateBulk{err: fmt.Errorf("calling to DevicePackageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DevicePackageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DevicePackageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DevicePackage.
+func (c *DevicePackageClient) Update() *DevicePackageUpdate {
+	mutation := newDevicePackageMutation(c.config, OpUpdate)
+	return &DevicePackageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DevicePackageClient) UpdateOne(_m *DevicePackage) *DevicePackageUpdateOne {
+	mutation := newDevicePackageMutation(c.config, OpUpdateOne, withDevicePackage(_m))
+	return &DevicePackageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DevicePackageClient) UpdateOneID(id string) *DevicePackageUpdateOne {
+	mutation := newDevicePackageMutation(c.config, OpUpdateOne, withDevicePackageID(id))
+	return &DevicePackageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DevicePackage.
+func (c *DevicePackageClient) Delete() *DevicePackageDelete {
+	mutation := newDevicePackageMutation(c.config, OpDelete)
+	return &DevicePackageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DevicePackageClient) DeleteOne(_m *DevicePackage) *DevicePackageDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DevicePackageClient) DeleteOneID(id string) *DevicePackageDeleteOne {
+	builder := c.Delete().Where(devicepackage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DevicePackageDeleteOne{builder}
+}
+
+// Query returns a query builder for DevicePackage.
+func (c *DevicePackageClient) Query() *DevicePackageQuery {
+	return &DevicePackageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDevicePackage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DevicePackage entity by its id.
+func (c *DevicePackageClient) Get(ctx context.Context, id string) (*DevicePackage, error) {
+	return c.Query().Where(devicepackage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DevicePackageClient) GetX(ctx context.Context, id string) *DevicePackage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DevicePackageClient) Hooks() []Hook {
+	hooks := c.hooks.DevicePackage
+	return append(hooks[:len(hooks):len(hooks)], devicepackage.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *DevicePackageClient) Interceptors() []Interceptor {
+	return c.inters.DevicePackage
+}
+
+func (c *DevicePackageClient) mutate(ctx context.Context, m *DevicePackageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DevicePackageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DevicePackageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DevicePackageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DevicePackageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DevicePackage mutation op: %q", m.Op())
 	}
 }
 
@@ -2447,12 +2589,13 @@ func (c *VlanClient) mutate(ctx context.Context, m *VlanMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AuditLog, Device, DeviceInterface, DnsConfig, HostGroup, HostGroupMember,
-		IpAddress, IpGroup, IpGroupMember, IpScanJob, Location, Subnet, Vlan []ent.Hook
+		AuditLog, Device, DeviceInterface, DevicePackage, DnsConfig, HostGroup,
+		HostGroupMember, IpAddress, IpGroup, IpGroupMember, IpScanJob, Location,
+		Subnet, Vlan []ent.Hook
 	}
 	inters struct {
-		AuditLog, Device, DeviceInterface, DnsConfig, HostGroup, HostGroupMember,
-		IpAddress, IpGroup, IpGroupMember, IpScanJob, Location, Subnet,
-		Vlan []ent.Interceptor
+		AuditLog, Device, DeviceInterface, DevicePackage, DnsConfig, HostGroup,
+		HostGroupMember, IpAddress, IpGroup, IpGroupMember, IpScanJob, Location,
+		Subnet, Vlan []ent.Interceptor
 	}
 )

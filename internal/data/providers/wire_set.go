@@ -28,4 +28,5 @@ var ProviderSet = wire.NewSet(
 	data.NewAuditLogRepo,
 	data.NewStatisticsRepo,
 	data.NewDeviceInterfaceRepo,
+	data.NewDevicePackageRepo,
 )

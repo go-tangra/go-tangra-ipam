@@ -84,6 +84,16 @@ const routes: RouteRecordRaw[] = [
         },
         component: () => import('./views/host-group/index.vue'),
       },
+      {
+        path: 'packages',
+        name: 'IpamDevicePackages',
+        meta: {
+          icon: 'lucide:package',
+          title: 'ipam.menu.packages',
+          authority: ['platform:admin', 'tenant:manager'],
+        },
+        component: () => import('./views/packages/index.vue'),
+      },
     ],
   },
 ];

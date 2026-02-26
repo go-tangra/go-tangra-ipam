@@ -61,6 +61,7 @@ func NewGRPCServer(
 	ipGroupSvc *service.IpGroupService,
 	hostGroupSvc *service.HostGroupService,
 	backupSvc *service.BackupService,
+	devicePackageSvc *service.DevicePackageService,
 ) *grpc.Server {
 	cfg := ctx.GetConfig()
 	logger := ctx.GetLogger()
@@ -143,6 +144,7 @@ func NewGRPCServer(
 	ipamV1.RegisterRedactedIpGroupServiceServer(srv, ipGroupSvc, nil)
 	ipamV1.RegisterRedactedHostGroupServiceServer(srv, hostGroupSvc, nil)
 	ipamV1.RegisterRedactedBackupServiceServer(srv, backupSvc, nil)
+	ipamV1.RegisterRedactedDevicePackageServiceServer(srv, devicePackageSvc, nil)
 
 	return srv
 }

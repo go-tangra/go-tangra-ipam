@@ -10,6 +10,7 @@ import { useIpamSystemStore } from './stores/ipam-system.state';
 import { useIpamIpScanStore } from './stores/ipam-ip-scan.state';
 import { useIpamGroupStore } from './stores/ipam-group.state';
 import { useIpamHostGroupStore } from './stores/ipam-host-group.state';
+import { useIpamDevicePackageStore } from './stores/ipam-device-package.state';
 import enUS from './locales/en-US.json';
 
 const ipamModule: TangraModule = {
@@ -26,6 +27,7 @@ const ipamModule: TangraModule = {
     'ipam-ip-scan': useIpamIpScanStore,
     'ipam-group': useIpamGroupStore,
     'ipam-host-group': useIpamHostGroupStore,
+    'ipam-device-package': useIpamDevicePackageStore,
   },
   locales: {
     'en-US': enUS,

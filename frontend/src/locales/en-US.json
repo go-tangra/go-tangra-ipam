@@ -9,7 +9,8 @@
     "system": "Systems",
     "scanJob": "Scan Jobs",
     "groups": "IP Groups",
-    "hostGroups": "Host Groups"
+    "hostGroups": "Host Groups",
+    "packages": "Packages"
   },
   "page": {
     "subnet": {
@@ -261,6 +262,30 @@
       "emptySlot": "Empty slot at U{position}",
       "positionConflict": "Position conflict: {positions} is already occupied by another device",
       "unpositioned": "Unpositioned Devices"
+    },
+    "packages": {
+      "title": "Device Packages",
+      "device": "Device",
+      "selectDevice": "Select a device",
+      "searchPlaceholder": "Search packages...",
+      "name": "Package Name",
+      "currentVersion": "Installed Version",
+      "availableVersion": "Available Version",
+      "needsUpdate": "Needs Update",
+      "upToDate": "Up to Date",
+      "securityUpdate": "Security",
+      "notSecurity": "Not Security",
+      "securityFilter": "Security Update",
+      "updateStatus": "Update Status",
+      "packageManager": "Package Manager",
+      "description": "Description",
+      "totalPackages": "Total Packages",
+      "updatesAvailable": "Updates Available",
+      "securityUpdates": "Security Updates",
+      "lastSync": "Last Sync",
+      "deleteAll": "Delete All",
+      "deleteAllSuccess": "All packages deleted successfully",
+      "confirmDeleteAll": "Are you sure you want to delete all packages for this device?"
     },
     "hostGroup": {
       "title": "Host Groups",

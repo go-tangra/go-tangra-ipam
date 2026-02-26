@@ -8,6 +8,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
@@ -160,6 +161,70 @@ func init() {
 	deviceinterfaceDescID := deviceinterfaceFields[0].Descriptor()
 	// deviceinterface.IDValidator is a validator for the "id" field. It is called by the builders before save.
 	deviceinterface.IDValidator = deviceinterfaceDescID.Validators[0].(func(string) error)
+	devicepackageMixin := schema.DevicePackage{}.Mixin()
+	devicepackage.Policy = privacy.NewPolicies(devicepackageMixin[1], schema.DevicePackage{})
+	devicepackage.Hooks[0] = func(next ent.Mutator) ent.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+			if err := devicepackage.Policy.EvalMutation(ctx, m); err != nil {
+				return nil, err
+			}
+			return next.Mutate(ctx, m)
+		})
+	}
+	devicepackageMixinFields1 := devicepackageMixin[1].Fields()
+	_ = devicepackageMixinFields1
+	devicepackageFields := schema.DevicePackage{}.Fields()
+	_ = devicepackageFields
+	// devicepackageDescTenantID is the schema descriptor for tenant_id field.
+	devicepackageDescTenantID := devicepackageMixinFields1[0].Descriptor()
+	// devicepackage.DefaultTenantID holds the default value on creation for the tenant_id field.
+	devicepackage.DefaultTenantID = devicepackageDescTenantID.Default.(uint32)
+	// devicepackageDescDeviceID is the schema descriptor for device_id field.
+	devicepackageDescDeviceID := devicepackageFields[1].Descriptor()
+	// devicepackage.DeviceIDValidator is a validator for the "device_id" field. It is called by the builders before save.
+	devicepackage.DeviceIDValidator = devicepackageDescDeviceID.Validators[0].(func(string) error)
+	// devicepackageDescName is the schema descriptor for name field.
+	devicepackageDescName := devicepackageFields[2].Descriptor()
+	// devicepackage.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	devicepackage.NameValidator = func() func(string) error {
+		validators := devicepackageDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// devicepackageDescCurrentVersion is the schema descriptor for current_version field.
+	devicepackageDescCurrentVersion := devicepackageFields[3].Descriptor()
+	// devicepackage.CurrentVersionValidator is a validator for the "current_version" field. It is called by the builders before save.
+	devicepackage.CurrentVersionValidator = devicepackageDescCurrentVersion.Validators[0].(func(string) error)
+	// devicepackageDescAvailableVersion is the schema descriptor for available_version field.
+	devicepackageDescAvailableVersion := devicepackageFields[4].Descriptor()
+	// devicepackage.AvailableVersionValidator is a validator for the "available_version" field. It is called by the builders before save.
+	devicepackage.AvailableVersionValidator = devicepackageDescAvailableVersion.Validators[0].(func(string) error)
+	// devicepackageDescNeedsUpdate is the schema descriptor for needs_update field.
+	devicepackageDescNeedsUpdate := devicepackageFields[5].Descriptor()
+	// devicepackage.DefaultNeedsUpdate holds the default value on creation for the needs_update field.
+	devicepackage.DefaultNeedsUpdate = devicepackageDescNeedsUpdate.Default.(bool)
+	// devicepackageDescIsSecurityUpdate is the schema descriptor for is_security_update field.
+	devicepackageDescIsSecurityUpdate := devicepackageFields[6].Descriptor()
+	// devicepackage.DefaultIsSecurityUpdate holds the default value on creation for the is_security_update field.
+	devicepackage.DefaultIsSecurityUpdate = devicepackageDescIsSecurityUpdate.Default.(bool)
+	// devicepackageDescPackageManager is the schema descriptor for package_manager field.
+	devicepackageDescPackageManager := devicepackageFields[7].Descriptor()
+	// devicepackage.PackageManagerValidator is a validator for the "package_manager" field. It is called by the builders before save.
+	devicepackage.PackageManagerValidator = devicepackageDescPackageManager.Validators[0].(func(string) error)
+	// devicepackageDescID is the schema descriptor for id field.
+	devicepackageDescID := devicepackageFields[0].Descriptor()
+	// devicepackage.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	devicepackage.IDValidator = devicepackageDescID.Validators[0].(func(string) error)
 	dnsconfigMixin := schema.DnsConfig{}.Mixin()
 	dnsconfig.Policy = privacy.NewPolicies(dnsconfigMixin[3], schema.DnsConfig{})
 	dnsconfig.Hooks[0] = func(next ent.Mutator) ent.Mutator {

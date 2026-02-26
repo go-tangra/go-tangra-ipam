@@ -20,6 +20,34 @@ export type ipamservicev1_IpGroupMember = components['schemas']['IpGroupMember']
 export type ipamservicev1_HostGroup = components['schemas']['HostGroup'];
 export type ipamservicev1_HostGroupMember = components['schemas']['HostGroupMember'];
 
+// DevicePackage types (not in OpenAPI yet, defined inline)
+export interface ipamservicev1_DevicePackage {
+  id?: string;
+  deviceId?: string;
+  tenantId?: number;
+  name?: string;
+  currentVersion?: string;
+  availableVersion?: string;
+  needsUpdate?: boolean;
+  isSecurityUpdate?: boolean;
+  packageManager?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ipamservicev1_ListDevicePackagesResponse {
+  items?: ipamservicev1_DevicePackage[];
+  total?: number;
+}
+
+export interface ipamservicev1_GetDevicePackageStatsResponse {
+  total?: number;
+  updatesAvailable?: number;
+  securityUpdates?: number;
+  lastSync?: string;
+}
+
 // Enum types
 export type ipamservicev1_IpGroupMemberType = NonNullable<components['schemas']['IpGroupMember']['memberType']>;
 

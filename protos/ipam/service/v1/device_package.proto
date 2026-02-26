@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package ipam.service.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "buf/validate/validate.proto";
+
+// DevicePackage represents an installed package on a device
+message DevicePackage {
+  optional string id = 1 [json_name = "id"];
+  optional string device_id = 2 [json_name = "deviceId"];
+  optional uint32 tenant_id = 3 [json_name = "tenantId"];
+  optional string name = 4 [json_name = "name"];
+  optional string current_version = 5 [json_name = "currentVersion"];
+  optional string available_version = 6 [json_name = "availableVersion"];
+  optional bool needs_update = 7 [json_name = "needsUpdate"];
+  optional bool is_security_update = 8 [json_name = "isSecurityUpdate"];
+  optional string package_manager = 9 [json_name = "packageManager"];
+  optional string description = 10 [json_name = "description"];
+  optional google.protobuf.Timestamp created_at = 11 [json_name = "createdAt"];
+  optional google.protobuf.Timestamp updated_at = 12 [json_name = "updatedAt"];
+}
+
+// SyncDevicePackagesRequest syncs all packages for a device (bulk replace)
+message SyncDevicePackagesRequest {
+  string device_id = 1 [
+    json_name = "deviceId",
+    (buf.validate.field).string.min_len = 1,
+    (google.api.field_behavior) = REQUIRED
+  ];
+
+  repeated DevicePackage packages = 2 [json_name = "packages"];
+
+  optional string package_manager = 3 [json_name = "packageManager"];
+}
+
+message SyncDevicePackagesResponse {
+  optional int32 total = 1 [json_name = "total"];
+  optional int32 updates_available = 2 [json_name = "updatesAvailable"];
+  optional int32 security_updates = 3 [json_name = "securityUpdates"];
+}
+
+// ListDevicePackagesRequest lists packages for a device
+message ListDevicePackagesRequest {
+  string device_id = 1 [
+    json_name = "deviceId",
+    (buf.validate.field).string.min_len = 1,
+    (google.api.field_behavior) = REQUIRED
+  ];
+
+  optional uint32 tenant_id = 2 [json_name = "tenantId"];
+  optional int32 page = 3 [json_name = "page"];
+  optional int32 page_size = 4 [json_name = "pageSize"];
+  optional bool no_paging = 5 [json_name = "noPaging"];
+  optional string query = 6 [json_name = "query"];
+  repeated string order_by = 7 [json_name = "orderBy"];
+
+  // Filters
+  optional bool needs_update = 10 [json_name = "needsUpdate"];
+  optional bool is_security_update = 11 [json_name = "isSecurityUpdate"];
+  optional string package_manager = 12 [json_name = "packageManager"];
+}
+
+message ListDevicePackagesResponse {
+  repeated DevicePackage items = 1 [json_name = "items"];
+  optional int32 total = 2 [json_name = "total"];
+}
+
+// GetDevicePackageStatsRequest gets package statistics for a device
+message GetDevicePackageStatsRequest {
+  string device_id = 1 [
+    json_name = "deviceId",
+    (buf.validate.field).string.min_len = 1,
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message GetDevicePackageStatsResponse {
+  optional int32 total = 1 [json_name = "total"];
+  optional int32 updates_available = 2 [json_name = "updatesAvailable"];
+  optional int32 security_updates = 3 [json_name = "securityUpdates"];
+  optional google.protobuf.Timestamp last_sync = 4 [json_name = "lastSync"];
+}
+
+// DeleteDevicePackagesRequest deletes all packages for a device
+message DeleteDevicePackagesRequest {
+  string device_id = 1 [
+    json_name = "deviceId",
+    (buf.validate.field).string.min_len = 1,
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+// DevicePackageService manages installed packages on devices
+service DevicePackageService {
+  // Sync all packages for a device (bulk replace)
+  rpc SyncDevicePackages(SyncDevicePackagesRequest) returns (SyncDevicePackagesResponse) {
+    option (google.api.http) = {
+      post: "/v1/devices/{device_id}/packages/sync"
+      body: "*"
+    };
+  }
+
+  // List packages for a device
+  rpc ListDevicePackages(ListDevicePackagesRequest) returns (ListDevicePackagesResponse) {
+    option (google.api.http) = {
+      get: "/v1/devices/{device_id}/packages"
+    };
+  }
+
+  // Get package statistics for a device
+  rpc GetDevicePackageStats(GetDevicePackageStatsRequest) returns (GetDevicePackageStatsResponse) {
+    option (google.api.http) = {
+      get: "/v1/devices/{device_id}/packages/stats"
+    };
+  }
+
+  // Delete all packages for a device
+  rpc DeleteDevicePackages(DeleteDevicePackagesRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/devices/{device_id}/packages"
+    };
+  }
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
@@ -39,6 +40,7 @@ const (
 	TypeAuditLog        = "AuditLog"
 	TypeDevice          = "Device"
 	TypeDeviceInterface = "DeviceInterface"
+	TypeDevicePackage   = "DevicePackage"
 	TypeDnsConfig       = "DnsConfig"
 	TypeHostGroup       = "HostGroup"
 	TypeHostGroupMember = "HostGroupMember"
@@ -5773,6 +5775,1124 @@ func (m *DeviceInterfaceMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown DeviceInterface edge %s", name)
+}
+
+// DevicePackageMutation represents an operation that mutates the DevicePackage nodes in the graph.
+type DevicePackageMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *string
+	create_time        *time.Time
+	update_time        *time.Time
+	delete_time        *time.Time
+	tenant_id          *uint32
+	addtenant_id       *int32
+	device_id          *string
+	name               *string
+	current_version    *string
+	available_version  *string
+	needs_update       *bool
+	is_security_update *bool
+	package_manager    *string
+	description        *string
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*DevicePackage, error)
+	predicates         []predicate.DevicePackage
+}
+
+var _ ent.Mutation = (*DevicePackageMutation)(nil)
+
+// devicepackageOption allows management of the mutation configuration using functional options.
+type devicepackageOption func(*DevicePackageMutation)
+
+// newDevicePackageMutation creates new mutation for the DevicePackage entity.
+func newDevicePackageMutation(c config, op Op, opts ...devicepackageOption) *DevicePackageMutation {
+	m := &DevicePackageMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDevicePackage,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDevicePackageID sets the ID field of the mutation.
+func withDevicePackageID(id string) devicepackageOption {
+	return func(m *DevicePackageMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DevicePackage
+		)
+		m.oldValue = func(ctx context.Context) (*DevicePackage, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DevicePackage.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDevicePackage sets the old DevicePackage of the mutation.
+func withDevicePackage(node *DevicePackage) devicepackageOption {
+	return func(m *DevicePackageMutation) {
+		m.oldValue = func(context.Context) (*DevicePackage, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DevicePackageMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DevicePackageMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DevicePackage entities.
+func (m *DevicePackageMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DevicePackageMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DevicePackageMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DevicePackage.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *DevicePackageMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *DevicePackageMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldCreateTime(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ClearCreateTime clears the value of the "create_time" field.
+func (m *DevicePackageMutation) ClearCreateTime() {
+	m.create_time = nil
+	m.clearedFields[devicepackage.FieldCreateTime] = struct{}{}
+}
+
+// CreateTimeCleared returns if the "create_time" field was cleared in this mutation.
+func (m *DevicePackageMutation) CreateTimeCleared() bool {
+	_, ok := m.clearedFields[devicepackage.FieldCreateTime]
+	return ok
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *DevicePackageMutation) ResetCreateTime() {
+	m.create_time = nil
+	delete(m.clearedFields, devicepackage.FieldCreateTime)
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *DevicePackageMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *DevicePackageMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldUpdateTime(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ClearUpdateTime clears the value of the "update_time" field.
+func (m *DevicePackageMutation) ClearUpdateTime() {
+	m.update_time = nil
+	m.clearedFields[devicepackage.FieldUpdateTime] = struct{}{}
+}
+
+// UpdateTimeCleared returns if the "update_time" field was cleared in this mutation.
+func (m *DevicePackageMutation) UpdateTimeCleared() bool {
+	_, ok := m.clearedFields[devicepackage.FieldUpdateTime]
+	return ok
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *DevicePackageMutation) ResetUpdateTime() {
+	m.update_time = nil
+	delete(m.clearedFields, devicepackage.FieldUpdateTime)
+}
+
+// SetDeleteTime sets the "delete_time" field.
+func (m *DevicePackageMutation) SetDeleteTime(t time.Time) {
+	m.delete_time = &t
+}
+
+// DeleteTime returns the value of the "delete_time" field in the mutation.
+func (m *DevicePackageMutation) DeleteTime() (r time.Time, exists bool) {
+	v := m.delete_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeleteTime returns the old "delete_time" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldDeleteTime(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeleteTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeleteTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeleteTime: %w", err)
+	}
+	return oldValue.DeleteTime, nil
+}
+
+// ClearDeleteTime clears the value of the "delete_time" field.
+func (m *DevicePackageMutation) ClearDeleteTime() {
+	m.delete_time = nil
+	m.clearedFields[devicepackage.FieldDeleteTime] = struct{}{}
+}
+
+// DeleteTimeCleared returns if the "delete_time" field was cleared in this mutation.
+func (m *DevicePackageMutation) DeleteTimeCleared() bool {
+	_, ok := m.clearedFields[devicepackage.FieldDeleteTime]
+	return ok
+}
+
+// ResetDeleteTime resets all changes to the "delete_time" field.
+func (m *DevicePackageMutation) ResetDeleteTime() {
+	m.delete_time = nil
+	delete(m.clearedFields, devicepackage.FieldDeleteTime)
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (m *DevicePackageMutation) SetTenantID(u uint32) {
+	m.tenant_id = &u
+	m.addtenant_id = nil
+}
+
+// TenantID returns the value of the "tenant_id" field in the mutation.
+func (m *DevicePackageMutation) TenantID() (r uint32, exists bool) {
+	v := m.tenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTenantID returns the old "tenant_id" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldTenantID(ctx context.Context) (v *uint32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTenantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTenantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTenantID: %w", err)
+	}
+	return oldValue.TenantID, nil
+}
+
+// AddTenantID adds u to the "tenant_id" field.
+func (m *DevicePackageMutation) AddTenantID(u int32) {
+	if m.addtenant_id != nil {
+		*m.addtenant_id += u
+	} else {
+		m.addtenant_id = &u
+	}
+}
+
+// AddedTenantID returns the value that was added to the "tenant_id" field in this mutation.
+func (m *DevicePackageMutation) AddedTenantID() (r int32, exists bool) {
+	v := m.addtenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (m *DevicePackageMutation) ClearTenantID() {
+	m.tenant_id = nil
+	m.addtenant_id = nil
+	m.clearedFields[devicepackage.FieldTenantID] = struct{}{}
+}
+
+// TenantIDCleared returns if the "tenant_id" field was cleared in this mutation.
+func (m *DevicePackageMutation) TenantIDCleared() bool {
+	_, ok := m.clearedFields[devicepackage.FieldTenantID]
+	return ok
+}
+
+// ResetTenantID resets all changes to the "tenant_id" field.
+func (m *DevicePackageMutation) ResetTenantID() {
+	m.tenant_id = nil
+	m.addtenant_id = nil
+	delete(m.clearedFields, devicepackage.FieldTenantID)
+}
+
+// SetDeviceID sets the "device_id" field.
+func (m *DevicePackageMutation) SetDeviceID(s string) {
+	m.device_id = &s
+}
+
+// DeviceID returns the value of the "device_id" field in the mutation.
+func (m *DevicePackageMutation) DeviceID() (r string, exists bool) {
+	v := m.device_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeviceID returns the old "device_id" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldDeviceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeviceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeviceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeviceID: %w", err)
+	}
+	return oldValue.DeviceID, nil
+}
+
+// ResetDeviceID resets all changes to the "device_id" field.
+func (m *DevicePackageMutation) ResetDeviceID() {
+	m.device_id = nil
+}
+
+// SetName sets the "name" field.
+func (m *DevicePackageMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *DevicePackageMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *DevicePackageMutation) ResetName() {
+	m.name = nil
+}
+
+// SetCurrentVersion sets the "current_version" field.
+func (m *DevicePackageMutation) SetCurrentVersion(s string) {
+	m.current_version = &s
+}
+
+// CurrentVersion returns the value of the "current_version" field in the mutation.
+func (m *DevicePackageMutation) CurrentVersion() (r string, exists bool) {
+	v := m.current_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrentVersion returns the old "current_version" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldCurrentVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrentVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrentVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrentVersion: %w", err)
+	}
+	return oldValue.CurrentVersion, nil
+}
+
+// ClearCurrentVersion clears the value of the "current_version" field.
+func (m *DevicePackageMutation) ClearCurrentVersion() {
+	m.current_version = nil
+	m.clearedFields[devicepackage.FieldCurrentVersion] = struct{}{}
+}
+
+// CurrentVersionCleared returns if the "current_version" field was cleared in this mutation.
+func (m *DevicePackageMutation) CurrentVersionCleared() bool {
+	_, ok := m.clearedFields[devicepackage.FieldCurrentVersion]
+	return ok
+}
+
+// ResetCurrentVersion resets all changes to the "current_version" field.
+func (m *DevicePackageMutation) ResetCurrentVersion() {
+	m.current_version = nil
+	delete(m.clearedFields, devicepackage.FieldCurrentVersion)
+}
+
+// SetAvailableVersion sets the "available_version" field.
+func (m *DevicePackageMutation) SetAvailableVersion(s string) {
+	m.available_version = &s
+}
+
+// AvailableVersion returns the value of the "available_version" field in the mutation.
+func (m *DevicePackageMutation) AvailableVersion() (r string, exists bool) {
+	v := m.available_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAvailableVersion returns the old "available_version" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldAvailableVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAvailableVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAvailableVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAvailableVersion: %w", err)
+	}
+	return oldValue.AvailableVersion, nil
+}
+
+// ClearAvailableVersion clears the value of the "available_version" field.
+func (m *DevicePackageMutation) ClearAvailableVersion() {
+	m.available_version = nil
+	m.clearedFields[devicepackage.FieldAvailableVersion] = struct{}{}
+}
+
+// AvailableVersionCleared returns if the "available_version" field was cleared in this mutation.
+func (m *DevicePackageMutation) AvailableVersionCleared() bool {
+	_, ok := m.clearedFields[devicepackage.FieldAvailableVersion]
+	return ok
+}
+
+// ResetAvailableVersion resets all changes to the "available_version" field.
+func (m *DevicePackageMutation) ResetAvailableVersion() {
+	m.available_version = nil
+	delete(m.clearedFields, devicepackage.FieldAvailableVersion)
+}
+
+// SetNeedsUpdate sets the "needs_update" field.
+func (m *DevicePackageMutation) SetNeedsUpdate(b bool) {
+	m.needs_update = &b
+}
+
+// NeedsUpdate returns the value of the "needs_update" field in the mutation.
+func (m *DevicePackageMutation) NeedsUpdate() (r bool, exists bool) {
+	v := m.needs_update
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNeedsUpdate returns the old "needs_update" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldNeedsUpdate(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNeedsUpdate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNeedsUpdate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNeedsUpdate: %w", err)
+	}
+	return oldValue.NeedsUpdate, nil
+}
+
+// ResetNeedsUpdate resets all changes to the "needs_update" field.
+func (m *DevicePackageMutation) ResetNeedsUpdate() {
+	m.needs_update = nil
+}
+
+// SetIsSecurityUpdate sets the "is_security_update" field.
+func (m *DevicePackageMutation) SetIsSecurityUpdate(b bool) {
+	m.is_security_update = &b
+}
+
+// IsSecurityUpdate returns the value of the "is_security_update" field in the mutation.
+func (m *DevicePackageMutation) IsSecurityUpdate() (r bool, exists bool) {
+	v := m.is_security_update
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsSecurityUpdate returns the old "is_security_update" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldIsSecurityUpdate(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsSecurityUpdate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsSecurityUpdate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsSecurityUpdate: %w", err)
+	}
+	return oldValue.IsSecurityUpdate, nil
+}
+
+// ResetIsSecurityUpdate resets all changes to the "is_security_update" field.
+func (m *DevicePackageMutation) ResetIsSecurityUpdate() {
+	m.is_security_update = nil
+}
+
+// SetPackageManager sets the "package_manager" field.
+func (m *DevicePackageMutation) SetPackageManager(s string) {
+	m.package_manager = &s
+}
+
+// PackageManager returns the value of the "package_manager" field in the mutation.
+func (m *DevicePackageMutation) PackageManager() (r string, exists bool) {
+	v := m.package_manager
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPackageManager returns the old "package_manager" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldPackageManager(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPackageManager is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPackageManager requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPackageManager: %w", err)
+	}
+	return oldValue.PackageManager, nil
+}
+
+// ClearPackageManager clears the value of the "package_manager" field.
+func (m *DevicePackageMutation) ClearPackageManager() {
+	m.package_manager = nil
+	m.clearedFields[devicepackage.FieldPackageManager] = struct{}{}
+}
+
+// PackageManagerCleared returns if the "package_manager" field was cleared in this mutation.
+func (m *DevicePackageMutation) PackageManagerCleared() bool {
+	_, ok := m.clearedFields[devicepackage.FieldPackageManager]
+	return ok
+}
+
+// ResetPackageManager resets all changes to the "package_manager" field.
+func (m *DevicePackageMutation) ResetPackageManager() {
+	m.package_manager = nil
+	delete(m.clearedFields, devicepackage.FieldPackageManager)
+}
+
+// SetDescription sets the "description" field.
+func (m *DevicePackageMutation) SetDescription(s string) {
+	m.description = &s
+}
+
+// Description returns the value of the "description" field in the mutation.
+func (m *DevicePackageMutation) Description() (r string, exists bool) {
+	v := m.description
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDescription returns the old "description" field's value of the DevicePackage entity.
+// If the DevicePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DevicePackageMutation) OldDescription(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDescription is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDescription requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDescription: %w", err)
+	}
+	return oldValue.Description, nil
+}
+
+// ClearDescription clears the value of the "description" field.
+func (m *DevicePackageMutation) ClearDescription() {
+	m.description = nil
+	m.clearedFields[devicepackage.FieldDescription] = struct{}{}
+}
+
+// DescriptionCleared returns if the "description" field was cleared in this mutation.
+func (m *DevicePackageMutation) DescriptionCleared() bool {
+	_, ok := m.clearedFields[devicepackage.FieldDescription]
+	return ok
+}
+
+// ResetDescription resets all changes to the "description" field.
+func (m *DevicePackageMutation) ResetDescription() {
+	m.description = nil
+	delete(m.clearedFields, devicepackage.FieldDescription)
+}
+
+// Where appends a list predicates to the DevicePackageMutation builder.
+func (m *DevicePackageMutation) Where(ps ...predicate.DevicePackage) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DevicePackageMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DevicePackageMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DevicePackage, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DevicePackageMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DevicePackageMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DevicePackage).
+func (m *DevicePackageMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DevicePackageMutation) Fields() []string {
+	fields := make([]string, 0, 12)
+	if m.create_time != nil {
+		fields = append(fields, devicepackage.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, devicepackage.FieldUpdateTime)
+	}
+	if m.delete_time != nil {
+		fields = append(fields, devicepackage.FieldDeleteTime)
+	}
+	if m.tenant_id != nil {
+		fields = append(fields, devicepackage.FieldTenantID)
+	}
+	if m.device_id != nil {
+		fields = append(fields, devicepackage.FieldDeviceID)
+	}
+	if m.name != nil {
+		fields = append(fields, devicepackage.FieldName)
+	}
+	if m.current_version != nil {
+		fields = append(fields, devicepackage.FieldCurrentVersion)
+	}
+	if m.available_version != nil {
+		fields = append(fields, devicepackage.FieldAvailableVersion)
+	}
+	if m.needs_update != nil {
+		fields = append(fields, devicepackage.FieldNeedsUpdate)
+	}
+	if m.is_security_update != nil {
+		fields = append(fields, devicepackage.FieldIsSecurityUpdate)
+	}
+	if m.package_manager != nil {
+		fields = append(fields, devicepackage.FieldPackageManager)
+	}
+	if m.description != nil {
+		fields = append(fields, devicepackage.FieldDescription)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DevicePackageMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case devicepackage.FieldCreateTime:
+		return m.CreateTime()
+	case devicepackage.FieldUpdateTime:
+		return m.UpdateTime()
+	case devicepackage.FieldDeleteTime:
+		return m.DeleteTime()
+	case devicepackage.FieldTenantID:
+		return m.TenantID()
+	case devicepackage.FieldDeviceID:
+		return m.DeviceID()
+	case devicepackage.FieldName:
+		return m.Name()
+	case devicepackage.FieldCurrentVersion:
+		return m.CurrentVersion()
+	case devicepackage.FieldAvailableVersion:
+		return m.AvailableVersion()
+	case devicepackage.FieldNeedsUpdate:
+		return m.NeedsUpdate()
+	case devicepackage.FieldIsSecurityUpdate:
+		return m.IsSecurityUpdate()
+	case devicepackage.FieldPackageManager:
+		return m.PackageManager()
+	case devicepackage.FieldDescription:
+		return m.Description()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DevicePackageMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case devicepackage.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case devicepackage.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case devicepackage.FieldDeleteTime:
+		return m.OldDeleteTime(ctx)
+	case devicepackage.FieldTenantID:
+		return m.OldTenantID(ctx)
+	case devicepackage.FieldDeviceID:
+		return m.OldDeviceID(ctx)
+	case devicepackage.FieldName:
+		return m.OldName(ctx)
+	case devicepackage.FieldCurrentVersion:
+		return m.OldCurrentVersion(ctx)
+	case devicepackage.FieldAvailableVersion:
+		return m.OldAvailableVersion(ctx)
+	case devicepackage.FieldNeedsUpdate:
+		return m.OldNeedsUpdate(ctx)
+	case devicepackage.FieldIsSecurityUpdate:
+		return m.OldIsSecurityUpdate(ctx)
+	case devicepackage.FieldPackageManager:
+		return m.OldPackageManager(ctx)
+	case devicepackage.FieldDescription:
+		return m.OldDescription(ctx)
+	}
+	return nil, fmt.Errorf("unknown DevicePackage field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DevicePackageMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case devicepackage.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case devicepackage.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case devicepackage.FieldDeleteTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeleteTime(v)
+		return nil
+	case devicepackage.FieldTenantID:
+		v, ok := value.(uint32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTenantID(v)
+		return nil
+	case devicepackage.FieldDeviceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeviceID(v)
+		return nil
+	case devicepackage.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case devicepackage.FieldCurrentVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrentVersion(v)
+		return nil
+	case devicepackage.FieldAvailableVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAvailableVersion(v)
+		return nil
+	case devicepackage.FieldNeedsUpdate:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNeedsUpdate(v)
+		return nil
+	case devicepackage.FieldIsSecurityUpdate:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsSecurityUpdate(v)
+		return nil
+	case devicepackage.FieldPackageManager:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPackageManager(v)
+		return nil
+	case devicepackage.FieldDescription:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDescription(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DevicePackage field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DevicePackageMutation) AddedFields() []string {
+	var fields []string
+	if m.addtenant_id != nil {
+		fields = append(fields, devicepackage.FieldTenantID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DevicePackageMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case devicepackage.FieldTenantID:
+		return m.AddedTenantID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DevicePackageMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case devicepackage.FieldTenantID:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTenantID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DevicePackage numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DevicePackageMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(devicepackage.FieldCreateTime) {
+		fields = append(fields, devicepackage.FieldCreateTime)
+	}
+	if m.FieldCleared(devicepackage.FieldUpdateTime) {
+		fields = append(fields, devicepackage.FieldUpdateTime)
+	}
+	if m.FieldCleared(devicepackage.FieldDeleteTime) {
+		fields = append(fields, devicepackage.FieldDeleteTime)
+	}
+	if m.FieldCleared(devicepackage.FieldTenantID) {
+		fields = append(fields, devicepackage.FieldTenantID)
+	}
+	if m.FieldCleared(devicepackage.FieldCurrentVersion) {
+		fields = append(fields, devicepackage.FieldCurrentVersion)
+	}
+	if m.FieldCleared(devicepackage.FieldAvailableVersion) {
+		fields = append(fields, devicepackage.FieldAvailableVersion)
+	}
+	if m.FieldCleared(devicepackage.FieldPackageManager) {
+		fields = append(fields, devicepackage.FieldPackageManager)
+	}
+	if m.FieldCleared(devicepackage.FieldDescription) {
+		fields = append(fields, devicepackage.FieldDescription)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DevicePackageMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DevicePackageMutation) ClearField(name string) error {
+	switch name {
+	case devicepackage.FieldCreateTime:
+		m.ClearCreateTime()
+		return nil
+	case devicepackage.FieldUpdateTime:
+		m.ClearUpdateTime()
+		return nil
+	case devicepackage.FieldDeleteTime:
+		m.ClearDeleteTime()
+		return nil
+	case devicepackage.FieldTenantID:
+		m.ClearTenantID()
+		return nil
+	case devicepackage.FieldCurrentVersion:
+		m.ClearCurrentVersion()
+		return nil
+	case devicepackage.FieldAvailableVersion:
+		m.ClearAvailableVersion()
+		return nil
+	case devicepackage.FieldPackageManager:
+		m.ClearPackageManager()
+		return nil
+	case devicepackage.FieldDescription:
+		m.ClearDescription()
+		return nil
+	}
+	return fmt.Errorf("unknown DevicePackage nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DevicePackageMutation) ResetField(name string) error {
+	switch name {
+	case devicepackage.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case devicepackage.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case devicepackage.FieldDeleteTime:
+		m.ResetDeleteTime()
+		return nil
+	case devicepackage.FieldTenantID:
+		m.ResetTenantID()
+		return nil
+	case devicepackage.FieldDeviceID:
+		m.ResetDeviceID()
+		return nil
+	case devicepackage.FieldName:
+		m.ResetName()
+		return nil
+	case devicepackage.FieldCurrentVersion:
+		m.ResetCurrentVersion()
+		return nil
+	case devicepackage.FieldAvailableVersion:
+		m.ResetAvailableVersion()
+		return nil
+	case devicepackage.FieldNeedsUpdate:
+		m.ResetNeedsUpdate()
+		return nil
+	case devicepackage.FieldIsSecurityUpdate:
+		m.ResetIsSecurityUpdate()
+		return nil
+	case devicepackage.FieldPackageManager:
+		m.ResetPackageManager()
+		return nil
+	case devicepackage.FieldDescription:
+		m.ResetDescription()
+		return nil
+	}
+	return fmt.Errorf("unknown DevicePackage field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DevicePackageMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DevicePackageMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DevicePackageMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DevicePackageMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DevicePackageMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DevicePackageMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DevicePackageMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DevicePackage unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DevicePackageMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DevicePackage edge %s", name)
 }
 
 // DnsConfigMutation represents an operation that mutates the DnsConfig nodes in the graph.

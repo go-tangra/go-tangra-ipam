@@ -15,6 +15,9 @@ type Device func(*sql.Selector)
 // DeviceInterface is the predicate function for deviceinterface builders.
 type DeviceInterface func(*sql.Selector)
 
+// DevicePackage is the predicate function for devicepackage builders.
+type DevicePackage func(*sql.Selector)
+
 // DnsConfig is the predicate function for dnsconfig builders.
 type DnsConfig func(*sql.Selector)
 

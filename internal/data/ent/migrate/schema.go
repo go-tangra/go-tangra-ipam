@@ -207,6 +207,50 @@ var (
 			},
 		},
 	}
+	// IpamDevicePackagesColumns holds the columns for the "ipam_device_packages" table.
+	IpamDevicePackagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true, Comment: "Unique identifier"},
+		{Name: "create_time", Type: field.TypeTime, Nullable: true, Comment: "创建时间"},
+		{Name: "update_time", Type: field.TypeTime, Nullable: true, Comment: "更新时间"},
+		{Name: "delete_time", Type: field.TypeTime, Nullable: true, Comment: "删除时间"},
+		{Name: "tenant_id", Type: field.TypeUint32, Nullable: true, Comment: "租户ID", Default: 0},
+		{Name: "device_id", Type: field.TypeString, Comment: "Device ID"},
+		{Name: "name", Type: field.TypeString, Size: 512, Comment: "Package name"},
+		{Name: "current_version", Type: field.TypeString, Nullable: true, Size: 255, Comment: "Currently installed version"},
+		{Name: "available_version", Type: field.TypeString, Nullable: true, Size: 255, Comment: "Available version for update"},
+		{Name: "needs_update", Type: field.TypeBool, Comment: "Whether the package has an update available", Default: false},
+		{Name: "is_security_update", Type: field.TypeBool, Comment: "Whether the available update is a security update", Default: false},
+		{Name: "package_manager", Type: field.TypeString, Nullable: true, Size: 32, Comment: "Package manager: apt, dnf, apk, pacman"},
+		{Name: "description", Type: field.TypeString, Nullable: true, Comment: "Package description"},
+	}
+	// IpamDevicePackagesTable holds the schema information for the "ipam_device_packages" table.
+	IpamDevicePackagesTable = &schema.Table{
+		Name:       "ipam_device_packages",
+		Columns:    IpamDevicePackagesColumns,
+		PrimaryKey: []*schema.Column{IpamDevicePackagesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "devicepackage_tenant_id_device_id_name",
+				Unique:  true,
+				Columns: []*schema.Column{IpamDevicePackagesColumns[4], IpamDevicePackagesColumns[5], IpamDevicePackagesColumns[6]},
+			},
+			{
+				Name:    "devicepackage_device_id",
+				Unique:  false,
+				Columns: []*schema.Column{IpamDevicePackagesColumns[5]},
+			},
+			{
+				Name:    "devicepackage_needs_update",
+				Unique:  false,
+				Columns: []*schema.Column{IpamDevicePackagesColumns[9]},
+			},
+			{
+				Name:    "devicepackage_is_security_update",
+				Unique:  false,
+				Columns: []*schema.Column{IpamDevicePackagesColumns[10]},
+			},
+		},
+	}
 	// IpamDNSConfigsColumns holds the columns for the "ipam_dns_configs" table.
 	IpamDNSConfigsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true, Comment: "Unique identifier"},
@@ -808,6 +852,7 @@ var (
 		IpamAuditLogsTable,
 		IpamDevicesTable,
 		IpamDeviceInterfacesTable,
+		IpamDevicePackagesTable,
 		IpamDNSConfigsTable,
 		IpamHostGroupsTable,
 		IpamHostGroupMembersTable,
@@ -832,6 +877,9 @@ func init() {
 	IpamDeviceInterfacesTable.ForeignKeys[0].RefTable = IpamDevicesTable
 	IpamDeviceInterfacesTable.Annotation = &entsql.Annotation{
 		Table: "ipam_device_interfaces",
+	}
+	IpamDevicePackagesTable.Annotation = &entsql.Annotation{
+		Table: "ipam_device_packages",
 	}
 	IpamDNSConfigsTable.Annotation = &entsql.Annotation{
 		Table: "ipam_dns_configs",

@@ -15,6 +15,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
@@ -88,6 +89,7 @@ func checkColumn(t, c string) error {
 			auditlog.Table:        auditlog.ValidColumn,
 			device.Table:          device.ValidColumn,
 			deviceinterface.Table: deviceinterface.ValidColumn,
+			devicepackage.Table:   devicepackage.ValidColumn,
 			dnsconfig.Table:       dnsconfig.ValidColumn,
 			hostgroup.Table:       hostgroup.ValidColumn,
 			hostgroupmember.Table: hostgroupmember.ValidColumn,
