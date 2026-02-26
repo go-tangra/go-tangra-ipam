@@ -338,10 +338,11 @@ const ipAddress = computed(() => data.value?.row);
             </span>
             <Button
               size="small"
+              class="!inline-flex !items-center !gap-1.5"
               :loading="suggestLoading"
               @click="refreshSuggestions"
             >
-              <template #icon><LucideRefreshCw class="size-4" /></template>
+              <LucideRefreshCw :size="14" />
               {{ $t('ipam.page.ipAddress.refreshSuggestions') }}
             </Button>
           </div>
@@ -374,9 +375,9 @@ const ipAddress = computed(() => data.value?.row);
             <div
               v-for="addr in suggestedAddresses"
               :key="addr.address"
-              class="cursor-pointer rounded-md border px-3 py-2 transition-colors hover:border-blue-400 hover:bg-blue-50 dark:hover:border-blue-600 dark:hover:bg-blue-950"
+              class="cursor-pointer rounded-md border px-3 py-2 transition-colors hover:border-blue-400 hover:bg-blue-100 hover:text-gray-900 dark:hover:border-blue-600 dark:hover:bg-blue-950 dark:hover:text-gray-100"
               :class="{
-                'border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-950': selectedSuggestion === addr.address,
+                'border-blue-500 bg-blue-100 text-gray-900 dark:border-blue-600 dark:bg-blue-950 dark:text-gray-100': selectedSuggestion === addr.address,
                 'border-gray-200 dark:border-gray-700': selectedSuggestion !== addr.address,
               }"
               @click="selectSuggestedAddress(addr)"
