@@ -225,6 +225,71 @@ func (r *DevicePackageRepo) GetStatsByDevice(ctx context.Context, tenantID uint3
 	return total, updatesAvailable, securityUpdates, lastSync, nil
 }
 
+// PackageStats holds aggregate update counts for a device
+type PackageStats struct {
+	UpdatesAvailable int
+	SecurityUpdates  int
+}
+
+// GetBulkStatsByDeviceIDs returns package update counts for multiple devices in a single query
+func (r *DevicePackageRepo) GetBulkStatsByDeviceIDs(ctx context.Context, tenantID uint32, deviceIDs []string) (map[string]*PackageStats, error) {
+	if len(deviceIDs) == 0 {
+		return nil, nil
+	}
+
+	result := make(map[string]*PackageStats, len(deviceIDs))
+
+	// Count needs_update=true grouped by device_id
+	var updateCounts []struct {
+		DeviceID string `json:"device_id"`
+		Count    int    `json:"count"`
+	}
+	err := r.entClient.Client().DevicePackage.Query().
+		Where(
+			devicepackage.TenantID(tenantID),
+			devicepackage.DeviceIDIn(deviceIDs...),
+			devicepackage.NeedsUpdate(true),
+		).
+		GroupBy(devicepackage.FieldDeviceID).
+		Aggregate(ent.Count()).
+		Scan(ctx, &updateCounts)
+	if err != nil {
+		r.log.Errorf("bulk count updates failed: %s", err.Error())
+		return nil, ipamV1.ErrorInternalServerError("get bulk device package stats failed")
+	}
+	for _, uc := range updateCounts {
+		result[uc.DeviceID] = &PackageStats{UpdatesAvailable: uc.Count}
+	}
+
+	// Count is_security_update=true grouped by device_id
+	var secCounts []struct {
+		DeviceID string `json:"device_id"`
+		Count    int    `json:"count"`
+	}
+	err = r.entClient.Client().DevicePackage.Query().
+		Where(
+			devicepackage.TenantID(tenantID),
+			devicepackage.DeviceIDIn(deviceIDs...),
+			devicepackage.IsSecurityUpdate(true),
+		).
+		GroupBy(devicepackage.FieldDeviceID).
+		Aggregate(ent.Count()).
+		Scan(ctx, &secCounts)
+	if err != nil {
+		r.log.Errorf("bulk count security updates failed: %s", err.Error())
+		return nil, ipamV1.ErrorInternalServerError("get bulk device package stats failed")
+	}
+	for _, sc := range secCounts {
+		if stats, ok := result[sc.DeviceID]; ok {
+			stats.SecurityUpdates = sc.Count
+		} else {
+			result[sc.DeviceID] = &PackageStats{SecurityUpdates: sc.Count}
+		}
+	}
+
+	return result, nil
+}
+
 // DeleteByDevice removes all packages for a device
 func (r *DevicePackageRepo) DeleteByDevice(ctx context.Context, tenantID uint32, deviceID string) (int, error) {
 	count, err := r.entClient.Client().DevicePackage.Delete().

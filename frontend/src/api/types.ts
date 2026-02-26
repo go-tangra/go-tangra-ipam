@@ -1090,6 +1090,16 @@ export interface components {
              * @description Last updater user ID
              */
             updatedBy?: number;
+            /**
+             * Format: int32
+             * @description Package update counts (populated in list responses)
+             */
+            packageUpdateCount?: number;
+            /**
+             * Format: int32
+             * @description Security update counts (populated in list responses)
+             */
+            securityUpdateCount?: number;
         };
         /** @description DeviceInterface represents a network interface on a device */
         DeviceInterface: {

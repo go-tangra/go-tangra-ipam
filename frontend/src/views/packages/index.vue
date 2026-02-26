@@ -2,6 +2,7 @@
 import type { VxeGridProps } from 'shell/adapter/vxe-table';
 
 import { h, ref, computed, watch } from 'vue';
+import { useRoute } from 'vue-router';
 
 import { Page, type VbenFormProps } from 'shell/vben/common-ui';
 import { LucideTrash } from 'shell/vben/icons';
@@ -15,6 +16,7 @@ import { useIpamDevicePackageStore } from '../../stores/ipam-device-package.stat
 import { useIpamDeviceStore } from '../../stores/ipam-device.state';
 import type { GetDevicePackageStatsResponse } from '../../api/services';
 
+const route = useRoute();
 const devicePackageStore = useIpamDevicePackageStore();
 const deviceStore = useIpamDeviceStore();
 
@@ -34,7 +36,14 @@ async function loadDevices() {
     // ignore
   }
 }
-loadDevices();
+loadDevices().then(() => {
+  // Pre-select device from query param if present
+  const queryDeviceId = route.query.deviceId;
+  if (typeof queryDeviceId === 'string' && queryDeviceId) {
+    selectedDeviceId.value = queryDeviceId;
+    gridApi.query();
+  }
+});
 
 // Load stats when device changes
 watch(selectedDeviceId, async (deviceId) => {

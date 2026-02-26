@@ -20,14 +20,16 @@ type DeviceService struct {
 	deviceRepo          *data.DeviceRepo
 	deviceInterfaceRepo *data.DeviceInterfaceRepo
 	ipAddressRepo       *data.IpAddressRepo
+	devicePackageRepo   *data.DevicePackageRepo
 }
 
-func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo) *DeviceService {
+func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo, devicePackageRepo *data.DevicePackageRepo) *DeviceService {
 	return &DeviceService{
 		log:                 ctx.NewLoggerHelper("ipam/service/device"),
 		deviceRepo:          deviceRepo,
 		deviceInterfaceRepo: deviceInterfaceRepo,
 		ipAddressRepo:       ipAddressRepo,
+		devicePackageRepo:   devicePackageRepo,
 	}
 }
 
@@ -144,8 +146,26 @@ func (s *DeviceService) ListDevices(ctx context.Context, req *ipamV1.ListDevices
 	}
 
 	items := make([]*ipamV1.Device, len(entities))
+	var packageDeviceIDs []string
 	for i, e := range entities {
 		items[i] = deviceToProto(e)
+		// Collect IDs for SERVER and VM devices to enrich with package stats
+		if e.DeviceType == int32(ipamV1.DeviceType_DEVICE_TYPE_SERVER) || e.DeviceType == int32(ipamV1.DeviceType_DEVICE_TYPE_VM) {
+			packageDeviceIDs = append(packageDeviceIDs, e.ID)
+		}
+	}
+
+	// Enrich with package update stats
+	if len(packageDeviceIDs) > 0 {
+		statsMap, err := s.devicePackageRepo.GetBulkStatsByDeviceIDs(ctx, req.GetTenantId(), packageDeviceIDs)
+		if err == nil && statsMap != nil {
+			for _, item := range items {
+				if stats, ok := statsMap[item.GetId()]; ok {
+					item.PackageUpdateCount = ptrInt32(int32(stats.UpdatesAvailable))
+					item.SecurityUpdateCount = ptrInt32(int32(stats.SecurityUpdates))
+				}
+			}
+		}
 	}
 
 	return &ipamV1.ListDevicesResponse{

@@ -6,6 +6,42 @@ info:
     title: ""
     version: 0.0.1
 paths:
+    /v1/backup/export:
+        get:
+            tags:
+                - BackupService
+            operationId: BackupService_ExportBackup
+            parameters:
+                - name: tenantId
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ExportBackupResponse'
+    /v1/backup/import:
+        post:
+            tags:
+                - BackupService
+            operationId: BackupService_ImportBackup
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ImportBackupRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ImportBackupResponse'
     /v1/devices:
         get:
             tags:
@@ -209,6 +245,126 @@ paths:
                 "200":
                     description: OK
                     content: {}
+    /v1/devices/{deviceId}/packages:
+        get:
+            tags:
+                - DevicePackageService
+            description: List packages for a device
+            operationId: DevicePackageService_ListDevicePackages
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: tenantId
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: noPaging
+                  in: query
+                  schema:
+                    type: boolean
+                - name: query
+                  in: query
+                  schema:
+                    type: string
+                - name: orderBy
+                  in: query
+                  schema:
+                    type: array
+                    items:
+                        type: string
+                - name: needsUpdate
+                  in: query
+                  description: Filters
+                  schema:
+                    type: boolean
+                - name: isSecurityUpdate
+                  in: query
+                  schema:
+                    type: boolean
+                - name: packageManager
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListDevicePackagesResponse'
+        delete:
+            tags:
+                - DevicePackageService
+            description: Delete all packages for a device
+            operationId: DevicePackageService_DeleteDevicePackages
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /v1/devices/{deviceId}/packages/stats:
+        get:
+            tags:
+                - DevicePackageService
+            description: Get package statistics for a device
+            operationId: DevicePackageService_GetDevicePackageStats
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetDevicePackageStatsResponse'
+    /v1/devices/{deviceId}/packages/sync:
+        post:
+            tags:
+                - DevicePackageService
+            description: Sync all packages for a device (bulk replace)
+            operationId: DevicePackageService_SyncDevicePackages
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SyncDevicePackagesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SyncDevicePackagesResponse'
     /v1/devices/{id}:
         get:
             tags:
@@ -778,6 +934,40 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/FindAddressResponse'
+    /v1/ip-addresses/suggest:
+        get:
+            tags:
+                - IpAddressService
+            description: Suggest available IP addresses in a subnet (verified via ICMP ping + TCP port scan)
+            operationId: IpAddressService_SuggestAvailableAddresses
+            parameters:
+                - name: tenantId
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+                - name: subnetId
+                  in: query
+                  schema:
+                    type: string
+                - name: count
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: skipAddresses
+                  in: query
+                  schema:
+                    type: array
+                    items:
+                        type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SuggestAvailableAddressesResponse'
     /v1/ip-addresses/{id}:
         get:
             tags:
@@ -2357,6 +2547,22 @@ components:
                     type: string
                 metadata:
                     type: string
+                snmpCommunity:
+                    type: string
+                    description: SNMP Configuration
+                snmpVersion:
+                    type: integer
+                    format: int32
+                snmpUser:
+                    type: string
+                snmpAuthPassword:
+                    type: string
+                snmpPrivPassword:
+                    type: string
+                snmpAuthProtocol:
+                    type: string
+                snmpPrivProtocol:
+                    type: string
                 autoScan:
                     type: boolean
                     description: Auto-scan the subnet for active hosts after creation
@@ -2540,6 +2746,13 @@ components:
                     type: integer
                     description: Last updater user ID
                     format: uint32
+                packageUpdateCount:
+                    type: integer
+                    description: Package update counts (populated in list responses)
+                    format: int32
+                securityUpdateCount:
+                    type: integer
+                    format: int32
             description: Device represents a network device
         DeviceInterface:
             type: object
@@ -2568,6 +2781,37 @@ components:
                     type: string
                     format: date-time
             description: DeviceInterface represents a network interface on a device
+        DevicePackage:
+            type: object
+            properties:
+                id:
+                    type: string
+                deviceId:
+                    type: string
+                tenantId:
+                    type: integer
+                    format: uint32
+                name:
+                    type: string
+                currentVersion:
+                    type: string
+                availableVersion:
+                    type: string
+                needsUpdate:
+                    type: boolean
+                isSecurityUpdate:
+                    type: boolean
+                packageManager:
+                    type: string
+                description:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: DevicePackage represents an installed package on a device
         DnsConfig:
             type: object
             properties:
@@ -2602,6 +2846,41 @@ components:
                     description: Last update timestamp
                     format: date-time
             description: DnsConfig holds DNS server configuration for reverse DNS lookups
+        EntityImportResult:
+            type: object
+            properties:
+                entityType:
+                    type: string
+                total:
+                    type: string
+                created:
+                    type: string
+                updated:
+                    type: string
+                skipped:
+                    type: string
+                failed:
+                    type: string
+        ExportBackupResponse:
+            type: object
+            properties:
+                data:
+                    type: string
+                    format: bytes
+                module:
+                    type: string
+                version:
+                    type: string
+                exportedAt:
+                    type: string
+                    format: date-time
+                tenantId:
+                    type: integer
+                    format: uint32
+                entityCounts:
+                    type: object
+                    additionalProperties:
+                        type: string
         FindAddressResponse:
             type: object
             properties:
@@ -2621,6 +2900,21 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/DeviceInterface'
+        GetDevicePackageStatsResponse:
+            type: object
+            properties:
+                total:
+                    type: integer
+                    format: int32
+                updatesAvailable:
+                    type: integer
+                    format: int32
+                securityUpdates:
+                    type: integer
+                    format: int32
+                lastSync:
+                    type: string
+                    format: date-time
         GetDeviceResponse:
             type: object
             properties:
@@ -2829,6 +3123,31 @@ components:
                     description: Last update timestamp
                     format: date-time
             description: HostGroupMember represents a device member of a host group
+        ImportBackupRequest:
+            type: object
+            properties:
+                data:
+                    type: string
+                    format: bytes
+                mode:
+                    enum:
+                        - RESTORE_MODE_SKIP
+                        - RESTORE_MODE_OVERWRITE
+                    type: string
+                    format: enum
+        ImportBackupResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                results:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/EntityImportResult'
+                warnings:
+                    type: array
+                    items:
+                        type: string
         IpAddress:
             type: object
             properties:
@@ -3122,6 +3441,12 @@ components:
                 tcpProbePorts:
                     type: string
                     description: Comma-separated list of TCP ports to probe
+                enableSnmp:
+                    type: boolean
+                    description: Enable SNMP device discovery
+                snmpDiscoveredCount:
+                    type: string
+                    description: Number of SNMP devices discovered
                 startedAt:
                     type: string
                     description: When the scan started
@@ -3150,6 +3475,16 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/HostGroup'
+        ListDevicePackagesResponse:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/DevicePackage'
+                total:
+                    type: integer
+                    format: int32
         ListDevicesResponse:
             type: object
             properties:
@@ -3438,6 +3773,9 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/ScanConfig'
                     description: Scan configuration
+                enableSnmp:
+                    type: boolean
+                    description: Enable SNMP device discovery during scan
             description: StartScanRequest starts a new scan for a subnet
         StartScanResponse:
             type: object
@@ -3524,6 +3862,30 @@ components:
                 metadata:
                     type: string
                     description: Custom metadata (JSON)
+                snmpCommunity:
+                    type: string
+                    description: |-
+                        SNMP Configuration
+                         SNMPv2c community string
+                snmpVersion:
+                    type: integer
+                    description: 'SNMP version: 0=none, 2=v2c, 3=v3'
+                    format: int32
+                snmpUser:
+                    type: string
+                    description: SNMPv3 USM username
+                snmpAuthPassword:
+                    type: string
+                    description: SNMPv3 auth password
+                snmpPrivPassword:
+                    type: string
+                    description: SNMPv3 privacy password
+                snmpAuthProtocol:
+                    type: string
+                    description: SNMPv3 auth protocol (MD5/SHA)
+                snmpPrivProtocol:
+                    type: string
+                    description: SNMPv3 priv protocol (DES/AES)
                 createdAt:
                     type: string
                     description: Creation timestamp
@@ -3550,6 +3912,52 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/SubnetTreeNode'
+        SuggestAvailableAddressesResponse:
+            type: object
+            properties:
+                addresses:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/SuggestedAddress'
+                totalUnallocated:
+                    type: string
+            description: SuggestAvailableAddressesResponse returns suggested available addresses
+        SuggestedAddress:
+            type: object
+            properties:
+                address:
+                    type: string
+                pingFree:
+                    type: boolean
+                portScanFree:
+                    type: boolean
+            description: SuggestedAddress represents a single suggested available IP address
+        SyncDevicePackagesRequest:
+            required:
+                - deviceId
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                packages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/DevicePackage'
+                packageManager:
+                    type: string
+            description: SyncDevicePackagesRequest syncs all packages for a device (bulk replace)
+        SyncDevicePackagesResponse:
+            type: object
+            properties:
+                total:
+                    type: integer
+                    format: int32
+                updatesAvailable:
+                    type: integer
+                    format: int32
+                securityUpdates:
+                    type: integer
+                    format: int32
         TestDnsConfigRequest:
             required:
                 - testIp
@@ -3837,6 +4245,9 @@ components:
                     format: uint32
             description: Vlan represents a Virtual LAN
 tags:
+    - name: BackupService
+    - name: DevicePackageService
+      description: DevicePackageService manages installed packages on devices
     - name: DeviceService
       description: DeviceService manages network devices
     - name: HostGroupService

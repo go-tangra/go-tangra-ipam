@@ -2,6 +2,7 @@
 import type { VxeGridProps } from 'shell/adapter/vxe-table';
 
 import { h, computed } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { Page, useVbenDrawer, type VbenFormProps } from 'shell/vben/common-ui';
 import {
@@ -19,6 +20,7 @@ import { useIpamDeviceStore } from '../../stores/ipam-device.state';
 
 import DeviceDrawer from './device-drawer.vue';
 
+const router = useRouter();
 const deviceStore = useIpamDeviceStore();
 
 const deviceTypeOptions = computed(() => [
@@ -86,6 +88,14 @@ function statusToColor(status: string | undefined) {
 function statusToName(status: string | undefined) {
   const option = statusOptions.value.find((o) => o.value === status);
   return option?.label ?? status ?? '';
+}
+
+function isServerOrVM(deviceType: string | undefined) {
+  return deviceType === 'DEVICE_TYPE_SERVER' || deviceType === 'DEVICE_TYPE_VM';
+}
+
+function navigateToPackages(deviceId: string) {
+  router.push({ path: '/ipam/packages', query: { deviceId } });
 }
 
 const formOptions: VbenFormProps = {
@@ -207,6 +217,12 @@ const gridOptions: VxeGridProps<ipamservicev1_Device> = {
     { title: $t('ipam.page.device.osVersion'), field: 'osVersion', width: 150, sortable: true },
     { title: $t('ipam.page.device.description'), field: 'description', minWidth: 150, sortable: true },
     {
+      title: $t('ipam.page.device.updateStatus'),
+      field: 'packageUpdateCount',
+      width: 180,
+      slots: { default: 'updateStatus' },
+    },
+    {
       title: $t('ui.table.action'),
       field: 'action',
       fixed: 'right',
@@ -276,6 +292,29 @@ async function handleDelete(row: ipamservicev1_Device) {
         <Tag :color="statusToColor(row.status)">
           {{ statusToName(row.status) }}
         </Tag>
+      </template>
+      <template #updateStatus="{ row }">
+        <template v-if="isServerOrVM(row.deviceType)">
+          <span
+            v-if="row.packageUpdateCount == null"
+            class="text-gray-400"
+          >-</span>
+          <span
+            v-else-if="row.packageUpdateCount === 0"
+            class="cursor-pointer"
+            @click="navigateToPackages(row.id)"
+          >
+            <Tag color="success">{{ $t('ipam.page.device.upToDate') }}</Tag>
+          </span>
+          <span
+            v-else
+            class="cursor-pointer"
+            @click="navigateToPackages(row.id)"
+          >
+            <Tag color="warning">{{ $t('ipam.page.device.updatesAvailable', { count: row.packageUpdateCount }) }}</Tag>
+            <Tag v-if="row.securityUpdateCount > 0" color="error">{{ $t('ipam.page.device.securityUpdates', { count: row.securityUpdateCount }) }}</Tag>
+          </span>
+        </template>
       </template>
       <template #action="{ row }">
         <Space>
