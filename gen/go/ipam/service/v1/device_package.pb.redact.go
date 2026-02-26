@@ -26,6 +26,7 @@ var (
 	_ timestamppb.Timestamp
 	_ emptypb.Empty
 	_ validate.Rule
+	_ redact.FieldRules
 )
 
 // RegisterRedactedDevicePackageServiceServer wraps the DevicePackageServiceServer with the redacted server and registers the service in GRPC
@@ -92,33 +93,7 @@ func (s *redactedDevicePackageServiceServer) DeleteDevicePackages(ctx context.Co
 
 // Redact method implementation for DevicePackage
 func (x *DevicePackage) Redact() string {
-	if x == nil {
-		return ""
-	}
-
-	// Safe field: Id
-
-	// Safe field: DeviceId
-
-	// Safe field: TenantId
-
-	// Safe field: Name
-
-	// Safe field: CurrentVersion
-
-	// Safe field: AvailableVersion
-
-	// Safe field: NeedsUpdate
-
-	// Safe field: IsSecurityUpdate
-
-	// Safe field: PackageManager
-
-	// Safe field: Description
-
-	// Safe field: CreatedAt
-
-	// Safe field: UpdatedAt
+	// Message will be set to empty, ignoring all field level rules
 	return x.String()
 }
 
@@ -130,7 +105,8 @@ func (x *SyncDevicePackagesRequest) Redact() string {
 
 	// Safe field: DeviceId
 
-	// Safe field: Packages
+	// Redacting field: Packages
+	x.Packages = []*DevicePackage{}
 
 	// Safe field: PackageManager
 	return x.String()
@@ -184,7 +160,8 @@ func (x *ListDevicePackagesResponse) Redact() string {
 		return ""
 	}
 
-	// Safe field: Items
+	// Redacting field: Items
+	x.Items = []*DevicePackage{}
 
 	// Safe field: Total
 	return x.String()

@@ -8,6 +8,7 @@ package ipampb
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	_ "github.com/menta2k/protoc-gen-redact/v3/redact/v3"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -611,7 +612,7 @@ var File_ipam_service_v1_device_package_proto protoreflect.FileDescriptor
 
 const file_ipam_service_v1_device_package_proto_rawDesc = "" +
 	"\n" +
-	"$ipam/service/v1/device_package.proto\x12\x0fipam.service.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1bbuf/validate/validate.proto\"\xd1\x05\n" +
+	"$ipam/service/v1/device_package.proto\x12\x0fipam.service.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1bbuf/validate/validate.proto\x1a\x16redact/v3/redact.proto\"\xd7\x05\n" +
 	"\rDevicePackage\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
 	"\tdevice_id\x18\x02 \x01(\tH\x01R\bdeviceId\x88\x01\x01\x12 \n" +
@@ -628,7 +629,7 @@ const file_ipam_service_v1_device_package_proto_rawDesc = "" +
 	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampH\n" +
 	"R\tcreatedAt\x88\x01\x01\x12>\n" +
 	"\n" +
-	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampH\vR\tupdatedAt\x88\x01\x01B\x05\n" +
+	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampH\vR\tupdatedAt\x88\x01\x01:\x04\xe0\xb6\x1a\x01B\x05\n" +
 	"\x03_idB\f\n" +
 	"\n" +
 	"_device_idB\f\n" +
@@ -642,11 +643,11 @@ const file_ipam_service_v1_device_package_proto_rawDesc = "" +
 	"\x10_package_managerB\x0e\n" +
 	"\f_descriptionB\r\n" +
 	"\v_created_atB\r\n" +
-	"\v_updated_at\"\xc2\x01\n" +
+	"\v_updated_at\"\xcd\x01\n" +
 	"\x19SyncDevicePackagesRequest\x12'\n" +
 	"\tdevice_id\x18\x01 \x01(\tB\n" +
-	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\bdeviceId\x12:\n" +
-	"\bpackages\x18\x02 \x03(\v2\x1e.ipam.service.v1.DevicePackageR\bpackages\x12,\n" +
+	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\bdeviceId\x12E\n" +
+	"\bpackages\x18\x02 \x03(\v2\x1e.ipam.service.v1.DevicePackageB\tڶ\x1a\x05\xa2\x01\x02\b\x01R\bpackages\x12,\n" +
 	"\x0fpackage_manager\x18\x03 \x01(\tH\x00R\x0epackageManager\x88\x01\x01B\x12\n" +
 	"\x10_package_manager\"\xce\x01\n" +
 	"\x1aSyncDevicePackagesResponse\x12\x19\n" +
@@ -679,9 +680,9 @@ const file_ipam_service_v1_device_package_proto_rawDesc = "" +
 	"\x06_queryB\x0f\n" +
 	"\r_needs_updateB\x15\n" +
 	"\x13_is_security_updateB\x12\n" +
-	"\x10_package_manager\"w\n" +
-	"\x1aListDevicePackagesResponse\x124\n" +
-	"\x05items\x18\x01 \x03(\v2\x1e.ipam.service.v1.DevicePackageR\x05items\x12\x19\n" +
+	"\x10_package_manager\"\x82\x01\n" +
+	"\x1aListDevicePackagesResponse\x12?\n" +
+	"\x05items\x18\x01 \x03(\v2\x1e.ipam.service.v1.DevicePackageB\tڶ\x1a\x05\xa2\x01\x02\b\x01R\x05items\x12\x19\n" +
 	"\x05total\x18\x02 \x01(\x05H\x00R\x05total\x88\x01\x01B\b\n" +
 	"\x06_total\"G\n" +
 	"\x1cGetDevicePackageStatsRequest\x12'\n" +

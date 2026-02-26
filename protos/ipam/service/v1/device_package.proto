@@ -7,9 +7,11 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 import "buf/validate/validate.proto";
+import "redact/v3/redact.proto";
 
 // DevicePackage represents an installed package on a device
 message DevicePackage {
+  option (redact.v3.empty) = true;
   optional string id = 1 [json_name = "id"];
   optional string device_id = 2 [json_name = "deviceId"];
   optional uint32 tenant_id = 3 [json_name = "tenantId"];
@@ -32,7 +34,7 @@ message SyncDevicePackagesRequest {
     (google.api.field_behavior) = REQUIRED
   ];
 
-  repeated DevicePackage packages = 2 [json_name = "packages"];
+  repeated DevicePackage packages = 2 [(redact.v3.value).element.empty = true, json_name = "packages"];
 
   optional string package_manager = 3 [json_name = "packageManager"];
 }
@@ -65,7 +67,7 @@ message ListDevicePackagesRequest {
 }
 
 message ListDevicePackagesResponse {
-  repeated DevicePackage items = 1 [json_name = "items"];
+  repeated DevicePackage items = 1 [(redact.v3.value).element.empty = true, json_name = "items"];
   optional int32 total = 2 [json_name = "total"];
 }
 
