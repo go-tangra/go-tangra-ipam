@@ -12,6 +12,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
+	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
@@ -21,13 +22,15 @@ type SubnetService struct {
 	log         *log.Helper
 	subnetRepo  *data.SubnetRepo
 	scanJobRepo *data.IpScanJobRepo
+	metrics     *metrics.Collector
 }
 
-func NewSubnetService(ctx *bootstrap.Context, subnetRepo *data.SubnetRepo, scanJobRepo *data.IpScanJobRepo) *SubnetService {
+func NewSubnetService(ctx *bootstrap.Context, subnetRepo *data.SubnetRepo, scanJobRepo *data.IpScanJobRepo, metrics *metrics.Collector) *SubnetService {
 	return &SubnetService{
 		log:         ctx.NewLoggerHelper("ipam/service/subnet"),
 		subnetRepo:  subnetRepo,
 		scanJobRepo: scanJobRepo,
+		metrics:     metrics,
 	}
 }
 
@@ -107,6 +110,8 @@ func (s *SubnetService) CreateSubnet(ctx context.Context, req *ipamV1.CreateSubn
 			s.log.Warnf("Failed to trigger auto-scan for subnet %s: %v", entity.ID, err)
 		}
 	}
+
+	s.metrics.SubnetCreated()
 
 	return &ipamV1.CreateSubnetResponse{
 		Subnet: subnetToProto(entity),
@@ -273,6 +278,9 @@ func (s *SubnetService) DeleteSubnet(ctx context.Context, req *ipamV1.DeleteSubn
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.SubnetDeleted()
+
 	return &emptypb.Empty{}, nil
 }
 

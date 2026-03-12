@@ -13,6 +13,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/biz"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
+	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
@@ -22,13 +23,15 @@ type IpAddressService struct {
 	log           *log.Helper
 	ipAddressRepo *data.IpAddressRepo
 	subnetRepo    *data.SubnetRepo
+	metrics       *metrics.Collector
 }
 
-func NewIpAddressService(ctx *bootstrap.Context, ipAddressRepo *data.IpAddressRepo, subnetRepo *data.SubnetRepo) *IpAddressService {
+func NewIpAddressService(ctx *bootstrap.Context, ipAddressRepo *data.IpAddressRepo, subnetRepo *data.SubnetRepo, metrics *metrics.Collector) *IpAddressService {
 	return &IpAddressService{
 		log:           ctx.NewLoggerHelper("ipam/service/ip_address"),
 		ipAddressRepo: ipAddressRepo,
 		subnetRepo:    subnetRepo,
+		metrics:       metrics,
 	}
 }
 
@@ -58,6 +61,8 @@ func (s *IpAddressService) CreateIpAddress(ctx context.Context, req *ipamV1.Crea
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.IPAddressCreated(metrics.StatusIntToString(entity.Status))
 
 	return &ipamV1.CreateIpAddressResponse{
 		IpAddress: ipAddressToProto(entity),
@@ -132,6 +137,19 @@ func (s *IpAddressService) ListIpAddresses(ctx context.Context, req *ipamV1.List
 }
 
 func (s *IpAddressService) UpdateIpAddress(ctx context.Context, req *ipamV1.UpdateIpAddressRequest) (*ipamV1.UpdateIpAddressResponse, error) {
+	// Track old status for metrics if status is being changed
+	var oldStatus int32
+	statusChanging := req.Data != nil && req.Data.Status != nil
+	if statusChanging {
+		existing, err := s.ipAddressRepo.GetByID(ctx, req.GetId())
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			oldStatus = existing.Status
+		}
+	}
+
 	updates := make(map[string]interface{})
 
 	if req.Data != nil {
@@ -157,16 +175,34 @@ func (s *IpAddressService) UpdateIpAddress(ctx context.Context, req *ipamV1.Upda
 		return nil, err
 	}
 
+	if statusChanging {
+		newStatus := int32(*req.Data.Status)
+		if oldStatus != newStatus {
+			s.metrics.IPAddressStatusChanged(
+				metrics.StatusIntToString(oldStatus),
+				metrics.StatusIntToString(newStatus),
+			)
+		}
+	}
+
 	return &ipamV1.UpdateIpAddressResponse{
 		IpAddress: ipAddressToProto(entity),
 	}, nil
 }
 
 func (s *IpAddressService) DeleteIpAddress(ctx context.Context, req *ipamV1.DeleteIpAddressRequest) (*emptypb.Empty, error) {
+	// Get entity before deleting to know its status for metrics
+	existing, _ := s.ipAddressRepo.GetByID(ctx, req.GetId())
+
 	err := s.ipAddressRepo.Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, err
 	}
+
+	if existing != nil {
+		s.metrics.IPAddressDeleted(metrics.StatusIntToString(existing.Status))
+	}
+
 	return &emptypb.Empty{}, nil
 }
 

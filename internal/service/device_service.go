@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
+	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
@@ -21,15 +22,17 @@ type DeviceService struct {
 	deviceInterfaceRepo *data.DeviceInterfaceRepo
 	ipAddressRepo       *data.IpAddressRepo
 	devicePackageRepo   *data.DevicePackageRepo
+	metrics             *metrics.Collector
 }
 
-func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo, devicePackageRepo *data.DevicePackageRepo) *DeviceService {
+func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo, devicePackageRepo *data.DevicePackageRepo, metrics *metrics.Collector) *DeviceService {
 	return &DeviceService{
 		log:                 ctx.NewLoggerHelper("ipam/service/device"),
 		deviceRepo:          deviceRepo,
 		deviceInterfaceRepo: deviceInterfaceRepo,
 		ipAddressRepo:       ipAddressRepo,
 		devicePackageRepo:   devicePackageRepo,
+		metrics:             metrics,
 	}
 }
 
@@ -98,6 +101,8 @@ func (s *DeviceService) CreateDevice(ctx context.Context, req *ipamV1.CreateDevi
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.DeviceCreated()
 
 	return &ipamV1.CreateDeviceResponse{
 		Device: deviceToProto(entity),
@@ -258,6 +263,9 @@ func (s *DeviceService) DeleteDevice(ctx context.Context, req *ipamV1.DeleteDevi
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.DeviceDeleted()
+
 	return &emptypb.Empty{}, nil
 }
 

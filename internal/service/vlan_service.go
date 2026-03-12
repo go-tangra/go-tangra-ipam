@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
+	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
@@ -18,12 +19,14 @@ type VlanService struct {
 
 	log      *log.Helper
 	vlanRepo *data.VlanRepo
+	metrics  *metrics.Collector
 }
 
-func NewVlanService(ctx *bootstrap.Context, vlanRepo *data.VlanRepo) *VlanService {
+func NewVlanService(ctx *bootstrap.Context, vlanRepo *data.VlanRepo, metrics *metrics.Collector) *VlanService {
 	return &VlanService{
 		log:      ctx.NewLoggerHelper("ipam/service/vlan"),
 		vlanRepo: vlanRepo,
+		metrics:  metrics,
 	}
 }
 
@@ -44,6 +47,8 @@ func (s *VlanService) CreateVlan(ctx context.Context, req *ipamV1.CreateVlanRequ
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.VlanCreated()
 
 	return &ipamV1.CreateVlanResponse{
 		Vlan: vlanToProto(entity),
@@ -129,6 +134,9 @@ func (s *VlanService) DeleteVlan(ctx context.Context, req *ipamV1.DeleteVlanRequ
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.VlanDeleted()
+
 	return &emptypb.Empty{}, nil
 }
 

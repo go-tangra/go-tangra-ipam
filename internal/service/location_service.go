@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
+	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
@@ -18,12 +19,14 @@ type LocationService struct {
 
 	log          *log.Helper
 	locationRepo *data.LocationRepo
+	metrics      *metrics.Collector
 }
 
-func NewLocationService(ctx *bootstrap.Context, locationRepo *data.LocationRepo) *LocationService {
+func NewLocationService(ctx *bootstrap.Context, locationRepo *data.LocationRepo, metrics *metrics.Collector) *LocationService {
 	return &LocationService{
 		log:          ctx.NewLoggerHelper("ipam/service/location"),
 		locationRepo: locationRepo,
+		metrics:      metrics,
 	}
 }
 
@@ -59,6 +62,8 @@ func (s *LocationService) CreateLocation(ctx context.Context, req *ipamV1.Create
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.LocationCreated()
 
 	return &ipamV1.CreateLocationResponse{
 		Location: locationToProto(entity),
@@ -156,6 +161,9 @@ func (s *LocationService) DeleteLocation(ctx context.Context, req *ipamV1.Delete
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.LocationDeleted()
+
 	return &emptypb.Empty{}, nil
 }
 
