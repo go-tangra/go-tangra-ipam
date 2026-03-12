@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
@@ -35,6 +36,10 @@ type Collector struct {
 
 	// Location metrics
 	LocationsTotal prometheus.Gauge
+
+	// gRPC request metrics
+	RequestDuration *prometheus.HistogramVec
+	RequestsTotal   *prometheus.CounterVec
 }
 
 // NewCollector creates and registers all IPAM Prometheus metrics.
@@ -90,6 +95,21 @@ func NewCollector(ctx *bootstrap.Context) *Collector {
 			Name:      "locations_total",
 			Help:      "Total number of locations.",
 		}),
+
+		RequestDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "grpc_request_duration_seconds",
+			Help:      "Histogram of gRPC request durations in seconds.",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{"method"}),
+
+		RequestsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "grpc_requests_total",
+			Help:      "Total number of gRPC requests by method and status.",
+		}, []string{"method", "status"}),
 	}
 
 	prometheus.MustRegister(
@@ -100,6 +120,8 @@ func NewCollector(ctx *bootstrap.Context) *Collector {
 		c.VlansTotal,
 		c.DevicesTotal,
 		c.LocationsTotal,
+		c.RequestDuration,
+		c.RequestsTotal,
 	)
 
 	addr := os.Getenv("METRICS_ADDR")
@@ -122,6 +144,11 @@ func (c *Collector) Stop(ctx context.Context) {
 	if c.server != nil {
 		c.server.Stop(ctx)
 	}
+}
+
+// Middleware returns a Kratos middleware that records gRPC request metrics.
+func (c *Collector) Middleware() middleware.Middleware {
+	return commonMetrics.NewServerMiddleware(c.RequestDuration, c.RequestsTotal)
 }
 
 // StatusIntToString maps IP address status integers to string labels.

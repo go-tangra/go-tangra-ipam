@@ -12,8 +12,9 @@ import (
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
 	"github.com/go-tangra/go-tangra-ipam/internal/cert"
-	customLogging "github.com/go-tangra/go-tangra-ipam/internal/middleware/logging"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
+	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
+	customLogging "github.com/go-tangra/go-tangra-ipam/internal/middleware/logging"
 	"github.com/go-tangra/go-tangra-ipam/internal/service"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 
@@ -50,6 +51,7 @@ func systemViewerMiddleware() middleware.Middleware {
 func NewGRPCServer(
 	ctx *bootstrap.Context,
 	certManager *cert.CertManager,
+	collector *metrics.Collector,
 	auditLogRepo *data.AuditLogRepo,
 	systemSvc *service.SystemService,
 	subnetSvc *service.SubnetService,
@@ -93,6 +95,7 @@ func NewGRPCServer(
 	// Build middleware stack
 	var ms []middleware.Middleware
 	ms = append(ms, recovery.Recovery())
+	ms = append(ms, collector.Middleware())
 	ms = append(ms, systemViewerMiddleware()) // Inject system viewer for ENT privacy
 	ms = append(ms, customLogging.RedactedServer(logger))
 
