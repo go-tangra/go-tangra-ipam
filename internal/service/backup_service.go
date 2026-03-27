@@ -2,9 +2,7 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
@@ -12,6 +10,7 @@ import (
 
 	entCrud "github.com/tx7do/go-crud/entgo"
 
+	"github.com/go-tangra/go-tangra-common/backup"
 	"github.com/go-tangra/go-tangra-common/grpcx"
 
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
@@ -32,9 +31,20 @@ import (
 )
 
 const (
-	backupModule  = "ipam"
-	backupVersion = "1.0"
+	backupModule        = "ipam"
+	backupSchemaVersion = 1
 )
+
+// Migrations registry — add entries here when schema changes.
+var migrations = backup.NewMigrationRegistry(backupModule)
+
+// Register migrations in init. Example for future use:
+//
+//	func init() {
+//	    migrations.Register(1, func(entities map[string]json.RawMessage) error {
+//	        return backup.MigrateAddField(entities, "locations", "newField", "")
+//	    })
+//	}
 
 type BackupService struct {
 	ipamV1.UnimplementedBackupServiceServer
@@ -50,31 +60,7 @@ func NewBackupService(ctx *bootstrap.Context, entClient *entCrud.EntClient[*ent.
 	}
 }
 
-type backupData struct {
-	Module     string          `json:"module"`
-	Version    string          `json:"version"`
-	ExportedAt time.Time      `json:"exportedAt"`
-	TenantID   uint32         `json:"tenantId"`
-	FullBackup bool           `json:"fullBackup"`
-	Data       backupEntities `json:"data"`
-}
-
-type backupEntities struct {
-	Locations        []json.RawMessage `json:"locations,omitempty"`
-	Vlans            []json.RawMessage `json:"vlans,omitempty"`
-	DnsConfigs       []json.RawMessage `json:"dnsConfigs,omitempty"`
-	Subnets          []json.RawMessage `json:"subnets,omitempty"`
-	Devices          []json.RawMessage `json:"devices,omitempty"`
-	DeviceInterfaces []json.RawMessage `json:"deviceInterfaces,omitempty"`
-	IpAddresses      []json.RawMessage `json:"ipAddresses,omitempty"`
-	IpGroups         []json.RawMessage `json:"ipGroups,omitempty"`
-	IpGroupMembers   []json.RawMessage `json:"ipGroupMembers,omitempty"`
-	HostGroups       []json.RawMessage `json:"hostGroups,omitempty"`
-	HostGroupMembers []json.RawMessage `json:"hostGroupMembers,omitempty"`
-	IpScanJobs       []json.RawMessage `json:"ipScanJobs,omitempty"`
-	DevicePackages   []json.RawMessage `json:"devicePackages,omitempty"`
-}
-
+// ExportBackup exports all IPAM entities as a gzipped archive.
 func (s *BackupService) ExportBackup(ctx context.Context, req *ipamV1.ExportBackupRequest) (*ipamV1.ExportBackupResponse, error) {
 	tenantID := grpcx.GetTenantIDFromContext(ctx)
 	full := false
@@ -82,212 +68,286 @@ func (s *BackupService) ExportBackup(ctx context.Context, req *ipamV1.ExportBack
 	if grpcx.IsPlatformAdmin(ctx) && req.TenantId != nil && *req.TenantId == 0 {
 		full = true
 		tenantID = 0
-	} else if req.TenantId != nil && *req.TenantId != 0 {
-		if grpcx.IsPlatformAdmin(ctx) {
-			tenantID = *req.TenantId
-		}
+	} else if req.TenantId != nil && *req.TenantId != 0 && grpcx.IsPlatformAdmin(ctx) {
+		tenantID = *req.TenantId
 	}
 
 	client := s.entClient.Client()
-	now := time.Now()
+	a := backup.NewArchive(backupModule, backupSchemaVersion, tenantID, full)
 
-	locations, err := s.exportLocations(ctx, client, tenantID, full)
+	// Export locations
+	locQuery := client.Location.Query()
+	if !full {
+		locQuery = locQuery.Where(location.TenantID(tenantID))
+	}
+	locations, err := locQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export locations: %w", err)
 	}
-	vlans, err := s.exportVlans(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "locations", locations); err != nil {
+		return nil, fmt.Errorf("set locations: %w", err)
+	}
+
+	// Export vlans
+	vlanQuery := client.Vlan.Query()
+	if !full {
+		vlanQuery = vlanQuery.Where(vlan.TenantID(tenantID))
+	}
+	vlans, err := vlanQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export vlans: %w", err)
 	}
-	dnsConfigs, err := s.exportDnsConfigs(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "vlans", vlans); err != nil {
+		return nil, fmt.Errorf("set vlans: %w", err)
+	}
+
+	// Export DNS configs
+	dnsQuery := client.DnsConfig.Query()
+	if !full {
+		dnsQuery = dnsQuery.Where(dnsconfig.TenantID(tenantID))
+	}
+	dnsConfigs, err := dnsQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export dns configs: %w", err)
 	}
-	subnets, err := s.exportSubnets(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "dnsConfigs", dnsConfigs); err != nil {
+		return nil, fmt.Errorf("set dns configs: %w", err)
+	}
+
+	// Export subnets
+	subnetQuery := client.Subnet.Query()
+	if !full {
+		subnetQuery = subnetQuery.Where(subnet.TenantID(tenantID))
+	}
+	subnets, err := subnetQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export subnets: %w", err)
 	}
-	devices, err := s.exportDevices(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "subnets", subnets); err != nil {
+		return nil, fmt.Errorf("set subnets: %w", err)
+	}
+
+	// Export devices
+	devQuery := client.Device.Query()
+	if !full {
+		devQuery = devQuery.Where(device.TenantID(tenantID))
+	}
+	devices, err := devQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export devices: %w", err)
 	}
-	deviceInterfaces, err := s.exportDeviceInterfaces(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "devices", devices); err != nil {
+		return nil, fmt.Errorf("set devices: %w", err)
+	}
+
+	// Export device interfaces (no tenant_id — filter via parent device)
+	diQuery := client.DeviceInterface.Query()
+	if !full {
+		diQuery = diQuery.Where(deviceinterface.HasDeviceWith(device.TenantID(tenantID)))
+	}
+	deviceInterfaces, err := diQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export device interfaces: %w", err)
 	}
-	ipAddresses, err := s.exportIpAddresses(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "deviceInterfaces", deviceInterfaces); err != nil {
+		return nil, fmt.Errorf("set device interfaces: %w", err)
+	}
+
+	// Export IP addresses
+	ipQuery := client.IpAddress.Query()
+	if !full {
+		ipQuery = ipQuery.Where(ipaddress.TenantID(tenantID))
+	}
+	ipAddresses, err := ipQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export ip addresses: %w", err)
 	}
-	ipGroups, err := s.exportIpGroups(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "ipAddresses", ipAddresses); err != nil {
+		return nil, fmt.Errorf("set ip addresses: %w", err)
+	}
+
+	// Export IP groups
+	igQuery := client.IpGroup.Query()
+	if !full {
+		igQuery = igQuery.Where(ipgroup.TenantID(tenantID))
+	}
+	ipGroups, err := igQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export ip groups: %w", err)
 	}
-	ipGroupMembers, err := s.exportIpGroupMembers(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "ipGroups", ipGroups); err != nil {
+		return nil, fmt.Errorf("set ip groups: %w", err)
+	}
+
+	// Export IP group members (no tenant_id — filter via parent group)
+	igmQuery := client.IpGroupMember.Query()
+	if !full {
+		igmQuery = igmQuery.Where(ipgroupmember.HasGroupWith(ipgroup.TenantID(tenantID)))
+	}
+	ipGroupMembers, err := igmQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export ip group members: %w", err)
 	}
-	hostGroups, err := s.exportHostGroups(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "ipGroupMembers", ipGroupMembers); err != nil {
+		return nil, fmt.Errorf("set ip group members: %w", err)
+	}
+
+	// Export host groups
+	hgQuery := client.HostGroup.Query()
+	if !full {
+		hgQuery = hgQuery.Where(hostgroup.TenantID(tenantID))
+	}
+	hostGroups, err := hgQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export host groups: %w", err)
 	}
-	hostGroupMembers, err := s.exportHostGroupMembers(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "hostGroups", hostGroups); err != nil {
+		return nil, fmt.Errorf("set host groups: %w", err)
+	}
+
+	// Export host group members (no tenant_id — filter via parent group)
+	hgmQuery := client.HostGroupMember.Query()
+	if !full {
+		hgmQuery = hgmQuery.Where(hostgroupmember.HasGroupWith(hostgroup.TenantID(tenantID)))
+	}
+	hostGroupMembers, err := hgmQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export host group members: %w", err)
 	}
-	ipScanJobs, err := s.exportIpScanJobs(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "hostGroupMembers", hostGroupMembers); err != nil {
+		return nil, fmt.Errorf("set host group members: %w", err)
+	}
+
+	// Export IP scan jobs
+	scanQuery := client.IpScanJob.Query()
+	if !full {
+		scanQuery = scanQuery.Where(ipscanjob.TenantID(tenantID))
+	}
+	ipScanJobs, err := scanQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export ip scan jobs: %w", err)
 	}
-	devicePackages, err := s.exportDevicePackages(ctx, client, tenantID, full)
+	if err := backup.SetEntities(a, "ipScanJobs", ipScanJobs); err != nil {
+		return nil, fmt.Errorf("set ip scan jobs: %w", err)
+	}
+
+	// Export device packages
+	dpQuery := client.DevicePackage.Query()
+	if !full {
+		dpQuery = dpQuery.Where(devicepackage.TenantID(tenantID))
+	}
+	devicePackages, err := dpQuery.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("export device packages: %w", err)
 	}
-
-	backup := backupData{
-		Module:     backupModule,
-		Version:    backupVersion,
-		ExportedAt: now,
-		TenantID:   tenantID,
-		FullBackup: full,
-		Data: backupEntities{
-			Locations:        locations,
-			Vlans:            vlans,
-			DnsConfigs:       dnsConfigs,
-			Subnets:          subnets,
-			Devices:          devices,
-			DeviceInterfaces: deviceInterfaces,
-			IpAddresses:      ipAddresses,
-			IpGroups:         ipGroups,
-			IpGroupMembers:   ipGroupMembers,
-			HostGroups:       hostGroups,
-			HostGroupMembers: hostGroupMembers,
-			IpScanJobs:       ipScanJobs,
-			DevicePackages:   devicePackages,
-		},
+	if err := backup.SetEntities(a, "devicePackages", devicePackages); err != nil {
+		return nil, fmt.Errorf("set device packages: %w", err)
 	}
 
-	data, err := json.Marshal(backup)
+	// Pack (JSON + gzip)
+	data, err := backup.Pack(a)
 	if err != nil {
-		return nil, fmt.Errorf("marshal backup: %w", err)
+		return nil, fmt.Errorf("pack backup: %w", err)
 	}
 
-	entityCounts := map[string]int64{
-		"locations":        int64(len(locations)),
-		"vlans":            int64(len(vlans)),
-		"dnsConfigs":       int64(len(dnsConfigs)),
-		"subnets":          int64(len(subnets)),
-		"devices":          int64(len(devices)),
-		"deviceInterfaces": int64(len(deviceInterfaces)),
-		"ipAddresses":      int64(len(ipAddresses)),
-		"ipGroups":         int64(len(ipGroups)),
-		"ipGroupMembers":   int64(len(ipGroupMembers)),
-		"hostGroups":       int64(len(hostGroups)),
-		"hostGroupMembers": int64(len(hostGroupMembers)),
-		"ipScanJobs":       int64(len(ipScanJobs)),
-		"devicePackages":   int64(len(devicePackages)),
-	}
-
-	s.log.Infof("exported backup: module=%s tenant=%d full=%v entities=%v", backupModule, tenantID, full, entityCounts)
+	s.log.Infof("exported backup: module=%s tenant=%d full=%v entities=%v", backupModule, tenantID, full, a.Manifest.EntityCounts)
 
 	return &ipamV1.ExportBackupResponse{
-		Data:         data,
-		Module:       backupModule,
-		Version:      backupVersion,
-		ExportedAt:   timestamppb.New(now),
-		TenantId:     tenantID,
-		EntityCounts: entityCounts,
+		Data:          data,
+		Module:        backupModule,
+		Version:       fmt.Sprintf("%d", backupSchemaVersion),
+		ExportedAt:    timestamppb.New(a.Manifest.ExportedAt),
+		TenantId:      tenantID,
+		EntityCounts:  a.Manifest.EntityCounts,
+		SchemaVersion: int32(backupSchemaVersion),
 	}, nil
 }
 
+// ImportBackup restores IPAM entities from a gzipped archive.
 func (s *BackupService) ImportBackup(ctx context.Context, req *ipamV1.ImportBackupRequest) (*ipamV1.ImportBackupResponse, error) {
 	tenantID := grpcx.GetTenantIDFromContext(ctx)
 	isPlatformAdmin := grpcx.IsPlatformAdmin(ctx)
-	mode := req.GetMode()
+	mode := mapRestoreMode(req.GetMode())
 
-	var backup backupData
-	if err := json.Unmarshal(req.GetData(), &backup); err != nil {
-		return nil, fmt.Errorf("invalid backup data: %w", err)
+	// Unpack
+	a, err := backup.Unpack(req.GetData())
+	if err != nil {
+		return nil, fmt.Errorf("unpack backup: %w", err)
 	}
 
-	if backup.Module != backupModule {
-		return nil, fmt.Errorf("backup module mismatch: expected %s, got %s", backupModule, backup.Module)
-	}
-	if backup.Version != backupVersion {
-		return nil, fmt.Errorf("backup version mismatch: expected %s, got %s", backupVersion, backup.Version)
+	// Validate
+	if err := backup.Validate(a, backupModule, backupSchemaVersion); err != nil {
+		return nil, err
 	}
 
-	// For full backups, only platform admins can restore
-	if backup.FullBackup && !isPlatformAdmin {
+	// Full backups require platform admin
+	if a.Manifest.FullBackup && !isPlatformAdmin {
 		return nil, fmt.Errorf("only platform admins can restore full backups")
 	}
 
-	// Non-platform admins always restore to their own tenant
-	if !isPlatformAdmin || !backup.FullBackup {
+	// Run migrations if needed
+	sourceVersion := a.Manifest.SchemaVersion
+	applied, err := migrations.RunMigrations(a, backupSchemaVersion)
+	if err != nil {
+		return nil, fmt.Errorf("migration failed: %w", err)
+	}
+
+	// Determine restore tenant
+	if !isPlatformAdmin || !a.Manifest.FullBackup {
 		tenantID = grpcx.GetTenantIDFromContext(ctx)
 	} else {
-		tenantID = 0 // Signal for full backup restore — each entity carries its own tenant_id
+		tenantID = 0
 	}
 
 	client := s.entClient.Client()
-	var results []*ipamV1.EntityImportResult
-	var warnings []string
+	result := backup.NewRestoreResult(sourceVersion, backupSchemaVersion, applied)
 
 	// Import in FK dependency order
-	importFuncs := []struct {
-		name string
-		fn   func(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string)
-	}{
-		{"locations", s.importLocations},
-		{"vlans", s.importVlans},
-		{"dnsConfigs", s.importDnsConfigs},
-		{"subnets", s.importSubnets},
-		{"devices", s.importDevices},
-		{"deviceInterfaces", s.importDeviceInterfaces},
-		{"ipAddresses", s.importIpAddresses},
-		{"ipGroups", s.importIpGroups},
-		{"ipGroupMembers", s.importIpGroupMembers},
-		{"hostGroups", s.importHostGroups},
-		{"hostGroupMembers", s.importHostGroupMembers},
-		{"ipScanJobs", s.importIpScanJobs},
-		{"devicePackages", s.importDevicePackages},
-	}
+	s.importLocations(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importVlans(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importDnsConfigs(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importSubnets(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importDevices(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importDeviceInterfaces(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importIpAddresses(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importIpGroups(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importIpGroupMembers(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importHostGroups(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importHostGroupMembers(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importIpScanJobs(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	s.importDevicePackages(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
 
-	dataMap := map[string][]json.RawMessage{
-		"locations":        backup.Data.Locations,
-		"vlans":            backup.Data.Vlans,
-		"dnsConfigs":       backup.Data.DnsConfigs,
-		"subnets":          backup.Data.Subnets,
-		"devices":          backup.Data.Devices,
-		"deviceInterfaces": backup.Data.DeviceInterfaces,
-		"ipAddresses":      backup.Data.IpAddresses,
-		"ipGroups":         backup.Data.IpGroups,
-		"ipGroupMembers":   backup.Data.IpGroupMembers,
-		"hostGroups":       backup.Data.HostGroups,
-		"hostGroupMembers": backup.Data.HostGroupMembers,
-		"ipScanJobs":       backup.Data.IpScanJobs,
-		"devicePackages":   backup.Data.DevicePackages,
-	}
+	s.log.Infof("imported backup: module=%s tenant=%d mode=%v migrations=%d results=%d",
+		backupModule, tenantID, mode, applied, len(result.Results))
 
-	for _, imp := range importFuncs {
-		items := dataMap[imp.name]
-		if len(items) == 0 {
-			continue
+	// Convert to proto response
+	protoResults := make([]*ipamV1.EntityImportResult, len(result.Results))
+	for i, r := range result.Results {
+		protoResults[i] = &ipamV1.EntityImportResult{
+			EntityType: r.EntityType,
+			Total:      r.Total,
+			Created:    r.Created,
+			Updated:    r.Updated,
+			Skipped:    r.Skipped,
+			Failed:     r.Failed,
 		}
-		result, w := imp.fn(ctx, client, items, tenantID, backup.FullBackup, mode)
-		if result != nil {
-			results = append(results, result)
-		}
-		warnings = append(warnings, w...)
 	}
-
-	s.log.Infof("imported backup: module=%s tenant=%d mode=%v results=%d warnings=%d", backupModule, tenantID, mode, len(results), len(warnings))
 
 	return &ipamV1.ImportBackupResponse{
-		Success:  true,
-		Results:  results,
-		Warnings: warnings,
+		Success:           result.Success,
+		Results:           protoResults,
+		Warnings:          result.Warnings,
+		SourceVersion:     int32(result.SourceVersion),
+		TargetVersion:     int32(result.TargetVersion),
+		MigrationsApplied: int32(result.MigrationsApplied),
 	}, nil
+}
+
+func mapRestoreMode(m ipamV1.RestoreMode) backup.RestoreMode {
+	if m == ipamV1.RestoreMode_RESTORE_MODE_OVERWRITE {
+		return backup.RestoreModeOverwrite
+	}
+	return backup.RestoreModeSkip
 }
 
 // topologicalSortByParentID sorts items so parents come before children.
@@ -308,200 +368,38 @@ func topologicalSortByParentID[T any](items []T, getID func(T) string, getParent
 		}
 	}
 
-	result := make([]T, 0, len(items))
+	sorted := make([]T, 0, len(items))
 	var walk func([]T)
 	walk = func(nodes []T) {
 		for _, n := range nodes {
-			result = append(result, n)
+			sorted = append(sorted, n)
 			if children, ok := childMap[getID(n)]; ok {
 				walk(children)
 			}
 		}
 	}
 	walk(roots)
-	return result
-}
-
-func marshalEntities[T any](entities []*T) ([]json.RawMessage, error) {
-	result := make([]json.RawMessage, 0, len(entities))
-	for _, e := range entities {
-		b, err := json.Marshal(e)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, b)
-	}
-	return result, nil
-}
-
-// --- Export helpers ---
-
-func (s *BackupService) exportLocations(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.Location.Query()
-	if !full {
-		query = query.Where(location.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportVlans(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.Vlan.Query()
-	if !full {
-		query = query.Where(vlan.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportDnsConfigs(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.DnsConfig.Query()
-	if !full {
-		query = query.Where(dnsconfig.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportSubnets(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.Subnet.Query()
-	if !full {
-		query = query.Where(subnet.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportDevices(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.Device.Query()
-	if !full {
-		query = query.Where(device.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportDeviceInterfaces(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.DeviceInterface.Query()
-	if !full {
-		// DeviceInterface doesn't have tenant_id — filter via parent device
-		query = query.Where(deviceinterface.HasDeviceWith(device.TenantID(tenantID)))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportIpAddresses(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.IpAddress.Query()
-	if !full {
-		query = query.Where(ipaddress.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportIpGroups(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.IpGroup.Query()
-	if !full {
-		query = query.Where(ipgroup.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportIpGroupMembers(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.IpGroupMember.Query()
-	if !full {
-		query = query.Where(ipgroupmember.HasGroupWith(ipgroup.TenantID(tenantID)))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportHostGroups(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.HostGroup.Query()
-	if !full {
-		query = query.Where(hostgroup.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportHostGroupMembers(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.HostGroupMember.Query()
-	if !full {
-		query = query.Where(hostgroupmember.HasGroupWith(hostgroup.TenantID(tenantID)))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
-}
-
-func (s *BackupService) exportIpScanJobs(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.IpScanJob.Query()
-	if !full {
-		query = query.Where(ipscanjob.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return marshalEntities(entities)
+	return sorted
 }
 
 // --- Import helpers ---
 
-func (s *BackupService) importLocations(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "locations", Total: int64(len(items))}
-	var warnings []string
-
-	var entities []*ent.Location
-	for _, raw := range items {
-		var e ent.Location
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("locations: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
-		entities = append(entities, &e)
+func (s *BackupService) importLocations(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	locations, err := backup.GetEntities[ent.Location](a, "locations")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("locations: unmarshal error: %v", err))
+		return
+	}
+	if len(locations) == 0 {
+		return
 	}
 
+	er := backup.EntityResult{EntityType: "locations", Total: int64(len(locations))}
+
 	// Topological sort for self-referential parent_id
-	sorted := topologicalSortByParentID(entities,
-		func(e *ent.Location) string { return e.ID },
-		func(e *ent.Location) string { return e.ParentID },
+	sorted := topologicalSortByParentID(locations,
+		func(e ent.Location) string { return e.ID },
+		func(e ent.Location) string { return e.ParentID },
 	)
 
 	for _, e := range sorted {
@@ -510,13 +408,17 @@ func (s *BackupService) importLocations(ctx context.Context, client *ent.Client,
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.Location.Get(ctx, e.ID)
+		existing, getErr := client.Location.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("locations: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
-			// Overwrite
 			_, err := client.Location.UpdateOneID(e.ID).
 				SetName(e.Name).
 				SetCode(e.Code).
@@ -541,13 +443,12 @@ func (s *BackupService) importLocations(ctx context.Context, client *ent.Client,
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("locations: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("locations: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
-			// Create
 			_, err := client.Location.Create().
 				SetID(e.ID).
 				SetNillableTenantID(&tid).
@@ -575,38 +476,44 @@ func (s *BackupService) importLocations(ctx context.Context, client *ent.Client,
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("locations: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("locations: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importVlans(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "vlans", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importVlans(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	vlans, err := backup.GetEntities[ent.Vlan](a, "vlans")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("vlans: unmarshal error: %v", err))
+		return
+	}
+	if len(vlans) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.Vlan
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("vlans: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
+	er := backup.EntityResult{EntityType: "vlans", Total: int64(len(vlans))}
 
+	for _, e := range vlans {
 		tid := tenantID
 		if full && e.TenantID != nil {
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.Vlan.Get(ctx, e.ID)
+		existing, getErr := client.Vlan.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("vlans: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.Vlan.UpdateOneID(e.ID).
@@ -621,11 +528,11 @@ func (s *BackupService) importVlans(ctx context.Context, client *ent.Client, ite
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("vlans: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("vlans: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.Vlan.Create().
 				SetID(e.ID).
@@ -642,38 +549,44 @@ func (s *BackupService) importVlans(ctx context.Context, client *ent.Client, ite
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("vlans: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("vlans: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importDnsConfigs(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "dnsConfigs", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importDnsConfigs(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	dnsConfigs, err := backup.GetEntities[ent.DnsConfig](a, "dnsConfigs")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("dnsConfigs: unmarshal error: %v", err))
+		return
+	}
+	if len(dnsConfigs) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.DnsConfig
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("dnsConfigs: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
+	er := backup.EntityResult{EntityType: "dnsConfigs", Total: int64(len(dnsConfigs))}
 
+	for _, e := range dnsConfigs {
 		tid := tenantID
 		if full && e.TenantID != nil {
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.DnsConfig.Get(ctx, e.ID)
+		existing, getErr := client.DnsConfig.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("dnsConfigs: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.DnsConfig.UpdateOneID(e.ID).
@@ -684,11 +597,11 @@ func (s *BackupService) importDnsConfigs(ctx context.Context, client *ent.Client
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("dnsConfigs: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("dnsConfigs: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.DnsConfig.Create().
 				SetID(e.ID).
@@ -701,36 +614,33 @@ func (s *BackupService) importDnsConfigs(ctx context.Context, client *ent.Client
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("dnsConfigs: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("dnsConfigs: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importSubnets(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "subnets", Total: int64(len(items))}
-	var warnings []string
-
-	var entities []*ent.Subnet
-	for _, raw := range items {
-		var e ent.Subnet
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("subnets: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
-		entities = append(entities, &e)
+func (s *BackupService) importSubnets(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	subnets, err := backup.GetEntities[ent.Subnet](a, "subnets")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("subnets: unmarshal error: %v", err))
+		return
+	}
+	if len(subnets) == 0 {
+		return
 	}
 
+	er := backup.EntityResult{EntityType: "subnets", Total: int64(len(subnets))}
+
 	// Topological sort for self-referential parent_id
-	sorted := topologicalSortByParentID(entities,
-		func(e *ent.Subnet) string { return e.ID },
-		func(e *ent.Subnet) string { return e.ParentID },
+	sorted := topologicalSortByParentID(subnets,
+		func(e ent.Subnet) string { return e.ID },
+		func(e ent.Subnet) string { return e.ParentID },
 	)
 
 	for _, e := range sorted {
@@ -739,10 +649,15 @@ func (s *BackupService) importSubnets(ctx context.Context, client *ent.Client, i
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.Subnet.Get(ctx, e.ID)
+		existing, getErr := client.Subnet.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("subnets: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.Subnet.UpdateOneID(e.ID).
@@ -766,11 +681,11 @@ func (s *BackupService) importSubnets(ctx context.Context, client *ent.Client, i
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("subnets: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("subnets: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.Subnet.Create().
 				SetID(e.ID).
@@ -796,38 +711,44 @@ func (s *BackupService) importSubnets(ctx context.Context, client *ent.Client, i
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("subnets: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("subnets: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importDevices(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "devices", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importDevices(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	devices, err := backup.GetEntities[ent.Device](a, "devices")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("devices: unmarshal error: %v", err))
+		return
+	}
+	if len(devices) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.Device
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("devices: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
+	er := backup.EntityResult{EntityType: "devices", Total: int64(len(devices))}
 
+	for _, e := range devices {
 		tid := tenantID
 		if full && e.TenantID != nil {
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.Device.Get(ctx, e.ID)
+		existing, getErr := client.Device.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("devices: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.Device.UpdateOneID(e.ID).
@@ -857,11 +778,11 @@ func (s *BackupService) importDevices(ctx context.Context, client *ent.Client, i
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("devices: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("devices: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.Device.Create().
 				SetID(e.ID).
@@ -893,33 +814,39 @@ func (s *BackupService) importDevices(ctx context.Context, client *ent.Client, i
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("devices: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("devices: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importDeviceInterfaces(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "deviceInterfaces", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importDeviceInterfaces(ctx context.Context, client *ent.Client, a *backup.Archive, _ uint32, _ bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	deviceInterfaces, err := backup.GetEntities[ent.DeviceInterface](a, "deviceInterfaces")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("deviceInterfaces: unmarshal error: %v", err))
+		return
+	}
+	if len(deviceInterfaces) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.DeviceInterface
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("deviceInterfaces: unmarshal error: %v", err))
-			result.Failed++
+	er := backup.EntityResult{EntityType: "deviceInterfaces", Total: int64(len(deviceInterfaces))}
+
+	for _, e := range deviceInterfaces {
+		existing, getErr := client.DeviceInterface.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("deviceInterfaces: lookup %s: %v", e.ID, getErr))
+			er.Failed++
 			continue
 		}
-
-		existing, _ := client.DeviceInterface.Get(ctx, e.ID)
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.DeviceInterface.UpdateOneID(e.ID).
@@ -932,11 +859,11 @@ func (s *BackupService) importDeviceInterfaces(ctx context.Context, client *ent.
 				SetDescription(e.Description).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("deviceInterfaces: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("deviceInterfaces: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.DeviceInterface.Create().
 				SetID(e.ID).
@@ -950,38 +877,44 @@ func (s *BackupService) importDeviceInterfaces(ctx context.Context, client *ent.
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("deviceInterfaces: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("deviceInterfaces: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importIpAddresses(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "ipAddresses", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importIpAddresses(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	ipAddresses, err := backup.GetEntities[ent.IpAddress](a, "ipAddresses")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("ipAddresses: unmarshal error: %v", err))
+		return
+	}
+	if len(ipAddresses) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.IpAddress
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("ipAddresses: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
+	er := backup.EntityResult{EntityType: "ipAddresses", Total: int64(len(ipAddresses))}
 
+	for _, e := range ipAddresses {
 		tid := tenantID
 		if full && e.TenantID != nil {
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.IpAddress.Get(ctx, e.ID)
+		existing, getErr := client.IpAddress.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("ipAddresses: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.IpAddress.UpdateOneID(e.ID).
@@ -1007,11 +940,11 @@ func (s *BackupService) importIpAddresses(ctx context.Context, client *ent.Clien
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("ipAddresses: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("ipAddresses: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.IpAddress.Create().
 				SetID(e.ID).
@@ -1039,38 +972,44 @@ func (s *BackupService) importIpAddresses(ctx context.Context, client *ent.Clien
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("ipAddresses: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("ipAddresses: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importIpGroups(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "ipGroups", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importIpGroups(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	ipGroups, err := backup.GetEntities[ent.IpGroup](a, "ipGroups")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("ipGroups: unmarshal error: %v", err))
+		return
+	}
+	if len(ipGroups) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.IpGroup
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("ipGroups: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
+	er := backup.EntityResult{EntityType: "ipGroups", Total: int64(len(ipGroups))}
 
+	for _, e := range ipGroups {
 		tid := tenantID
 		if full && e.TenantID != nil {
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.IpGroup.Get(ctx, e.ID)
+		existing, getErr := client.IpGroup.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("ipGroups: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.IpGroup.UpdateOneID(e.ID).
@@ -1082,11 +1021,11 @@ func (s *BackupService) importIpGroups(ctx context.Context, client *ent.Client, 
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("ipGroups: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("ipGroups: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.IpGroup.Create().
 				SetID(e.ID).
@@ -1100,33 +1039,39 @@ func (s *BackupService) importIpGroups(ctx context.Context, client *ent.Client, 
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("ipGroups: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("ipGroups: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importIpGroupMembers(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "ipGroupMembers", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importIpGroupMembers(ctx context.Context, client *ent.Client, a *backup.Archive, _ uint32, _ bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	ipGroupMembers, err := backup.GetEntities[ent.IpGroupMember](a, "ipGroupMembers")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("ipGroupMembers: unmarshal error: %v", err))
+		return
+	}
+	if len(ipGroupMembers) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.IpGroupMember
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("ipGroupMembers: unmarshal error: %v", err))
-			result.Failed++
+	er := backup.EntityResult{EntityType: "ipGroupMembers", Total: int64(len(ipGroupMembers))}
+
+	for _, e := range ipGroupMembers {
+		existing, getErr := client.IpGroupMember.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("ipGroupMembers: lookup %s: %v", e.ID, getErr))
+			er.Failed++
 			continue
 		}
-
-		existing, _ := client.IpGroupMember.Get(ctx, e.ID)
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.IpGroupMember.UpdateOneID(e.ID).
@@ -1137,11 +1082,11 @@ func (s *BackupService) importIpGroupMembers(ctx context.Context, client *ent.Cl
 				SetSequence(e.Sequence).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("ipGroupMembers: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("ipGroupMembers: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.IpGroupMember.Create().
 				SetID(e.ID).
@@ -1153,38 +1098,44 @@ func (s *BackupService) importIpGroupMembers(ctx context.Context, client *ent.Cl
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("ipGroupMembers: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("ipGroupMembers: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importHostGroups(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "hostGroups", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importHostGroups(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	hostGroups, err := backup.GetEntities[ent.HostGroup](a, "hostGroups")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("hostGroups: unmarshal error: %v", err))
+		return
+	}
+	if len(hostGroups) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.HostGroup
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("hostGroups: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
+	er := backup.EntityResult{EntityType: "hostGroups", Total: int64(len(hostGroups))}
 
+	for _, e := range hostGroups {
 		tid := tenantID
 		if full && e.TenantID != nil {
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.HostGroup.Get(ctx, e.ID)
+		existing, getErr := client.HostGroup.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("hostGroups: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.HostGroup.UpdateOneID(e.ID).
@@ -1196,11 +1147,11 @@ func (s *BackupService) importHostGroups(ctx context.Context, client *ent.Client
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("hostGroups: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("hostGroups: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.HostGroup.Create().
 				SetID(e.ID).
@@ -1214,33 +1165,39 @@ func (s *BackupService) importHostGroups(ctx context.Context, client *ent.Client
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("hostGroups: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("hostGroups: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importHostGroupMembers(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "hostGroupMembers", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importHostGroupMembers(ctx context.Context, client *ent.Client, a *backup.Archive, _ uint32, _ bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	hostGroupMembers, err := backup.GetEntities[ent.HostGroupMember](a, "hostGroupMembers")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("hostGroupMembers: unmarshal error: %v", err))
+		return
+	}
+	if len(hostGroupMembers) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.HostGroupMember
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("hostGroupMembers: unmarshal error: %v", err))
-			result.Failed++
+	er := backup.EntityResult{EntityType: "hostGroupMembers", Total: int64(len(hostGroupMembers))}
+
+	for _, e := range hostGroupMembers {
+		existing, getErr := client.HostGroupMember.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("hostGroupMembers: lookup %s: %v", e.ID, getErr))
+			er.Failed++
 			continue
 		}
-
-		existing, _ := client.HostGroupMember.Get(ctx, e.ID)
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.HostGroupMember.UpdateOneID(e.ID).
@@ -1249,11 +1206,11 @@ func (s *BackupService) importHostGroupMembers(ctx context.Context, client *ent.
 				SetSequence(e.Sequence).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("hostGroupMembers: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("hostGroupMembers: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.HostGroupMember.Create().
 				SetID(e.ID).
@@ -1263,38 +1220,44 @@ func (s *BackupService) importHostGroupMembers(ctx context.Context, client *ent.
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("hostGroupMembers: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("hostGroupMembers: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) importIpScanJobs(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "ipScanJobs", Total: int64(len(items))}
-	var warnings []string
+func (s *BackupService) importIpScanJobs(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	ipScanJobs, err := backup.GetEntities[ent.IpScanJob](a, "ipScanJobs")
+	if err != nil {
+		result.AddWarning(fmt.Sprintf("ipScanJobs: unmarshal error: %v", err))
+		return
+	}
+	if len(ipScanJobs) == 0 {
+		return
+	}
 
-	for _, raw := range items {
-		var e ent.IpScanJob
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("ipScanJobs: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
+	er := backup.EntityResult{EntityType: "ipScanJobs", Total: int64(len(ipScanJobs))}
 
+	for _, e := range ipScanJobs {
 		tid := tenantID
 		if full && e.TenantID != nil {
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.IpScanJob.Get(ctx, e.ID)
+		existing, getErr := client.IpScanJob.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("ipScanJobs: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.IpScanJob.UpdateOneID(e.ID).
@@ -1320,11 +1283,11 @@ func (s *BackupService) importIpScanJobs(ctx context.Context, client *ent.Client
 				SetNillableCreateBy(e.CreateBy).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("ipScanJobs: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("ipScanJobs: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.IpScanJob.Create().
 				SetID(e.ID).
@@ -1352,50 +1315,44 @@ func (s *BackupService) importIpScanJobs(ctx context.Context, client *ent.Client
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("ipScanJobs: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("ipScanJobs: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
 
-func (s *BackupService) exportDevicePackages(ctx context.Context, client *ent.Client, tenantID uint32, full bool) ([]json.RawMessage, error) {
-	query := client.DevicePackage.Query()
-	if !full {
-		query = query.Where(devicepackage.TenantID(tenantID))
-	}
-	entities, err := query.All(ctx)
+func (s *BackupService) importDevicePackages(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
+	devicePackages, err := backup.GetEntities[ent.DevicePackage](a, "devicePackages")
 	if err != nil {
-		return nil, err
+		result.AddWarning(fmt.Sprintf("devicePackages: unmarshal error: %v", err))
+		return
 	}
-	return marshalEntities(entities)
-}
+	if len(devicePackages) == 0 {
+		return
+	}
 
-func (s *BackupService) importDevicePackages(ctx context.Context, client *ent.Client, items []json.RawMessage, tenantID uint32, full bool, mode ipamV1.RestoreMode) (*ipamV1.EntityImportResult, []string) {
-	result := &ipamV1.EntityImportResult{EntityType: "devicePackages", Total: int64(len(items))}
-	var warnings []string
+	er := backup.EntityResult{EntityType: "devicePackages", Total: int64(len(devicePackages))}
 
-	for _, raw := range items {
-		var e ent.DevicePackage
-		if err := json.Unmarshal(raw, &e); err != nil {
-			warnings = append(warnings, fmt.Sprintf("devicePackages: unmarshal error: %v", err))
-			result.Failed++
-			continue
-		}
-
+	for _, e := range devicePackages {
 		tid := tenantID
 		if full && e.TenantID != nil {
 			tid = *e.TenantID
 		}
 
-		existing, _ := client.DevicePackage.Get(ctx, e.ID)
+		existing, getErr := client.DevicePackage.Get(ctx, e.ID)
+		if getErr != nil && !ent.IsNotFound(getErr) {
+			result.AddWarning(fmt.Sprintf("devicePackages: lookup %s: %v", e.ID, getErr))
+			er.Failed++
+			continue
+		}
 		if existing != nil {
-			if mode == ipamV1.RestoreMode_RESTORE_MODE_SKIP {
-				result.Skipped++
+			if mode == backup.RestoreModeSkip {
+				er.Skipped++
 				continue
 			}
 			_, err := client.DevicePackage.UpdateOneID(e.ID).
@@ -1409,11 +1366,11 @@ func (s *BackupService) importDevicePackages(ctx context.Context, client *ent.Cl
 				SetDescription(e.Description).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("devicePackages: update %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("devicePackages: update %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Updated++
+			er.Updated++
 		} else {
 			_, err := client.DevicePackage.Create().
 				SetID(e.ID).
@@ -1429,13 +1386,13 @@ func (s *BackupService) importDevicePackages(ctx context.Context, client *ent.Cl
 				SetNillableCreateTime(e.CreateTime).
 				Save(ctx)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("devicePackages: create %s: %v", e.ID, err))
-				result.Failed++
+				result.AddWarning(fmt.Sprintf("devicePackages: create %s: %v", e.ID, err))
+				er.Failed++
 				continue
 			}
-			result.Created++
+			er.Created++
 		}
 	}
 
-	return result, warnings
+	result.AddResult(er)
 }
