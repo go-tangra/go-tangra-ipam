@@ -17,14 +17,12 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroupmember"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipaddress"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroup"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipgroupmember"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/location"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/subnet"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/vlan"
@@ -218,31 +216,9 @@ func (s *BackupService) ExportBackup(ctx context.Context, req *ipamV1.ExportBack
 		return nil, fmt.Errorf("set host group members: %w", err)
 	}
 
-	// Export IP scan jobs
-	scanQuery := client.IpScanJob.Query()
-	if !full {
-		scanQuery = scanQuery.Where(ipscanjob.TenantID(tenantID))
-	}
-	ipScanJobs, err := scanQuery.All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("export ip scan jobs: %w", err)
-	}
-	if err := backup.SetEntities(a, "ipScanJobs", ipScanJobs); err != nil {
-		return nil, fmt.Errorf("set ip scan jobs: %w", err)
-	}
-
-	// Export device packages
-	dpQuery := client.DevicePackage.Query()
-	if !full {
-		dpQuery = dpQuery.Where(devicepackage.TenantID(tenantID))
-	}
-	devicePackages, err := dpQuery.All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("export device packages: %w", err)
-	}
-	if err := backup.SetEntities(a, "devicePackages", devicePackages); err != nil {
-		return nil, fmt.Errorf("set device packages: %w", err)
-	}
+	// NOTE: ipScanJobs and devicePackages are excluded from backup.
+	// ipScanJobs are operational scan configs that can be recreated.
+	// devicePackages (77K+ rows) are discovered data from scans, not configuration.
 
 	// Pack (JSON + gzip)
 	data, err := backup.Pack(a)
@@ -314,8 +290,7 @@ func (s *BackupService) ImportBackup(ctx context.Context, req *ipamV1.ImportBack
 	s.importIpGroupMembers(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
 	s.importHostGroups(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
 	s.importHostGroupMembers(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
-	s.importIpScanJobs(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
-	s.importDevicePackages(ctx, client, a, tenantID, a.Manifest.FullBackup, mode, result)
+	// ipScanJobs and devicePackages excluded — operational data, not configuration
 
 	s.log.Infof("imported backup: module=%s tenant=%d mode=%v migrations=%d results=%d",
 		backupModule, tenantID, mode, applied, len(result.Results))
@@ -1231,168 +1206,5 @@ func (s *BackupService) importHostGroupMembers(ctx context.Context, client *ent.
 	result.AddResult(er)
 }
 
-func (s *BackupService) importIpScanJobs(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
-	ipScanJobs, err := backup.GetEntities[ent.IpScanJob](a, "ipScanJobs")
-	if err != nil {
-		result.AddWarning(fmt.Sprintf("ipScanJobs: unmarshal error: %v", err))
-		return
-	}
-	if len(ipScanJobs) == 0 {
-		return
-	}
-
-	er := backup.EntityResult{EntityType: "ipScanJobs", Total: int64(len(ipScanJobs))}
-
-	for _, e := range ipScanJobs {
-		tid := tenantID
-		if full && e.TenantID != nil {
-			tid = *e.TenantID
-		}
-
-		existing, getErr := client.IpScanJob.Get(ctx, e.ID)
-		if getErr != nil && !ent.IsNotFound(getErr) {
-			result.AddWarning(fmt.Sprintf("ipScanJobs: lookup %s: %v", e.ID, getErr))
-			er.Failed++
-			continue
-		}
-		if existing != nil {
-			if mode == backup.RestoreModeSkip {
-				er.Skipped++
-				continue
-			}
-			_, err := client.IpScanJob.UpdateOneID(e.ID).
-				SetSubnetID(e.SubnetID).
-				SetStatus(e.Status).
-				SetProgress(e.Progress).
-				SetStatusMessage(e.StatusMessage).
-				SetTotalAddresses(e.TotalAddresses).
-				SetScannedCount(e.ScannedCount).
-				SetAliveCount(e.AliveCount).
-				SetNewCount(e.NewCount).
-				SetUpdatedCount(e.UpdatedCount).
-				SetTriggeredBy(e.TriggeredBy).
-				SetRetryCount(e.RetryCount).
-				SetMaxRetries(e.MaxRetries).
-				SetNillableNextRetryAt(e.NextRetryAt).
-				SetTimeoutMs(e.TimeoutMs).
-				SetConcurrency(e.Concurrency).
-				SetSkipReverseDNS(e.SkipReverseDNS).
-				SetTCPProbePorts(e.TCPProbePorts).
-				SetNillableStartedAt(e.StartedAt).
-				SetNillableCompletedAt(e.CompletedAt).
-				SetNillableCreateBy(e.CreateBy).
-				Save(ctx)
-			if err != nil {
-				result.AddWarning(fmt.Sprintf("ipScanJobs: update %s: %v", e.ID, err))
-				er.Failed++
-				continue
-			}
-			er.Updated++
-		} else {
-			_, err := client.IpScanJob.Create().
-				SetID(e.ID).
-				SetNillableTenantID(&tid).
-				SetSubnetID(e.SubnetID).
-				SetStatus(e.Status).
-				SetProgress(e.Progress).
-				SetStatusMessage(e.StatusMessage).
-				SetTotalAddresses(e.TotalAddresses).
-				SetScannedCount(e.ScannedCount).
-				SetAliveCount(e.AliveCount).
-				SetNewCount(e.NewCount).
-				SetUpdatedCount(e.UpdatedCount).
-				SetTriggeredBy(e.TriggeredBy).
-				SetRetryCount(e.RetryCount).
-				SetMaxRetries(e.MaxRetries).
-				SetNillableNextRetryAt(e.NextRetryAt).
-				SetTimeoutMs(e.TimeoutMs).
-				SetConcurrency(e.Concurrency).
-				SetSkipReverseDNS(e.SkipReverseDNS).
-				SetTCPProbePorts(e.TCPProbePorts).
-				SetNillableStartedAt(e.StartedAt).
-				SetNillableCompletedAt(e.CompletedAt).
-				SetNillableCreateBy(e.CreateBy).
-				SetNillableCreateTime(e.CreateTime).
-				Save(ctx)
-			if err != nil {
-				result.AddWarning(fmt.Sprintf("ipScanJobs: create %s: %v", e.ID, err))
-				er.Failed++
-				continue
-			}
-			er.Created++
-		}
-	}
-
-	result.AddResult(er)
-}
-
-func (s *BackupService) importDevicePackages(ctx context.Context, client *ent.Client, a *backup.Archive, tenantID uint32, full bool, mode backup.RestoreMode, result *backup.RestoreResult) {
-	devicePackages, err := backup.GetEntities[ent.DevicePackage](a, "devicePackages")
-	if err != nil {
-		result.AddWarning(fmt.Sprintf("devicePackages: unmarshal error: %v", err))
-		return
-	}
-	if len(devicePackages) == 0 {
-		return
-	}
-
-	er := backup.EntityResult{EntityType: "devicePackages", Total: int64(len(devicePackages))}
-
-	for _, e := range devicePackages {
-		tid := tenantID
-		if full && e.TenantID != nil {
-			tid = *e.TenantID
-		}
-
-		existing, getErr := client.DevicePackage.Get(ctx, e.ID)
-		if getErr != nil && !ent.IsNotFound(getErr) {
-			result.AddWarning(fmt.Sprintf("devicePackages: lookup %s: %v", e.ID, getErr))
-			er.Failed++
-			continue
-		}
-		if existing != nil {
-			if mode == backup.RestoreModeSkip {
-				er.Skipped++
-				continue
-			}
-			_, err := client.DevicePackage.UpdateOneID(e.ID).
-				SetDeviceID(e.DeviceID).
-				SetName(e.Name).
-				SetCurrentVersion(e.CurrentVersion).
-				SetAvailableVersion(e.AvailableVersion).
-				SetNeedsUpdate(e.NeedsUpdate).
-				SetIsSecurityUpdate(e.IsSecurityUpdate).
-				SetPackageManager(e.PackageManager).
-				SetDescription(e.Description).
-				Save(ctx)
-			if err != nil {
-				result.AddWarning(fmt.Sprintf("devicePackages: update %s: %v", e.ID, err))
-				er.Failed++
-				continue
-			}
-			er.Updated++
-		} else {
-			_, err := client.DevicePackage.Create().
-				SetID(e.ID).
-				SetNillableTenantID(&tid).
-				SetDeviceID(e.DeviceID).
-				SetName(e.Name).
-				SetCurrentVersion(e.CurrentVersion).
-				SetAvailableVersion(e.AvailableVersion).
-				SetNeedsUpdate(e.NeedsUpdate).
-				SetIsSecurityUpdate(e.IsSecurityUpdate).
-				SetPackageManager(e.PackageManager).
-				SetDescription(e.Description).
-				SetNillableCreateTime(e.CreateTime).
-				Save(ctx)
-			if err != nil {
-				result.AddWarning(fmt.Sprintf("devicePackages: create %s: %v", e.ID, err))
-				er.Failed++
-				continue
-			}
-			er.Created++
-		}
-	}
-
-	result.AddResult(er)
-}
+// importIpScanJobs and importDevicePackages intentionally removed —
+// these contain operational/discovered data, not configuration.
