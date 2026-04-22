@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -75,10 +76,61 @@ type SNMPInterface struct {
 	Description string // ifAlias
 }
 
-// ScanDevice connects to a single IP via SNMP and queries system + interface information
+// ScanDevice connects to a single IP via SNMP and queries system + interface
+// information. For SNMPv3 with AES privacy, it transparently falls back to
+// DES on the first non-timeout failure — some legacy devices do not support
+// AES and silently reject (or fail to decrypt) the initial authenticated GET.
 func ScanDevice(ctx context.Context, logger *kratosLog.Helper, address string, config SNMPConfig) (*SNMPDeviceInfo, error) {
-	logger.Debugf("[SNMP] Connecting to %s via SNMPv%d (port %d, timeout %v, retries %d)",
-		address, config.Version, defaultSNMPPort, resolveTimeout(config), resolveRetries(config))
+	info, err := scanDeviceOnce(ctx, logger, address, config)
+	if err == nil || !shouldFallbackToDES(config, err) {
+		return info, err
+	}
+
+	fallback := config
+	fallback.PrivProtocol = "DES"
+	logger.Infof("[SNMP] AES failed for %s (%v); retrying with DES privacy for legacy-device compatibility", address, err)
+	return scanDeviceOnce(ctx, logger, address, fallback)
+}
+
+// shouldFallbackToDES reports whether the error from an SNMPv3 AES probe is
+// consistent with the remote agent not supporting AES (vs. the host being
+// dead). We only retry for SNMPv3 when AES was attempted and the failure is
+// not a network timeout or a cancelled context — those won't get better with
+// a different privacy protocol and would double the wait for dead hosts.
+func shouldFallbackToDES(config SNMPConfig, err error) bool {
+	if err == nil {
+		return false
+	}
+	if config.Version != 3 {
+		return false
+	}
+	if strings.ToUpper(config.PrivProtocol) != "AES" {
+		return false
+	}
+	if config.PrivPassword == "" {
+		// No privacy configured, nothing to fall back to.
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var nerr net.Error
+	if errors.As(err, &nerr) && nerr.Timeout() {
+		return false
+	}
+	// Plain gosnmp timeouts surface as errors that wrap a deadline exceeded
+	// but also as strings; check substring as a last resort.
+	if strings.Contains(strings.ToLower(err.Error()), "timeout") {
+		return false
+	}
+	return true
+}
+
+// scanDeviceOnce is the single-shot probe. ScanDevice wraps it with the
+// AES->DES fallback so tests and future callers can target just one attempt.
+func scanDeviceOnce(ctx context.Context, logger *kratosLog.Helper, address string, config SNMPConfig) (*SNMPDeviceInfo, error) {
+	logger.Debugf("[SNMP] Connecting to %s via SNMPv%d (port %d, timeout %v, retries %d, priv=%s)",
+		address, config.Version, defaultSNMPPort, resolveTimeout(config), resolveRetries(config), config.PrivProtocol)
 
 	snmpClient, err := newSNMPClient(address, config)
 	if err != nil {
