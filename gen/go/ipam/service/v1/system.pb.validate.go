@@ -414,6 +414,8 @@ func (m *GetStatsResponse) validate(all bool) error {
 
 	// no validation rules for OverallUtilization
 
+	// no validation rules for DevicesByType
+
 	if len(errors) > 0 {
 		return GetStatsResponseMultiError(errors)
 	}

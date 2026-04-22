@@ -169,6 +169,7 @@
     },
     "device": {
       "title": "Devices",
+      "totalCount": "Total: {count}",
       "create": "Create Device",
       "edit": "Edit Device",
       "view": "View Device",
