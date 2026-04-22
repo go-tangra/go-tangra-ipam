@@ -30,6 +30,11 @@ message GetStatsResponse {
   int64 total_devices = 6 [json_name = "totalDevices"];
   int64 total_locations = 7 [json_name = "totalLocations"];
   double overall_utilization = 8 [json_name = "overallUtilization"];
+
+  // Device counts grouped by DeviceType enum name (e.g. "DEVICE_TYPE_SERVER").
+  // Populated in a single GROUP BY query so callers can render summary badges
+  // without listing every device.
+  map<string, int64> devices_by_type = 9 [json_name = "devicesByType"];
 }
 
 // DnsConfig holds DNS server configuration for reverse DNS lookups

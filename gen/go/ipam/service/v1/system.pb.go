@@ -176,8 +176,12 @@ type GetStatsResponse struct {
 	TotalDevices       int64                  `protobuf:"varint,6,opt,name=total_devices,json=totalDevices,proto3" json:"total_devices,omitempty"`
 	TotalLocations     int64                  `protobuf:"varint,7,opt,name=total_locations,json=totalLocations,proto3" json:"total_locations,omitempty"`
 	OverallUtilization float64                `protobuf:"fixed64,8,opt,name=overall_utilization,json=overallUtilization,proto3" json:"overall_utilization,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Device counts grouped by DeviceType enum name (e.g. "DEVICE_TYPE_SERVER").
+	// Populated in a single GROUP BY query so callers can render summary badges
+	// without listing every device.
+	DevicesByType map[string]int64 `protobuf:"bytes,9,rep,name=devices_by_type,json=devicesByType,proto3" json:"devices_by_type,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetStatsResponse) Reset() {
@@ -264,6 +268,13 @@ func (x *GetStatsResponse) GetOverallUtilization() float64 {
 		return x.OverallUtilization
 	}
 	return 0
+}
+
+func (x *GetStatsResponse) GetDevicesByType() map[string]int64 {
+	if x != nil {
+		return x.DevicesByType
+	}
+	return nil
 }
 
 // DnsConfig holds DNS server configuration for reverse DNS lookups
@@ -733,7 +744,7 @@ const file_ipam_service_v1_system_proto_rawDesc = "" +
 	"\x0fGetStatsRequest\x12 \n" +
 	"\ttenant_id\x18\x01 \x01(\rH\x00R\btenantId\x88\x01\x01B\f\n" +
 	"\n" +
-	"_tenant_id\"\xd8\x02\n" +
+	"_tenant_id\"\xf8\x03\n" +
 	"\x10GetStatsResponse\x12#\n" +
 	"\rtotal_subnets\x18\x01 \x01(\x03R\ftotalSubnets\x12'\n" +
 	"\x0ftotal_addresses\x18\x02 \x01(\x03R\x0etotalAddresses\x12%\n" +
@@ -743,7 +754,11 @@ const file_ipam_service_v1_system_proto_rawDesc = "" +
 	"totalVlans\x12#\n" +
 	"\rtotal_devices\x18\x06 \x01(\x03R\ftotalDevices\x12'\n" +
 	"\x0ftotal_locations\x18\a \x01(\x03R\x0etotalLocations\x12/\n" +
-	"\x13overall_utilization\x18\b \x01(\x01R\x12overallUtilization\"\xee\x03\n" +
+	"\x13overall_utilization\x18\b \x01(\x01R\x12overallUtilization\x12\\\n" +
+	"\x0fdevices_by_type\x18\t \x03(\v24.ipam.service.v1.GetStatsResponse.DevicesByTypeEntryR\rdevicesByType\x1a@\n" +
+	"\x12DevicesByTypeEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\xee\x03\n" +
 	"\tDnsConfig\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
 	"\ttenant_id\x18\x02 \x01(\rH\x01R\btenantId\x88\x01\x01\x12\x1f\n" +
@@ -825,7 +840,7 @@ func file_ipam_service_v1_system_proto_rawDescGZIP() []byte {
 	return file_ipam_service_v1_system_proto_rawDescData
 }
 
-var file_ipam_service_v1_system_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_ipam_service_v1_system_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_ipam_service_v1_system_proto_goTypes = []any{
 	(*HealthCheckRequest)(nil),      // 0: ipam.service.v1.HealthCheckRequest
 	(*HealthCheckResponse)(nil),     // 1: ipam.service.v1.HealthCheckResponse
@@ -838,29 +853,31 @@ var file_ipam_service_v1_system_proto_goTypes = []any{
 	(*UpdateDnsConfigResponse)(nil), // 8: ipam.service.v1.UpdateDnsConfigResponse
 	(*TestDnsConfigRequest)(nil),    // 9: ipam.service.v1.TestDnsConfigRequest
 	(*TestDnsConfigResponse)(nil),   // 10: ipam.service.v1.TestDnsConfigResponse
-	(*timestamppb.Timestamp)(nil),   // 11: google.protobuf.Timestamp
+	nil,                             // 11: ipam.service.v1.GetStatsResponse.DevicesByTypeEntry
+	(*timestamppb.Timestamp)(nil),   // 12: google.protobuf.Timestamp
 }
 var file_ipam_service_v1_system_proto_depIdxs = []int32{
-	11, // 0: ipam.service.v1.HealthCheckResponse.timestamp:type_name -> google.protobuf.Timestamp
-	11, // 1: ipam.service.v1.DnsConfig.created_at:type_name -> google.protobuf.Timestamp
-	11, // 2: ipam.service.v1.DnsConfig.updated_at:type_name -> google.protobuf.Timestamp
-	4,  // 3: ipam.service.v1.GetDnsConfigResponse.config:type_name -> ipam.service.v1.DnsConfig
-	4,  // 4: ipam.service.v1.UpdateDnsConfigResponse.config:type_name -> ipam.service.v1.DnsConfig
-	0,  // 5: ipam.service.v1.SystemService.HealthCheck:input_type -> ipam.service.v1.HealthCheckRequest
-	2,  // 6: ipam.service.v1.SystemService.GetStats:input_type -> ipam.service.v1.GetStatsRequest
-	5,  // 7: ipam.service.v1.SystemService.GetDnsConfig:input_type -> ipam.service.v1.GetDnsConfigRequest
-	7,  // 8: ipam.service.v1.SystemService.UpdateDnsConfig:input_type -> ipam.service.v1.UpdateDnsConfigRequest
-	9,  // 9: ipam.service.v1.SystemService.TestDnsConfig:input_type -> ipam.service.v1.TestDnsConfigRequest
-	1,  // 10: ipam.service.v1.SystemService.HealthCheck:output_type -> ipam.service.v1.HealthCheckResponse
-	3,  // 11: ipam.service.v1.SystemService.GetStats:output_type -> ipam.service.v1.GetStatsResponse
-	6,  // 12: ipam.service.v1.SystemService.GetDnsConfig:output_type -> ipam.service.v1.GetDnsConfigResponse
-	8,  // 13: ipam.service.v1.SystemService.UpdateDnsConfig:output_type -> ipam.service.v1.UpdateDnsConfigResponse
-	10, // 14: ipam.service.v1.SystemService.TestDnsConfig:output_type -> ipam.service.v1.TestDnsConfigResponse
-	10, // [10:15] is the sub-list for method output_type
-	5,  // [5:10] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	12, // 0: ipam.service.v1.HealthCheckResponse.timestamp:type_name -> google.protobuf.Timestamp
+	11, // 1: ipam.service.v1.GetStatsResponse.devices_by_type:type_name -> ipam.service.v1.GetStatsResponse.DevicesByTypeEntry
+	12, // 2: ipam.service.v1.DnsConfig.created_at:type_name -> google.protobuf.Timestamp
+	12, // 3: ipam.service.v1.DnsConfig.updated_at:type_name -> google.protobuf.Timestamp
+	4,  // 4: ipam.service.v1.GetDnsConfigResponse.config:type_name -> ipam.service.v1.DnsConfig
+	4,  // 5: ipam.service.v1.UpdateDnsConfigResponse.config:type_name -> ipam.service.v1.DnsConfig
+	0,  // 6: ipam.service.v1.SystemService.HealthCheck:input_type -> ipam.service.v1.HealthCheckRequest
+	2,  // 7: ipam.service.v1.SystemService.GetStats:input_type -> ipam.service.v1.GetStatsRequest
+	5,  // 8: ipam.service.v1.SystemService.GetDnsConfig:input_type -> ipam.service.v1.GetDnsConfigRequest
+	7,  // 9: ipam.service.v1.SystemService.UpdateDnsConfig:input_type -> ipam.service.v1.UpdateDnsConfigRequest
+	9,  // 10: ipam.service.v1.SystemService.TestDnsConfig:input_type -> ipam.service.v1.TestDnsConfigRequest
+	1,  // 11: ipam.service.v1.SystemService.HealthCheck:output_type -> ipam.service.v1.HealthCheckResponse
+	3,  // 12: ipam.service.v1.SystemService.GetStats:output_type -> ipam.service.v1.GetStatsResponse
+	6,  // 13: ipam.service.v1.SystemService.GetDnsConfig:output_type -> ipam.service.v1.GetDnsConfigResponse
+	8,  // 14: ipam.service.v1.SystemService.UpdateDnsConfig:output_type -> ipam.service.v1.UpdateDnsConfigResponse
+	10, // 15: ipam.service.v1.SystemService.TestDnsConfig:output_type -> ipam.service.v1.TestDnsConfigResponse
+	11, // [11:16] is the sub-list for method output_type
+	6,  // [6:11] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_ipam_service_v1_system_proto_init() }
@@ -880,7 +897,7 @@ func file_ipam_service_v1_system_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipam_service_v1_system_proto_rawDesc), len(file_ipam_service_v1_system_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

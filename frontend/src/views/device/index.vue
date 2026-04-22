@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { VxeGridProps } from 'shell/adapter/vxe-table';
 
-import { h, computed } from 'vue';
+import { h, computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { Page, useVbenDrawer, type VbenFormProps } from 'shell/vben/common-ui';
@@ -17,11 +17,65 @@ import { useVbenVxeGrid } from 'shell/adapter/vxe-table';
 import { type ipamservicev1_Device } from '../../api/proto-types';
 import { $t } from 'shell/locales';
 import { useIpamDeviceStore } from '../../stores/ipam-device.state';
+import { SystemService } from '../../api/services';
 
 import DeviceDrawer from './device-drawer.vue';
 
 const router = useRouter();
 const deviceStore = useIpamDeviceStore();
+
+// Summary badges rendered above the filter row. The counts come from the
+// backend GetStats endpoint (single GROUP BY), so the page stays responsive
+// even at thousands of devices. Clicking a badge applies the matching type
+// filter on the grid form.
+const deviceTypeCounts = ref<Record<string, number>>({});
+const totalDeviceCount = ref<number>(0);
+
+// Which badge types to render, in display order. UNSPECIFIED / OTHER are
+// intentionally dropped — they're noise on a summary strip.
+const badgeOrder = [
+  { key: 'DEVICE_TYPE_VM', labelKey: 'ipam.enum.deviceType.virtualMachine', color: 'purple' },
+  { key: 'DEVICE_TYPE_SERVER', labelKey: 'ipam.enum.deviceType.server', color: 'blue' },
+  { key: 'DEVICE_TYPE_ROUTER', labelKey: 'ipam.enum.deviceType.router', color: 'green' },
+  { key: 'DEVICE_TYPE_SWITCH', labelKey: 'ipam.enum.deviceType.switch', color: 'green' },
+  { key: 'DEVICE_TYPE_FIREWALL', labelKey: 'ipam.enum.deviceType.firewall', color: 'orange' },
+  { key: 'DEVICE_TYPE_LOAD_BALANCER', labelKey: 'ipam.enum.deviceType.loadBalancer', color: 'geekblue' },
+  { key: 'DEVICE_TYPE_CONTAINER', labelKey: 'ipam.enum.deviceType.container', color: 'cyan' },
+] as const;
+
+const summaryBadges = computed(() =>
+  badgeOrder
+    .map((b) => ({
+      ...b,
+      count: deviceTypeCounts.value[b.key] ?? 0,
+    }))
+    .filter((b) => b.count > 0),
+);
+
+async function loadDeviceStats() {
+  try {
+    const resp = (await SystemService.getStats()) as {
+      totalDevices?: number;
+      devicesByType?: Record<string, number>;
+    };
+    deviceTypeCounts.value = resp.devicesByType ?? {};
+    totalDeviceCount.value = Number(resp.totalDevices ?? 0);
+  } catch {
+    // Summary is best-effort — swallow errors so a broken stats call doesn't
+    // block the grid from rendering.
+  }
+}
+
+function applyTypeFilter(deviceType: string) {
+  const current = (gridApi.formApi.getValues() ?? {}) as Record<string, unknown>;
+  const next = current.deviceType === deviceType ? undefined : deviceType;
+  gridApi.formApi.setValues({ ...current, deviceType: next });
+  gridApi.query();
+}
+
+onMounted(() => {
+  loadDeviceStats();
+});
 
 const deviceTypeOptions = computed(() => [
   { value: 'DEVICE_TYPE_SERVER', label: $t('ipam.enum.deviceType.server') },
@@ -274,6 +328,24 @@ async function handleDelete(row: ipamservicev1_Device) {
 
 <template>
   <Page auto-content-height>
+    <div
+      v-if="summaryBadges.length > 0"
+      class="ipam-device-summary"
+    >
+      <Tag class="ipam-device-summary__total">
+        {{ $t('ipam.page.device.totalCount', { count: totalDeviceCount }) }}
+      </Tag>
+      <Tag
+        v-for="badge in summaryBadges"
+        :key="badge.key"
+        :color="badge.color"
+        class="ipam-device-summary__badge"
+        @click="applyTypeFilter(badge.key)"
+      >
+        {{ $t(badge.labelKey) }}: <strong>{{ badge.count }}</strong>
+      </Tag>
+    </div>
+
     <Grid :table-title="$t('ipam.page.device.title')">
       <template #toolbar-tools>
         <Button class="mr-2" type="primary" @click="handleCreate">
@@ -353,3 +425,29 @@ async function handleDelete(row: ipamservicev1_Device) {
     <DeviceDrawerComponent />
   </Page>
 </template>
+
+<style scoped>
+.ipam-device-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  padding: 8px 12px;
+  background: var(--background-panel, #fff);
+  border-radius: 6px;
+}
+
+.ipam-device-summary__total {
+  font-weight: 600;
+}
+
+.ipam-device-summary__badge {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease;
+}
+
+.ipam-device-summary__badge:hover {
+  transform: translateY(-1px);
+}
+</style>

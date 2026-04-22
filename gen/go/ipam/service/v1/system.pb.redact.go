@@ -152,6 +152,8 @@ func (x *GetStatsResponse) Redact() string {
 	// Safe field: TotalLocations
 
 	// Safe field: OverallUtilization
+
+	// Safe field: DevicesByType
 	return x.String()
 }
 

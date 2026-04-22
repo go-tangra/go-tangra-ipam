@@ -91,6 +91,23 @@ func (s *SystemService) GetStats(ctx context.Context, req *ipamV1.GetStatsReques
 		response.TotalDevices = deviceCount
 	}
 
+	// Device counts grouped by type (single GROUP BY query)
+	deviceCountsByType, err := s.statsRepo.GetDeviceCountsByType(ctx)
+	if err != nil {
+		s.log.Errorf("Failed to get device counts by type: %v", err)
+	} else if len(deviceCountsByType) > 0 {
+		byType := make(map[string]int64, len(deviceCountsByType))
+		for typeNum, count := range deviceCountsByType {
+			// Map numeric enum to its proto name. Unknown values are dropped;
+			// UNSPECIFIED is kept so the caller can distinguish
+			// "uncategorised" devices from missing data.
+			if name, ok := ipamV1.DeviceType_name[typeNum]; ok {
+				byType[name] = count
+			}
+		}
+		response.DevicesByType = byType
+	}
+
 	// Get location count
 	locationCount, err := s.statsRepo.GetLocationCount(ctx)
 	if err != nil {
