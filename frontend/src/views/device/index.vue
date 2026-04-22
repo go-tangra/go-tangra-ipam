@@ -66,11 +66,15 @@ async function loadDeviceStats() {
   }
 }
 
-function applyTypeFilter(deviceType: string) {
-  const current = (gridApi.formApi.getValues() ?? {}) as Record<string, unknown>;
-  const next = current.deviceType === deviceType ? undefined : deviceType;
-  gridApi.formApi.setValues({ ...current, deviceType: next });
-  gridApi.query();
+async function applyTypeFilter(deviceType: string) {
+  // formApi.getValues() is async — awaiting it prevents reading `.deviceType`
+  // off an unresolved Promise, which silently broke the toggle behaviour.
+  const current = (await gridApi.formApi.getValues()) as
+    | Record<string, unknown>
+    | undefined;
+  const next = current?.deviceType === deviceType ? undefined : deviceType;
+  await gridApi.formApi.setFieldValue('deviceType', next);
+  await gridApi.query();
 }
 
 onMounted(() => {
@@ -433,7 +437,12 @@ async function handleDelete(row: ipamservicev1_Device) {
   gap: 8px;
   margin: 0 0 12px 0;
   padding: 8px 12px;
-  background: var(--background-panel, #fff);
+  /* Vben Admin exposes its palette as HSL triplets on :root — wrapping them
+     in hsl(...) lets the strip track both light and dark themes without a
+     hardcoded fallback bleeding through when the variable resolves. */
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
   border-radius: 6px;
 }
 
