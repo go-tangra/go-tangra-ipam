@@ -67,14 +67,17 @@ async function loadDeviceStats() {
 }
 
 async function applyTypeFilter(deviceType: string) {
-  // formApi.getValues() is async — awaiting it prevents reading `.deviceType`
-  // off an unresolved Promise, which silently broke the toggle behaviour.
+  // VxeGrid's ajax.query reads formApi.getLatestSubmissionValues() — which is
+  // only populated by a real form submit. setFieldValue alone updates the
+  // form's internal state but not the submission snapshot, so the query
+  // reloaded with the old filter. Submitting the form performs the whole
+  // dance: validate, snapshot, and trigger api.reload() with the new values.
   const current = (await gridApi.formApi.getValues()) as
     | Record<string, unknown>
     | undefined;
   const next = current?.deviceType === deviceType ? undefined : deviceType;
   await gridApi.formApi.setFieldValue('deviceType', next);
-  await gridApi.query();
+  await gridApi.formApi.submitForm();
 }
 
 onMounted(() => {
