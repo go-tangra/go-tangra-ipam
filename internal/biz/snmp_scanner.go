@@ -93,10 +93,16 @@ func ScanDevice(ctx context.Context, logger *kratosLog.Helper, address string, c
 }
 
 // shouldFallbackToDES reports whether the error from an SNMPv3 AES probe is
-// consistent with the remote agent not supporting AES (vs. the host being
-// dead). We only retry for SNMPv3 when AES was attempted and the failure is
-// not a network timeout or a cancelled context — those won't get better with
-// a different privacy protocol and would double the wait for dead hosts.
+// worth retrying with DES privacy. In practice, legacy devices that don't
+// understand AES silently drop the encrypted request — which surfaces on
+// the client as a gosnmp "request timeout", NOT as an auth-level error. So
+// timeouts must trigger the fallback.
+//
+// The only thing we never retry is a cancelled context — that's our own
+// deadline, not the remote device's behaviour, and a DES retry would just
+// hit the same cancellation. Callers rely on the alive-host sweep upstream
+// to prune unreachable hosts before we ever get here, so we don't worry
+// about the extra round-trip on dead hosts.
 func shouldFallbackToDES(config SNMPConfig, err error) bool {
 	if err == nil {
 		return false
@@ -112,15 +118,6 @@ func shouldFallbackToDES(config SNMPConfig, err error) bool {
 		return false
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return false
-	}
-	var nerr net.Error
-	if errors.As(err, &nerr) && nerr.Timeout() {
-		return false
-	}
-	// Plain gosnmp timeouts surface as errors that wrap a deadline exceeded
-	// but also as strings; check substring as a last resort.
-	if strings.Contains(strings.ToLower(err.Error()), "timeout") {
 		return false
 	}
 	return true
