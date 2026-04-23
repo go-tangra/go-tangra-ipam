@@ -183,6 +183,7 @@
       "primaryIp": "Primary IP",
       "primaryIpv6": "Primary IPv6",
       "managementIp": "Management IP",
+      "managementIpInvalid": "Enter a valid IPv4 or IPv6 address",
       "osType": "OS Type",
       "osVersion": "OS Version",
       "firmwareVersion": "Firmware Version",

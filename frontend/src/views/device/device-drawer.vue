@@ -78,6 +78,7 @@ const formState = ref<{
   model: string;
   rackPosition?: number;
   deviceHeightU?: number;
+  managementIp: string;
 }>({
   name: '',
   description: '',
@@ -89,6 +90,7 @@ const formState = ref<{
   model: '',
   rackPosition: undefined,
   deviceHeightU: 1,
+  managementIp: '',
 });
 
 // Physical device types that can only be placed in rack locations
@@ -281,6 +283,7 @@ async function handleSubmit() {
     const deviceHeightU = isRackLocation.value ? (formState.value.deviceHeightU ?? 1) : undefined;
     // When location is a rack, use the locationId as rackId
     const rackId = isRackLocation.value ? formState.value.locationId : undefined;
+    const managementIp = formState.value.managementIp.trim() || undefined;
 
     if (isCreateMode.value) {
       await deviceStore.createDevice(
@@ -297,13 +300,14 @@ async function handleSubmit() {
           serialNumber: formState.value.serialNumber || undefined,
           manufacturer: formState.value.manufacturer || undefined,
           model: formState.value.model || undefined,
+          managementIp,
         },
       );
       notification.success({
         message: $t('ipam.page.device.createSuccess'),
       });
     } else if (isEditMode.value && data.value?.row?.id) {
-      const updateMask = ['name', 'description', 'deviceType', 'status', 'locationId', 'serialNumber', 'manufacturer', 'model'];
+      const updateMask = ['name', 'description', 'deviceType', 'status', 'locationId', 'serialNumber', 'manufacturer', 'model', 'managementIp'];
       if (isRackLocation.value) {
         updateMask.push('rackId', 'rackPosition', 'deviceHeightU');
       }
@@ -321,6 +325,7 @@ async function handleSubmit() {
           serialNumber: formState.value.serialNumber || undefined,
           manufacturer: formState.value.manufacturer || undefined,
           model: formState.value.model || undefined,
+          managementIp,
         },
         updateMask,
       );
@@ -353,6 +358,7 @@ function resetForm() {
     model: '',
     rackPosition: undefined,
     deviceHeightU: 1,
+    managementIp: '',
   };
 }
 
@@ -385,6 +391,7 @@ const [Drawer, drawerApi] = useVbenDrawer({
           model: data.value.row.model ?? '',
           rackPosition: data.value.row.rackPosition ?? undefined,
           deviceHeightU: data.value.row.deviceHeightU ?? 1,
+          managementIp: data.value.row.managementIp ?? '',
         };
 
         // Load rack devices for validation if editing a device in a rack
@@ -793,6 +800,25 @@ const interfaceColumns = [
             </div>
           </FormItem>
         </template>
+
+        <FormItem
+          :label="$t('ipam.page.device.managementIp')"
+          name="managementIp"
+          :rules="[
+            {
+              pattern: /^(?:(?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]+)?$/,
+              message: $t('ipam.page.device.managementIpInvalid'),
+              trigger: 'blur',
+            },
+          ]"
+        >
+          <Input
+            v-model:value="formState.managementIp"
+            placeholder="192.0.2.10"
+            :maxlength="45"
+            allow-clear
+          />
+        </FormItem>
 
         <FormItem :label="$t('ipam.page.device.manufacturer')" name="manufacturer">
           <Input

@@ -3,18 +3,9 @@ package biz
 import (
 	"context"
 	"errors"
-	"net"
 	"testing"
 	"time"
 )
-
-// fakeTimeout satisfies net.Error with Timeout() == true so we can exercise
-// the timeout branch of shouldFallbackToDES without opening a real socket.
-type fakeTimeout struct{}
-
-func (fakeTimeout) Error() string   { return "i/o timeout" }
-func (fakeTimeout) Timeout() bool   { return true }
-func (fakeTimeout) Temporary() bool { return true }
 
 func TestShouldFallbackToDES(t *testing.T) {
 	baseV3 := SNMPConfig{
@@ -38,10 +29,13 @@ func TestShouldFallbackToDES(t *testing.T) {
 		{"v3 without priv password", func() SNMPConfig { c := baseV3; c.PrivPassword = ""; return c }(), errors.New("boom"), false},
 		{"context cancelled", baseV3, context.Canceled, false},
 		{"context deadline", baseV3, context.DeadlineExceeded, false},
-		{"net timeout wrapped", baseV3, &net.OpError{Op: "read", Err: fakeTimeout{}}, false},
-		{"timeout substring", baseV3, errors.New("request timeout after 3 retries"), false},
+		// Legacy devices that don't support AES silently drop the request,
+		// which the client sees as a gosnmp "request timeout". These MUST
+		// trigger the DES fallback.
+		{"request timeout", baseV3, errors.New("request timeout (after 1 retries)"), true},
 		{"generic auth failure", baseV3, errors.New("wrong digest"), true},
 		{"decryption error", baseV3, errors.New("decryption error"), true},
+		{"not in time window", baseV3, errors.New("not in time window"), true},
 	}
 
 	for _, tc := range tests {
