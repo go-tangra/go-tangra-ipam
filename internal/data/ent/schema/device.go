@@ -80,7 +80,7 @@ func (Device) Fields() []ent.Field {
 
 		field.Int32("status").
 			Default(1).
-			Comment("Device status: 1=Active, 2=Planned, 3=Staged, 4=Decommissioned, 5=Offline, 6=Failed"),
+			Comment("Device status: 1=Active, 2=Planned, 3=Staged, 4=Decommissioned, 5=Offline, 6=Failed, 7=Available"),
 
 		field.String("primary_ip").
 			Optional().

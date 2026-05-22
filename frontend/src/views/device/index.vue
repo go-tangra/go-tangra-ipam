@@ -97,6 +97,7 @@ const deviceTypeOptions = computed(() => [
 
 const statusOptions = computed(() => [
   { value: 'DEVICE_STATUS_ACTIVE', label: $t('ipam.enum.deviceStatus.active') },
+  { value: 'DEVICE_STATUS_AVAILABLE', label: $t('ipam.enum.deviceStatus.available') },
   { value: 'DEVICE_STATUS_INACTIVE', label: $t('ipam.enum.deviceStatus.inactive') },
   { value: 'DEVICE_STATUS_MAINTENANCE', label: $t('ipam.enum.deviceStatus.maintenance') },
   { value: 'DEVICE_STATUS_DECOMMISSIONED', label: $t('ipam.enum.deviceStatus.decommissioned') },
@@ -135,6 +136,8 @@ function statusToColor(status: string | undefined) {
   switch (status) {
     case 'DEVICE_STATUS_ACTIVE':
       return '#52C41A';
+    case 'DEVICE_STATUS_AVAILABLE':
+      return '#1890FF';
     case 'DEVICE_STATUS_INACTIVE':
       return '#8C8C8C';
     case 'DEVICE_STATUS_MAINTENANCE':

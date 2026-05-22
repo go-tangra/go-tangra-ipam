@@ -119,6 +119,9 @@ const (
 	DeviceStatus_DEVICE_STATUS_DECOMMISSIONED DeviceStatus = 4
 	DeviceStatus_DEVICE_STATUS_OFFLINE        DeviceStatus = 5
 	DeviceStatus_DEVICE_STATUS_FAILED         DeviceStatus = 6
+	// AVAILABLE — on the shelf / in standby. Not in production but
+	// configured and ready to be deployed when needed.
+	DeviceStatus_DEVICE_STATUS_AVAILABLE DeviceStatus = 7
 )
 
 // Enum value maps for DeviceStatus.
@@ -131,6 +134,7 @@ var (
 		4: "DEVICE_STATUS_DECOMMISSIONED",
 		5: "DEVICE_STATUS_OFFLINE",
 		6: "DEVICE_STATUS_FAILED",
+		7: "DEVICE_STATUS_AVAILABLE",
 	}
 	DeviceStatus_value = map[string]int32{
 		"DEVICE_STATUS_UNSPECIFIED":    0,
@@ -140,6 +144,7 @@ var (
 		"DEVICE_STATUS_DECOMMISSIONED": 4,
 		"DEVICE_STATUS_OFFLINE":        5,
 		"DEVICE_STATUS_FAILED":         6,
+		"DEVICE_STATUS_AVAILABLE":      7,
 	}
 )
 
@@ -1958,7 +1963,7 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\x12\x1b\n" +
 	"\x17DEVICE_TYPE_WORKSTATION\x10\v\x12\x19\n" +
 	"\x15DEVICE_TYPE_CONTAINER\x10\f\x12\x15\n" +
-	"\x11DEVICE_TYPE_OTHER\x10c*\xd3\x01\n" +
+	"\x11DEVICE_TYPE_OTHER\x10c*\xf0\x01\n" +
 	"\fDeviceStatus\x12\x1d\n" +
 	"\x19DEVICE_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14DEVICE_STATUS_ACTIVE\x10\x01\x12\x19\n" +
@@ -1966,7 +1971,8 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\x14DEVICE_STATUS_STAGED\x10\x03\x12 \n" +
 	"\x1cDEVICE_STATUS_DECOMMISSIONED\x10\x04\x12\x19\n" +
 	"\x15DEVICE_STATUS_OFFLINE\x10\x05\x12\x18\n" +
-	"\x14DEVICE_STATUS_FAILED\x10\x062\xb0\t\n" +
+	"\x14DEVICE_STATUS_FAILED\x10\x06\x12\x1b\n" +
+	"\x17DEVICE_STATUS_AVAILABLE\x10\a2\xb0\t\n" +
 	"\rDeviceService\x12s\n" +
 	"\fCreateDevice\x12$.ipam.service.v1.CreateDeviceRequest\x1a%.ipam.service.v1.CreateDeviceResponse\"\x16\x82\xd3\xe4\x93\x02\x10:\x01*\"\v/v1/devices\x12l\n" +
 	"\tGetDevice\x12!.ipam.service.v1.GetDeviceRequest\x1a\".ipam.service.v1.GetDeviceResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/devices/{id}\x12m\n" +

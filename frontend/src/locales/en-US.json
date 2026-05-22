@@ -356,7 +356,8 @@
       "active": "Active",
       "inactive": "Inactive",
       "maintenance": "Maintenance",
-      "decommissioned": "Decommissioned"
+      "decommissioned": "Decommissioned",
+      "available": "Available"
     },
     "locationType": {
       "dataCenter": "Datacenter",

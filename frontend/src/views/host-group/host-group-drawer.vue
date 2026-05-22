@@ -135,6 +135,8 @@ function deviceStatusToColor(status: number | undefined) {
       return '#FA8C16'; // Offline
     case 6:
       return '#F5222D'; // Failed
+    case 7:
+      return '#13C2C2'; // Available
     default:
       return '#C9CDD4';
   }
@@ -154,6 +156,8 @@ function deviceStatusToName(status: number | undefined) {
       return 'Offline';
     case 6:
       return 'Failed';
+    case 7:
+      return $t('ipam.enum.deviceStatus.available');
     default:
       return 'Unknown';
   }

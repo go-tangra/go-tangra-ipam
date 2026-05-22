@@ -135,6 +135,9 @@ enum DeviceStatus {
   DEVICE_STATUS_DECOMMISSIONED = 4;
   DEVICE_STATUS_OFFLINE = 5;
   DEVICE_STATUS_FAILED = 6;
+  // AVAILABLE — on the shelf / in standby. Not in production but
+  // configured and ready to be deployed when needed.
+  DEVICE_STATUS_AVAILABLE = 7;
 }
 
 // DeviceInterface represents a network interface on a device

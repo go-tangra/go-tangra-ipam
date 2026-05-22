@@ -17,6 +17,10 @@ paths:
                   schema:
                     type: integer
                     format: uint32
+                - name: includeSecrets
+                  in: query
+                  schema:
+                    type: boolean
             responses:
                 "200":
                     description: OK
@@ -115,6 +119,7 @@ paths:
                         - DEVICE_STATUS_DECOMMISSIONED
                         - DEVICE_STATUS_OFFLINE
                         - DEVICE_STATUS_FAILED
+                        - DEVICE_STATUS_AVAILABLE
                     type: string
                     format: enum
                 - name: locationId
@@ -2271,6 +2276,7 @@ components:
                         - DEVICE_STATUS_DECOMMISSIONED
                         - DEVICE_STATUS_OFFLINE
                         - DEVICE_STATUS_FAILED
+                        - DEVICE_STATUS_AVAILABLE
                     type: string
                     format: enum
                 primaryIp:
@@ -2685,6 +2691,7 @@ components:
                         - DEVICE_STATUS_DECOMMISSIONED
                         - DEVICE_STATUS_OFFLINE
                         - DEVICE_STATUS_FAILED
+                        - DEVICE_STATUS_AVAILABLE
                     type: string
                     description: Device status
                     format: enum
@@ -2881,6 +2888,10 @@ components:
                     type: object
                     additionalProperties:
                         type: string
+                schemaVersion:
+                    type: integer
+                    description: Schema version for migration support
+                    format: int32
         FindAddressResponse:
             type: object
             properties:
@@ -2985,6 +2996,14 @@ components:
                 overallUtilization:
                     type: number
                     format: double
+                devicesByType:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: |-
+                        Device counts grouped by DeviceType enum name (e.g. "DEVICE_TYPE_SERVER").
+                         Populated in a single GROUP BY query so callers can render summary badges
+                         without listing every device.
         GetSubnetResponse:
             type: object
             properties:
@@ -3148,6 +3167,16 @@ components:
                     type: array
                     items:
                         type: string
+                sourceVersion:
+                    type: integer
+                    description: Schema migration info
+                    format: int32
+                targetVersion:
+                    type: integer
+                    format: int32
+                migrationsApplied:
+                    type: integer
+                    format: int32
         IpAddress:
             type: object
             properties:
