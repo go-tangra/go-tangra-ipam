@@ -332,12 +332,22 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 				e.log.Warnf("Failed to update IP %s: %v", result.Address, err)
 			} else {
 				updatedCount++
-				// DNS sync: hostname changed on a known host → move the record.
-				if job.EnableDNSUpdate && e.publisher != nil && result.Hostname != "" && existing.Hostname != result.Hostname {
-					e.publisher.PublishIPAddressUpdated(e.ctx, &event.IPAddressEvent{
-						IPAddressID: existing.ID, TenantID: jobTenantID, Address: result.Address,
-						Hostname: result.Hostname, OldHostname: existing.Hostname, SubnetID: job.SubnetID,
-					})
+				// DNS sync: ensure records exist for every discovered host that
+				// has a hostname — not only newly-created ones. If the hostname
+				// changed, move the record (drop the previous name); otherwise
+				// idempotently upsert the current name's A + PTR.
+				if job.EnableDNSUpdate && e.publisher != nil && result.Hostname != "" {
+					if existing.Hostname != "" && existing.Hostname != result.Hostname {
+						e.publisher.PublishIPAddressUpdated(e.ctx, &event.IPAddressEvent{
+							IPAddressID: existing.ID, TenantID: jobTenantID, Address: result.Address,
+							Hostname: result.Hostname, OldHostname: existing.Hostname, SubnetID: job.SubnetID,
+						})
+					} else {
+						e.publisher.PublishIPAddressScanned(e.ctx, &event.IPAddressEvent{
+							IPAddressID: existing.ID, TenantID: jobTenantID, Address: result.Address,
+							Hostname: result.Hostname, SubnetID: job.SubnetID,
+						})
+					}
 				}
 			}
 		} else {
