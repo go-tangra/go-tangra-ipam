@@ -14453,6 +14453,7 @@ type IpScanJobMutation struct {
 	skip_reverse_dns         *bool
 	tcp_probe_ports          *string
 	enable_snmp              *bool
+	enable_dns_update        *bool
 	snmp_discovered_count    *int64
 	addsnmp_discovered_count *int64
 	started_at               *time.Time
@@ -15800,6 +15801,42 @@ func (m *IpScanJobMutation) ResetEnableSnmp() {
 	m.enable_snmp = nil
 }
 
+// SetEnableDNSUpdate sets the "enable_dns_update" field.
+func (m *IpScanJobMutation) SetEnableDNSUpdate(b bool) {
+	m.enable_dns_update = &b
+}
+
+// EnableDNSUpdate returns the value of the "enable_dns_update" field in the mutation.
+func (m *IpScanJobMutation) EnableDNSUpdate() (r bool, exists bool) {
+	v := m.enable_dns_update
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnableDNSUpdate returns the old "enable_dns_update" field's value of the IpScanJob entity.
+// If the IpScanJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *IpScanJobMutation) OldEnableDNSUpdate(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnableDNSUpdate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnableDNSUpdate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnableDNSUpdate: %w", err)
+	}
+	return oldValue.EnableDNSUpdate, nil
+}
+
+// ResetEnableDNSUpdate resets all changes to the "enable_dns_update" field.
+func (m *IpScanJobMutation) ResetEnableDNSUpdate() {
+	m.enable_dns_update = nil
+}
+
 // SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
 func (m *IpScanJobMutation) SetSnmpDiscoveredCount(i int64) {
 	m.snmp_discovered_count = &i
@@ -16015,7 +16052,7 @@ func (m *IpScanJobMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *IpScanJobMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 28)
 	if m.create_by != nil {
 		fields = append(fields, ipscanjob.FieldCreateBy)
 	}
@@ -16088,6 +16125,9 @@ func (m *IpScanJobMutation) Fields() []string {
 	if m.enable_snmp != nil {
 		fields = append(fields, ipscanjob.FieldEnableSnmp)
 	}
+	if m.enable_dns_update != nil {
+		fields = append(fields, ipscanjob.FieldEnableDNSUpdate)
+	}
 	if m.snmp_discovered_count != nil {
 		fields = append(fields, ipscanjob.FieldSnmpDiscoveredCount)
 	}
@@ -16153,6 +16193,8 @@ func (m *IpScanJobMutation) Field(name string) (ent.Value, bool) {
 		return m.TCPProbePorts()
 	case ipscanjob.FieldEnableSnmp:
 		return m.EnableSnmp()
+	case ipscanjob.FieldEnableDNSUpdate:
+		return m.EnableDNSUpdate()
 	case ipscanjob.FieldSnmpDiscoveredCount:
 		return m.SnmpDiscoveredCount()
 	case ipscanjob.FieldStartedAt:
@@ -16216,6 +16258,8 @@ func (m *IpScanJobMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldTCPProbePorts(ctx)
 	case ipscanjob.FieldEnableSnmp:
 		return m.OldEnableSnmp(ctx)
+	case ipscanjob.FieldEnableDNSUpdate:
+		return m.OldEnableDNSUpdate(ctx)
 	case ipscanjob.FieldSnmpDiscoveredCount:
 		return m.OldSnmpDiscoveredCount(ctx)
 	case ipscanjob.FieldStartedAt:
@@ -16398,6 +16442,13 @@ func (m *IpScanJobMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetEnableSnmp(v)
+		return nil
+	case ipscanjob.FieldEnableDNSUpdate:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnableDNSUpdate(v)
 		return nil
 	case ipscanjob.FieldSnmpDiscoveredCount:
 		v, ok := value.(int64)
@@ -16774,6 +16825,9 @@ func (m *IpScanJobMutation) ResetField(name string) error {
 		return nil
 	case ipscanjob.FieldEnableSnmp:
 		m.ResetEnableSnmp()
+		return nil
+	case ipscanjob.FieldEnableDNSUpdate:
+		m.ResetEnableDNSUpdate()
 		return nil
 	case ipscanjob.FieldSnmpDiscoveredCount:
 		m.ResetSnmpDiscoveredCount()

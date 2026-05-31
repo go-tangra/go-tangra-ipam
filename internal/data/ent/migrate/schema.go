@@ -102,7 +102,7 @@ var (
 		{Name: "rack_id", Type: field.TypeString, Nullable: true, Comment: "Rack ID"},
 		{Name: "rack_position", Type: field.TypeInt32, Nullable: true, Comment: "Rack position (U)"},
 		{Name: "device_height_u", Type: field.TypeInt32, Nullable: true, Comment: "Device height in rack units", Default: 1},
-		{Name: "status", Type: field.TypeInt32, Comment: "Device status: 1=Active, 2=Planned, 3=Staged, 4=Decommissioned, 5=Offline, 6=Failed", Default: 1},
+		{Name: "status", Type: field.TypeInt32, Comment: "Device status: 1=Active, 2=Planned, 3=Staged, 4=Decommissioned, 5=Offline, 6=Failed, 7=Available", Default: 1},
 		{Name: "primary_ip", Type: field.TypeString, Nullable: true, Comment: "Primary IP address"},
 		{Name: "primary_ipv6", Type: field.TypeString, Nullable: true, Comment: "Primary IPv6 address"},
 		{Name: "management_ip", Type: field.TypeString, Nullable: true, Comment: "Management IP (if different)"},
@@ -559,6 +559,7 @@ var (
 		{Name: "skip_reverse_dns", Type: field.TypeBool, Comment: "Skip reverse DNS lookup", Default: false},
 		{Name: "tcp_probe_ports", Type: field.TypeString, Comment: "Comma-separated list of TCP ports to probe", Default: "22,80,443,3389,445"},
 		{Name: "enable_snmp", Type: field.TypeBool, Comment: "Enable SNMP device discovery", Default: false},
+		{Name: "enable_dns_update", Type: field.TypeBool, Comment: "Fire DNS-sync events for discovered hosts (handled by go-tangra-dns)", Default: false},
 		{Name: "snmp_discovered_count", Type: field.TypeInt64, Comment: "Number of SNMP devices discovered", Default: 0},
 		{Name: "started_at", Type: field.TypeTime, Nullable: true, Comment: "When the scan started"},
 		{Name: "completed_at", Type: field.TypeTime, Nullable: true, Comment: "When the scan completed"},
@@ -572,7 +573,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "ipam_ip_scan_jobs_ipam_subnets_scan_jobs",
-				Columns:    []*schema.Column{IpamIPScanJobsColumns[27]},
+				Columns:    []*schema.Column{IpamIPScanJobsColumns[28]},
 				RefColumns: []*schema.Column{IpamSubnetsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -581,7 +582,7 @@ var (
 			{
 				Name:    "ipscanjob_tenant_id_subnet_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamIPScanJobsColumns[6], IpamIPScanJobsColumns[27]},
+				Columns: []*schema.Column{IpamIPScanJobsColumns[6], IpamIPScanJobsColumns[28]},
 			},
 			{
 				Name:    "ipscanjob_tenant_id_status",
@@ -596,7 +597,7 @@ var (
 			{
 				Name:    "ipscanjob_subnet_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamIPScanJobsColumns[27]},
+				Columns: []*schema.Column{IpamIPScanJobsColumns[28]},
 			},
 			{
 				Name:    "ipscanjob_status",

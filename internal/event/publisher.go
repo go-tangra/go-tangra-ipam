@@ -70,3 +70,13 @@ func (p *Publisher) PublishIPAddressCreated(ctx context.Context, e *IPAddressEve
 func (p *Publisher) PublishIPAddressDeleted(ctx context.Context, e *IPAddressEvent) {
 	p.Publish(ctx, TopicIPAddressDeleted, e.TenantID, e)
 }
+
+// PublishIPAddressUpdated publishes an ip_address.updated event (hostname change).
+func (p *Publisher) PublishIPAddressUpdated(ctx context.Context, e *IPAddressEvent) {
+	p.Publish(ctx, TopicIPAddressUpdated, e.TenantID, e)
+}
+
+// PublishIPAddressScanned publishes an ip_address.scanned event (scan DNS sync).
+func (p *Publisher) PublishIPAddressScanned(ctx context.Context, e *IPAddressEvent) {
+	p.Publish(ctx, TopicIPAddressScanned, e.TenantID, e)
+}

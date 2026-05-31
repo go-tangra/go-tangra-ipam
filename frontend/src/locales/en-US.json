@@ -102,6 +102,8 @@
       "snmpPrivProtocol": "Privacy Protocol",
       "enableSnmp": "Enable SNMP Discovery",
       "enableSnmpHint": "Query SNMP-enabled devices to auto-discover device info and interfaces",
+      "enableDnsUpdate": "Update DNS",
+      "enableDnsUpdateHint": "Create/update DNS A + PTR records for discovered hosts with a hostname (handled by the DNS module)",
       "snmpDiscoveredCount": "SNMP Devices"
     },
     "ipAddress": {

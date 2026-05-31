@@ -507,8 +507,12 @@ func init() {
 	ipscanjobDescEnableSnmp := ipscanjobFields[18].Descriptor()
 	// ipscanjob.DefaultEnableSnmp holds the default value on creation for the enable_snmp field.
 	ipscanjob.DefaultEnableSnmp = ipscanjobDescEnableSnmp.Default.(bool)
+	// ipscanjobDescEnableDNSUpdate is the schema descriptor for enable_dns_update field.
+	ipscanjobDescEnableDNSUpdate := ipscanjobFields[19].Descriptor()
+	// ipscanjob.DefaultEnableDNSUpdate holds the default value on creation for the enable_dns_update field.
+	ipscanjob.DefaultEnableDNSUpdate = ipscanjobDescEnableDNSUpdate.Default.(bool)
 	// ipscanjobDescSnmpDiscoveredCount is the schema descriptor for snmp_discovered_count field.
-	ipscanjobDescSnmpDiscoveredCount := ipscanjobFields[19].Descriptor()
+	ipscanjobDescSnmpDiscoveredCount := ipscanjobFields[20].Descriptor()
 	// ipscanjob.DefaultSnmpDiscoveredCount holds the default value on creation for the snmp_discovered_count field.
 	ipscanjob.DefaultSnmpDiscoveredCount = ipscanjobDescSnmpDiscoveredCount.Default.(int64)
 	// ipscanjobDescID is the schema descriptor for id field.
@@ -674,6 +678,6 @@ func init() {
 }
 
 const (
-	Version = "v0.14.5"                                         // Version of ent codegen.
-	Sum     = "h1:Rj2WOYJtCkWyFo6a+5wB3EfBRP0rnx1fMk6gGA0UUe4=" // Sum of ent codegen.
+	Version = "v0.14.6"                                         // Version of ent codegen.
+	Sum     = "h1:/f2696BpwuWAEEG6PVGWflg6+Inrpq4pRWuNlWz/Skk=" // Sum of ent codegen.
 )

@@ -108,6 +108,10 @@ func (IpScanJob) Fields() []ent.Field {
 			Default(false).
 			Comment("Enable SNMP device discovery"),
 
+		field.Bool("enable_dns_update").
+			Default(false).
+			Comment("Fire DNS-sync events for discovered hosts (handled by go-tangra-dns)"),
+
 		field.Int64("snmp_discovered_count").
 			Default(0).
 			Comment("Number of SNMP devices discovered"),

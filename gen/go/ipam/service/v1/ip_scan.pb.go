@@ -177,6 +177,8 @@ type IpScanJob struct {
 	EnableSnmp *bool `protobuf:"varint,24,opt,name=enable_snmp,json=enableSnmp,proto3,oneof" json:"enable_snmp,omitempty"`
 	// Number of SNMP devices discovered
 	SnmpDiscoveredCount *int64 `protobuf:"varint,25,opt,name=snmp_discovered_count,json=snmpDiscoveredCount,proto3,oneof" json:"snmp_discovered_count,omitempty"`
+	// Whether DNS-sync events were fired for discovered hosts
+	EnableDnsUpdate *bool `protobuf:"varint,26,opt,name=enable_dns_update,json=enableDnsUpdate,proto3,oneof" json:"enable_dns_update,omitempty"`
 	// When the scan started
 	StartedAt *timestamppb.Timestamp `protobuf:"bytes,30,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
 	// When the scan completed
@@ -361,6 +363,13 @@ func (x *IpScanJob) GetSnmpDiscoveredCount() int64 {
 	return 0
 }
 
+func (x *IpScanJob) GetEnableDnsUpdate() bool {
+	if x != nil && x.EnableDnsUpdate != nil {
+		return *x.EnableDnsUpdate
+	}
+	return false
+}
+
 func (x *IpScanJob) GetStartedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.StartedAt
@@ -404,9 +413,12 @@ type StartScanRequest struct {
 	// Scan configuration
 	ScanConfig *ScanConfig `protobuf:"bytes,3,opt,name=scan_config,json=scanConfig,proto3,oneof" json:"scan_config,omitempty"`
 	// Enable SNMP device discovery during scan
-	EnableSnmp    *bool `protobuf:"varint,4,opt,name=enable_snmp,json=enableSnmp,proto3,oneof" json:"enable_snmp,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	EnableSnmp *bool `protobuf:"varint,4,opt,name=enable_snmp,json=enableSnmp,proto3,oneof" json:"enable_snmp,omitempty"`
+	// Fire DNS-sync events for discovered hosts (handled by go-tangra-dns,
+	// which creates/updates A + PTR records). Optional, like enable_snmp.
+	EnableDnsUpdate *bool `protobuf:"varint,5,opt,name=enable_dns_update,json=enableDnsUpdate,proto3,oneof" json:"enable_dns_update,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *StartScanRequest) Reset() {
@@ -463,6 +475,13 @@ func (x *StartScanRequest) GetScanConfig() *ScanConfig {
 func (x *StartScanRequest) GetEnableSnmp() bool {
 	if x != nil && x.EnableSnmp != nil {
 		return *x.EnableSnmp
+	}
+	return false
+}
+
+func (x *StartScanRequest) GetEnableDnsUpdate() bool {
+	if x != nil && x.EnableDnsUpdate != nil {
+		return *x.EnableDnsUpdate
 	}
 	return false
 }
@@ -824,7 +843,7 @@ var File_ipam_service_v1_ip_scan_proto protoreflect.FileDescriptor
 
 const file_ipam_service_v1_ip_scan_proto_rawDesc = "" +
 	"\n" +
-	"\x1dipam/service/v1/ip_scan.proto\x12\x0fipam.service.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cipam/service/v1/subnet.proto\"\x93\f\n" +
+	"\x1dipam/service/v1/ip_scan.proto\x12\x0fipam.service.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cipam/service/v1/subnet.proto\"\xda\f\n" +
 	"\tIpScanJob\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
 	"\ttenant_id\x18\x02 \x01(\rH\x01R\btenantId\x88\x01\x01\x12 \n" +
@@ -852,16 +871,17 @@ const file_ipam_service_v1_ip_scan_proto_rawDesc = "" +
 	"\x0ftcp_probe_ports\x18\x17 \x01(\tH\x11R\rtcpProbePorts\x88\x01\x01\x12$\n" +
 	"\venable_snmp\x18\x18 \x01(\bH\x12R\n" +
 	"enableSnmp\x88\x01\x01\x127\n" +
-	"\x15snmp_discovered_count\x18\x19 \x01(\x03H\x13R\x13snmpDiscoveredCount\x88\x01\x01\x12>\n" +
+	"\x15snmp_discovered_count\x18\x19 \x01(\x03H\x13R\x13snmpDiscoveredCount\x88\x01\x01\x12/\n" +
+	"\x11enable_dns_update\x18\x1a \x01(\bH\x14R\x0fenableDnsUpdate\x88\x01\x01\x12>\n" +
 	"\n" +
-	"started_at\x18\x1e \x01(\v2\x1a.google.protobuf.TimestampH\x14R\tstartedAt\x88\x01\x01\x12B\n" +
-	"\fcompleted_at\x18\x1f \x01(\v2\x1a.google.protobuf.TimestampH\x15R\vcompletedAt\x88\x01\x01\x12>\n" +
+	"started_at\x18\x1e \x01(\v2\x1a.google.protobuf.TimestampH\x15R\tstartedAt\x88\x01\x01\x12B\n" +
+	"\fcompleted_at\x18\x1f \x01(\v2\x1a.google.protobuf.TimestampH\x16R\vcompletedAt\x88\x01\x01\x12>\n" +
 	"\n" +
-	"created_at\x18  \x01(\v2\x1a.google.protobuf.TimestampH\x16R\tcreatedAt\x88\x01\x01\x12>\n" +
+	"created_at\x18  \x01(\v2\x1a.google.protobuf.TimestampH\x17R\tcreatedAt\x88\x01\x01\x12>\n" +
 	"\n" +
-	"updated_at\x18! \x01(\v2\x1a.google.protobuf.TimestampH\x17R\tupdatedAt\x88\x01\x01\x12\"\n" +
+	"updated_at\x18! \x01(\v2\x1a.google.protobuf.TimestampH\x18R\tupdatedAt\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"created_by\x18\" \x01(\rH\x18R\tcreatedBy\x88\x01\x01B\x05\n" +
+	"created_by\x18\" \x01(\rH\x19R\tcreatedBy\x88\x01\x01B\x05\n" +
 	"\x03_idB\f\n" +
 	"\n" +
 	"_tenant_idB\f\n" +
@@ -884,12 +904,13 @@ const file_ipam_service_v1_ip_scan_proto_rawDesc = "" +
 	"\x11_skip_reverse_dnsB\x12\n" +
 	"\x10_tcp_probe_portsB\x0e\n" +
 	"\f_enable_snmpB\x18\n" +
-	"\x16_snmp_discovered_countB\r\n" +
+	"\x16_snmp_discovered_countB\x14\n" +
+	"\x12_enable_dns_updateB\r\n" +
 	"\v_started_atB\x0f\n" +
 	"\r_completed_atB\r\n" +
 	"\v_created_atB\r\n" +
 	"\v_updated_atB\r\n" +
-	"\v_created_by\"\xf9\x01\n" +
+	"\v_created_by\"\xc0\x02\n" +
 	"\x10StartScanRequest\x12%\n" +
 	"\ttenant_id\x18\x01 \x01(\rB\x03\xe0A\x02H\x00R\btenantId\x88\x01\x01\x12'\n" +
 	"\tsubnet_id\x18\x02 \x01(\tB\n" +
@@ -897,11 +918,13 @@ const file_ipam_service_v1_ip_scan_proto_rawDesc = "" +
 	"\vscan_config\x18\x03 \x01(\v2\x1b.ipam.service.v1.ScanConfigH\x01R\n" +
 	"scanConfig\x88\x01\x01\x12$\n" +
 	"\venable_snmp\x18\x04 \x01(\bH\x02R\n" +
-	"enableSnmp\x88\x01\x01B\f\n" +
+	"enableSnmp\x88\x01\x01\x12/\n" +
+	"\x11enable_dns_update\x18\x05 \x01(\bH\x03R\x0fenableDnsUpdate\x88\x01\x01B\f\n" +
 	"\n" +
 	"_tenant_idB\x0e\n" +
 	"\f_scan_configB\x0e\n" +
-	"\f_enable_snmp\"A\n" +
+	"\f_enable_snmpB\x14\n" +
+	"\x12_enable_dns_update\"A\n" +
 	"\x11StartScanResponse\x12,\n" +
 	"\x03job\x18\x01 \x01(\v2\x1a.ipam.service.v1.IpScanJobR\x03job\"/\n" +
 	"\x11GetScanJobRequest\x12\x1a\n" +

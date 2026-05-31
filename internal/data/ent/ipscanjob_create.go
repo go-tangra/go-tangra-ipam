@@ -352,6 +352,20 @@ func (_c *IpScanJobCreate) SetNillableEnableSnmp(v *bool) *IpScanJobCreate {
 	return _c
 }
 
+// SetEnableDNSUpdate sets the "enable_dns_update" field.
+func (_c *IpScanJobCreate) SetEnableDNSUpdate(v bool) *IpScanJobCreate {
+	_c.mutation.SetEnableDNSUpdate(v)
+	return _c
+}
+
+// SetNillableEnableDNSUpdate sets the "enable_dns_update" field if the given value is not nil.
+func (_c *IpScanJobCreate) SetNillableEnableDNSUpdate(v *bool) *IpScanJobCreate {
+	if v != nil {
+		_c.SetEnableDNSUpdate(*v)
+	}
+	return _c
+}
+
 // SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
 func (_c *IpScanJobCreate) SetSnmpDiscoveredCount(v int64) *IpScanJobCreate {
 	_c.mutation.SetSnmpDiscoveredCount(v)
@@ -506,6 +520,10 @@ func (_c *IpScanJobCreate) defaults() error {
 		v := ipscanjob.DefaultEnableSnmp
 		_c.mutation.SetEnableSnmp(v)
 	}
+	if _, ok := _c.mutation.EnableDNSUpdate(); !ok {
+		v := ipscanjob.DefaultEnableDNSUpdate
+		_c.mutation.SetEnableDNSUpdate(v)
+	}
 	if _, ok := _c.mutation.SnmpDiscoveredCount(); !ok {
 		v := ipscanjob.DefaultSnmpDiscoveredCount
 		_c.mutation.SetSnmpDiscoveredCount(v)
@@ -577,6 +595,9 @@ func (_c *IpScanJobCreate) check() error {
 	}
 	if _, ok := _c.mutation.EnableSnmp(); !ok {
 		return &ValidationError{Name: "enable_snmp", err: errors.New(`ent: missing required field "IpScanJob.enable_snmp"`)}
+	}
+	if _, ok := _c.mutation.EnableDNSUpdate(); !ok {
+		return &ValidationError{Name: "enable_dns_update", err: errors.New(`ent: missing required field "IpScanJob.enable_dns_update"`)}
 	}
 	if _, ok := _c.mutation.SnmpDiscoveredCount(); !ok {
 		return &ValidationError{Name: "snmp_discovered_count", err: errors.New(`ent: missing required field "IpScanJob.snmp_discovered_count"`)}
@@ -716,6 +737,10 @@ func (_c *IpScanJobCreate) createSpec() (*IpScanJob, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.EnableSnmp(); ok {
 		_spec.SetField(ipscanjob.FieldEnableSnmp, field.TypeBool, value)
 		_node.EnableSnmp = value
+	}
+	if value, ok := _c.mutation.EnableDNSUpdate(); ok {
+		_spec.SetField(ipscanjob.FieldEnableDNSUpdate, field.TypeBool, value)
+		_node.EnableDNSUpdate = value
 	}
 	if value, ok := _c.mutation.SnmpDiscoveredCount(); ok {
 		_spec.SetField(ipscanjob.FieldSnmpDiscoveredCount, field.TypeInt64, value)
@@ -1167,6 +1192,18 @@ func (u *IpScanJobUpsert) SetEnableSnmp(v bool) *IpScanJobUpsert {
 // UpdateEnableSnmp sets the "enable_snmp" field to the value that was provided on create.
 func (u *IpScanJobUpsert) UpdateEnableSnmp() *IpScanJobUpsert {
 	u.SetExcluded(ipscanjob.FieldEnableSnmp)
+	return u
+}
+
+// SetEnableDNSUpdate sets the "enable_dns_update" field.
+func (u *IpScanJobUpsert) SetEnableDNSUpdate(v bool) *IpScanJobUpsert {
+	u.Set(ipscanjob.FieldEnableDNSUpdate, v)
+	return u
+}
+
+// UpdateEnableDNSUpdate sets the "enable_dns_update" field to the value that was provided on create.
+func (u *IpScanJobUpsert) UpdateEnableDNSUpdate() *IpScanJobUpsert {
+	u.SetExcluded(ipscanjob.FieldEnableDNSUpdate)
 	return u
 }
 
@@ -1709,6 +1746,20 @@ func (u *IpScanJobUpsertOne) SetEnableSnmp(v bool) *IpScanJobUpsertOne {
 func (u *IpScanJobUpsertOne) UpdateEnableSnmp() *IpScanJobUpsertOne {
 	return u.Update(func(s *IpScanJobUpsert) {
 		s.UpdateEnableSnmp()
+	})
+}
+
+// SetEnableDNSUpdate sets the "enable_dns_update" field.
+func (u *IpScanJobUpsertOne) SetEnableDNSUpdate(v bool) *IpScanJobUpsertOne {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.SetEnableDNSUpdate(v)
+	})
+}
+
+// UpdateEnableDNSUpdate sets the "enable_dns_update" field to the value that was provided on create.
+func (u *IpScanJobUpsertOne) UpdateEnableDNSUpdate() *IpScanJobUpsertOne {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.UpdateEnableDNSUpdate()
 	})
 }
 
@@ -2427,6 +2478,20 @@ func (u *IpScanJobUpsertBulk) SetEnableSnmp(v bool) *IpScanJobUpsertBulk {
 func (u *IpScanJobUpsertBulk) UpdateEnableSnmp() *IpScanJobUpsertBulk {
 	return u.Update(func(s *IpScanJobUpsert) {
 		s.UpdateEnableSnmp()
+	})
+}
+
+// SetEnableDNSUpdate sets the "enable_dns_update" field.
+func (u *IpScanJobUpsertBulk) SetEnableDNSUpdate(v bool) *IpScanJobUpsertBulk {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.SetEnableDNSUpdate(v)
+	})
+}
+
+// UpdateEnableDNSUpdate sets the "enable_dns_update" field to the value that was provided on create.
+func (u *IpScanJobUpsertBulk) UpdateEnableDNSUpdate() *IpScanJobUpsertBulk {
+	return u.Update(func(s *IpScanJobUpsert) {
+		s.UpdateEnableDNSUpdate()
 	})
 }
 

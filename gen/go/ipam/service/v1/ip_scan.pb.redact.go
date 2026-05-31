@@ -136,6 +136,8 @@ func (x *IpScanJob) Redact() string {
 
 	// Safe field: SnmpDiscoveredCount
 
+	// Safe field: EnableDnsUpdate
+
 	// Safe field: StartedAt
 
 	// Safe field: CompletedAt
@@ -161,6 +163,8 @@ func (x *StartScanRequest) Redact() string {
 	// Safe field: ScanConfig
 
 	// Safe field: EnableSnmp
+
+	// Safe field: EnableDnsUpdate
 	return x.String()
 }
 

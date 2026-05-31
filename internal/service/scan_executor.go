@@ -14,6 +14,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
+	"github.com/go-tangra/go-tangra-ipam/internal/event"
 	appViewer "github.com/go-tangra/go-tangra-common/viewer"
 )
 
@@ -44,6 +45,7 @@ type ScanExecutor struct {
 	ipAddressRepo       *data.IpAddressRepo
 	deviceRepo          *data.DeviceRepo
 	deviceInterfaceRepo *data.DeviceInterfaceRepo
+	publisher           *event.Publisher
 	config              ScanExecutorConfig
 
 	ctx     context.Context
@@ -61,6 +63,7 @@ func NewScanExecutor(
 	ipAddressRepo *data.IpAddressRepo,
 	deviceRepo *data.DeviceRepo,
 	deviceInterfaceRepo *data.DeviceInterfaceRepo,
+	publisher *event.Publisher,
 ) *ScanExecutor {
 	// Use default config
 	config := ScanExecutorConfig{
@@ -78,6 +81,7 @@ func NewScanExecutor(
 		ipAddressRepo:       ipAddressRepo,
 		deviceRepo:          deviceRepo,
 		deviceInterfaceRepo: deviceInterfaceRepo,
+		publisher:           publisher,
 		config:              config,
 	}
 }
@@ -328,6 +332,13 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 				e.log.Warnf("Failed to update IP %s: %v", result.Address, err)
 			} else {
 				updatedCount++
+				// DNS sync: hostname changed on a known host → move the record.
+				if job.EnableDNSUpdate && e.publisher != nil && result.Hostname != "" && existing.Hostname != result.Hostname {
+					e.publisher.PublishIPAddressUpdated(e.ctx, &event.IPAddressEvent{
+						IPAddressID: existing.ID, TenantID: jobTenantID, Address: result.Address,
+						Hostname: result.Hostname, OldHostname: existing.Hostname, SubnetID: job.SubnetID,
+					})
+				}
 			}
 		} else {
 			// Create new record
@@ -345,11 +356,22 @@ func (e *ScanExecutor) processJob(job *ent.IpScanJob) error {
 				c.SetLastSeen(time.Now())
 			})
 
-			_, err := e.ipAddressRepo.Create(e.ctx, jobTenantID, result.Address, job.SubnetID, opts...)
+			created, err := e.ipAddressRepo.Create(e.ctx, jobTenantID, result.Address, job.SubnetID, opts...)
 			if err != nil {
 				e.log.Warnf("Failed to create IP %s: %v", result.Address, err)
 			} else {
 				newCount++
+				// DNS sync: newly discovered host with a hostname.
+				if job.EnableDNSUpdate && e.publisher != nil && result.Hostname != "" {
+					id := result.Address
+					if created != nil {
+						id = created.ID
+					}
+					e.publisher.PublishIPAddressScanned(e.ctx, &event.IPAddressEvent{
+						IPAddressID: id, TenantID: jobTenantID, Address: result.Address,
+						Hostname: result.Hostname, SubnetID: job.SubnetID,
+					})
+				}
 			}
 		}
 	}

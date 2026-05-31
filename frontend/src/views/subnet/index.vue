@@ -300,12 +300,14 @@ async function handleDeleteSubnet(subnetId: string) {
 // Scan configuration state
 const scanConfigVisible = ref(false);
 const scanEnableSnmp = ref(false);
+const scanEnableDnsUpdate = ref(false);
 const scanTargetSubnetId = ref<string>('');
 
 // Show scan config before starting
 function handleStartScan(subnetId: string) {
   scanTargetSubnetId.value = subnetId;
   scanEnableSnmp.value = false;
+  scanEnableDnsUpdate.value = false;
   scanConfigVisible.value = true;
 }
 
@@ -319,6 +321,7 @@ async function confirmStartScan() {
       subnetId,
       undefined,
       scanEnableSnmp.value,
+      scanEnableDnsUpdate.value,
     );
     if (resp.job) {
       currentScanJob.value = resp.job as ipamservicev1_IpScanJob;
@@ -614,6 +617,15 @@ onMounted(() => {
         </Checkbox>
         <div v-if="scanEnableSnmp" class="text-muted-foreground ml-6 text-xs">
           {{ $t('ipam.page.subnet.enableSnmpHint') }}
+        </div>
+        <Checkbox v-model:checked="scanEnableDnsUpdate">
+          {{ $t('ipam.page.subnet.enableDnsUpdate') }}
+        </Checkbox>
+        <div
+          v-if="scanEnableDnsUpdate"
+          class="text-muted-foreground ml-6 text-xs"
+        >
+          {{ $t('ipam.page.subnet.enableDnsUpdateHint') }}
         </div>
       </div>
     </Modal>

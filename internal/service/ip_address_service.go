@@ -158,16 +158,19 @@ func (s *IpAddressService) ListIpAddresses(ctx context.Context, req *ipamV1.List
 }
 
 func (s *IpAddressService) UpdateIpAddress(ctx context.Context, req *ipamV1.UpdateIpAddressRequest) (*ipamV1.UpdateIpAddressResponse, error) {
-	// Track old status for metrics if status is being changed
+	// Track old status (metrics) + old hostname (DNS event) when changing.
 	var oldStatus int32
+	var oldHostname string
 	statusChanging := req.Data != nil && req.Data.Status != nil
-	if statusChanging {
+	hostnameChanging := req.Data != nil && req.Data.Hostname != nil
+	if statusChanging || hostnameChanging {
 		existing, err := s.ipAddressRepo.GetByID(ctx, req.GetId())
 		if err != nil {
 			return nil, err
 		}
 		if existing != nil {
 			oldStatus = existing.Status
+			oldHostname = existing.Hostname
 		}
 	}
 
@@ -204,6 +207,23 @@ func (s *IpAddressService) UpdateIpAddress(ctx context.Context, req *ipamV1.Upda
 				metrics.StatusIntToString(newStatus),
 			)
 		}
+	}
+
+	// DNS sync: hostname was edited → let go-tangra-dns move the record
+	// (remove the old name's A/PTR, create the new one).
+	if hostnameChanging && s.publisher != nil && entity.Hostname != oldHostname {
+		var tenantID uint32
+		if entity.TenantID != nil {
+			tenantID = *entity.TenantID
+		}
+		s.publisher.PublishIPAddressUpdated(ctx, &event.IPAddressEvent{
+			IPAddressID: entity.ID,
+			TenantID:    tenantID,
+			Address:     entity.Address,
+			Hostname:    entity.Hostname,
+			OldHostname: oldHostname,
+			SubnetID:    entity.SubnetID,
+		})
 	}
 
 	return &ipamV1.UpdateIpAddressResponse{

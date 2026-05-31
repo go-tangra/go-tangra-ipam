@@ -34,8 +34,9 @@ type ScanConfig struct {
 	Concurrency    int32
 	SkipReverseDNS bool
 	TCPProbePorts  string
-	MaxRetries     int32
-	EnableSNMP     bool
+	MaxRetries      int32
+	EnableSNMP      bool
+	EnableDNSUpdate bool
 }
 
 // Create creates a new scan job
@@ -71,6 +72,9 @@ func (r *IpScanJobRepo) Create(ctx context.Context, tenantID uint32, subnetID st
 		}
 		if config.EnableSNMP {
 			create = create.SetEnableSnmp(config.EnableSNMP)
+		}
+		if config.EnableDNSUpdate {
+			create = create.SetEnableDNSUpdate(config.EnableDNSUpdate)
 		}
 	}
 

@@ -137,6 +137,10 @@ func (m *IpScanJob) validate(all bool) error {
 		// no validation rules for SnmpDiscoveredCount
 	}
 
+	if m.EnableDnsUpdate != nil {
+		// no validation rules for EnableDnsUpdate
+	}
+
 	if m.StartedAt != nil {
 
 		if all {
@@ -413,6 +417,10 @@ func (m *StartScanRequest) validate(all bool) error {
 
 	if m.EnableSnmp != nil {
 		// no validation rules for EnableSnmp
+	}
+
+	if m.EnableDnsUpdate != nil {
+		// no validation rules for EnableDnsUpdate
 	}
 
 	if len(errors) > 0 {

@@ -20,7 +20,7 @@ import (
 // Injectors from wire.go:
 
 func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
-	certManager, err := cert.NewCertManager(context)
+	v, err := cert.NewCertManager(context)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -59,9 +59,9 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	hostGroupService := service.NewHostGroupService(context, hostGroupRepo)
 	backupService := service.NewBackupService(context, entClient)
 	devicePackageService := service.NewDevicePackageService(context, deviceRepo, devicePackageRepo)
-	grpcServer := server.NewGRPCServer(context, certManager, collector, auditLogRepo, systemService, subnetService, vlanService, deviceService, locationService, ipAddressService, ipScanService, ipGroupService, hostGroupService, backupService, devicePackageService)
+	grpcServer := server.NewGRPCServer(context, v, collector, auditLogRepo, systemService, subnetService, vlanService, deviceService, locationService, ipAddressService, ipScanService, ipGroupService, hostGroupService, backupService, devicePackageService)
 	httpServer := server.NewHTTPServer(context)
-	scanExecutor := service.NewScanExecutor(context, ipScanJobRepo, subnetRepo, ipAddressRepo, deviceRepo, deviceInterfaceRepo)
+	scanExecutor := service.NewScanExecutor(context, ipScanJobRepo, subnetRepo, ipAddressRepo, deviceRepo, deviceInterfaceRepo, publisher)
 	app := newApp(context, grpcServer, httpServer, scanExecutor)
 	return app, func() {
 		cleanup2()

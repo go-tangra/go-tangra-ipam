@@ -88,6 +88,9 @@ message IpScanJob {
   // Number of SNMP devices discovered
   optional int64 snmp_discovered_count = 25 [json_name = "snmpDiscoveredCount"];
 
+  // Whether DNS-sync events were fired for discovered hosts
+  optional bool enable_dns_update = 26 [json_name = "enableDnsUpdate"];
+
   // When the scan started
   optional google.protobuf.Timestamp started_at = 30 [json_name = "startedAt"];
 
@@ -122,6 +125,10 @@ message StartScanRequest {
 
   // Enable SNMP device discovery during scan
   optional bool enable_snmp = 4 [json_name = "enableSnmp"];
+
+  // Fire DNS-sync events for discovered hosts (handled by go-tangra-dns,
+  // which creates/updates A + PTR records). Optional, like enable_snmp.
+  optional bool enable_dns_update = 5 [json_name = "enableDnsUpdate"];
 }
 
 message StartScanResponse {

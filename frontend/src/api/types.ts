@@ -1555,6 +1555,8 @@ export interface components {
             enableSnmp?: boolean;
             /** @description Number of SNMP devices discovered */
             snmpDiscoveredCount?: string;
+            /** @description Whether DNS-sync events were fired for discovered hosts */
+            enableDnsUpdate?: boolean;
             /**
              * Format: date-time
              * @description When the scan started
@@ -1783,6 +1785,8 @@ export interface components {
             scanConfig?: components["schemas"]["ScanConfig"];
             /** @description Enable SNMP device discovery during scan */
             enableSnmp?: boolean;
+            /** @description Fire DNS-sync events for discovered hosts (handled by go-tangra-dns) */
+            enableDnsUpdate?: boolean;
         };
         StartScanResponse: {
             job?: components["schemas"]["IpScanJob"];

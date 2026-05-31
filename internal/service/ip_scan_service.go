@@ -106,6 +106,9 @@ func (s *IpScanService) StartScan(ctx context.Context, req *ipamV1.StartScanRequ
 	if req.EnableSnmp != nil && *req.EnableSnmp {
 		scanConfig.EnableSNMP = true
 	}
+	if req.EnableDnsUpdate != nil && *req.EnableDnsUpdate {
+		scanConfig.EnableDNSUpdate = true
+	}
 
 	// Create the scan job
 	job, err := s.scanJobRepo.Create(ctx, tenantID, subnetID, ipscanjob.TriggeredByMANUAL, totalAddresses, scanConfig)
@@ -211,6 +214,7 @@ func scanJobToProto(e *ent.IpScanJob) *ipamV1.IpScanJob {
 		SkipReverseDns: &e.SkipReverseDNS,
 		TcpProbePorts:       &e.TCPProbePorts,
 		EnableSnmp:          &e.EnableSnmp,
+		EnableDnsUpdate:     &e.EnableDNSUpdate,
 		SnmpDiscoveredCount: &e.SnmpDiscoveredCount,
 		CreatedBy:           e.CreateBy,
 	}

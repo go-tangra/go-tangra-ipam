@@ -175,6 +175,11 @@ func EnableSnmp(v bool) predicate.IpScanJob {
 	return predicate.IpScanJob(sql.FieldEQ(FieldEnableSnmp, v))
 }
 
+// EnableDNSUpdate applies equality check predicate on the "enable_dns_update" field. It's identical to EnableDNSUpdateEQ.
+func EnableDNSUpdate(v bool) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldEQ(FieldEnableDNSUpdate, v))
+}
+
 // SnmpDiscoveredCount applies equality check predicate on the "snmp_discovered_count" field. It's identical to SnmpDiscoveredCountEQ.
 func SnmpDiscoveredCount(v int64) predicate.IpScanJob {
 	return predicate.IpScanJob(sql.FieldEQ(FieldSnmpDiscoveredCount, v))
@@ -1203,6 +1208,16 @@ func EnableSnmpEQ(v bool) predicate.IpScanJob {
 // EnableSnmpNEQ applies the NEQ predicate on the "enable_snmp" field.
 func EnableSnmpNEQ(v bool) predicate.IpScanJob {
 	return predicate.IpScanJob(sql.FieldNEQ(FieldEnableSnmp, v))
+}
+
+// EnableDNSUpdateEQ applies the EQ predicate on the "enable_dns_update" field.
+func EnableDNSUpdateEQ(v bool) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldEQ(FieldEnableDNSUpdate, v))
+}
+
+// EnableDNSUpdateNEQ applies the NEQ predicate on the "enable_dns_update" field.
+func EnableDNSUpdateNEQ(v bool) predicate.IpScanJob {
+	return predicate.IpScanJob(sql.FieldNEQ(FieldEnableDNSUpdate, v))
 }
 
 // SnmpDiscoveredCountEQ applies the EQ predicate on the "snmp_discovered_count" field.

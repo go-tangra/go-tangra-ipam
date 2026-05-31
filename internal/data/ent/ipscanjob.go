@@ -67,6 +67,8 @@ type IpScanJob struct {
 	TCPProbePorts string `json:"tcp_probe_ports,omitempty"`
 	// Enable SNMP device discovery
 	EnableSnmp bool `json:"enable_snmp,omitempty"`
+	// Fire DNS-sync events for discovered hosts (handled by go-tangra-dns)
+	EnableDNSUpdate bool `json:"enable_dns_update,omitempty"`
 	// Number of SNMP devices discovered
 	SnmpDiscoveredCount int64 `json:"snmp_discovered_count,omitempty"`
 	// When the scan started
@@ -104,7 +106,7 @@ func (*IpScanJob) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case ipscanjob.FieldSkipReverseDNS, ipscanjob.FieldEnableSnmp:
+		case ipscanjob.FieldSkipReverseDNS, ipscanjob.FieldEnableSnmp, ipscanjob.FieldEnableDNSUpdate:
 			values[i] = new(sql.NullBool)
 		case ipscanjob.FieldCreateBy, ipscanjob.FieldUpdateBy, ipscanjob.FieldTenantID, ipscanjob.FieldProgress, ipscanjob.FieldTotalAddresses, ipscanjob.FieldScannedCount, ipscanjob.FieldAliveCount, ipscanjob.FieldNewCount, ipscanjob.FieldUpdatedCount, ipscanjob.FieldRetryCount, ipscanjob.FieldMaxRetries, ipscanjob.FieldTimeoutMs, ipscanjob.FieldConcurrency, ipscanjob.FieldSnmpDiscoveredCount:
 			values[i] = new(sql.NullInt64)
@@ -284,6 +286,12 @@ func (_m *IpScanJob) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.EnableSnmp = value.Bool
 			}
+		case ipscanjob.FieldEnableDNSUpdate:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field enable_dns_update", values[i])
+			} else if value.Valid {
+				_m.EnableDNSUpdate = value.Bool
+			}
 		case ipscanjob.FieldSnmpDiscoveredCount:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field snmp_discovered_count", values[i])
@@ -430,6 +438,9 @@ func (_m *IpScanJob) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("enable_snmp=")
 	builder.WriteString(fmt.Sprintf("%v", _m.EnableSnmp))
+	builder.WriteString(", ")
+	builder.WriteString("enable_dns_update=")
+	builder.WriteString(fmt.Sprintf("%v", _m.EnableDNSUpdate))
 	builder.WriteString(", ")
 	builder.WriteString("snmp_discovered_count=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SnmpDiscoveredCount))

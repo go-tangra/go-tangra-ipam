@@ -458,6 +458,20 @@ func (_u *IpScanJobUpdate) SetNillableEnableSnmp(v *bool) *IpScanJobUpdate {
 	return _u
 }
 
+// SetEnableDNSUpdate sets the "enable_dns_update" field.
+func (_u *IpScanJobUpdate) SetEnableDNSUpdate(v bool) *IpScanJobUpdate {
+	_u.mutation.SetEnableDNSUpdate(v)
+	return _u
+}
+
+// SetNillableEnableDNSUpdate sets the "enable_dns_update" field if the given value is not nil.
+func (_u *IpScanJobUpdate) SetNillableEnableDNSUpdate(v *bool) *IpScanJobUpdate {
+	if v != nil {
+		_u.SetEnableDNSUpdate(*v)
+	}
+	return _u
+}
+
 // SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
 func (_u *IpScanJobUpdate) SetSnmpDiscoveredCount(v int64) *IpScanJobUpdate {
 	_u.mutation.ResetSnmpDiscoveredCount()
@@ -725,6 +739,9 @@ func (_u *IpScanJobUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.EnableSnmp(); ok {
 		_spec.SetField(ipscanjob.FieldEnableSnmp, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.EnableDNSUpdate(); ok {
+		_spec.SetField(ipscanjob.FieldEnableDNSUpdate, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.SnmpDiscoveredCount(); ok {
 		_spec.SetField(ipscanjob.FieldSnmpDiscoveredCount, field.TypeInt64, value)
@@ -1223,6 +1240,20 @@ func (_u *IpScanJobUpdateOne) SetNillableEnableSnmp(v *bool) *IpScanJobUpdateOne
 	return _u
 }
 
+// SetEnableDNSUpdate sets the "enable_dns_update" field.
+func (_u *IpScanJobUpdateOne) SetEnableDNSUpdate(v bool) *IpScanJobUpdateOne {
+	_u.mutation.SetEnableDNSUpdate(v)
+	return _u
+}
+
+// SetNillableEnableDNSUpdate sets the "enable_dns_update" field if the given value is not nil.
+func (_u *IpScanJobUpdateOne) SetNillableEnableDNSUpdate(v *bool) *IpScanJobUpdateOne {
+	if v != nil {
+		_u.SetEnableDNSUpdate(*v)
+	}
+	return _u
+}
+
 // SetSnmpDiscoveredCount sets the "snmp_discovered_count" field.
 func (_u *IpScanJobUpdateOne) SetSnmpDiscoveredCount(v int64) *IpScanJobUpdateOne {
 	_u.mutation.ResetSnmpDiscoveredCount()
@@ -1520,6 +1551,9 @@ func (_u *IpScanJobUpdateOne) sqlSave(ctx context.Context) (_node *IpScanJob, er
 	}
 	if value, ok := _u.mutation.EnableSnmp(); ok {
 		_spec.SetField(ipscanjob.FieldEnableSnmp, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.EnableDNSUpdate(); ok {
+		_spec.SetField(ipscanjob.FieldEnableDNSUpdate, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.SnmpDiscoveredCount(); ok {
 		_spec.SetField(ipscanjob.FieldSnmpDiscoveredCount, field.TypeInt64, value)

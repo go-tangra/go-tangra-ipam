@@ -53,7 +53,7 @@ type Device struct {
 	RackPosition *int32 `json:"rack_position,omitempty"`
 	// Device height in rack units
 	DeviceHeightU *int32 `json:"device_height_u,omitempty"`
-	// Device status: 1=Active, 2=Planned, 3=Staged, 4=Decommissioned, 5=Offline, 6=Failed
+	// Device status: 1=Active, 2=Planned, 3=Staged, 4=Decommissioned, 5=Offline, 6=Failed, 7=Available
 	Status int32 `json:"status,omitempty"`
 	// Primary IP address
 	PrimaryIP string `json:"primary_ip,omitempty"`

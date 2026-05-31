@@ -20,12 +20,14 @@ export const useIpamIpScanStore = defineStore('ipam-ip-scan', () => {
     subnetId: string,
     scanConfig?: ScanConfig,
     enableSnmp?: boolean,
+    enableDnsUpdate?: boolean,
   ): Promise<GetScanJobResponse> {
     return await IpScanService.start({
       tenantId,
       subnetId,
       scanConfig,
       enableSnmp,
+      enableDnsUpdate,
     });
   }
 

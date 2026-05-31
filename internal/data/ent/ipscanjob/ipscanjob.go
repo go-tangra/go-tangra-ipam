@@ -63,6 +63,8 @@ const (
 	FieldTCPProbePorts = "tcp_probe_ports"
 	// FieldEnableSnmp holds the string denoting the enable_snmp field in the database.
 	FieldEnableSnmp = "enable_snmp"
+	// FieldEnableDNSUpdate holds the string denoting the enable_dns_update field in the database.
+	FieldEnableDNSUpdate = "enable_dns_update"
 	// FieldSnmpDiscoveredCount holds the string denoting the snmp_discovered_count field in the database.
 	FieldSnmpDiscoveredCount = "snmp_discovered_count"
 	// FieldStartedAt holds the string denoting the started_at field in the database.
@@ -109,6 +111,7 @@ var Columns = []string{
 	FieldSkipReverseDNS,
 	FieldTCPProbePorts,
 	FieldEnableSnmp,
+	FieldEnableDNSUpdate,
 	FieldSnmpDiscoveredCount,
 	FieldStartedAt,
 	FieldCompletedAt,
@@ -162,6 +165,8 @@ var (
 	DefaultTCPProbePorts string
 	// DefaultEnableSnmp holds the default value on creation for the "enable_snmp" field.
 	DefaultEnableSnmp bool
+	// DefaultEnableDNSUpdate holds the default value on creation for the "enable_dns_update" field.
+	DefaultEnableDNSUpdate bool
 	// DefaultSnmpDiscoveredCount holds the default value on creation for the "snmp_discovered_count" field.
 	DefaultSnmpDiscoveredCount int64
 	// IDValidator is a validator for the "id" field. It is called by the builders before save.
@@ -349,6 +354,11 @@ func ByTCPProbePorts(opts ...sql.OrderTermOption) OrderOption {
 // ByEnableSnmp orders the results by the enable_snmp field.
 func ByEnableSnmp(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEnableSnmp, opts...).ToFunc()
+}
+
+// ByEnableDNSUpdate orders the results by the enable_dns_update field.
+func ByEnableDNSUpdate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnableDNSUpdate, opts...).ToFunc()
 }
 
 // BySnmpDiscoveredCount orders the results by the snmp_discovered_count field.

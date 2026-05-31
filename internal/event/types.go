@@ -13,6 +13,12 @@ const TopicPrefix = "ipam"
 const (
 	TopicIPAddressCreated = "ip_address.created"
 	TopicIPAddressDeleted = "ip_address.deleted"
+	// TopicIPAddressUpdated fires when an IP's hostname changes (DNS moves the record).
+	TopicIPAddressUpdated = "ip_address.updated"
+	// TopicIPAddressScanned fires for hosts discovered by a network scan when the
+	// scan's "update DNS" option is enabled. Separate from created so DNS can tell
+	// scan-driven syncs apart from explicit IP creation.
+	TopicIPAddressScanned = "ip_address.scanned"
 )
 
 // Envelope is the common wrapper for all IPAM events published to Redis.
@@ -33,6 +39,9 @@ type IPAddressEvent struct {
 	TenantID    uint32 `json:"tenant_id"`
 	Address     string `json:"address"`
 	Hostname    string `json:"hostname,omitempty"`
+	// OldHostname is set on ip_address.updated when the hostname changed, so a
+	// consumer can remove the record for the previous name.
+	OldHostname string `json:"old_hostname,omitempty"`
 	SubnetID    string `json:"subnet_id,omitempty"`
 	MACAddress  string `json:"mac_address,omitempty"`
 }
