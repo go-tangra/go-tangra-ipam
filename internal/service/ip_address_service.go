@@ -13,6 +13,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/biz"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
+	"github.com/go-tangra/go-tangra-ipam/internal/event"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
@@ -24,14 +25,16 @@ type IpAddressService struct {
 	ipAddressRepo *data.IpAddressRepo
 	subnetRepo    *data.SubnetRepo
 	metrics       *metrics.Collector
+	publisher     *event.Publisher
 }
 
-func NewIpAddressService(ctx *bootstrap.Context, ipAddressRepo *data.IpAddressRepo, subnetRepo *data.SubnetRepo, metrics *metrics.Collector) *IpAddressService {
+func NewIpAddressService(ctx *bootstrap.Context, ipAddressRepo *data.IpAddressRepo, subnetRepo *data.SubnetRepo, metrics *metrics.Collector, publisher *event.Publisher) *IpAddressService {
 	return &IpAddressService{
 		log:           ctx.NewLoggerHelper("ipam/service/ip_address"),
 		ipAddressRepo: ipAddressRepo,
 		subnetRepo:    subnetRepo,
 		metrics:       metrics,
+		publisher:     publisher,
 	}
 }
 
@@ -63,6 +66,24 @@ func (s *IpAddressService) CreateIpAddress(ctx context.Context, req *ipamV1.Crea
 	}
 
 	s.metrics.IPAddressCreated(metrics.StatusIntToString(entity.Status))
+
+	// Fire an ip_address.created event so other services (e.g. the DNS
+	// module) can react — e.g. auto-create a zone + A record for the
+	// hostname. Best-effort: never fails the create.
+	if s.publisher != nil {
+		var tenantID uint32
+		if entity.TenantID != nil {
+			tenantID = *entity.TenantID
+		}
+		s.publisher.PublishIPAddressCreated(ctx, &event.IPAddressEvent{
+			IPAddressID: entity.ID,
+			TenantID:    tenantID,
+			Address:     entity.Address,
+			Hostname:    entity.Hostname,
+			SubnetID:    entity.SubnetID,
+			MACAddress:  entity.MACAddress,
+		})
+	}
 
 	return &ipamV1.CreateIpAddressResponse{
 		IpAddress: ipAddressToProto(entity),
@@ -201,6 +222,23 @@ func (s *IpAddressService) DeleteIpAddress(ctx context.Context, req *ipamV1.Dele
 
 	if existing != nil {
 		s.metrics.IPAddressDeleted(metrics.StatusIntToString(existing.Status))
+
+		// Fire ip_address.deleted so the DNS module can remove the
+		// matching forward (A) and reverse (PTR) records. Best-effort.
+		if s.publisher != nil {
+			var tenantID uint32
+			if existing.TenantID != nil {
+				tenantID = *existing.TenantID
+			}
+			s.publisher.PublishIPAddressDeleted(ctx, &event.IPAddressEvent{
+				IPAddressID: existing.ID,
+				TenantID:    tenantID,
+				Address:     existing.Address,
+				Hostname:    existing.Hostname,
+				SubnetID:    existing.SubnetID,
+				MACAddress:  existing.MACAddress,
+			})
+		}
 	}
 
 	return &emptypb.Empty{}, nil

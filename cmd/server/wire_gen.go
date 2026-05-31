@@ -7,12 +7,10 @@
 package main
 
 import (
-	gocontext "context"
-
 	"github.com/go-kratos/kratos/v2"
-	"github.com/go-tangra/go-tangra-common/viewer"
 	"github.com/go-tangra/go-tangra-ipam/internal/cert"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
+	"github.com/go-tangra/go-tangra-ipam/internal/event"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	"github.com/go-tangra/go-tangra-ipam/internal/server"
 	"github.com/go-tangra/go-tangra-ipam/internal/service"
@@ -26,6 +24,7 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	collector := metrics.NewCollector(context)
 	entClient, cleanup, err := data.NewEntClient(context)
 	if err != nil {
 		return nil, nil, err
@@ -34,7 +33,6 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	dnsConfigRepo := data.NewDnsConfigRepo(context, entClient)
 	statisticsRepo := data.NewStatisticsRepo(context, entClient)
 	systemService := service.NewSystemService(context, dnsConfigRepo, statisticsRepo)
-	collector := metrics.NewCollector(context)
 	subnetRepo := data.NewSubnetRepo(context, entClient)
 	ipScanJobRepo := data.NewIpScanJobRepo(context, entClient)
 	subnetService := service.NewSubnetService(context, subnetRepo, ipScanJobRepo, collector)
@@ -47,7 +45,13 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	deviceService := service.NewDeviceService(context, deviceRepo, deviceInterfaceRepo, ipAddressRepo, devicePackageRepo, collector)
 	locationRepo := data.NewLocationRepo(context, entClient)
 	locationService := service.NewLocationService(context, locationRepo, collector)
-	ipAddressService := service.NewIpAddressService(context, ipAddressRepo, subnetRepo, collector)
+	client, cleanup2, err := data.NewRedisClient(context)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	publisher := event.NewPublisher(context, client)
+	ipAddressService := service.NewIpAddressService(context, ipAddressRepo, subnetRepo, collector, publisher)
 	ipScanService := service.NewIpScanService(context, ipScanJobRepo, subnetRepo, ipAddressRepo)
 	ipGroupRepo := data.NewIpGroupRepo(context, entClient)
 	ipGroupService := service.NewIpGroupService(context, ipGroupRepo)
@@ -58,14 +62,9 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	grpcServer := server.NewGRPCServer(context, certManager, collector, auditLogRepo, systemService, subnetService, vlanService, deviceService, locationService, ipAddressService, ipScanService, ipGroupService, hostGroupService, backupService, devicePackageService)
 	httpServer := server.NewHTTPServer(context)
 	scanExecutor := service.NewScanExecutor(context, ipScanJobRepo, subnetRepo, ipAddressRepo, deviceRepo, deviceInterfaceRepo)
-
-	// Seed Prometheus metrics from database
-	seedCtx := viewer.NewSystemViewerContext(gocontext.Background())
-	collector.Seed(seedCtx, statisticsRepo)
-
 	app := newApp(context, grpcServer, httpServer, scanExecutor)
 	return app, func() {
-		collector.Stop(gocontext.Background())
+		cleanup2()
 		cleanup()
 	}, nil
 }
