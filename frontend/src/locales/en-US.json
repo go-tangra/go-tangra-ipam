@@ -213,6 +213,7 @@
       "disks": "Disks",
       "interfaces": "Network Interfaces",
       "macAddress": "MAC Address",
+      "sectionInterfaces": "Interfaces",
       "sectionPorts": "Switch Ports",
       "sectionDiscoveredInterfaces": "Discovered Interfaces",
       "discoveredInterfacesHint": "Ports and links discovered via SNMP during network scans",

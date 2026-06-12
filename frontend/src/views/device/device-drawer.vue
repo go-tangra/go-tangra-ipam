@@ -19,6 +19,8 @@ import {
   Alert,
   Divider,
   Table,
+  Tabs,
+  TabPane,
 } from 'ant-design-vue';
 
 import { type ipamservicev1_Device } from '../../api/proto-types';
@@ -491,20 +493,30 @@ function connectedToLabel(row: DeviceInterface): string {
   return switchName ? `${switchName} · ${port}` : port;
 }
 
+// Adaptive, slim columns so the table fits the drawer without horizontal
+// scroll. Status is conveyed by row colour (see discoveredRowClass), not a
+// column. Switch ports show ifIndex + speed; servers show their NIC + link.
 const discoveredInterfaceColumns = computed(() => {
-  const cols: Record<string, unknown>[] = [
-    { title: $t('ipam.page.device.portIfIndex'), dataIndex: 'ifIndex', key: 'ifIndex', width: 70 },
-    { title: $t('ipam.page.device.name'), dataIndex: 'name', key: 'name', width: 130 },
-    { title: $t('ipam.page.device.macAddress'), dataIndex: 'macAddress', key: 'macAddress', width: 150 },
-    { title: $t('ipam.page.device.portSpeed'), dataIndex: 'speedMbps', key: 'speedMbps', width: 90 },
-    { title: $t('ipam.page.device.portStatus'), dataIndex: 'enabled', key: 'enabled', width: 80 },
-  ];
-  // Only physical servers carry discovered links — show the column when present.
+  const cols: Record<string, unknown>[] = [];
+  if (isSwitchDevice.value) {
+    cols.push({ title: $t('ipam.page.device.portIfIndex'), dataIndex: 'ifIndex', key: 'ifIndex', width: 60 });
+  }
+  cols.push({ title: $t('ipam.page.device.name'), dataIndex: 'name', key: 'name', ellipsis: true });
+  cols.push({ title: $t('ipam.page.device.macAddress'), dataIndex: 'macAddress', key: 'macAddress', width: 150 });
+  if (isSwitchDevice.value) {
+    cols.push({ title: $t('ipam.page.device.portSpeed'), dataIndex: 'speedMbps', key: 'speedMbps', width: 80 });
+  }
+  // Discovered links live on the server side; show the column when present.
   if (hasDiscoveredLinks.value) {
-    cols.push({ title: $t('ipam.page.device.connectedTo'), key: 'connectedTo' });
+    cols.push({ title: $t('ipam.page.device.connectedTo'), key: 'connectedTo', ellipsis: true });
   }
   return cols;
 });
+
+// Down interfaces are dimmed via row colour instead of a Status column.
+function discoveredRowClass(record: DeviceInterface): string {
+  return record.enabled === false ? 'iface-row-down' : '';
+}
 
 // Parse metadata JSON from the device
 interface BoardMetadata {
@@ -572,6 +584,12 @@ const parsedMetadata = computed<DeviceMetadata | null>(() => {
     return null;
   }
 });
+
+// Agent-reported interfaces embedded in device metadata (distinct from the
+// persisted, SNMP-discovered interface rows).
+const hasReportedInterfaces = computed(
+  () => (parsedMetadata.value?.interfaces?.length ?? 0) > 0,
+);
 
 function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '-';
@@ -777,65 +795,69 @@ const interfaceColumns = [
           />
         </template>
 
-        <!-- Interfaces table -->
-        <template v-if="parsedMetadata.interfaces && parsedMetadata.interfaces.length > 0">
-          <Divider orientation="left" plain>{{ $t('ipam.page.device.interfaces') }}</Divider>
-          <Table
-            :columns="interfaceColumns"
-            :data-source="parsedMetadata.interfaces"
-            :pagination="false"
-            size="small"
-            bordered
-            :row-key="(r: any) => r.name"
-          />
-        </template>
       </template>
 
-      <!-- Switch ports / discovered interfaces & links (SNMP) -->
-      <template v-if="hasDiscoveredInterfaces">
-        <Divider orientation="left">
-          {{ isSwitchDevice ? $t('ipam.page.device.sectionPorts') : $t('ipam.page.device.sectionDiscoveredInterfaces') }}
-        </Divider>
-        <p style="margin: -4px 0 8px; color: #8c8c8c; font-size: 12px;">
-          {{ $t('ipam.page.device.discoveredInterfacesHint') }}
-        </p>
-        <Table
-          :columns="discoveredInterfaceColumns"
-          :data-source="deviceInterfaces"
-          :loading="loadingInterfaces"
-          :pagination="false"
-          size="small"
-          bordered
-          :row-key="(r: DeviceInterface) => r.id ?? r.name ?? ''"
-          :scroll="{ y: 320 }"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'ifIndex'">
-              {{ (record as DeviceInterface).ifIndex ?? '-' }}
-            </template>
-            <template v-else-if="column.key === 'macAddress'">
-              <code v-if="(record as DeviceInterface).macAddress">{{ (record as DeviceInterface).macAddress }}</code>
-              <span v-else>-</span>
-            </template>
-            <template v-else-if="column.key === 'speedMbps'">
-              {{ formatSpeed((record as DeviceInterface).speedMbps) }}
-            </template>
-            <template v-else-if="column.key === 'enabled'">
-              <Tag :color="(record as DeviceInterface).enabled ? 'green' : 'default'">
-                {{ (record as DeviceInterface).enabled ? $t('ipam.page.device.portUp') : $t('ipam.page.device.portDown') }}
-              </Tag>
-            </template>
-            <template v-else-if="column.key === 'connectedTo'">
-              <template v-if="connectedToLabel(record as DeviceInterface)">
-                <Tag color="blue">{{ connectedToLabel(record as DeviceInterface) }}</Tag>
-                <Tag v-if="(record as DeviceInterface).linkVlan" color="geekblue">
-                  {{ $t('ipam.page.device.linkVlan') }} {{ (record as DeviceInterface).linkVlan }}
-                </Tag>
+      <!-- Interfaces: agent-reported (metadata) + SNMP-discovered ports/links,
+           in tabs to avoid a long, wide, horizontally-scrolling stack. -->
+      <template v-if="hasReportedInterfaces || hasDiscoveredInterfaces">
+        <Divider orientation="left">{{ $t('ipam.page.device.sectionInterfaces') }}</Divider>
+        <Tabs size="small">
+          <TabPane
+            v-if="hasReportedInterfaces"
+            key="reported"
+            :tab="$t('ipam.page.device.interfaces')"
+          >
+            <Table
+              :columns="interfaceColumns"
+              :data-source="parsedMetadata?.interfaces ?? []"
+              :pagination="false"
+              size="small"
+              bordered
+              :row-key="(r: any) => r.name"
+            />
+          </TabPane>
+          <TabPane
+            v-if="hasDiscoveredInterfaces"
+            key="discovered"
+            :tab="isSwitchDevice ? $t('ipam.page.device.sectionPorts') : $t('ipam.page.device.sectionDiscoveredInterfaces')"
+          >
+            <p style="margin: 0 0 8px; color: #8c8c8c; font-size: 12px;">
+              {{ $t('ipam.page.device.discoveredInterfacesHint') }}
+            </p>
+            <Table
+              :columns="discoveredInterfaceColumns"
+              :data-source="deviceInterfaces"
+              :loading="loadingInterfaces"
+              :pagination="false"
+              size="small"
+              bordered
+              :row-key="(r: DeviceInterface) => r.id ?? r.name ?? ''"
+              :row-class-name="discoveredRowClass"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'ifIndex'">
+                  {{ (record as DeviceInterface).ifIndex ?? '-' }}
+                </template>
+                <template v-else-if="column.key === 'macAddress'">
+                  <code v-if="(record as DeviceInterface).macAddress">{{ (record as DeviceInterface).macAddress }}</code>
+                  <span v-else>-</span>
+                </template>
+                <template v-else-if="column.key === 'speedMbps'">
+                  {{ formatSpeed((record as DeviceInterface).speedMbps) }}
+                </template>
+                <template v-else-if="column.key === 'connectedTo'">
+                  <template v-if="connectedToLabel(record as DeviceInterface)">
+                    <Tag color="blue">{{ connectedToLabel(record as DeviceInterface) }}</Tag>
+                    <Tag v-if="(record as DeviceInterface).linkVlan" color="geekblue">
+                      {{ $t('ipam.page.device.linkVlan') }} {{ (record as DeviceInterface).linkVlan }}
+                    </Tag>
+                  </template>
+                  <span v-else>-</span>
+                </template>
               </template>
-              <span v-else>-</span>
-            </template>
-          </template>
-        </Table>
+            </Table>
+          </TabPane>
+        </Tabs>
       </template>
 
       <!-- Notes / Contact / Tags -->
@@ -1005,3 +1027,11 @@ const interfaceColumns = [
     </template>
   </Drawer>
 </template>
+
+<style>
+/* Disabled (link-down) discovered interfaces are dimmed instead of carrying a
+   Status column. Opacity keeps the cue working in both light and dark themes. */
+.iface-row-down > td {
+  opacity: 0.4;
+}
+</style>
