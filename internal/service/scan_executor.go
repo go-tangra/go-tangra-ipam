@@ -117,7 +117,54 @@ func (e *ScanExecutor) Start() error {
 	e.wg.Add(1)
 	go e.cleanupWorker()
 
+	// One-time backfill: promote agent-reported metadata interfaces to rows so
+	// previously-collected server data participates in link discovery.
+	e.wg.Add(1)
+	go e.backfillMetadataInterfaces()
+
 	return nil
+}
+
+// backfillMetadataInterfaces promotes agent-reported metadata interfaces into
+// interface rows for existing physical-server devices. tangra-client reports
+// NICs inside device metadata JSON rather than as interface records; without
+// this, their MACs are invisible to bridge-FDB link correlation until the agent
+// next re-syncs. It is idempotent (rows matched by name; only the MAC is set).
+func (e *ScanExecutor) backfillMetadataInterfaces() {
+	defer e.wg.Done()
+
+	const pageSize = 100
+	afterID := ""
+	devicesTouched, ifacesApplied := 0, 0
+	for {
+		select {
+		case <-e.ctx.Done():
+			return
+		default:
+		}
+
+		devices, err := e.deviceRepo.ListByTypeWithMetadataCursor(e.ctx, data.DeviceTypeServer, afterID, pageSize)
+		if err != nil {
+			e.log.Warnf("interface backfill: list failed: %v", err)
+			return
+		}
+		if len(devices) == 0 {
+			break
+		}
+		for _, d := range devices {
+			if n := materializeMetadataInterfaces(e.ctx, e.deviceInterfaceRepo, e.log, d.ID, d.Metadata); n > 0 {
+				devicesTouched++
+				ifacesApplied += n
+			}
+			afterID = d.ID
+		}
+		if len(devices) < pageSize {
+			break
+		}
+	}
+	if ifacesApplied > 0 {
+		e.log.Infof("interface backfill: materialized %d interfaces across %d server devices", ifacesApplied, devicesTouched)
+	}
 }
 
 // Stop stops the scan executor

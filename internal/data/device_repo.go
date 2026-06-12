@@ -180,6 +180,24 @@ func (r *DeviceRepo) List(ctx context.Context, tenantID uint32, page, pageSize i
 	return entities, total, nil
 }
 
+// ListByTypeWithMetadataCursor returns up to limit devices of the given type
+// that have non-empty metadata, ordered by id with id > afterID (cursor
+// pagination), across all tenants. Intended for background backfills that run
+// under a system viewer context (tenant privacy bypassed).
+func (r *DeviceRepo) ListByTypeWithMetadataCursor(ctx context.Context, deviceType int32, afterID string, limit int) ([]*ent.Device, error) {
+	query := r.entClient.Client().Device.Query().
+		Where(device.DeviceType(deviceType), device.MetadataNEQ(""))
+	if afterID != "" {
+		query = query.Where(device.IDGT(afterID))
+	}
+	entities, err := query.Order(ent.Asc(device.FieldID)).Limit(limit).All(ctx)
+	if err != nil {
+		r.log.Errorf("list devices by type with metadata failed: %s", err.Error())
+		return nil, ipamV1.ErrorInternalServerError("list devices failed")
+	}
+	return entities, nil
+}
+
 func (r *DeviceRepo) Update(ctx context.Context, id string, updates map[string]interface{}) (*ent.Device, error) {
 	update := r.entClient.Client().Device.UpdateOneID(id)
 

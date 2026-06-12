@@ -104,6 +104,12 @@ func (s *DeviceService) CreateDevice(ctx context.Context, req *ipamV1.CreateDevi
 
 	s.metrics.DeviceCreated()
 
+	// Promote agent-reported metadata interfaces to interface rows so their MACs
+	// are visible to SNMP bridge-FDB link correlation.
+	if req.Metadata != nil {
+		materializeMetadataInterfaces(ctx, s.deviceInterfaceRepo, s.log, entity.ID, *req.Metadata)
+	}
+
 	return &ipamV1.CreateDeviceResponse{
 		Device: deviceToProto(entity),
 	}, nil
@@ -251,6 +257,11 @@ func (s *DeviceService) UpdateDevice(ctx context.Context, req *ipamV1.UpdateDevi
 	entity, err := s.deviceRepo.Update(ctx, req.GetId(), updates)
 	if err != nil {
 		return nil, err
+	}
+
+	// Keep interface rows in sync with agent-reported metadata interfaces.
+	if req.Data != nil && req.Data.Metadata != nil {
+		materializeMetadataInterfaces(ctx, s.deviceInterfaceRepo, s.log, entity.ID, *req.Data.Metadata)
 	}
 
 	return &ipamV1.UpdateDeviceResponse{
