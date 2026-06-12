@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ const (
 	oidIfSpeed       = "1.3.6.1.2.1.2.2.1.5"  // Interface speed (bps)
 	oidIfPhysAddress = "1.3.6.1.2.1.2.2.1.6"  // MAC address
 	oidIfAdminStatus = "1.3.6.1.2.1.2.2.1.7"  // Admin status (1=up, 2=down)
+	oidIfName        = "1.3.6.1.2.1.31.1.1.1.1"  // ifXTable interface name (e.g. ExtremeXOS "1:29")
 	oidIfAlias       = "1.3.6.1.2.1.31.1.1.1.18" // Interface alias/description
 
 	// SNMP OIDs for the bridge forwarding database (MAC address table). Used to
@@ -440,6 +442,25 @@ func walkInterfaces(client *gosnmp.GoSNMP) ([]SNMPInterface, error) {
 		return nil, fmt.Errorf("walk ifDescr: %w", err)
 	}
 
+	// Some platforms (notably ExtremeXOS) leave ifDescr empty and only populate
+	// the ifXTable ifName (e.g. "1:29"). Walk ifName to discover those
+	// interfaces and to fill in names where ifDescr was blank.
+	_ = client.Walk(oidIfName, func(pdu gosnmp.SnmpPDU) error {
+		idx := extractIfIndex(pdu.Name, oidIfName)
+		if idx <= 0 {
+			return nil
+		}
+		name := extractStringValue(pdu)
+		if iface, ok := ifMap[idx]; ok {
+			if iface.Name == "" {
+				iface.Name = name
+			}
+		} else {
+			ifMap[idx] = &SNMPInterface{Index: idx, Name: name, Enabled: true}
+		}
+		return nil
+	})
+
 	if len(ifMap) == 0 {
 		return nil, nil
 	}
@@ -495,12 +516,17 @@ func walkInterfaces(client *gosnmp.GoSNMP) ([]SNMPInterface, error) {
 		return nil
 	})
 
-	// Convert map to sorted slice
+	// Convert map to a slice sorted by ifIndex. Indices are not necessarily
+	// contiguous or low-numbered (ExtremeXOS uses values like 1029), so sort the
+	// actual keys rather than scanning a bounded range.
+	indices := make([]int, 0, len(ifMap))
+	for idx := range ifMap {
+		indices = append(indices, idx)
+	}
+	sort.Ints(indices)
 	result := make([]SNMPInterface, 0, len(ifMap))
-	for i := 1; i <= len(ifMap)+100; i++ {
-		if iface, ok := ifMap[i]; ok {
-			result = append(result, *iface)
-		}
+	for _, idx := range indices {
+		result = append(result, *ifMap[idx])
 	}
 
 	return result, nil
@@ -740,13 +766,18 @@ func parseDeviceType(sysObjectID, sysDescr string) int32 {
 		if strings.Contains(lower, "srx") || strings.Contains(lower, "firewall") {
 			return 5
 		}
+	case strings.Contains(sysObjectID, "1.3.6.1.4.1.1916."):
+		// Extreme Networks — switches (ExtremeXOS / Switch Engine). sysDescr
+		// often lacks the word "switch" (e.g. "ExtremeXOS (X670G2-48x-4q)").
+		return 4
 	}
 
 	// Fall back to description-based detection
 	switch {
 	case strings.Contains(lower, "router") || strings.Contains(lower, "routing"):
 		return 3 // ROUTER
-	case strings.Contains(lower, "switch") || strings.Contains(lower, "switching"):
+	case strings.Contains(lower, "switch") || strings.Contains(lower, "switching") ||
+		strings.Contains(lower, "extremexos") || strings.Contains(lower, "extreme networks"):
 		return 4 // SWITCH
 	case strings.Contains(lower, "firewall") || strings.Contains(lower, "security"):
 		return 5 // FIREWALL

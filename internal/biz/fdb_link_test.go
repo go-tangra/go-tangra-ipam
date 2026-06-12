@@ -129,3 +129,25 @@ func TestSelectAccessPortsUppercaseDeduped(t *testing.T) {
 		t.Fatalf("expected normalized lower-case key")
 	}
 }
+
+func TestParseDeviceTypeExtreme(t *testing.T) {
+	// ExtremeXOS sysDescr lacks the word "switch"; detection must still classify
+	// it as a switch (type 4) so the bridge-FDB walk runs.
+	cases := []struct {
+		name        string
+		sysObjectID string
+		sysDescr    string
+		want        int32
+	}{
+		{"extreme by sysObjectID", "1.3.6.1.4.1.1916.2.76", "ExtremeXOS (X670G2-48x-4q) version 30.7.2.1", 4},
+		{"extreme by descr only", "1.3.6.1.4.1.99999.1", "ExtremeXOS (X670G2-48x-4q) version 30.7.2.1", 4},
+		{"extreme switch engine", "1.3.6.1.4.1.1916.2.169", "Extreme Networks Switch Engine (Stack) version 32.3.1.11", 4},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := parseDeviceType(c.sysObjectID, c.sysDescr); got != c.want {
+				t.Fatalf("parseDeviceType(%q,%q) = %d, want %d", c.sysObjectID, c.sysDescr, got, c.want)
+			}
+		})
+	}
+}
