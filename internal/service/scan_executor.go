@@ -603,6 +603,8 @@ func (e *ScanExecutor) runCleanup() {
 func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []biz.SNMPDeviceInfo) {
 	e.log.Infof("Processing %d SNMP device results for tenant %d", len(results), tenantID)
 
+	var switchScans []switchFDB
+
 	for _, info := range results {
 		// Try to find existing device by primary IP
 		e.log.Debugf("Looking up device by primary IP: %s", info.Address)
@@ -708,12 +710,14 @@ func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []b
 		// Sync interfaces
 		e.syncDeviceInterfaces(deviceID, info.Interfaces)
 
-		// For switches, correlate the bridge forwarding database against known
-		// physical-server MACs to discover server -> switch-port links.
+		// Collect switch forwarding databases for a single global correlation
+		// pass once all devices/interfaces in this scan are persisted.
 		if info.DeviceType == deviceTypeSwitch && len(info.ForwardingDB) > 0 {
-			e.correlateSwitchLinks(tenantID, deviceID, info.ForwardingDB)
+			switchScans = append(switchScans, switchFDB{deviceID: deviceID, fdb: info.ForwardingDB})
 		}
 	}
+
+	e.correlateLinks(tenantID, switchScans)
 }
 
 const (
@@ -730,71 +734,92 @@ const (
 	fdbEdgePortMaxMACs = 16
 )
 
-// correlateSwitchLinks maps host MACs from a switch's forwarding database to the
-// switch ports they were learned on, then records a link on the matching
-// physical-server interface (remote_device_id / remote_interface_id ...).
+// switchFDB pairs a discovered switch with its bridge forwarding database for
+// the global link-correlation pass.
+type switchFDB struct {
+	deviceID string
+	fdb      []biz.FDBEntry
+}
+
+// correlateLinks discovers server -> switch-port links across ALL switches in a
+// scan at once.
 //
-// For each MAC seen on multiple ports it picks the port that learned the fewest
-// distinct MACs (the most edge-like), and only links when that port is below the
-// edge-port MAC threshold — avoiding false links to uplink/trunk ports that see
-// a host MAC transitively.
-func (e *ScanExecutor) correlateSwitchLinks(tenantID uint32, switchID string, fdb []biz.FDBEntry) {
-	ports, err := e.deviceInterfaceRepo.ListByDeviceID(e.ctx, switchID)
-	if err != nil {
-		e.log.Warnf("Link correlation: failed to list ports for switch %s: %v", switchID, err)
-		return
+// A host MAC appears on its access switch's edge port (few MACs) AND on a core
+// switch's uplink port (many MACs). Correlating per switch and writing
+// immediately lets whichever switch is processed last overwrite the link with
+// an uplink port. This pass instead compares the candidate ports across every
+// switch and keeps the one with the fewest learned MACs (the globally most
+// direct connection), writing each server's link exactly once.
+func (e *ScanExecutor) correlateLinks(tenantID uint32, switches []switchFDB) {
+	type candidate struct {
+		switchID string
+		port     *ent.DeviceInterface
+		macCount int
+		vlan     int
 	}
-	portByIf := make(map[int32]*ent.DeviceInterface)
-	for _, p := range ports {
-		if p.IfIndex != nil {
-			portByIf[*p.IfIndex] = p
+	best := make(map[string]candidate)
+
+	for _, sw := range switches {
+		ports, err := e.deviceInterfaceRepo.ListByDeviceID(e.ctx, sw.deviceID)
+		if err != nil {
+			e.log.Warnf("Link correlation: failed to list ports for switch %s: %v", sw.deviceID, err)
+			continue
+		}
+		portByIf := make(map[int32]*ent.DeviceInterface)
+		for _, p := range ports {
+			if p.IfIndex != nil {
+				portByIf[*p.IfIndex] = p
+			}
+		}
+		if len(portByIf) == 0 {
+			continue
+		}
+
+		for mac, ap := range biz.RankAccessPorts(sw.fdb) {
+			port, ok := portByIf[int32(ap.IfIndex)]
+			if !ok {
+				continue // switch port for this ifIndex not modeled
+			}
+			if cur, exists := best[mac]; !exists || ap.MACCount < cur.macCount {
+				best[mac] = candidate{switchID: sw.deviceID, port: port, macCount: ap.MACCount, vlan: ap.VLAN}
+			}
 		}
 	}
-	if len(portByIf) == 0 {
-		e.log.Debugf("Link correlation: switch %s has no ports with ifIndex, skipping", switchID)
-		return
-	}
-
-	// Pick the edge (access) port for each host MAC, dropping uplink/trunk ports.
-	access := biz.SelectAccessPorts(fdb, fdbEdgePortMaxMACs)
 
 	linked := 0
-	for mac, entry := range access {
-		port, ok := portByIf[int32(entry.IfIndex)]
-		if !ok {
-			continue // switch port for this ifIndex not modeled
+	for mac, c := range best {
+		if c.macCount > fdbEdgePortMaxMACs {
+			continue // only seen on uplinks/trunks — host is behind another switch
 		}
-
 		serverIface, err := e.deviceInterfaceRepo.FindServerInterfaceByMAC(e.ctx, tenantID, mac)
 		if err != nil {
 			e.log.Warnf("Link correlation: lookup for MAC %s failed: %v", mac, err)
 			continue
 		}
-		if serverIface == nil || serverIface.DeviceID == switchID {
+		if serverIface == nil || serverIface.DeviceID == c.switchID {
 			continue // not a known physical server (or the switch's own MAC)
 		}
 
 		updates := map[string]any{
-			"remote_device_id":    switchID,
-			"remote_interface_id": port.ID,
-			"remote_port_name":    port.Name,
+			"remote_device_id":    c.switchID,
+			"remote_interface_id": c.port.ID,
+			"remote_port_name":    c.port.Name,
 			"link_source":         linkSourceSNMPFDB,
 			"link_last_seen":      time.Now(),
 		}
-		if entry.VLAN > 0 {
-			updates["link_vlan"] = int32(entry.VLAN)
+		if c.vlan > 0 {
+			updates["link_vlan"] = int32(c.vlan)
 		}
 		if _, err := e.deviceInterfaceRepo.Update(e.ctx, serverIface.ID, updates); err != nil {
 			e.log.Warnf("Link correlation: failed to set link on interface %s: %v", serverIface.ID, err)
 			continue
 		}
 		linked++
-		e.log.Infof("Link discovered: server interface %s (MAC %s) -> switch %s port %s (ifIndex %d, vlan %d)",
-			serverIface.Name, mac, switchID, port.Name, entry.IfIndex, entry.VLAN)
+		e.log.Infof("Link discovered: server interface %s (MAC %s) -> switch %s port %s (macs %d, vlan %d)",
+			serverIface.Name, mac, c.switchID, c.port.Name, c.macCount, c.vlan)
 	}
 
-	e.log.Infof("Link correlation for switch %s: %d server links discovered from %d FDB entries",
-		switchID, linked, len(fdb))
+	e.log.Infof("Link correlation: %d server links discovered across %d switches", linked, len(switches))
 }
 
 // maskString masks a string for logging, showing only first 2 chars

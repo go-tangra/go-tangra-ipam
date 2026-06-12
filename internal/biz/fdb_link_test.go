@@ -75,7 +75,7 @@ func TestPduToInt(t *testing.T) {
 	}
 }
 
-func TestSelectAccessPorts(t *testing.T) {
+func TestRankAccessPorts(t *testing.T) {
 	const (
 		server  = "90:5a:08:be:ec:3e"
 		otherA  = "aa:aa:aa:aa:aa:01"
@@ -95,33 +95,38 @@ func TestSelectAccessPorts(t *testing.T) {
 		{MAC: behind, IfIndex: 48}, // only ever seen on the uplink
 	}
 
-	got := SelectAccessPorts(fdb, 3)
+	got := RankAccessPorts(fdb)
 
-	// Server MAC resolves to the access port (10), not the uplink (48).
+	// Server MAC resolves to the access port (10, 1 MAC), not the uplink (48).
 	entry, ok := got[server]
 	if !ok {
-		t.Fatalf("expected server MAC to be selected")
+		t.Fatalf("expected server MAC to be ranked")
 	}
-	if entry.IfIndex != 10 {
-		t.Fatalf("server MAC chose ifIndex %d, want 10 (access port)", entry.IfIndex)
+	if entry.IfIndex != 10 || entry.VLAN != 100 {
+		t.Fatalf("server MAC chose ifIndex %d vlan %d, want 10/100 (access port)", entry.IfIndex, entry.VLAN)
 	}
-	if entry.VLAN != 100 {
-		t.Fatalf("server MAC VLAN = %d, want 100", entry.VLAN)
+	if entry.MACCount != 1 {
+		t.Fatalf("server access port MACCount = %d, want 1", entry.MACCount)
 	}
 
-	// A MAC only ever seen on the over-threshold uplink must be dropped.
-	if _, ok := got[behind]; ok {
-		t.Fatalf("MAC seen only on uplink (5 MACs > maxMACs 3) should be omitted")
+	// A MAC only seen on the uplink keeps that port, with a high MACCount so the
+	// caller's threshold can drop it.
+	b, ok := got[behind]
+	if !ok || b.IfIndex != 48 {
+		t.Fatalf("behind MAC should rank to uplink ifIndex 48, got %+v", b)
+	}
+	if b.MACCount < 4 {
+		t.Fatalf("uplink port MACCount = %d, want >= 4 (it carries many MACs)", b.MACCount)
 	}
 }
 
-func TestSelectAccessPortsUppercaseDeduped(t *testing.T) {
+func TestRankAccessPortsUppercaseDeduped(t *testing.T) {
 	// The same MAC in different cases must be treated as one.
 	fdb := []FDBEntry{
 		{MAC: "90:5A:08:BE:EC:3E", IfIndex: 5, VLAN: 1},
 		{MAC: "90:5a:08:be:ec:3e", IfIndex: 5, VLAN: 1},
 	}
-	got := SelectAccessPorts(fdb, 16)
+	got := RankAccessPorts(fdb)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 normalized MAC, got %d", len(got))
 	}
