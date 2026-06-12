@@ -564,6 +564,7 @@ interface DeviceMetadata {
   memory?: MemoryMetadata;
   disks?: { name: string; type: string; model: string; size: number }[];
   interfaces?: { name: string; mac_address: string; ips: string[]; cidrs?: string[] }[];
+  ipmi?: { ip?: string; mac?: string; gateway?: string; subnet?: string };
 }
 
 function isVirtualDevice(deviceType: string | undefined) {
@@ -693,6 +694,25 @@ const interfaceColumns = [
           </DescriptionsItem>
           <DescriptionsItem v-if="device.addressCount" :label="$t('ipam.page.device.addressCount')">
             {{ device.addressCount }}
+          </DescriptionsItem>
+        </Descriptions>
+      </template>
+
+      <!-- IPMI / BMC management interface -->
+      <template v-if="parsedMetadata?.ipmi?.ip || parsedMetadata?.ipmi?.mac">
+        <Divider orientation="left">{{ $t('ipam.page.device.sectionIpmi') }}</Divider>
+        <Descriptions :column="1" bordered size="small">
+          <DescriptionsItem v-if="parsedMetadata.ipmi.ip" :label="$t('ipam.page.device.ipmiIp')">
+            <Tag color="purple">{{ parsedMetadata.ipmi.ip }}</Tag>
+          </DescriptionsItem>
+          <DescriptionsItem v-if="parsedMetadata.ipmi.mac" :label="$t('ipam.page.device.ipmiMac')">
+            <code>{{ parsedMetadata.ipmi.mac }}</code>
+          </DescriptionsItem>
+          <DescriptionsItem v-if="parsedMetadata.ipmi.gateway" :label="$t('ipam.page.device.ipmiGateway')">
+            {{ parsedMetadata.ipmi.gateway }}
+          </DescriptionsItem>
+          <DescriptionsItem v-if="parsedMetadata.ipmi.subnet" :label="$t('ipam.page.device.ipmiSubnet')">
+            {{ parsedMetadata.ipmi.subnet }}
           </DescriptionsItem>
         </Descriptions>
       </template>
