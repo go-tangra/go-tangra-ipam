@@ -495,6 +495,26 @@ async function resolveIpmiSecret(id: string | undefined): Promise<void> {
   }
 }
 
+// Platform-admin gate for IPMI console access. Mirrors the backend
+// (roles platform:admin / super:admin); the backend is the real guard.
+const isPlatformAdmin = computed(() => {
+  const store = userStore as unknown as {
+    userRoles?: string[];
+    userInfo?: { roles?: Array<string | { value?: string }> };
+  };
+  const raw = store.userRoles ?? store.userInfo?.roles ?? [];
+  const roles = raw.map((r) => (typeof r === 'string' ? r : (r?.value ?? '')));
+  return roles.includes('platform:admin') || roles.includes('super:admin');
+});
+
+// Open the BMC KVM console (IPMI View) in a new tab. The page mints the session
+// (platform-admin checked server-side) and embeds the console.
+function openIpmiConsole(): void {
+  const id = device.value?.id;
+  if (!id) return;
+  window.open(`${window.location.origin}/#/ipam/ipmi-view/${id}`, '_blank', 'noopener');
+}
+
 // Switch port the BMC is connected to, discovered by SNMP from the IPMI MAC.
 // The link lands on the synthetic "ipmi" interface row.
 const ipmiLink = computed(() => {
@@ -785,6 +805,14 @@ const interfaceColumns = [
           </DescriptionsItem>
           <DescriptionsItem v-if="ipmiLink" :label="$t('ipam.page.device.connectedTo')">
             <Tag color="blue" style="white-space: normal; height: auto;">{{ ipmiLink }}</Tag>
+          </DescriptionsItem>
+          <DescriptionsItem
+            v-if="device.ipmiSecretRef && isPlatformAdmin"
+            :label="$t('ipam.page.device.ipmiConsole')"
+          >
+            <Button type="primary" size="small" @click="openIpmiConsole">
+              {{ $t('ipam.page.device.ipmiConnect') }}
+            </Button>
           </DescriptionsItem>
         </Descriptions>
       </template>

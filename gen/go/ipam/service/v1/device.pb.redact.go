@@ -170,6 +170,17 @@ func (s *redactedDeviceServiceServer) GetWardenSecret(ctx context.Context, in *G
 	return res, err
 }
 
+// StartKvmSession is the redacted wrapper for the actual DeviceServiceServer.StartKvmSession method
+// Unary RPC
+func (s *redactedDeviceServiceServer) StartKvmSession(ctx context.Context, in *StartKvmSessionRequest) (*StartKvmSessionResponse, error) {
+	res, err := s.srv.StartKvmSession(ctx, in)
+	if !s.bypass.CheckInternal(ctx) {
+		// Apply redaction to the response
+		redact.Apply(res)
+	}
+	return res, err
+}
+
 // Redact method implementation for Device
 func (x *Device) Redact() string {
 	if x == nil {
@@ -535,6 +546,30 @@ func (x *DeleteDeviceInterfaceRequest) Redact() string {
 	// Safe field: DeviceId
 
 	// Safe field: Id
+	return x.String()
+}
+
+// Redact method implementation for StartKvmSessionRequest
+func (x *StartKvmSessionRequest) Redact() string {
+	if x == nil {
+		return ""
+	}
+
+	// Safe field: Id
+	return x.String()
+}
+
+// Redact method implementation for StartKvmSessionResponse
+func (x *StartKvmSessionResponse) Redact() string {
+	if x == nil {
+		return ""
+	}
+
+	// Safe field: Token
+
+	// Safe field: ConsoleUrl
+
+	// Safe field: BmcHost
 	return x.String()
 }
 

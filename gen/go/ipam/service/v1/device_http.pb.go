@@ -30,6 +30,7 @@ const OperationDeviceServiceGetDeviceInterfaces = "/ipam.service.v1.DeviceServic
 const OperationDeviceServiceGetWardenSecret = "/ipam.service.v1.DeviceService/GetWardenSecret"
 const OperationDeviceServiceListDevices = "/ipam.service.v1.DeviceService/ListDevices"
 const OperationDeviceServiceSearchWardenSecrets = "/ipam.service.v1.DeviceService/SearchWardenSecrets"
+const OperationDeviceServiceStartKvmSession = "/ipam.service.v1.DeviceService/StartKvmSession"
 const OperationDeviceServiceUpdateDevice = "/ipam.service.v1.DeviceService/UpdateDevice"
 
 type DeviceServiceHTTPServer interface {
@@ -55,6 +56,11 @@ type DeviceServiceHTTPServer interface {
 	// IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
 	// returns secret values.
 	SearchWardenSecrets(context.Context, *SearchWardenSecretsRequest) (*SearchWardenSecretsResponse, error)
+	// StartKvmSession Start an IPMI/BMC KVM session for a device. Platform-admin only. Resolves
+	// the device's BMC IP + linked Warden credentials, logs into the BMC, and
+	// returns a short-lived token + the proxy console URL. The credentials never
+	// leave the server.
+	StartKvmSession(context.Context, *StartKvmSessionRequest) (*StartKvmSessionResponse, error)
 	// UpdateDevice Update a device
 	UpdateDevice(context.Context, *UpdateDeviceRequest) (*UpdateDeviceResponse, error)
 }
@@ -72,6 +78,7 @@ func RegisterDeviceServiceHTTPServer(s *http.Server, srv DeviceServiceHTTPServer
 	r.DELETE("/v1/devices/{device_id}/interfaces/{id}", _DeviceService_DeleteDeviceInterface0_HTTP_Handler(srv))
 	r.GET("/v1/warden-secrets", _DeviceService_SearchWardenSecrets0_HTTP_Handler(srv))
 	r.GET("/v1/warden-secrets/{id}", _DeviceService_GetWardenSecret0_HTTP_Handler(srv))
+	r.POST("/v1/devices/{id}/kvm-session", _DeviceService_StartKvmSession0_HTTP_Handler(srv))
 }
 
 func _DeviceService_CreateDevice0_HTTP_Handler(srv DeviceServiceHTTPServer) func(ctx http.Context) error {
@@ -316,6 +323,31 @@ func _DeviceService_GetWardenSecret0_HTTP_Handler(srv DeviceServiceHTTPServer) f
 	}
 }
 
+func _DeviceService_StartKvmSession0_HTTP_Handler(srv DeviceServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in StartKvmSessionRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationDeviceServiceStartKvmSession)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.StartKvmSession(ctx, req.(*StartKvmSessionRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*StartKvmSessionResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type DeviceServiceHTTPClient interface {
 	// CreateDevice Create a new device
 	CreateDevice(ctx context.Context, req *CreateDeviceRequest, opts ...http.CallOption) (rsp *CreateDeviceResponse, err error)
@@ -339,6 +371,11 @@ type DeviceServiceHTTPClient interface {
 	// IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
 	// returns secret values.
 	SearchWardenSecrets(ctx context.Context, req *SearchWardenSecretsRequest, opts ...http.CallOption) (rsp *SearchWardenSecretsResponse, err error)
+	// StartKvmSession Start an IPMI/BMC KVM session for a device. Platform-admin only. Resolves
+	// the device's BMC IP + linked Warden credentials, logs into the BMC, and
+	// returns a short-lived token + the proxy console URL. The credentials never
+	// leave the server.
+	StartKvmSession(ctx context.Context, req *StartKvmSessionRequest, opts ...http.CallOption) (rsp *StartKvmSessionResponse, err error)
 	// UpdateDevice Update a device
 	UpdateDevice(ctx context.Context, req *UpdateDeviceRequest, opts ...http.CallOption) (rsp *UpdateDeviceResponse, err error)
 }
@@ -487,6 +524,23 @@ func (c *DeviceServiceHTTPClientImpl) SearchWardenSecrets(ctx context.Context, i
 	opts = append(opts, http.Operation(OperationDeviceServiceSearchWardenSecrets))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// StartKvmSession Start an IPMI/BMC KVM session for a device. Platform-admin only. Resolves
+// the device's BMC IP + linked Warden credentials, logs into the BMC, and
+// returns a short-lived token + the proxy console URL. The credentials never
+// leave the server.
+func (c *DeviceServiceHTTPClientImpl) StartKvmSession(ctx context.Context, in *StartKvmSessionRequest, opts ...http.CallOption) (*StartKvmSessionResponse, error) {
+	var out StartKvmSessionResponse
+	pattern := "/v1/devices/{id}/kvm-session"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationDeviceServiceStartKvmSession))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

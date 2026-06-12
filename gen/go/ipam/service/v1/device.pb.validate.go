@@ -2671,6 +2671,218 @@ var _ interface {
 	ErrorName() string
 } = DeleteDeviceInterfaceRequestValidationError{}
 
+// Validate checks the field values on StartKvmSessionRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *StartKvmSessionRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StartKvmSessionRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// StartKvmSessionRequestMultiError, or nil if none found.
+func (m *StartKvmSessionRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StartKvmSessionRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Id
+
+	if len(errors) > 0 {
+		return StartKvmSessionRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StartKvmSessionRequestMultiError is an error wrapping multiple validation
+// errors returned by StartKvmSessionRequest.ValidateAll() if the designated
+// constraints aren't met.
+type StartKvmSessionRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StartKvmSessionRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StartKvmSessionRequestMultiError) AllErrors() []error { return m }
+
+// StartKvmSessionRequestValidationError is the validation error returned by
+// StartKvmSessionRequest.Validate if the designated constraints aren't met.
+type StartKvmSessionRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StartKvmSessionRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StartKvmSessionRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StartKvmSessionRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StartKvmSessionRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StartKvmSessionRequestValidationError) ErrorName() string {
+	return "StartKvmSessionRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StartKvmSessionRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStartKvmSessionRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StartKvmSessionRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StartKvmSessionRequestValidationError{}
+
+// Validate checks the field values on StartKvmSessionResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *StartKvmSessionResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StartKvmSessionResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// StartKvmSessionResponseMultiError, or nil if none found.
+func (m *StartKvmSessionResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StartKvmSessionResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Token
+
+	// no validation rules for ConsoleUrl
+
+	// no validation rules for BmcHost
+
+	if len(errors) > 0 {
+		return StartKvmSessionResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// StartKvmSessionResponseMultiError is an error wrapping multiple validation
+// errors returned by StartKvmSessionResponse.ValidateAll() if the designated
+// constraints aren't met.
+type StartKvmSessionResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StartKvmSessionResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StartKvmSessionResponseMultiError) AllErrors() []error { return m }
+
+// StartKvmSessionResponseValidationError is the validation error returned by
+// StartKvmSessionResponse.Validate if the designated constraints aren't met.
+type StartKvmSessionResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StartKvmSessionResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StartKvmSessionResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StartKvmSessionResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StartKvmSessionResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StartKvmSessionResponseValidationError) ErrorName() string {
+	return "StartKvmSessionResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StartKvmSessionResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStartKvmSessionResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StartKvmSessionResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StartKvmSessionResponseValidationError{}
+
 // Validate checks the field values on WardenSecretRef with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.

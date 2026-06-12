@@ -2,15 +2,22 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/go-kratos/kratos/v2/errors"
+
+	"github.com/go-tangra/go-tangra-common/grpcx"
 	"github.com/go-tangra/go-tangra-ipam/internal/client"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
+	"github.com/go-tangra/go-tangra-ipam/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
@@ -24,10 +31,11 @@ type DeviceService struct {
 	ipAddressRepo       *data.IpAddressRepo
 	devicePackageRepo   *data.DevicePackageRepo
 	wardenClient        *client.WardenClient
+	kvmService          *kvm.Service
 	metrics             *metrics.Collector
 }
 
-func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo, devicePackageRepo *data.DevicePackageRepo, wardenClient *client.WardenClient, metrics *metrics.Collector) *DeviceService {
+func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo, devicePackageRepo *data.DevicePackageRepo, wardenClient *client.WardenClient, kvmService *kvm.Service, metrics *metrics.Collector) *DeviceService {
 	return &DeviceService{
 		log:                 ctx.NewLoggerHelper("ipam/service/device"),
 		deviceRepo:          deviceRepo,
@@ -35,8 +43,79 @@ func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, devic
 		ipAddressRepo:       ipAddressRepo,
 		devicePackageRepo:   devicePackageRepo,
 		wardenClient:        wardenClient,
+		kvmService:          kvmService,
 		metrics:             metrics,
 	}
+}
+
+// StartKvmSession resolves a device's BMC address + linked Warden credentials,
+// logs into the BMC, and returns a short-lived token + console URL for the
+// reverse-proxied HTML5 KVM. Platform-admin only; credentials never leave the
+// server.
+func (s *DeviceService) StartKvmSession(ctx context.Context, req *ipamV1.StartKvmSessionRequest) (*ipamV1.StartKvmSessionResponse, error) {
+	if !grpcx.IsPlatformAdmin(ctx) {
+		return nil, errors.Forbidden("FORBIDDEN", "IPMI console access is restricted to platform admins")
+	}
+
+	device, err := s.deviceRepo.GetByID(ctx, req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	if device == nil {
+		return nil, ipamV1.ErrorDeviceNotFound("device not found")
+	}
+	if device.IpmiSecretRef == "" {
+		return nil, ipamV1.ErrorBadRequest("device has no IPMI credentials linked")
+	}
+
+	host := bmcHostFromDevice(device)
+	if host == "" {
+		return nil, ipamV1.ErrorBadRequest("device has no IPMI/BMC address")
+	}
+
+	username, password, err := s.wardenClient.GetCredentials(ctx, device.IpmiSecretRef)
+	if err != nil {
+		s.log.Warnf("kvm: resolve credentials for device %s: %v", device.ID, err)
+		return nil, ipamV1.ErrorInternalServerError("could not resolve IPMI credentials")
+	}
+	if username == "" || password == "" {
+		return nil, ipamV1.ErrorBadRequest("linked secret has no username/password")
+	}
+
+	token, err := s.kvmService.StartSession(device.ID, host, username, password)
+	if err != nil {
+		s.log.Errorf("kvm: mint session for device %s: %v", device.ID, err)
+		return nil, ipamV1.ErrorInternalServerError("could not start KVM session")
+	}
+
+	consoleURL := fmt.Sprintf(
+		"/modules/ipam/bmc/%s/cgi/url_redirect.cgi?url_name=man_ikvm_html5_bootstrap&kvmtoken=%s",
+		device.ID, token)
+
+	return &ipamV1.StartKvmSessionResponse{
+		Token:      token,
+		ConsoleUrl: consoleURL,
+		BmcHost:    host,
+	}, nil
+}
+
+// bmcHostFromDevice resolves a device's BMC/IPMI address: the metadata ipmi.ip
+// (authoritative, agent-collected) takes precedence, falling back to the
+// device's management_ip.
+func bmcHostFromDevice(device *ent.Device) string {
+	if device.Metadata != "" {
+		var env struct {
+			IPMI struct {
+				IP string `json:"ip"`
+			} `json:"ipmi"`
+		}
+		if err := json.Unmarshal([]byte(device.Metadata), &env); err == nil {
+			if ip := strings.TrimSpace(env.IPMI.IP); ip != "" {
+				return ip
+			}
+		}
+	}
+	return strings.TrimSpace(device.ManagementIP)
 }
 
 // SearchWardenSecrets proxies a metadata-only secret search to the Warden module

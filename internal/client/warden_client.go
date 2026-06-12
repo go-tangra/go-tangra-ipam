@@ -128,6 +128,28 @@ func (c *WardenClient) GetSecret(ctx context.Context, id string) (*SecretRef, er
 	return &ref, nil
 }
 
+// GetCredentials returns the username + password of a secret, for server-side
+// use only (e.g. logging into a BMC). NEVER return the password to a browser.
+// The username comes from the secret metadata; the password from the dedicated
+// password RPC. The caller's permissions are enforced by Warden.
+func (c *WardenClient) GetCredentials(ctx context.Context, secretID string) (username, password string, err error) {
+	if err := c.resolve(); err != nil {
+		return "", "", err
+	}
+	metaResp, err := c.secrets.GetSecret(propagate(ctx), &wardenV1.GetSecretRequest{Id: secretID})
+	if err != nil {
+		return "", "", fmt.Errorf("get secret: %w", err)
+	}
+	if metaResp.GetSecret() != nil {
+		username = metaResp.GetSecret().GetUsername()
+	}
+	pwResp, err := c.secrets.GetSecretPassword(propagate(ctx), &wardenV1.GetSecretPasswordRequest{Id: secretID})
+	if err != nil {
+		return "", "", fmt.Errorf("get secret password: %w", err)
+	}
+	return username, pwResp.GetPassword(), nil
+}
+
 func toRef(s *wardenV1.Secret) SecretRef {
 	return SecretRef{
 		ID:         s.GetId(),

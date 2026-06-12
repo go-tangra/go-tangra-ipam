@@ -31,6 +31,7 @@ const (
 	DeviceService_DeleteDeviceInterface_FullMethodName = "/ipam.service.v1.DeviceService/DeleteDeviceInterface"
 	DeviceService_SearchWardenSecrets_FullMethodName   = "/ipam.service.v1.DeviceService/SearchWardenSecrets"
 	DeviceService_GetWardenSecret_FullMethodName       = "/ipam.service.v1.DeviceService/GetWardenSecret"
+	DeviceService_StartKvmSession_FullMethodName       = "/ipam.service.v1.DeviceService/StartKvmSession"
 )
 
 // DeviceServiceClient is the client API for DeviceService service.
@@ -63,6 +64,11 @@ type DeviceServiceClient interface {
 	SearchWardenSecrets(ctx context.Context, in *SearchWardenSecretsRequest, opts ...grpc.CallOption) (*SearchWardenSecretsResponse, error)
 	// Resolve a single Warden secret's metadata by id (for display).
 	GetWardenSecret(ctx context.Context, in *GetWardenSecretRequest, opts ...grpc.CallOption) (*GetWardenSecretResponse, error)
+	// Start an IPMI/BMC KVM session for a device. Platform-admin only. Resolves
+	// the device's BMC IP + linked Warden credentials, logs into the BMC, and
+	// returns a short-lived token + the proxy console URL. The credentials never
+	// leave the server.
+	StartKvmSession(ctx context.Context, in *StartKvmSessionRequest, opts ...grpc.CallOption) (*StartKvmSessionResponse, error)
 }
 
 type deviceServiceClient struct {
@@ -183,6 +189,16 @@ func (c *deviceServiceClient) GetWardenSecret(ctx context.Context, in *GetWarden
 	return out, nil
 }
 
+func (c *deviceServiceClient) StartKvmSession(ctx context.Context, in *StartKvmSessionRequest, opts ...grpc.CallOption) (*StartKvmSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartKvmSessionResponse)
+	err := c.cc.Invoke(ctx, DeviceService_StartKvmSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DeviceServiceServer is the server API for DeviceService service.
 // All implementations must embed UnimplementedDeviceServiceServer
 // for forward compatibility.
@@ -213,6 +229,11 @@ type DeviceServiceServer interface {
 	SearchWardenSecrets(context.Context, *SearchWardenSecretsRequest) (*SearchWardenSecretsResponse, error)
 	// Resolve a single Warden secret's metadata by id (for display).
 	GetWardenSecret(context.Context, *GetWardenSecretRequest) (*GetWardenSecretResponse, error)
+	// Start an IPMI/BMC KVM session for a device. Platform-admin only. Resolves
+	// the device's BMC IP + linked Warden credentials, logs into the BMC, and
+	// returns a short-lived token + the proxy console URL. The credentials never
+	// leave the server.
+	StartKvmSession(context.Context, *StartKvmSessionRequest) (*StartKvmSessionResponse, error)
 	mustEmbedUnimplementedDeviceServiceServer()
 }
 
@@ -255,6 +276,9 @@ func (UnimplementedDeviceServiceServer) SearchWardenSecrets(context.Context, *Se
 }
 func (UnimplementedDeviceServiceServer) GetWardenSecret(context.Context, *GetWardenSecretRequest) (*GetWardenSecretResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetWardenSecret not implemented")
+}
+func (UnimplementedDeviceServiceServer) StartKvmSession(context.Context, *StartKvmSessionRequest) (*StartKvmSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartKvmSession not implemented")
 }
 func (UnimplementedDeviceServiceServer) mustEmbedUnimplementedDeviceServiceServer() {}
 func (UnimplementedDeviceServiceServer) testEmbeddedByValue()                       {}
@@ -475,6 +499,24 @@ func _DeviceService_GetWardenSecret_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DeviceService_StartKvmSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartKvmSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeviceServiceServer).StartKvmSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeviceService_StartKvmSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeviceServiceServer).StartKvmSession(ctx, req.(*StartKvmSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DeviceService_ServiceDesc is the grpc.ServiceDesc for DeviceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -525,6 +567,10 @@ var DeviceService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetWardenSecret",
 			Handler:    _DeviceService_GetWardenSecret_Handler,
+		},
+		{
+			MethodName: "StartKvmSession",
+			Handler:    _DeviceService_StartKvmSession_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

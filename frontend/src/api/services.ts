@@ -340,7 +340,19 @@ export const DeviceService = {
   deleteInterface: async (deviceId: string, interfaceId: string, options?: RequestOptions): Promise<void> => {
     return ipamApi.delete(`/devices/${deviceId}/interfaces/${interfaceId}`, options);
   },
+
+  // Start an IPMI/BMC KVM session (platform-admin only). Returns a short-lived
+  // token + the console URL to load in an iframe. Credentials stay server-side.
+  startKvmSession: async (deviceId: string, options?: RequestOptions): Promise<StartKvmSessionResponse> => {
+    return ipamApi.post<StartKvmSessionResponse>(`/devices/${deviceId}/kvm-session`, {}, options);
+  },
 };
+
+export interface StartKvmSessionResponse {
+  token?: string;
+  consoleUrl?: string;
+  bmcHost?: string;
+}
 
 // ==================== Location Service ====================
 

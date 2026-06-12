@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-tangra/go-tangra-ipam/internal/client"
 	"github.com/go-tangra/go-tangra-ipam/internal/event"
+	"github.com/go-tangra/go-tangra-ipam/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	"github.com/go-tangra/go-tangra-ipam/internal/service"
 )
@@ -15,6 +16,7 @@ var ProviderSet = wire.NewSet(
 	client.NewRegistrationClient,
 	client.NewModuleDialer,
 	client.NewWardenClient,
+	kvm.NewService,
 	service.NewSystemService,
 	service.NewSubnetService,
 	service.NewVlanService,

@@ -9,10 +9,12 @@ import (
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
 	"github.com/go-tangra/go-tangra-ipam/cmd/server/assets"
+	"github.com/go-tangra/go-tangra-ipam/internal/kvm"
 )
 
-// NewHTTPServer creates a simple HTTP server for serving the frontend assets.
-func NewHTTPServer(ctx *bootstrap.Context) *kratosHttp.Server {
+// NewHTTPServer creates a simple HTTP server for serving the frontend assets
+// and the BMC KVM reverse proxy.
+func NewHTTPServer(ctx *bootstrap.Context, kvmService *kvm.Service) *kratosHttp.Server {
 	l := ctx.NewLoggerHelper("ipam/http")
 
 	addr := os.Getenv("IPAM_HTTP_ADDR")
@@ -47,6 +49,14 @@ func NewHTTPServer(ctx *bootstrap.Context) *kratosHttp.Server {
 	})
 
 
+
+	// BMC KVM reverse proxy (token-gated inside the handler). Registered before
+	// the "/" catch-all. HandlePrefix bypasses the gRPC transcoding/middleware,
+	// which is required for the WebSocket upgrade and asset proxying.
+	if kvmService != nil {
+		srv.HandlePrefix("/bmc/", kvmService.Handler())
+		l.Infof("Serving BMC KVM reverse proxy at /bmc/")
+	}
 
 	fsys, err := fs.Sub(assets.FrontendDist, "frontend-dist")
 	if err == nil {

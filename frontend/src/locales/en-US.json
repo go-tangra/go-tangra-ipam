@@ -13,6 +13,12 @@
     "packages": "Packages"
   },
   "page": {
+    "ipmiView": {
+      "title": "IPMI Console",
+      "connecting": "Connecting to BMC…",
+      "reconnect": "Reconnect",
+      "failed": "Could not start the IPMI console"
+    },
     "subnet": {
       "title": "Subnets",
       "tree": "Subnet Tree",
@@ -209,6 +215,8 @@
       "ipmiSecret": "IPMI Credentials",
       "ipmiSecretPlaceholder": "Search Warden secrets…",
       "ipmiSecretHint": "Reference to a Warden secret (the value is never stored here)",
+      "ipmiConsole": "Remote Console",
+      "ipmiConnect": "Connect",
       "sectionHardware": "Hardware",
       "sectionLocation": "Location",
       "sectionMetadata": "Host Details",

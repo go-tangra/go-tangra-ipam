@@ -94,6 +94,17 @@ const routes: RouteRecordRaw[] = [
         },
         component: () => import('./views/packages/index.vue'),
       },
+      {
+        path: 'ipmi-view/:deviceId',
+        name: 'IpamIpmiView',
+        meta: {
+          title: 'ipam.page.ipmiView.title',
+          authority: ['platform:admin'],
+          hideInMenu: true,
+          hideInTab: true,
+        },
+        component: () => import('./views/ipmi-view/index.vue'),
+      },
     ],
   },
 ];

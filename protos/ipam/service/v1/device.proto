@@ -432,6 +432,34 @@ service DeviceService {
       get: "/v1/warden-secrets/{id}"
     };
   }
+
+  // Start an IPMI/BMC KVM session for a device. Platform-admin only. Resolves
+  // the device's BMC IP + linked Warden credentials, logs into the BMC, and
+  // returns a short-lived token + the proxy console URL. The credentials never
+  // leave the server.
+  rpc StartKvmSession(StartKvmSessionRequest) returns (StartKvmSessionResponse) {
+    option (google.api.http) = {
+      post: "/v1/devices/{id}/kvm-session"
+      body: "*"
+    };
+  }
+}
+
+message StartKvmSessionRequest {
+  string id = 1 [
+    json_name = "id",
+    (buf.validate.field).string.min_len = 1,
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message StartKvmSessionResponse {
+  // Opaque short-lived session token.
+  string token = 1 [json_name = "token"];
+  // Relative URL (under the module asset path) to load in an iframe/new tab.
+  string console_url = 2 [json_name = "consoleUrl"];
+  // The BMC host the session targets (for display).
+  string bmc_host = 3 [json_name = "bmcHost"];
 }
 
 // WardenSecretRef is the minimal Warden secret metadata used to pick/display a

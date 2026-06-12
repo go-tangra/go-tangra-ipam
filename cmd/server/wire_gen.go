@@ -12,6 +12,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/client"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/event"
+	"github.com/go-tangra/go-tangra-ipam/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	"github.com/go-tangra/go-tangra-ipam/internal/server"
 	"github.com/go-tangra/go-tangra-ipam/internal/service"
@@ -54,7 +55,8 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	deviceService := service.NewDeviceService(context, deviceRepo, deviceInterfaceRepo, ipAddressRepo, devicePackageRepo, wardenClient, collector)
+	kvmService := kvm.NewService(context)
+	deviceService := service.NewDeviceService(context, deviceRepo, deviceInterfaceRepo, ipAddressRepo, devicePackageRepo, wardenClient, kvmService, collector)
 	locationRepo := data.NewLocationRepo(context, entClient)
 	locationService := service.NewLocationService(context, locationRepo, collector)
 	redisClient, cleanup3, err := data.NewRedisClient(context)
@@ -73,7 +75,7 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	backupService := service.NewBackupService(context, entClient)
 	devicePackageService := service.NewDevicePackageService(context, deviceRepo, devicePackageRepo)
 	grpcServer := server.NewGRPCServer(context, certManager, collector, auditLogRepo, systemService, subnetService, vlanService, deviceService, locationService, ipAddressService, ipScanService, ipGroupService, hostGroupService, backupService, devicePackageService)
-	httpServer := server.NewHTTPServer(context)
+	httpServer := server.NewHTTPServer(context, kvmService)
 	scanExecutor := service.NewScanExecutor(context, ipScanJobRepo, subnetRepo, ipAddressRepo, deviceRepo, deviceInterfaceRepo, publisher)
 	app := newApp(context, grpcServer, httpServer, scanExecutor)
 	return app, func() {
