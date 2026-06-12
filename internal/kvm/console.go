@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/gorilla/websocket"
 )
 
@@ -181,30 +182,60 @@ func (s *Service) handleConsoleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Clear any deadline the http.Server set on the hijacked connections so the
+	// long-lived KVM stream is not killed by an inherited read/write timeout.
+	for _, c := range []*websocket.Conn{client, upstream} {
+		_ = c.SetReadDeadline(time.Time{})
+		_ = c.SetWriteDeadline(time.Time{})
+	}
+
 	s.log.Infof("KVM console opened for device %s (%s)", kt.deviceID, kt.target.Host)
-	proxyWebSocket(client, upstream)
+	s.proxyWebSocket(client, upstream)
 	s.log.Infof("KVM console closed for device %s", kt.deviceID)
 }
 
-// proxyWebSocket relays messages between two WebSocket peers until either closes.
-func proxyWebSocket(a, b *websocket.Conn) {
-	done := make(chan struct{}, 2)
-	go copyWebSocket(a, b, done)
-	go copyWebSocket(b, a, done)
+// proxyWebSocket relays messages between the browser and the BMC until either
+// closes, keeping the browser leg alive with periodic pings (it traverses
+// nginx + the admin gateway, which would otherwise idle it out).
+func (s *Service) proxyWebSocket(browser, bmc *websocket.Conn) {
+	done := make(chan string, 2)
+	go copyWebSocket(bmc, browser, "browser→bmc", done, s.log)
+	go copyWebSocket(browser, bmc, "bmc→browser", done, s.log)
+
+	stop := make(chan struct{})
+	go func() {
+		t := time.NewTicker(20 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+				// WriteControl is safe concurrently with WriteMessage.
+				_ = browser.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second))
+			}
+		}
+	}()
+
+	first := <-done
+	close(stop)
+	_ = browser.Close()
+	_ = bmc.Close()
 	<-done
-	_ = a.Close()
-	_ = b.Close()
-	<-done
+	s.log.Infof("KVM relay closed (first side to error: %s)", first)
 }
 
-func copyWebSocket(dst, src *websocket.Conn, done chan struct{}) {
-	defer func() { done <- struct{}{} }()
+func copyWebSocket(dst, src *websocket.Conn, label string, done chan string, log *log.Helper) {
 	for {
 		mt, data, err := src.ReadMessage()
 		if err != nil {
+			log.Infof("KVM relay %s read end: %v", label, err)
+			done <- label
 			return
 		}
 		if err := dst.WriteMessage(mt, data); err != nil {
+			log.Infof("KVM relay %s write end: %v", label, err)
+			done <- label
 			return
 		}
 	}
