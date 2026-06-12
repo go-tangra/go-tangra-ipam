@@ -18,6 +18,26 @@ func TestParseMetadataInterfaces(t *testing.T) {
 	}
 }
 
+func TestParseMetadataInterfacesIncludesIPMI(t *testing.T) {
+	const md = `{"interfaces":[{"name":"eth0","mac_address":"aa:bb:cc:dd:ee:ff"}],` +
+		`"ipmi":{"ip":"10.1.112.18","mac":"7c:c2:55:61:15:c9","gateway":"10.1.112.254","subnet":"255.255.255.0"}}`
+
+	got := parseMetadataInterfaces(md)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 entries (eth0 + ipmi), got %d: %+v", len(got), got)
+	}
+	last := got[len(got)-1]
+	if last.Name != "ipmi" || last.MACAddress != "7c:c2:55:61:15:c9" {
+		t.Fatalf("expected synthetic ipmi interface, got %+v", last)
+	}
+
+	// No ipmi MAC -> no synthetic entry.
+	noIPMI := parseMetadataInterfaces(`{"interfaces":[{"name":"eth0","mac_address":"aa:bb:cc:dd:ee:ff"}],"ipmi":{"ip":"10.1.112.18"}}`)
+	if len(noIPMI) != 1 {
+		t.Fatalf("expected only eth0 when ipmi has no MAC, got %d", len(noIPMI))
+	}
+}
+
 func TestParseMetadataInterfacesEmptyOrInvalid(t *testing.T) {
 	for _, in := range []string{"", "   ", "not json", `{"interfaces":null}`, `{}`} {
 		if got := parseMetadataInterfaces(in); len(got) != 0 {

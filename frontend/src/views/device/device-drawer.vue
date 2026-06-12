@@ -438,6 +438,15 @@ const hasDiscoveredLinks = computed(() =>
   deviceInterfaces.value.some((i) => !!i.remotePortName || !!i.remoteInterfaceId),
 );
 
+// Switch port the BMC is connected to, discovered by SNMP from the IPMI MAC.
+// The link lands on the synthetic "ipmi" interface row.
+const ipmiLink = computed(() => {
+  const row = deviceInterfaces.value.find(
+    (i) => i.name === 'ipmi' && (!!i.remotePortName || !!i.remoteInterfaceId),
+  );
+  return row ? connectedToLabel(row) : '';
+});
+
 async function loadDeviceInterfaces(deviceId: string): Promise<void> {
   loadingInterfaces.value = true;
   try {
@@ -713,6 +722,9 @@ const interfaceColumns = [
           </DescriptionsItem>
           <DescriptionsItem v-if="parsedMetadata.ipmi.subnet" :label="$t('ipam.page.device.ipmiSubnet')">
             {{ parsedMetadata.ipmi.subnet }}
+          </DescriptionsItem>
+          <DescriptionsItem v-if="ipmiLink" :label="$t('ipam.page.device.connectedTo')">
+            <Tag color="blue" style="white-space: normal; height: auto;">{{ ipmiLink }}</Tag>
           </DescriptionsItem>
         </Descriptions>
       </template>

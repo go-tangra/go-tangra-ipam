@@ -20,13 +20,22 @@ type metadataInterface struct {
 	MACAddress string `json:"mac_address"`
 }
 
+// ipmiInterfaceName is the synthetic interface name used for the BMC. It mirrors
+// the interface_name the client uses for the IPMI IP address, so the IPMI MAC
+// participates in bridge-FDB link discovery just like a regular NIC.
+const ipmiInterfaceName = "ipmi"
+
 type deviceMetadataEnvelope struct {
 	Interfaces []metadataInterface `json:"interfaces"`
+	IPMI       struct {
+		MAC string `json:"mac"`
+	} `json:"ipmi"`
 }
 
 // parseMetadataInterfaces extracts the interface list from a device metadata
-// JSON blob. Malformed JSON yields no interfaces rather than an error — the
-// metadata is free-form and best-effort.
+// JSON blob, including a synthetic "ipmi" entry for the BMC MAC when present.
+// Malformed JSON yields no interfaces rather than an error — the metadata is
+// free-form and best-effort.
 func parseMetadataInterfaces(metadataJSON string) []metadataInterface {
 	metadataJSON = strings.TrimSpace(metadataJSON)
 	if metadataJSON == "" {
@@ -36,7 +45,11 @@ func parseMetadataInterfaces(metadataJSON string) []metadataInterface {
 	if err := json.Unmarshal([]byte(metadataJSON), &env); err != nil {
 		return nil
 	}
-	return env.Interfaces
+	ifaces := env.Interfaces
+	if strings.TrimSpace(env.IPMI.MAC) != "" {
+		ifaces = append(ifaces, metadataInterface{Name: ipmiInterfaceName, MACAddress: env.IPMI.MAC})
+	}
+	return ifaces
 }
 
 // materializeMetadataInterfaces upserts DeviceInterface rows from a device's
