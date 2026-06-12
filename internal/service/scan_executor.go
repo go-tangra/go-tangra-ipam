@@ -660,7 +660,94 @@ func (e *ScanExecutor) processSNMPResults(tenantID uint32, _ string, results []b
 
 		// Sync interfaces
 		e.syncDeviceInterfaces(deviceID, info.Interfaces)
+
+		// For switches, correlate the bridge forwarding database against known
+		// physical-server MACs to discover server -> switch-port links.
+		if info.DeviceType == deviceTypeSwitch && len(info.ForwardingDB) > 0 {
+			e.correlateSwitchLinks(tenantID, deviceID, info.ForwardingDB)
+		}
 	}
+}
+
+const (
+	// deviceTypeSwitch mirrors ipam_devices.device_type for a switch.
+	deviceTypeSwitch = 4
+
+	// linkSourceSNMPFDB labels links discovered from the bridge forwarding DB.
+	linkSourceSNMPFDB = "snmp_fdb"
+
+	// fdbEdgePortMaxMACs is the most distinct MACs a switch port may have learned
+	// for it to still be treated as an edge (access) port directly attached to a
+	// host. Ports above this are uplinks/trunks carrying many MACs, where a host
+	// MAC is seen transitively rather than directly — those are not linked.
+	fdbEdgePortMaxMACs = 16
+)
+
+// correlateSwitchLinks maps host MACs from a switch's forwarding database to the
+// switch ports they were learned on, then records a link on the matching
+// physical-server interface (remote_device_id / remote_interface_id ...).
+//
+// For each MAC seen on multiple ports it picks the port that learned the fewest
+// distinct MACs (the most edge-like), and only links when that port is below the
+// edge-port MAC threshold — avoiding false links to uplink/trunk ports that see
+// a host MAC transitively.
+func (e *ScanExecutor) correlateSwitchLinks(tenantID uint32, switchID string, fdb []biz.FDBEntry) {
+	ports, err := e.deviceInterfaceRepo.ListByDeviceID(e.ctx, switchID)
+	if err != nil {
+		e.log.Warnf("Link correlation: failed to list ports for switch %s: %v", switchID, err)
+		return
+	}
+	portByIf := make(map[int32]*ent.DeviceInterface)
+	for _, p := range ports {
+		if p.IfIndex != nil {
+			portByIf[*p.IfIndex] = p
+		}
+	}
+	if len(portByIf) == 0 {
+		e.log.Debugf("Link correlation: switch %s has no ports with ifIndex, skipping", switchID)
+		return
+	}
+
+	// Pick the edge (access) port for each host MAC, dropping uplink/trunk ports.
+	access := biz.SelectAccessPorts(fdb, fdbEdgePortMaxMACs)
+
+	linked := 0
+	for mac, entry := range access {
+		port, ok := portByIf[int32(entry.IfIndex)]
+		if !ok {
+			continue // switch port for this ifIndex not modeled
+		}
+
+		serverIface, err := e.deviceInterfaceRepo.FindServerInterfaceByMAC(e.ctx, tenantID, mac)
+		if err != nil {
+			e.log.Warnf("Link correlation: lookup for MAC %s failed: %v", mac, err)
+			continue
+		}
+		if serverIface == nil || serverIface.DeviceID == switchID {
+			continue // not a known physical server (or the switch's own MAC)
+		}
+
+		updates := map[string]any{
+			"remote_device_id":    switchID,
+			"remote_interface_id": port.ID,
+			"remote_port_name":    port.Name,
+			"link_source":         linkSourceSNMPFDB,
+			"link_last_seen":      time.Now(),
+		}
+		if entry.VLAN > 0 {
+			updates["link_vlan"] = int32(entry.VLAN)
+		}
+		if _, err := e.deviceInterfaceRepo.Update(e.ctx, serverIface.ID, updates); err != nil {
+			e.log.Warnf("Link correlation: failed to set link on interface %s: %v", serverIface.ID, err)
+			continue
+		}
+		linked++
+		e.log.Infof("Link discovered: server interface %s (MAC %s) -> switch %s port %s (ifIndex %d, vlan %d)",
+			serverIface.Name, mac, switchID, port.Name, entry.IfIndex, entry.VLAN)
+	}
+
+	e.log.Infof("Link correlation for switch %s: %d server links discovered from %d FDB entries",
+		switchID, linked, len(fdb))
 }
 
 // maskString masks a string for logging, showing only first 2 chars
@@ -703,6 +790,9 @@ func (e *ScanExecutor) syncDeviceInterfaces(deviceID string, interfaces []biz.SN
 			if iface.Description != "" {
 				updates["description"] = iface.Description
 			}
+			if iface.Index > 0 {
+				updates["if_index"] = int32(iface.Index)
+			}
 			_, err = e.deviceInterfaceRepo.Update(e.ctx, existing.ID, updates)
 			if err != nil {
 				e.log.Warnf("Failed to update interface %s: %v", iface.Name, err)
@@ -722,6 +812,9 @@ func (e *ScanExecutor) syncDeviceInterfaces(deviceID string, interfaces []biz.SN
 			}
 			if iface.Description != "" {
 				opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetDescription(iface.Description) })
+			}
+			if iface.Index > 0 {
+				opts = append(opts, func(c *ent.DeviceInterfaceCreate) { c.SetIfIndex(int32(iface.Index)) })
 			}
 			_, err = e.deviceInterfaceRepo.Create(e.ctx, deviceID, iface.Name, opts...)
 			if err != nil {

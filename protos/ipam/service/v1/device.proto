@@ -152,6 +152,18 @@ message DeviceInterface {
   optional string description = 8 [json_name = "description"];
   optional google.protobuf.Timestamp created_at = 10 [json_name = "createdAt"];
   optional google.protobuf.Timestamp updated_at = 11 [json_name = "updatedAt"];
+
+  // SNMP ifIndex — identifies a switch port / interface within its device.
+  optional int32 if_index = 12 [json_name = "ifIndex"];
+
+  // Layer-2 neighbor link (e.g. server NIC -> switch port), discovered via the
+  // bridge forwarding database during a network scan.
+  optional string remote_device_id = 13 [json_name = "remoteDeviceId"];
+  optional string remote_interface_id = 14 [json_name = "remoteInterfaceId"];
+  optional string remote_port_name = 15 [json_name = "remotePortName"];
+  optional string link_source = 16 [json_name = "linkSource"];
+  optional int32 link_vlan = 17 [json_name = "linkVlan"];
+  optional google.protobuf.Timestamp link_last_seen = 18 [json_name = "linkLastSeen"];
 }
 
 // CreateDeviceRequest creates a new device

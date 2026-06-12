@@ -521,8 +521,18 @@ type DeviceInterface struct {
 	Description   *string                `protobuf:"bytes,8,opt,name=description,proto3,oneof" json:"description,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3,oneof" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3,oneof" json:"updated_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// SNMP ifIndex — identifies a switch port / interface within its device.
+	IfIndex *int32 `protobuf:"varint,12,opt,name=if_index,json=ifIndex,proto3,oneof" json:"if_index,omitempty"`
+	// Layer-2 neighbor link (e.g. server NIC -> switch port), discovered via the
+	// bridge forwarding database during a network scan.
+	RemoteDeviceId    *string                `protobuf:"bytes,13,opt,name=remote_device_id,json=remoteDeviceId,proto3,oneof" json:"remote_device_id,omitempty"`
+	RemoteInterfaceId *string                `protobuf:"bytes,14,opt,name=remote_interface_id,json=remoteInterfaceId,proto3,oneof" json:"remote_interface_id,omitempty"`
+	RemotePortName    *string                `protobuf:"bytes,15,opt,name=remote_port_name,json=remotePortName,proto3,oneof" json:"remote_port_name,omitempty"`
+	LinkSource        *string                `protobuf:"bytes,16,opt,name=link_source,json=linkSource,proto3,oneof" json:"link_source,omitempty"`
+	LinkVlan          *int32                 `protobuf:"varint,17,opt,name=link_vlan,json=linkVlan,proto3,oneof" json:"link_vlan,omitempty"`
+	LinkLastSeen      *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=link_last_seen,json=linkLastSeen,proto3,oneof" json:"link_last_seen,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *DeviceInterface) Reset() {
@@ -621,6 +631,55 @@ func (x *DeviceInterface) GetCreatedAt() *timestamppb.Timestamp {
 func (x *DeviceInterface) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *DeviceInterface) GetIfIndex() int32 {
+	if x != nil && x.IfIndex != nil {
+		return *x.IfIndex
+	}
+	return 0
+}
+
+func (x *DeviceInterface) GetRemoteDeviceId() string {
+	if x != nil && x.RemoteDeviceId != nil {
+		return *x.RemoteDeviceId
+	}
+	return ""
+}
+
+func (x *DeviceInterface) GetRemoteInterfaceId() string {
+	if x != nil && x.RemoteInterfaceId != nil {
+		return *x.RemoteInterfaceId
+	}
+	return ""
+}
+
+func (x *DeviceInterface) GetRemotePortName() string {
+	if x != nil && x.RemotePortName != nil {
+		return *x.RemotePortName
+	}
+	return ""
+}
+
+func (x *DeviceInterface) GetLinkSource() string {
+	if x != nil && x.LinkSource != nil {
+		return *x.LinkSource
+	}
+	return ""
+}
+
+func (x *DeviceInterface) GetLinkVlan() int32 {
+	if x != nil && x.LinkVlan != nil {
+		return *x.LinkVlan
+	}
+	return 0
+}
+
+func (x *DeviceInterface) GetLinkLastSeen() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LinkLastSeen
 	}
 	return nil
 }
@@ -1767,7 +1826,7 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\v_created_byB\r\n" +
 	"\v_updated_byB\x17\n" +
 	"\x15_package_update_countB\x18\n" +
-	"\x16_security_update_count\"\xa7\x04\n" +
+	"\x16_security_update_count\"\xe9\a\n" +
 	"\x0fDeviceInterface\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
 	"\tdevice_id\x18\x02 \x01(\tH\x01R\bdeviceId\x88\x01\x01\x12\x17\n" +
@@ -1783,7 +1842,16 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"created_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampH\bR\tcreatedAt\x88\x01\x01\x12>\n" +
 	"\n" +
-	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampH\tR\tupdatedAt\x88\x01\x01B\x05\n" +
+	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampH\tR\tupdatedAt\x88\x01\x01\x12\x1e\n" +
+	"\bif_index\x18\f \x01(\x05H\n" +
+	"R\aifIndex\x88\x01\x01\x12-\n" +
+	"\x10remote_device_id\x18\r \x01(\tH\vR\x0eremoteDeviceId\x88\x01\x01\x123\n" +
+	"\x13remote_interface_id\x18\x0e \x01(\tH\fR\x11remoteInterfaceId\x88\x01\x01\x12-\n" +
+	"\x10remote_port_name\x18\x0f \x01(\tH\rR\x0eremotePortName\x88\x01\x01\x12$\n" +
+	"\vlink_source\x18\x10 \x01(\tH\x0eR\n" +
+	"linkSource\x88\x01\x01\x12 \n" +
+	"\tlink_vlan\x18\x11 \x01(\x05H\x0fR\blinkVlan\x88\x01\x01\x12E\n" +
+	"\x0elink_last_seen\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampH\x10R\flinkLastSeen\x88\x01\x01B\x05\n" +
 	"\x03_idB\f\n" +
 	"\n" +
 	"_device_idB\a\n" +
@@ -1795,7 +1863,15 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\v_speed_mbpsB\x0e\n" +
 	"\f_descriptionB\r\n" +
 	"\v_created_atB\r\n" +
-	"\v_updated_at\"\xe8\b\n" +
+	"\v_updated_atB\v\n" +
+	"\t_if_indexB\x13\n" +
+	"\x11_remote_device_idB\x16\n" +
+	"\x14_remote_interface_idB\x13\n" +
+	"\x11_remote_port_nameB\x0e\n" +
+	"\f_link_sourceB\f\n" +
+	"\n" +
+	"_link_vlanB\x11\n" +
+	"\x0f_link_last_seen\"\xe8\b\n" +
 	"\x13CreateDeviceRequest\x12%\n" +
 	"\ttenant_id\x18\x01 \x01(\rB\x03\xe0A\x02H\x00R\btenantId\x88\x01\x01\x12&\n" +
 	"\x04name\x18\x02 \x01(\tB\r\xe0A\x02\xbaH\ar\x05\x10\x01\x18\xff\x01H\x01R\x04name\x88\x01\x01\x12A\n" +
@@ -2032,41 +2108,42 @@ var file_ipam_service_v1_device_proto_depIdxs = []int32{
 	20, // 4: ipam.service.v1.Device.updated_at:type_name -> google.protobuf.Timestamp
 	20, // 5: ipam.service.v1.DeviceInterface.created_at:type_name -> google.protobuf.Timestamp
 	20, // 6: ipam.service.v1.DeviceInterface.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 7: ipam.service.v1.CreateDeviceRequest.device_type:type_name -> ipam.service.v1.DeviceType
-	1,  // 8: ipam.service.v1.CreateDeviceRequest.status:type_name -> ipam.service.v1.DeviceStatus
-	2,  // 9: ipam.service.v1.CreateDeviceResponse.device:type_name -> ipam.service.v1.Device
-	2,  // 10: ipam.service.v1.GetDeviceResponse.device:type_name -> ipam.service.v1.Device
-	0,  // 11: ipam.service.v1.ListDevicesRequest.device_type:type_name -> ipam.service.v1.DeviceType
-	1,  // 12: ipam.service.v1.ListDevicesRequest.status:type_name -> ipam.service.v1.DeviceStatus
-	2,  // 13: ipam.service.v1.ListDevicesResponse.items:type_name -> ipam.service.v1.Device
-	2,  // 14: ipam.service.v1.UpdateDeviceRequest.data:type_name -> ipam.service.v1.Device
-	21, // 15: ipam.service.v1.UpdateDeviceRequest.update_mask:type_name -> google.protobuf.FieldMask
-	2,  // 16: ipam.service.v1.UpdateDeviceResponse.device:type_name -> ipam.service.v1.Device
-	3,  // 17: ipam.service.v1.GetDeviceInterfacesResponse.interfaces:type_name -> ipam.service.v1.DeviceInterface
-	3,  // 18: ipam.service.v1.CreateDeviceInterfaceResponse.interface:type_name -> ipam.service.v1.DeviceInterface
-	4,  // 19: ipam.service.v1.DeviceService.CreateDevice:input_type -> ipam.service.v1.CreateDeviceRequest
-	6,  // 20: ipam.service.v1.DeviceService.GetDevice:input_type -> ipam.service.v1.GetDeviceRequest
-	8,  // 21: ipam.service.v1.DeviceService.ListDevices:input_type -> ipam.service.v1.ListDevicesRequest
-	10, // 22: ipam.service.v1.DeviceService.UpdateDevice:input_type -> ipam.service.v1.UpdateDeviceRequest
-	12, // 23: ipam.service.v1.DeviceService.DeleteDevice:input_type -> ipam.service.v1.DeleteDeviceRequest
-	13, // 24: ipam.service.v1.DeviceService.GetDeviceAddresses:input_type -> ipam.service.v1.GetDeviceAddressesRequest
-	15, // 25: ipam.service.v1.DeviceService.GetDeviceInterfaces:input_type -> ipam.service.v1.GetDeviceInterfacesRequest
-	17, // 26: ipam.service.v1.DeviceService.CreateDeviceInterface:input_type -> ipam.service.v1.CreateDeviceInterfaceRequest
-	19, // 27: ipam.service.v1.DeviceService.DeleteDeviceInterface:input_type -> ipam.service.v1.DeleteDeviceInterfaceRequest
-	5,  // 28: ipam.service.v1.DeviceService.CreateDevice:output_type -> ipam.service.v1.CreateDeviceResponse
-	7,  // 29: ipam.service.v1.DeviceService.GetDevice:output_type -> ipam.service.v1.GetDeviceResponse
-	9,  // 30: ipam.service.v1.DeviceService.ListDevices:output_type -> ipam.service.v1.ListDevicesResponse
-	11, // 31: ipam.service.v1.DeviceService.UpdateDevice:output_type -> ipam.service.v1.UpdateDeviceResponse
-	22, // 32: ipam.service.v1.DeviceService.DeleteDevice:output_type -> google.protobuf.Empty
-	14, // 33: ipam.service.v1.DeviceService.GetDeviceAddresses:output_type -> ipam.service.v1.GetDeviceAddressesResponse
-	16, // 34: ipam.service.v1.DeviceService.GetDeviceInterfaces:output_type -> ipam.service.v1.GetDeviceInterfacesResponse
-	18, // 35: ipam.service.v1.DeviceService.CreateDeviceInterface:output_type -> ipam.service.v1.CreateDeviceInterfaceResponse
-	22, // 36: ipam.service.v1.DeviceService.DeleteDeviceInterface:output_type -> google.protobuf.Empty
-	28, // [28:37] is the sub-list for method output_type
-	19, // [19:28] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	20, // 7: ipam.service.v1.DeviceInterface.link_last_seen:type_name -> google.protobuf.Timestamp
+	0,  // 8: ipam.service.v1.CreateDeviceRequest.device_type:type_name -> ipam.service.v1.DeviceType
+	1,  // 9: ipam.service.v1.CreateDeviceRequest.status:type_name -> ipam.service.v1.DeviceStatus
+	2,  // 10: ipam.service.v1.CreateDeviceResponse.device:type_name -> ipam.service.v1.Device
+	2,  // 11: ipam.service.v1.GetDeviceResponse.device:type_name -> ipam.service.v1.Device
+	0,  // 12: ipam.service.v1.ListDevicesRequest.device_type:type_name -> ipam.service.v1.DeviceType
+	1,  // 13: ipam.service.v1.ListDevicesRequest.status:type_name -> ipam.service.v1.DeviceStatus
+	2,  // 14: ipam.service.v1.ListDevicesResponse.items:type_name -> ipam.service.v1.Device
+	2,  // 15: ipam.service.v1.UpdateDeviceRequest.data:type_name -> ipam.service.v1.Device
+	21, // 16: ipam.service.v1.UpdateDeviceRequest.update_mask:type_name -> google.protobuf.FieldMask
+	2,  // 17: ipam.service.v1.UpdateDeviceResponse.device:type_name -> ipam.service.v1.Device
+	3,  // 18: ipam.service.v1.GetDeviceInterfacesResponse.interfaces:type_name -> ipam.service.v1.DeviceInterface
+	3,  // 19: ipam.service.v1.CreateDeviceInterfaceResponse.interface:type_name -> ipam.service.v1.DeviceInterface
+	4,  // 20: ipam.service.v1.DeviceService.CreateDevice:input_type -> ipam.service.v1.CreateDeviceRequest
+	6,  // 21: ipam.service.v1.DeviceService.GetDevice:input_type -> ipam.service.v1.GetDeviceRequest
+	8,  // 22: ipam.service.v1.DeviceService.ListDevices:input_type -> ipam.service.v1.ListDevicesRequest
+	10, // 23: ipam.service.v1.DeviceService.UpdateDevice:input_type -> ipam.service.v1.UpdateDeviceRequest
+	12, // 24: ipam.service.v1.DeviceService.DeleteDevice:input_type -> ipam.service.v1.DeleteDeviceRequest
+	13, // 25: ipam.service.v1.DeviceService.GetDeviceAddresses:input_type -> ipam.service.v1.GetDeviceAddressesRequest
+	15, // 26: ipam.service.v1.DeviceService.GetDeviceInterfaces:input_type -> ipam.service.v1.GetDeviceInterfacesRequest
+	17, // 27: ipam.service.v1.DeviceService.CreateDeviceInterface:input_type -> ipam.service.v1.CreateDeviceInterfaceRequest
+	19, // 28: ipam.service.v1.DeviceService.DeleteDeviceInterface:input_type -> ipam.service.v1.DeleteDeviceInterfaceRequest
+	5,  // 29: ipam.service.v1.DeviceService.CreateDevice:output_type -> ipam.service.v1.CreateDeviceResponse
+	7,  // 30: ipam.service.v1.DeviceService.GetDevice:output_type -> ipam.service.v1.GetDeviceResponse
+	9,  // 31: ipam.service.v1.DeviceService.ListDevices:output_type -> ipam.service.v1.ListDevicesResponse
+	11, // 32: ipam.service.v1.DeviceService.UpdateDevice:output_type -> ipam.service.v1.UpdateDeviceResponse
+	22, // 33: ipam.service.v1.DeviceService.DeleteDevice:output_type -> google.protobuf.Empty
+	14, // 34: ipam.service.v1.DeviceService.GetDeviceAddresses:output_type -> ipam.service.v1.GetDeviceAddressesResponse
+	16, // 35: ipam.service.v1.DeviceService.GetDeviceInterfaces:output_type -> ipam.service.v1.GetDeviceInterfacesResponse
+	18, // 36: ipam.service.v1.DeviceService.CreateDeviceInterface:output_type -> ipam.service.v1.CreateDeviceInterfaceResponse
+	22, // 37: ipam.service.v1.DeviceService.DeleteDeviceInterface:output_type -> google.protobuf.Empty
+	29, // [29:38] is the sub-list for method output_type
+	20, // [20:29] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_ipam_service_v1_device_proto_init() }

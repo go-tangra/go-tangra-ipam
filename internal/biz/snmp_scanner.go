@@ -30,6 +30,16 @@ const (
 	oidIfAdminStatus = "1.3.6.1.2.1.2.2.1.7"  // Admin status (1=up, 2=down)
 	oidIfAlias       = "1.3.6.1.2.1.31.1.1.1.18" // Interface alias/description
 
+	// SNMP OIDs for the bridge forwarding database (MAC address table). Used to
+	// discover which switch port a given host MAC is learned on.
+	oidDot1dBasePortIfIndex = "1.3.6.1.2.1.17.1.4.1.2"     // BRIDGE-MIB: bridge port -> ifIndex
+	oidDot1dTpFdbPort       = "1.3.6.1.2.1.17.4.3.1.2"     // BRIDGE-MIB: MAC -> bridge port
+	oidDot1qTpFdbPort       = "1.3.6.1.2.1.17.7.1.2.2.1.2" // Q-BRIDGE-MIB: (VLAN,MAC) -> bridge port
+
+	// deviceTypeSwitch mirrors ipam_devices.device_type for a switch; only
+	// switches get a bridge-FDB walk.
+	deviceTypeSwitch = 4
+
 	// Default SNMP settings
 	defaultSNMPTimeout     = 5 * time.Second
 	defaultSNMPRetries     = 1
@@ -63,6 +73,18 @@ type SNMPDeviceInfo struct {
 	Model        string
 	OsVersion    string
 	Interfaces   []SNMPInterface
+	// ForwardingDB is the bridge MAC address table, populated only for switches.
+	// Each entry maps a learned MAC to the local switch port (ifIndex) it was
+	// seen on, used to discover server-to-switch links.
+	ForwardingDB []FDBEntry
+}
+
+// FDBEntry is one bridge forwarding-database row: a MAC address learned on a
+// local switch port (ifIndex), optionally on a specific VLAN.
+type FDBEntry struct {
+	MAC     string // normalized lower-case colon form, e.g. "90:5a:08:be:ec:3e"
+	IfIndex int    // local switch port ifIndex the MAC was learned on
+	VLAN    int    // VLAN the MAC was learned on (0 if not VLAN-aware)
 }
 
 // SNMPInterface holds discovered interface information
@@ -208,6 +230,24 @@ func scanDeviceOnce(ctx context.Context, logger *kratosLog.Helper, address strin
 		return info, nil
 	}
 	logger.Infof("Discovered %d interfaces on %s", len(info.Interfaces), address)
+
+	// For switches, also walk the bridge forwarding database so we can later
+	// map host MACs to the switch port they are attached to.
+	if info.DeviceType == deviceTypeSwitch {
+		select {
+		case <-ctx.Done():
+			return info, ctx.Err()
+		default:
+		}
+		logger.Debugf("Walking bridge forwarding database on %s", address)
+		fdb, fdbErr := walkBridgeFDB(snmpClient)
+		if fdbErr != nil {
+			logger.Warnf("Bridge FDB walk failed for %s (continuing without link data): %v", address, fdbErr)
+		} else {
+			info.ForwardingDB = fdb
+			logger.Infof("Discovered %d bridge FDB entries on %s", len(fdb), address)
+		}
+	}
 
 	return info, nil
 }
@@ -466,6 +506,137 @@ func walkInterfaces(client *gosnmp.GoSNMP) ([]SNMPInterface, error) {
 	return result, nil
 }
 
+// walkBridgeFDB walks the bridge forwarding database (MAC address table) and
+// returns the learned MAC -> local switch port (ifIndex) mappings.
+//
+// It prefers the VLAN-aware Q-BRIDGE-MIB (dot1qTpFdbPort); if that yields
+// nothing it falls back to the classic BRIDGE-MIB (dot1dTpFdbPort). Both report
+// a *bridge port* number, which is translated to an ifIndex via
+// dot1dBasePortIfIndex. Many devices number bridge ports identically to
+// ifIndex, so when the translation table is missing the bridge port is used
+// as-is (best effort).
+func walkBridgeFDB(client *gosnmp.GoSNMP) ([]FDBEntry, error) {
+	// bridge port -> ifIndex
+	portToIf := make(map[int]int)
+	_ = client.Walk(oidDot1dBasePortIfIndex, func(pdu gosnmp.SnmpPDU) error {
+		port := lastOIDInt(pdu.Name, oidDot1dBasePortIfIndex)
+		if ifIndex, ok := pduToInt(pdu.Value); ok && port > 0 {
+			portToIf[port] = ifIndex
+		}
+		return nil
+	})
+
+	resolve := func(port int) int {
+		if ifIndex, ok := portToIf[port]; ok {
+			return ifIndex
+		}
+		return port
+	}
+
+	var entries []FDBEntry
+
+	// VLAN-aware Q-BRIDGE FDB. OID suffix is <vlan>.<6 MAC octets>.
+	_ = client.Walk(oidDot1qTpFdbPort, func(pdu gosnmp.SnmpPDU) error {
+		suffix := oidSuffixInts(pdu.Name, oidDot1qTpFdbPort)
+		if len(suffix) != 7 {
+			return nil
+		}
+		port, ok := pduToInt(pdu.Value)
+		if !ok || port <= 0 {
+			return nil
+		}
+		entries = append(entries, FDBEntry{
+			MAC:     macFromOctets(suffix[1:]),
+			IfIndex: resolve(port),
+			VLAN:    suffix[0],
+		})
+		return nil
+	})
+
+	if len(entries) > 0 {
+		return entries, nil
+	}
+
+	// Classic BRIDGE-MIB FDB. OID suffix is <6 MAC octets>.
+	_ = client.Walk(oidDot1dTpFdbPort, func(pdu gosnmp.SnmpPDU) error {
+		suffix := oidSuffixInts(pdu.Name, oidDot1dTpFdbPort)
+		if len(suffix) != 6 {
+			return nil
+		}
+		port, ok := pduToInt(pdu.Value)
+		if !ok || port <= 0 {
+			return nil
+		}
+		entries = append(entries, FDBEntry{
+			MAC:     macFromOctets(suffix),
+			IfIndex: resolve(port),
+			VLAN:    0,
+		})
+		return nil
+	})
+
+	return entries, nil
+}
+
+// oidSuffixInts returns the dotted integers of oid that follow baseOID, or nil
+// if oid is not under baseOID.
+func oidSuffixInts(oid, baseOID string) []int {
+	prefix := "." + baseOID + "."
+	if !strings.HasPrefix(oid, prefix) {
+		return nil
+	}
+	parts := strings.Split(oid[len(prefix):], ".")
+	out := make([]int, 0, len(parts))
+	for _, p := range parts {
+		var n int
+		if _, err := fmt.Sscanf(p, "%d", &n); err != nil {
+			return nil
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
+// lastOIDInt returns the final integer component of oid below baseOID (e.g. the
+// bridge port index in dot1dBasePortIfIndex.<port>).
+func lastOIDInt(oid, baseOID string) int {
+	suffix := oidSuffixInts(oid, baseOID)
+	if len(suffix) == 0 {
+		return 0
+	}
+	return suffix[len(suffix)-1]
+}
+
+// macFromOctets renders 6 integer octets as a lower-case colon MAC string.
+func macFromOctets(octets []int) string {
+	if len(octets) != 6 {
+		return ""
+	}
+	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
+		octets[0]&0xff, octets[1]&0xff, octets[2]&0xff,
+		octets[3]&0xff, octets[4]&0xff, octets[5]&0xff)
+}
+
+// pduToInt coerces the various integer-ish gosnmp PDU value types to an int.
+func pduToInt(v interface{}) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case uint:
+		return int(n), true
+	case uint32:
+		return int(n), true
+	case uint64:
+		return int(n), true
+	case int32:
+		return int(n), true
+	case int64:
+		return int(n), true
+	default:
+		return 0, false
+	}
+}
+
 // extractStringValue extracts a string from an SNMP PDU value
 func extractStringValue(pdu gosnmp.SnmpPDU) string {
 	switch v := pdu.Value.(type) {
@@ -488,6 +659,39 @@ func extractIfIndex(oid, baseOID string) int {
 	var idx int
 	fmt.Sscanf(suffix, "%d", &idx)
 	return idx
+}
+
+// NormalizeMAC normalizes a MAC address to lower-case colon-separated form so
+// values from different sources (SNMP, the client agent, manual entry) compare
+// equal. Separators (':', '-', '.') are collapsed; a 12-hex-digit string is
+// regrouped into octets. Input that is not a 12-hex-digit MAC is returned
+// lower-cased and trimmed as a best effort.
+func NormalizeMAC(mac string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		switch r {
+		case ':', '-', '.', ' ':
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(mac))
+	cleaned = strings.ToLower(cleaned)
+
+	if len(cleaned) != 12 {
+		return strings.ToLower(strings.TrimSpace(mac))
+	}
+	for _, r := range cleaned {
+		if !(r >= '0' && r <= '9') && !(r >= 'a' && r <= 'f') {
+			return strings.ToLower(strings.TrimSpace(mac))
+		}
+	}
+	var b strings.Builder
+	for i := 0; i < 12; i += 2 {
+		if i > 0 {
+			b.WriteByte(':')
+		}
+		b.WriteString(cleaned[i : i+2])
+	}
+	return b.String()
 }
 
 // formatMAC converts raw bytes to a MAC address string

@@ -472,6 +472,63 @@ func (m *DeviceInterface) validate(all bool) error {
 
 	}
 
+	if m.IfIndex != nil {
+		// no validation rules for IfIndex
+	}
+
+	if m.RemoteDeviceId != nil {
+		// no validation rules for RemoteDeviceId
+	}
+
+	if m.RemoteInterfaceId != nil {
+		// no validation rules for RemoteInterfaceId
+	}
+
+	if m.RemotePortName != nil {
+		// no validation rules for RemotePortName
+	}
+
+	if m.LinkSource != nil {
+		// no validation rules for LinkSource
+	}
+
+	if m.LinkVlan != nil {
+		// no validation rules for LinkVlan
+	}
+
+	if m.LinkLastSeen != nil {
+
+		if all {
+			switch v := interface{}(m.GetLinkLastSeen()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DeviceInterfaceValidationError{
+						field:  "LinkLastSeen",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DeviceInterfaceValidationError{
+						field:  "LinkLastSeen",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetLinkLastSeen()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DeviceInterfaceValidationError{
+					field:  "LinkLastSeen",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return DeviceInterfaceMultiError(errors)
 	}

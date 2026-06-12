@@ -39,6 +39,20 @@ type DeviceInterface struct {
 	SpeedMbps *int32 `json:"speed_mbps,omitempty"`
 	// Description
 	Description string `json:"description,omitempty"`
+	// SNMP ifIndex — identifies a switch port / interface within its device
+	IfIndex *int32 `json:"if_index,omitempty"`
+	// Connected neighbor device ID (e.g. the switch this server port plugs into)
+	RemoteDeviceID string `json:"remote_device_id,omitempty"`
+	// Connected neighbor interface ID (e.g. the switch port)
+	RemoteInterfaceID string `json:"remote_interface_id,omitempty"`
+	// Connected neighbor port name (denormalized for display)
+	RemotePortName string `json:"remote_port_name,omitempty"`
+	// How the link was discovered: snmp_fdb, lldp, manual
+	LinkSource string `json:"link_source,omitempty"`
+	// VLAN the neighbor MAC was learned on (Q-BRIDGE FDB)
+	LinkVlan *int32 `json:"link_vlan,omitempty"`
+	// When the neighbor link was last observed
+	LinkLastSeen *time.Time `json:"link_last_seen,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DeviceInterfaceQuery when eager-loading is set.
 	Edges        DeviceInterfaceEdges `json:"edges"`
@@ -72,11 +86,11 @@ func (*DeviceInterface) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case deviceinterface.FieldEnabled:
 			values[i] = new(sql.NullBool)
-		case deviceinterface.FieldSpeedMbps:
+		case deviceinterface.FieldSpeedMbps, deviceinterface.FieldIfIndex, deviceinterface.FieldLinkVlan:
 			values[i] = new(sql.NullInt64)
-		case deviceinterface.FieldID, deviceinterface.FieldDeviceID, deviceinterface.FieldName, deviceinterface.FieldMACAddress, deviceinterface.FieldInterfaceType, deviceinterface.FieldDescription:
+		case deviceinterface.FieldID, deviceinterface.FieldDeviceID, deviceinterface.FieldName, deviceinterface.FieldMACAddress, deviceinterface.FieldInterfaceType, deviceinterface.FieldDescription, deviceinterface.FieldRemoteDeviceID, deviceinterface.FieldRemoteInterfaceID, deviceinterface.FieldRemotePortName, deviceinterface.FieldLinkSource:
 			values[i] = new(sql.NullString)
-		case deviceinterface.FieldCreateTime, deviceinterface.FieldUpdateTime, deviceinterface.FieldDeleteTime:
+		case deviceinterface.FieldCreateTime, deviceinterface.FieldUpdateTime, deviceinterface.FieldDeleteTime, deviceinterface.FieldLinkLastSeen:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -163,6 +177,51 @@ func (_m *DeviceInterface) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Description = value.String
 			}
+		case deviceinterface.FieldIfIndex:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field if_index", values[i])
+			} else if value.Valid {
+				_m.IfIndex = new(int32)
+				*_m.IfIndex = int32(value.Int64)
+			}
+		case deviceinterface.FieldRemoteDeviceID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field remote_device_id", values[i])
+			} else if value.Valid {
+				_m.RemoteDeviceID = value.String
+			}
+		case deviceinterface.FieldRemoteInterfaceID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field remote_interface_id", values[i])
+			} else if value.Valid {
+				_m.RemoteInterfaceID = value.String
+			}
+		case deviceinterface.FieldRemotePortName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field remote_port_name", values[i])
+			} else if value.Valid {
+				_m.RemotePortName = value.String
+			}
+		case deviceinterface.FieldLinkSource:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field link_source", values[i])
+			} else if value.Valid {
+				_m.LinkSource = value.String
+			}
+		case deviceinterface.FieldLinkVlan:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field link_vlan", values[i])
+			} else if value.Valid {
+				_m.LinkVlan = new(int32)
+				*_m.LinkVlan = int32(value.Int64)
+			}
+		case deviceinterface.FieldLinkLastSeen:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field link_last_seen", values[i])
+			} else if value.Valid {
+				_m.LinkLastSeen = new(time.Time)
+				*_m.LinkLastSeen = value.Time
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -241,6 +300,33 @@ func (_m *DeviceInterface) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("description=")
 	builder.WriteString(_m.Description)
+	builder.WriteString(", ")
+	if v := _m.IfIndex; v != nil {
+		builder.WriteString("if_index=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("remote_device_id=")
+	builder.WriteString(_m.RemoteDeviceID)
+	builder.WriteString(", ")
+	builder.WriteString("remote_interface_id=")
+	builder.WriteString(_m.RemoteInterfaceID)
+	builder.WriteString(", ")
+	builder.WriteString("remote_port_name=")
+	builder.WriteString(_m.RemotePortName)
+	builder.WriteString(", ")
+	builder.WriteString("link_source=")
+	builder.WriteString(_m.LinkSource)
+	builder.WriteString(", ")
+	if v := _m.LinkVlan; v != nil {
+		builder.WriteString("link_vlan=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.LinkLastSeen; v != nil {
+		builder.WriteString("link_last_seen=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

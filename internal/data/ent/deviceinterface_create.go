@@ -148,6 +148,104 @@ func (_c *DeviceInterfaceCreate) SetNillableDescription(v *string) *DeviceInterf
 	return _c
 }
 
+// SetIfIndex sets the "if_index" field.
+func (_c *DeviceInterfaceCreate) SetIfIndex(v int32) *DeviceInterfaceCreate {
+	_c.mutation.SetIfIndex(v)
+	return _c
+}
+
+// SetNillableIfIndex sets the "if_index" field if the given value is not nil.
+func (_c *DeviceInterfaceCreate) SetNillableIfIndex(v *int32) *DeviceInterfaceCreate {
+	if v != nil {
+		_c.SetIfIndex(*v)
+	}
+	return _c
+}
+
+// SetRemoteDeviceID sets the "remote_device_id" field.
+func (_c *DeviceInterfaceCreate) SetRemoteDeviceID(v string) *DeviceInterfaceCreate {
+	_c.mutation.SetRemoteDeviceID(v)
+	return _c
+}
+
+// SetNillableRemoteDeviceID sets the "remote_device_id" field if the given value is not nil.
+func (_c *DeviceInterfaceCreate) SetNillableRemoteDeviceID(v *string) *DeviceInterfaceCreate {
+	if v != nil {
+		_c.SetRemoteDeviceID(*v)
+	}
+	return _c
+}
+
+// SetRemoteInterfaceID sets the "remote_interface_id" field.
+func (_c *DeviceInterfaceCreate) SetRemoteInterfaceID(v string) *DeviceInterfaceCreate {
+	_c.mutation.SetRemoteInterfaceID(v)
+	return _c
+}
+
+// SetNillableRemoteInterfaceID sets the "remote_interface_id" field if the given value is not nil.
+func (_c *DeviceInterfaceCreate) SetNillableRemoteInterfaceID(v *string) *DeviceInterfaceCreate {
+	if v != nil {
+		_c.SetRemoteInterfaceID(*v)
+	}
+	return _c
+}
+
+// SetRemotePortName sets the "remote_port_name" field.
+func (_c *DeviceInterfaceCreate) SetRemotePortName(v string) *DeviceInterfaceCreate {
+	_c.mutation.SetRemotePortName(v)
+	return _c
+}
+
+// SetNillableRemotePortName sets the "remote_port_name" field if the given value is not nil.
+func (_c *DeviceInterfaceCreate) SetNillableRemotePortName(v *string) *DeviceInterfaceCreate {
+	if v != nil {
+		_c.SetRemotePortName(*v)
+	}
+	return _c
+}
+
+// SetLinkSource sets the "link_source" field.
+func (_c *DeviceInterfaceCreate) SetLinkSource(v string) *DeviceInterfaceCreate {
+	_c.mutation.SetLinkSource(v)
+	return _c
+}
+
+// SetNillableLinkSource sets the "link_source" field if the given value is not nil.
+func (_c *DeviceInterfaceCreate) SetNillableLinkSource(v *string) *DeviceInterfaceCreate {
+	if v != nil {
+		_c.SetLinkSource(*v)
+	}
+	return _c
+}
+
+// SetLinkVlan sets the "link_vlan" field.
+func (_c *DeviceInterfaceCreate) SetLinkVlan(v int32) *DeviceInterfaceCreate {
+	_c.mutation.SetLinkVlan(v)
+	return _c
+}
+
+// SetNillableLinkVlan sets the "link_vlan" field if the given value is not nil.
+func (_c *DeviceInterfaceCreate) SetNillableLinkVlan(v *int32) *DeviceInterfaceCreate {
+	if v != nil {
+		_c.SetLinkVlan(*v)
+	}
+	return _c
+}
+
+// SetLinkLastSeen sets the "link_last_seen" field.
+func (_c *DeviceInterfaceCreate) SetLinkLastSeen(v time.Time) *DeviceInterfaceCreate {
+	_c.mutation.SetLinkLastSeen(v)
+	return _c
+}
+
+// SetNillableLinkLastSeen sets the "link_last_seen" field if the given value is not nil.
+func (_c *DeviceInterfaceCreate) SetNillableLinkLastSeen(v *time.Time) *DeviceInterfaceCreate {
+	if v != nil {
+		_c.SetLinkLastSeen(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *DeviceInterfaceCreate) SetID(v string) *DeviceInterfaceCreate {
 	_c.mutation.SetID(v)
@@ -300,6 +398,34 @@ func (_c *DeviceInterfaceCreate) createSpec() (*DeviceInterface, *sqlgraph.Creat
 	if value, ok := _c.mutation.Description(); ok {
 		_spec.SetField(deviceinterface.FieldDescription, field.TypeString, value)
 		_node.Description = value
+	}
+	if value, ok := _c.mutation.IfIndex(); ok {
+		_spec.SetField(deviceinterface.FieldIfIndex, field.TypeInt32, value)
+		_node.IfIndex = &value
+	}
+	if value, ok := _c.mutation.RemoteDeviceID(); ok {
+		_spec.SetField(deviceinterface.FieldRemoteDeviceID, field.TypeString, value)
+		_node.RemoteDeviceID = value
+	}
+	if value, ok := _c.mutation.RemoteInterfaceID(); ok {
+		_spec.SetField(deviceinterface.FieldRemoteInterfaceID, field.TypeString, value)
+		_node.RemoteInterfaceID = value
+	}
+	if value, ok := _c.mutation.RemotePortName(); ok {
+		_spec.SetField(deviceinterface.FieldRemotePortName, field.TypeString, value)
+		_node.RemotePortName = value
+	}
+	if value, ok := _c.mutation.LinkSource(); ok {
+		_spec.SetField(deviceinterface.FieldLinkSource, field.TypeString, value)
+		_node.LinkSource = value
+	}
+	if value, ok := _c.mutation.LinkVlan(); ok {
+		_spec.SetField(deviceinterface.FieldLinkVlan, field.TypeInt32, value)
+		_node.LinkVlan = &value
+	}
+	if value, ok := _c.mutation.LinkLastSeen(); ok {
+		_spec.SetField(deviceinterface.FieldLinkLastSeen, field.TypeTime, value)
+		_node.LinkLastSeen = &value
 	}
 	if nodes := _c.mutation.DeviceIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -517,6 +643,144 @@ func (u *DeviceInterfaceUpsert) UpdateDescription() *DeviceInterfaceUpsert {
 // ClearDescription clears the value of the "description" field.
 func (u *DeviceInterfaceUpsert) ClearDescription() *DeviceInterfaceUpsert {
 	u.SetNull(deviceinterface.FieldDescription)
+	return u
+}
+
+// SetIfIndex sets the "if_index" field.
+func (u *DeviceInterfaceUpsert) SetIfIndex(v int32) *DeviceInterfaceUpsert {
+	u.Set(deviceinterface.FieldIfIndex, v)
+	return u
+}
+
+// UpdateIfIndex sets the "if_index" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsert) UpdateIfIndex() *DeviceInterfaceUpsert {
+	u.SetExcluded(deviceinterface.FieldIfIndex)
+	return u
+}
+
+// AddIfIndex adds v to the "if_index" field.
+func (u *DeviceInterfaceUpsert) AddIfIndex(v int32) *DeviceInterfaceUpsert {
+	u.Add(deviceinterface.FieldIfIndex, v)
+	return u
+}
+
+// ClearIfIndex clears the value of the "if_index" field.
+func (u *DeviceInterfaceUpsert) ClearIfIndex() *DeviceInterfaceUpsert {
+	u.SetNull(deviceinterface.FieldIfIndex)
+	return u
+}
+
+// SetRemoteDeviceID sets the "remote_device_id" field.
+func (u *DeviceInterfaceUpsert) SetRemoteDeviceID(v string) *DeviceInterfaceUpsert {
+	u.Set(deviceinterface.FieldRemoteDeviceID, v)
+	return u
+}
+
+// UpdateRemoteDeviceID sets the "remote_device_id" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsert) UpdateRemoteDeviceID() *DeviceInterfaceUpsert {
+	u.SetExcluded(deviceinterface.FieldRemoteDeviceID)
+	return u
+}
+
+// ClearRemoteDeviceID clears the value of the "remote_device_id" field.
+func (u *DeviceInterfaceUpsert) ClearRemoteDeviceID() *DeviceInterfaceUpsert {
+	u.SetNull(deviceinterface.FieldRemoteDeviceID)
+	return u
+}
+
+// SetRemoteInterfaceID sets the "remote_interface_id" field.
+func (u *DeviceInterfaceUpsert) SetRemoteInterfaceID(v string) *DeviceInterfaceUpsert {
+	u.Set(deviceinterface.FieldRemoteInterfaceID, v)
+	return u
+}
+
+// UpdateRemoteInterfaceID sets the "remote_interface_id" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsert) UpdateRemoteInterfaceID() *DeviceInterfaceUpsert {
+	u.SetExcluded(deviceinterface.FieldRemoteInterfaceID)
+	return u
+}
+
+// ClearRemoteInterfaceID clears the value of the "remote_interface_id" field.
+func (u *DeviceInterfaceUpsert) ClearRemoteInterfaceID() *DeviceInterfaceUpsert {
+	u.SetNull(deviceinterface.FieldRemoteInterfaceID)
+	return u
+}
+
+// SetRemotePortName sets the "remote_port_name" field.
+func (u *DeviceInterfaceUpsert) SetRemotePortName(v string) *DeviceInterfaceUpsert {
+	u.Set(deviceinterface.FieldRemotePortName, v)
+	return u
+}
+
+// UpdateRemotePortName sets the "remote_port_name" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsert) UpdateRemotePortName() *DeviceInterfaceUpsert {
+	u.SetExcluded(deviceinterface.FieldRemotePortName)
+	return u
+}
+
+// ClearRemotePortName clears the value of the "remote_port_name" field.
+func (u *DeviceInterfaceUpsert) ClearRemotePortName() *DeviceInterfaceUpsert {
+	u.SetNull(deviceinterface.FieldRemotePortName)
+	return u
+}
+
+// SetLinkSource sets the "link_source" field.
+func (u *DeviceInterfaceUpsert) SetLinkSource(v string) *DeviceInterfaceUpsert {
+	u.Set(deviceinterface.FieldLinkSource, v)
+	return u
+}
+
+// UpdateLinkSource sets the "link_source" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsert) UpdateLinkSource() *DeviceInterfaceUpsert {
+	u.SetExcluded(deviceinterface.FieldLinkSource)
+	return u
+}
+
+// ClearLinkSource clears the value of the "link_source" field.
+func (u *DeviceInterfaceUpsert) ClearLinkSource() *DeviceInterfaceUpsert {
+	u.SetNull(deviceinterface.FieldLinkSource)
+	return u
+}
+
+// SetLinkVlan sets the "link_vlan" field.
+func (u *DeviceInterfaceUpsert) SetLinkVlan(v int32) *DeviceInterfaceUpsert {
+	u.Set(deviceinterface.FieldLinkVlan, v)
+	return u
+}
+
+// UpdateLinkVlan sets the "link_vlan" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsert) UpdateLinkVlan() *DeviceInterfaceUpsert {
+	u.SetExcluded(deviceinterface.FieldLinkVlan)
+	return u
+}
+
+// AddLinkVlan adds v to the "link_vlan" field.
+func (u *DeviceInterfaceUpsert) AddLinkVlan(v int32) *DeviceInterfaceUpsert {
+	u.Add(deviceinterface.FieldLinkVlan, v)
+	return u
+}
+
+// ClearLinkVlan clears the value of the "link_vlan" field.
+func (u *DeviceInterfaceUpsert) ClearLinkVlan() *DeviceInterfaceUpsert {
+	u.SetNull(deviceinterface.FieldLinkVlan)
+	return u
+}
+
+// SetLinkLastSeen sets the "link_last_seen" field.
+func (u *DeviceInterfaceUpsert) SetLinkLastSeen(v time.Time) *DeviceInterfaceUpsert {
+	u.Set(deviceinterface.FieldLinkLastSeen, v)
+	return u
+}
+
+// UpdateLinkLastSeen sets the "link_last_seen" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsert) UpdateLinkLastSeen() *DeviceInterfaceUpsert {
+	u.SetExcluded(deviceinterface.FieldLinkLastSeen)
+	return u
+}
+
+// ClearLinkLastSeen clears the value of the "link_last_seen" field.
+func (u *DeviceInterfaceUpsert) ClearLinkLastSeen() *DeviceInterfaceUpsert {
+	u.SetNull(deviceinterface.FieldLinkLastSeen)
 	return u
 }
 
@@ -743,6 +1007,167 @@ func (u *DeviceInterfaceUpsertOne) UpdateDescription() *DeviceInterfaceUpsertOne
 func (u *DeviceInterfaceUpsertOne) ClearDescription() *DeviceInterfaceUpsertOne {
 	return u.Update(func(s *DeviceInterfaceUpsert) {
 		s.ClearDescription()
+	})
+}
+
+// SetIfIndex sets the "if_index" field.
+func (u *DeviceInterfaceUpsertOne) SetIfIndex(v int32) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetIfIndex(v)
+	})
+}
+
+// AddIfIndex adds v to the "if_index" field.
+func (u *DeviceInterfaceUpsertOne) AddIfIndex(v int32) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.AddIfIndex(v)
+	})
+}
+
+// UpdateIfIndex sets the "if_index" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertOne) UpdateIfIndex() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateIfIndex()
+	})
+}
+
+// ClearIfIndex clears the value of the "if_index" field.
+func (u *DeviceInterfaceUpsertOne) ClearIfIndex() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearIfIndex()
+	})
+}
+
+// SetRemoteDeviceID sets the "remote_device_id" field.
+func (u *DeviceInterfaceUpsertOne) SetRemoteDeviceID(v string) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetRemoteDeviceID(v)
+	})
+}
+
+// UpdateRemoteDeviceID sets the "remote_device_id" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertOne) UpdateRemoteDeviceID() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateRemoteDeviceID()
+	})
+}
+
+// ClearRemoteDeviceID clears the value of the "remote_device_id" field.
+func (u *DeviceInterfaceUpsertOne) ClearRemoteDeviceID() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearRemoteDeviceID()
+	})
+}
+
+// SetRemoteInterfaceID sets the "remote_interface_id" field.
+func (u *DeviceInterfaceUpsertOne) SetRemoteInterfaceID(v string) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetRemoteInterfaceID(v)
+	})
+}
+
+// UpdateRemoteInterfaceID sets the "remote_interface_id" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertOne) UpdateRemoteInterfaceID() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateRemoteInterfaceID()
+	})
+}
+
+// ClearRemoteInterfaceID clears the value of the "remote_interface_id" field.
+func (u *DeviceInterfaceUpsertOne) ClearRemoteInterfaceID() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearRemoteInterfaceID()
+	})
+}
+
+// SetRemotePortName sets the "remote_port_name" field.
+func (u *DeviceInterfaceUpsertOne) SetRemotePortName(v string) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetRemotePortName(v)
+	})
+}
+
+// UpdateRemotePortName sets the "remote_port_name" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertOne) UpdateRemotePortName() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateRemotePortName()
+	})
+}
+
+// ClearRemotePortName clears the value of the "remote_port_name" field.
+func (u *DeviceInterfaceUpsertOne) ClearRemotePortName() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearRemotePortName()
+	})
+}
+
+// SetLinkSource sets the "link_source" field.
+func (u *DeviceInterfaceUpsertOne) SetLinkSource(v string) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetLinkSource(v)
+	})
+}
+
+// UpdateLinkSource sets the "link_source" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertOne) UpdateLinkSource() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateLinkSource()
+	})
+}
+
+// ClearLinkSource clears the value of the "link_source" field.
+func (u *DeviceInterfaceUpsertOne) ClearLinkSource() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearLinkSource()
+	})
+}
+
+// SetLinkVlan sets the "link_vlan" field.
+func (u *DeviceInterfaceUpsertOne) SetLinkVlan(v int32) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetLinkVlan(v)
+	})
+}
+
+// AddLinkVlan adds v to the "link_vlan" field.
+func (u *DeviceInterfaceUpsertOne) AddLinkVlan(v int32) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.AddLinkVlan(v)
+	})
+}
+
+// UpdateLinkVlan sets the "link_vlan" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertOne) UpdateLinkVlan() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateLinkVlan()
+	})
+}
+
+// ClearLinkVlan clears the value of the "link_vlan" field.
+func (u *DeviceInterfaceUpsertOne) ClearLinkVlan() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearLinkVlan()
+	})
+}
+
+// SetLinkLastSeen sets the "link_last_seen" field.
+func (u *DeviceInterfaceUpsertOne) SetLinkLastSeen(v time.Time) *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetLinkLastSeen(v)
+	})
+}
+
+// UpdateLinkLastSeen sets the "link_last_seen" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertOne) UpdateLinkLastSeen() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateLinkLastSeen()
+	})
+}
+
+// ClearLinkLastSeen clears the value of the "link_last_seen" field.
+func (u *DeviceInterfaceUpsertOne) ClearLinkLastSeen() *DeviceInterfaceUpsertOne {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearLinkLastSeen()
 	})
 }
 
@@ -1136,6 +1561,167 @@ func (u *DeviceInterfaceUpsertBulk) UpdateDescription() *DeviceInterfaceUpsertBu
 func (u *DeviceInterfaceUpsertBulk) ClearDescription() *DeviceInterfaceUpsertBulk {
 	return u.Update(func(s *DeviceInterfaceUpsert) {
 		s.ClearDescription()
+	})
+}
+
+// SetIfIndex sets the "if_index" field.
+func (u *DeviceInterfaceUpsertBulk) SetIfIndex(v int32) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetIfIndex(v)
+	})
+}
+
+// AddIfIndex adds v to the "if_index" field.
+func (u *DeviceInterfaceUpsertBulk) AddIfIndex(v int32) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.AddIfIndex(v)
+	})
+}
+
+// UpdateIfIndex sets the "if_index" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertBulk) UpdateIfIndex() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateIfIndex()
+	})
+}
+
+// ClearIfIndex clears the value of the "if_index" field.
+func (u *DeviceInterfaceUpsertBulk) ClearIfIndex() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearIfIndex()
+	})
+}
+
+// SetRemoteDeviceID sets the "remote_device_id" field.
+func (u *DeviceInterfaceUpsertBulk) SetRemoteDeviceID(v string) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetRemoteDeviceID(v)
+	})
+}
+
+// UpdateRemoteDeviceID sets the "remote_device_id" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertBulk) UpdateRemoteDeviceID() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateRemoteDeviceID()
+	})
+}
+
+// ClearRemoteDeviceID clears the value of the "remote_device_id" field.
+func (u *DeviceInterfaceUpsertBulk) ClearRemoteDeviceID() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearRemoteDeviceID()
+	})
+}
+
+// SetRemoteInterfaceID sets the "remote_interface_id" field.
+func (u *DeviceInterfaceUpsertBulk) SetRemoteInterfaceID(v string) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetRemoteInterfaceID(v)
+	})
+}
+
+// UpdateRemoteInterfaceID sets the "remote_interface_id" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertBulk) UpdateRemoteInterfaceID() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateRemoteInterfaceID()
+	})
+}
+
+// ClearRemoteInterfaceID clears the value of the "remote_interface_id" field.
+func (u *DeviceInterfaceUpsertBulk) ClearRemoteInterfaceID() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearRemoteInterfaceID()
+	})
+}
+
+// SetRemotePortName sets the "remote_port_name" field.
+func (u *DeviceInterfaceUpsertBulk) SetRemotePortName(v string) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetRemotePortName(v)
+	})
+}
+
+// UpdateRemotePortName sets the "remote_port_name" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertBulk) UpdateRemotePortName() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateRemotePortName()
+	})
+}
+
+// ClearRemotePortName clears the value of the "remote_port_name" field.
+func (u *DeviceInterfaceUpsertBulk) ClearRemotePortName() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearRemotePortName()
+	})
+}
+
+// SetLinkSource sets the "link_source" field.
+func (u *DeviceInterfaceUpsertBulk) SetLinkSource(v string) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetLinkSource(v)
+	})
+}
+
+// UpdateLinkSource sets the "link_source" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertBulk) UpdateLinkSource() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateLinkSource()
+	})
+}
+
+// ClearLinkSource clears the value of the "link_source" field.
+func (u *DeviceInterfaceUpsertBulk) ClearLinkSource() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearLinkSource()
+	})
+}
+
+// SetLinkVlan sets the "link_vlan" field.
+func (u *DeviceInterfaceUpsertBulk) SetLinkVlan(v int32) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetLinkVlan(v)
+	})
+}
+
+// AddLinkVlan adds v to the "link_vlan" field.
+func (u *DeviceInterfaceUpsertBulk) AddLinkVlan(v int32) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.AddLinkVlan(v)
+	})
+}
+
+// UpdateLinkVlan sets the "link_vlan" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertBulk) UpdateLinkVlan() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateLinkVlan()
+	})
+}
+
+// ClearLinkVlan clears the value of the "link_vlan" field.
+func (u *DeviceInterfaceUpsertBulk) ClearLinkVlan() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearLinkVlan()
+	})
+}
+
+// SetLinkLastSeen sets the "link_last_seen" field.
+func (u *DeviceInterfaceUpsertBulk) SetLinkLastSeen(v time.Time) *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.SetLinkLastSeen(v)
+	})
+}
+
+// UpdateLinkLastSeen sets the "link_last_seen" field to the value that was provided on create.
+func (u *DeviceInterfaceUpsertBulk) UpdateLinkLastSeen() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.UpdateLinkLastSeen()
+	})
+}
+
+// ClearLinkLastSeen clears the value of the "link_last_seen" field.
+func (u *DeviceInterfaceUpsertBulk) ClearLinkLastSeen() *DeviceInterfaceUpsertBulk {
+	return u.Update(func(s *DeviceInterfaceUpsert) {
+		s.ClearLinkLastSeen()
 	})
 }
 

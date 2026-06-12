@@ -2787,6 +2787,23 @@ components:
                 updatedAt:
                     type: string
                     format: date-time
+                ifIndex:
+                    type: integer
+                    format: int32
+                remoteDeviceId:
+                    type: string
+                remoteInterfaceId:
+                    type: string
+                remotePortName:
+                    type: string
+                linkSource:
+                    type: string
+                linkVlan:
+                    type: integer
+                    format: int32
+                linkLastSeen:
+                    type: string
+                    format: date-time
             description: DeviceInterface represents a network interface on a device
         DevicePackage:
             type: object

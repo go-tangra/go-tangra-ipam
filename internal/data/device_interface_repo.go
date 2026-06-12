@@ -10,9 +10,14 @@ import (
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
+
+// DeviceTypeServer is the device_type value for a physical server. Layer-2 link
+// discovery only attaches links to physical servers, not VMs (device_type=2).
+const DeviceTypeServer int32 = 1
 
 type DeviceInterfaceRepo struct {
 	entClient *entCrud.EntClient[*ent.Client]
@@ -82,6 +87,34 @@ func (r *DeviceInterfaceRepo) GetByDeviceAndName(ctx context.Context, deviceID, 
 	return entity, nil
 }
 
+// FindServerInterfaceByMAC returns the interface with the given MAC that belongs
+// to a physical server (device_type=Server, excluding VMs) within the tenant,
+// with the owning device eager-loaded. Matching is case-insensitive. Returns
+// (nil, nil) when no physical-server interface owns that MAC.
+func (r *DeviceInterfaceRepo) FindServerInterfaceByMAC(ctx context.Context, tenantID uint32, mac string) (*ent.DeviceInterface, error) {
+	if mac == "" {
+		return nil, nil
+	}
+	entity, err := r.entClient.Client().DeviceInterface.Query().
+		Where(
+			deviceinterface.MACAddressEqualFold(mac),
+			deviceinterface.HasDeviceWith(
+				device.TenantID(tenantID),
+				device.DeviceType(DeviceTypeServer),
+			),
+		).
+		WithDevice().
+		First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil
+		}
+		r.log.Errorf("find server interface by MAC failed: %s", err.Error())
+		return nil, ipamV1.ErrorInternalServerError("find interface by MAC failed")
+	}
+	return entity, nil
+}
+
 // Update updates a device interface
 func (r *DeviceInterfaceRepo) Update(ctx context.Context, id string, updates map[string]any) (*ent.DeviceInterface, error) {
 	update := r.entClient.Client().DeviceInterface.UpdateOneID(id)
@@ -100,6 +133,27 @@ func (r *DeviceInterfaceRepo) Update(ctx context.Context, id string, updates map
 	}
 	if description, ok := updates["description"].(string); ok {
 		update = update.SetDescription(description)
+	}
+	if ifIndex, ok := updates["if_index"].(int32); ok {
+		update = update.SetIfIndex(ifIndex)
+	}
+	if remoteDeviceID, ok := updates["remote_device_id"].(string); ok {
+		update = update.SetRemoteDeviceID(remoteDeviceID)
+	}
+	if remoteInterfaceID, ok := updates["remote_interface_id"].(string); ok {
+		update = update.SetRemoteInterfaceID(remoteInterfaceID)
+	}
+	if remotePortName, ok := updates["remote_port_name"].(string); ok {
+		update = update.SetRemotePortName(remotePortName)
+	}
+	if linkSource, ok := updates["link_source"].(string); ok {
+		update = update.SetLinkSource(linkSource)
+	}
+	if linkVLAN, ok := updates["link_vlan"].(int32); ok {
+		update = update.SetLinkVlan(linkVLAN)
+	}
+	if linkLastSeen, ok := updates["link_last_seen"].(time.Time); ok {
+		update = update.SetLinkLastSeen(linkLastSeen)
 	}
 
 	update = update.SetUpdateTime(time.Now())

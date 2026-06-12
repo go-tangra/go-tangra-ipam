@@ -199,6 +199,160 @@ func (_u *DeviceInterfaceUpdate) ClearDescription() *DeviceInterfaceUpdate {
 	return _u
 }
 
+// SetIfIndex sets the "if_index" field.
+func (_u *DeviceInterfaceUpdate) SetIfIndex(v int32) *DeviceInterfaceUpdate {
+	_u.mutation.ResetIfIndex()
+	_u.mutation.SetIfIndex(v)
+	return _u
+}
+
+// SetNillableIfIndex sets the "if_index" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdate) SetNillableIfIndex(v *int32) *DeviceInterfaceUpdate {
+	if v != nil {
+		_u.SetIfIndex(*v)
+	}
+	return _u
+}
+
+// AddIfIndex adds value to the "if_index" field.
+func (_u *DeviceInterfaceUpdate) AddIfIndex(v int32) *DeviceInterfaceUpdate {
+	_u.mutation.AddIfIndex(v)
+	return _u
+}
+
+// ClearIfIndex clears the value of the "if_index" field.
+func (_u *DeviceInterfaceUpdate) ClearIfIndex() *DeviceInterfaceUpdate {
+	_u.mutation.ClearIfIndex()
+	return _u
+}
+
+// SetRemoteDeviceID sets the "remote_device_id" field.
+func (_u *DeviceInterfaceUpdate) SetRemoteDeviceID(v string) *DeviceInterfaceUpdate {
+	_u.mutation.SetRemoteDeviceID(v)
+	return _u
+}
+
+// SetNillableRemoteDeviceID sets the "remote_device_id" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdate) SetNillableRemoteDeviceID(v *string) *DeviceInterfaceUpdate {
+	if v != nil {
+		_u.SetRemoteDeviceID(*v)
+	}
+	return _u
+}
+
+// ClearRemoteDeviceID clears the value of the "remote_device_id" field.
+func (_u *DeviceInterfaceUpdate) ClearRemoteDeviceID() *DeviceInterfaceUpdate {
+	_u.mutation.ClearRemoteDeviceID()
+	return _u
+}
+
+// SetRemoteInterfaceID sets the "remote_interface_id" field.
+func (_u *DeviceInterfaceUpdate) SetRemoteInterfaceID(v string) *DeviceInterfaceUpdate {
+	_u.mutation.SetRemoteInterfaceID(v)
+	return _u
+}
+
+// SetNillableRemoteInterfaceID sets the "remote_interface_id" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdate) SetNillableRemoteInterfaceID(v *string) *DeviceInterfaceUpdate {
+	if v != nil {
+		_u.SetRemoteInterfaceID(*v)
+	}
+	return _u
+}
+
+// ClearRemoteInterfaceID clears the value of the "remote_interface_id" field.
+func (_u *DeviceInterfaceUpdate) ClearRemoteInterfaceID() *DeviceInterfaceUpdate {
+	_u.mutation.ClearRemoteInterfaceID()
+	return _u
+}
+
+// SetRemotePortName sets the "remote_port_name" field.
+func (_u *DeviceInterfaceUpdate) SetRemotePortName(v string) *DeviceInterfaceUpdate {
+	_u.mutation.SetRemotePortName(v)
+	return _u
+}
+
+// SetNillableRemotePortName sets the "remote_port_name" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdate) SetNillableRemotePortName(v *string) *DeviceInterfaceUpdate {
+	if v != nil {
+		_u.SetRemotePortName(*v)
+	}
+	return _u
+}
+
+// ClearRemotePortName clears the value of the "remote_port_name" field.
+func (_u *DeviceInterfaceUpdate) ClearRemotePortName() *DeviceInterfaceUpdate {
+	_u.mutation.ClearRemotePortName()
+	return _u
+}
+
+// SetLinkSource sets the "link_source" field.
+func (_u *DeviceInterfaceUpdate) SetLinkSource(v string) *DeviceInterfaceUpdate {
+	_u.mutation.SetLinkSource(v)
+	return _u
+}
+
+// SetNillableLinkSource sets the "link_source" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdate) SetNillableLinkSource(v *string) *DeviceInterfaceUpdate {
+	if v != nil {
+		_u.SetLinkSource(*v)
+	}
+	return _u
+}
+
+// ClearLinkSource clears the value of the "link_source" field.
+func (_u *DeviceInterfaceUpdate) ClearLinkSource() *DeviceInterfaceUpdate {
+	_u.mutation.ClearLinkSource()
+	return _u
+}
+
+// SetLinkVlan sets the "link_vlan" field.
+func (_u *DeviceInterfaceUpdate) SetLinkVlan(v int32) *DeviceInterfaceUpdate {
+	_u.mutation.ResetLinkVlan()
+	_u.mutation.SetLinkVlan(v)
+	return _u
+}
+
+// SetNillableLinkVlan sets the "link_vlan" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdate) SetNillableLinkVlan(v *int32) *DeviceInterfaceUpdate {
+	if v != nil {
+		_u.SetLinkVlan(*v)
+	}
+	return _u
+}
+
+// AddLinkVlan adds value to the "link_vlan" field.
+func (_u *DeviceInterfaceUpdate) AddLinkVlan(v int32) *DeviceInterfaceUpdate {
+	_u.mutation.AddLinkVlan(v)
+	return _u
+}
+
+// ClearLinkVlan clears the value of the "link_vlan" field.
+func (_u *DeviceInterfaceUpdate) ClearLinkVlan() *DeviceInterfaceUpdate {
+	_u.mutation.ClearLinkVlan()
+	return _u
+}
+
+// SetLinkLastSeen sets the "link_last_seen" field.
+func (_u *DeviceInterfaceUpdate) SetLinkLastSeen(v time.Time) *DeviceInterfaceUpdate {
+	_u.mutation.SetLinkLastSeen(v)
+	return _u
+}
+
+// SetNillableLinkLastSeen sets the "link_last_seen" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdate) SetNillableLinkLastSeen(v *time.Time) *DeviceInterfaceUpdate {
+	if v != nil {
+		_u.SetLinkLastSeen(*v)
+	}
+	return _u
+}
+
+// ClearLinkLastSeen clears the value of the "link_last_seen" field.
+func (_u *DeviceInterfaceUpdate) ClearLinkLastSeen() *DeviceInterfaceUpdate {
+	_u.mutation.ClearLinkLastSeen()
+	return _u
+}
+
 // SetDevice sets the "device" edge to the Device entity.
 func (_u *DeviceInterfaceUpdate) SetDevice(v *Device) *DeviceInterfaceUpdate {
 	return _u.SetDeviceID(v.ID)
@@ -325,6 +479,54 @@ func (_u *DeviceInterfaceUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if _u.mutation.DescriptionCleared() {
 		_spec.ClearField(deviceinterface.FieldDescription, field.TypeString)
+	}
+	if value, ok := _u.mutation.IfIndex(); ok {
+		_spec.SetField(deviceinterface.FieldIfIndex, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedIfIndex(); ok {
+		_spec.AddField(deviceinterface.FieldIfIndex, field.TypeInt32, value)
+	}
+	if _u.mutation.IfIndexCleared() {
+		_spec.ClearField(deviceinterface.FieldIfIndex, field.TypeInt32)
+	}
+	if value, ok := _u.mutation.RemoteDeviceID(); ok {
+		_spec.SetField(deviceinterface.FieldRemoteDeviceID, field.TypeString, value)
+	}
+	if _u.mutation.RemoteDeviceIDCleared() {
+		_spec.ClearField(deviceinterface.FieldRemoteDeviceID, field.TypeString)
+	}
+	if value, ok := _u.mutation.RemoteInterfaceID(); ok {
+		_spec.SetField(deviceinterface.FieldRemoteInterfaceID, field.TypeString, value)
+	}
+	if _u.mutation.RemoteInterfaceIDCleared() {
+		_spec.ClearField(deviceinterface.FieldRemoteInterfaceID, field.TypeString)
+	}
+	if value, ok := _u.mutation.RemotePortName(); ok {
+		_spec.SetField(deviceinterface.FieldRemotePortName, field.TypeString, value)
+	}
+	if _u.mutation.RemotePortNameCleared() {
+		_spec.ClearField(deviceinterface.FieldRemotePortName, field.TypeString)
+	}
+	if value, ok := _u.mutation.LinkSource(); ok {
+		_spec.SetField(deviceinterface.FieldLinkSource, field.TypeString, value)
+	}
+	if _u.mutation.LinkSourceCleared() {
+		_spec.ClearField(deviceinterface.FieldLinkSource, field.TypeString)
+	}
+	if value, ok := _u.mutation.LinkVlan(); ok {
+		_spec.SetField(deviceinterface.FieldLinkVlan, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedLinkVlan(); ok {
+		_spec.AddField(deviceinterface.FieldLinkVlan, field.TypeInt32, value)
+	}
+	if _u.mutation.LinkVlanCleared() {
+		_spec.ClearField(deviceinterface.FieldLinkVlan, field.TypeInt32)
+	}
+	if value, ok := _u.mutation.LinkLastSeen(); ok {
+		_spec.SetField(deviceinterface.FieldLinkLastSeen, field.TypeTime, value)
+	}
+	if _u.mutation.LinkLastSeenCleared() {
+		_spec.ClearField(deviceinterface.FieldLinkLastSeen, field.TypeTime)
 	}
 	if _u.mutation.DeviceCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -546,6 +748,160 @@ func (_u *DeviceInterfaceUpdateOne) ClearDescription() *DeviceInterfaceUpdateOne
 	return _u
 }
 
+// SetIfIndex sets the "if_index" field.
+func (_u *DeviceInterfaceUpdateOne) SetIfIndex(v int32) *DeviceInterfaceUpdateOne {
+	_u.mutation.ResetIfIndex()
+	_u.mutation.SetIfIndex(v)
+	return _u
+}
+
+// SetNillableIfIndex sets the "if_index" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdateOne) SetNillableIfIndex(v *int32) *DeviceInterfaceUpdateOne {
+	if v != nil {
+		_u.SetIfIndex(*v)
+	}
+	return _u
+}
+
+// AddIfIndex adds value to the "if_index" field.
+func (_u *DeviceInterfaceUpdateOne) AddIfIndex(v int32) *DeviceInterfaceUpdateOne {
+	_u.mutation.AddIfIndex(v)
+	return _u
+}
+
+// ClearIfIndex clears the value of the "if_index" field.
+func (_u *DeviceInterfaceUpdateOne) ClearIfIndex() *DeviceInterfaceUpdateOne {
+	_u.mutation.ClearIfIndex()
+	return _u
+}
+
+// SetRemoteDeviceID sets the "remote_device_id" field.
+func (_u *DeviceInterfaceUpdateOne) SetRemoteDeviceID(v string) *DeviceInterfaceUpdateOne {
+	_u.mutation.SetRemoteDeviceID(v)
+	return _u
+}
+
+// SetNillableRemoteDeviceID sets the "remote_device_id" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdateOne) SetNillableRemoteDeviceID(v *string) *DeviceInterfaceUpdateOne {
+	if v != nil {
+		_u.SetRemoteDeviceID(*v)
+	}
+	return _u
+}
+
+// ClearRemoteDeviceID clears the value of the "remote_device_id" field.
+func (_u *DeviceInterfaceUpdateOne) ClearRemoteDeviceID() *DeviceInterfaceUpdateOne {
+	_u.mutation.ClearRemoteDeviceID()
+	return _u
+}
+
+// SetRemoteInterfaceID sets the "remote_interface_id" field.
+func (_u *DeviceInterfaceUpdateOne) SetRemoteInterfaceID(v string) *DeviceInterfaceUpdateOne {
+	_u.mutation.SetRemoteInterfaceID(v)
+	return _u
+}
+
+// SetNillableRemoteInterfaceID sets the "remote_interface_id" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdateOne) SetNillableRemoteInterfaceID(v *string) *DeviceInterfaceUpdateOne {
+	if v != nil {
+		_u.SetRemoteInterfaceID(*v)
+	}
+	return _u
+}
+
+// ClearRemoteInterfaceID clears the value of the "remote_interface_id" field.
+func (_u *DeviceInterfaceUpdateOne) ClearRemoteInterfaceID() *DeviceInterfaceUpdateOne {
+	_u.mutation.ClearRemoteInterfaceID()
+	return _u
+}
+
+// SetRemotePortName sets the "remote_port_name" field.
+func (_u *DeviceInterfaceUpdateOne) SetRemotePortName(v string) *DeviceInterfaceUpdateOne {
+	_u.mutation.SetRemotePortName(v)
+	return _u
+}
+
+// SetNillableRemotePortName sets the "remote_port_name" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdateOne) SetNillableRemotePortName(v *string) *DeviceInterfaceUpdateOne {
+	if v != nil {
+		_u.SetRemotePortName(*v)
+	}
+	return _u
+}
+
+// ClearRemotePortName clears the value of the "remote_port_name" field.
+func (_u *DeviceInterfaceUpdateOne) ClearRemotePortName() *DeviceInterfaceUpdateOne {
+	_u.mutation.ClearRemotePortName()
+	return _u
+}
+
+// SetLinkSource sets the "link_source" field.
+func (_u *DeviceInterfaceUpdateOne) SetLinkSource(v string) *DeviceInterfaceUpdateOne {
+	_u.mutation.SetLinkSource(v)
+	return _u
+}
+
+// SetNillableLinkSource sets the "link_source" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdateOne) SetNillableLinkSource(v *string) *DeviceInterfaceUpdateOne {
+	if v != nil {
+		_u.SetLinkSource(*v)
+	}
+	return _u
+}
+
+// ClearLinkSource clears the value of the "link_source" field.
+func (_u *DeviceInterfaceUpdateOne) ClearLinkSource() *DeviceInterfaceUpdateOne {
+	_u.mutation.ClearLinkSource()
+	return _u
+}
+
+// SetLinkVlan sets the "link_vlan" field.
+func (_u *DeviceInterfaceUpdateOne) SetLinkVlan(v int32) *DeviceInterfaceUpdateOne {
+	_u.mutation.ResetLinkVlan()
+	_u.mutation.SetLinkVlan(v)
+	return _u
+}
+
+// SetNillableLinkVlan sets the "link_vlan" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdateOne) SetNillableLinkVlan(v *int32) *DeviceInterfaceUpdateOne {
+	if v != nil {
+		_u.SetLinkVlan(*v)
+	}
+	return _u
+}
+
+// AddLinkVlan adds value to the "link_vlan" field.
+func (_u *DeviceInterfaceUpdateOne) AddLinkVlan(v int32) *DeviceInterfaceUpdateOne {
+	_u.mutation.AddLinkVlan(v)
+	return _u
+}
+
+// ClearLinkVlan clears the value of the "link_vlan" field.
+func (_u *DeviceInterfaceUpdateOne) ClearLinkVlan() *DeviceInterfaceUpdateOne {
+	_u.mutation.ClearLinkVlan()
+	return _u
+}
+
+// SetLinkLastSeen sets the "link_last_seen" field.
+func (_u *DeviceInterfaceUpdateOne) SetLinkLastSeen(v time.Time) *DeviceInterfaceUpdateOne {
+	_u.mutation.SetLinkLastSeen(v)
+	return _u
+}
+
+// SetNillableLinkLastSeen sets the "link_last_seen" field if the given value is not nil.
+func (_u *DeviceInterfaceUpdateOne) SetNillableLinkLastSeen(v *time.Time) *DeviceInterfaceUpdateOne {
+	if v != nil {
+		_u.SetLinkLastSeen(*v)
+	}
+	return _u
+}
+
+// ClearLinkLastSeen clears the value of the "link_last_seen" field.
+func (_u *DeviceInterfaceUpdateOne) ClearLinkLastSeen() *DeviceInterfaceUpdateOne {
+	_u.mutation.ClearLinkLastSeen()
+	return _u
+}
+
 // SetDevice sets the "device" edge to the Device entity.
 func (_u *DeviceInterfaceUpdateOne) SetDevice(v *Device) *DeviceInterfaceUpdateOne {
 	return _u.SetDeviceID(v.ID)
@@ -702,6 +1058,54 @@ func (_u *DeviceInterfaceUpdateOne) sqlSave(ctx context.Context) (_node *DeviceI
 	}
 	if _u.mutation.DescriptionCleared() {
 		_spec.ClearField(deviceinterface.FieldDescription, field.TypeString)
+	}
+	if value, ok := _u.mutation.IfIndex(); ok {
+		_spec.SetField(deviceinterface.FieldIfIndex, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedIfIndex(); ok {
+		_spec.AddField(deviceinterface.FieldIfIndex, field.TypeInt32, value)
+	}
+	if _u.mutation.IfIndexCleared() {
+		_spec.ClearField(deviceinterface.FieldIfIndex, field.TypeInt32)
+	}
+	if value, ok := _u.mutation.RemoteDeviceID(); ok {
+		_spec.SetField(deviceinterface.FieldRemoteDeviceID, field.TypeString, value)
+	}
+	if _u.mutation.RemoteDeviceIDCleared() {
+		_spec.ClearField(deviceinterface.FieldRemoteDeviceID, field.TypeString)
+	}
+	if value, ok := _u.mutation.RemoteInterfaceID(); ok {
+		_spec.SetField(deviceinterface.FieldRemoteInterfaceID, field.TypeString, value)
+	}
+	if _u.mutation.RemoteInterfaceIDCleared() {
+		_spec.ClearField(deviceinterface.FieldRemoteInterfaceID, field.TypeString)
+	}
+	if value, ok := _u.mutation.RemotePortName(); ok {
+		_spec.SetField(deviceinterface.FieldRemotePortName, field.TypeString, value)
+	}
+	if _u.mutation.RemotePortNameCleared() {
+		_spec.ClearField(deviceinterface.FieldRemotePortName, field.TypeString)
+	}
+	if value, ok := _u.mutation.LinkSource(); ok {
+		_spec.SetField(deviceinterface.FieldLinkSource, field.TypeString, value)
+	}
+	if _u.mutation.LinkSourceCleared() {
+		_spec.ClearField(deviceinterface.FieldLinkSource, field.TypeString)
+	}
+	if value, ok := _u.mutation.LinkVlan(); ok {
+		_spec.SetField(deviceinterface.FieldLinkVlan, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedLinkVlan(); ok {
+		_spec.AddField(deviceinterface.FieldLinkVlan, field.TypeInt32, value)
+	}
+	if _u.mutation.LinkVlanCleared() {
+		_spec.ClearField(deviceinterface.FieldLinkVlan, field.TypeInt32)
+	}
+	if value, ok := _u.mutation.LinkLastSeen(); ok {
+		_spec.SetField(deviceinterface.FieldLinkLastSeen, field.TypeTime, value)
+	}
+	if _u.mutation.LinkLastSeenCleared() {
+		_spec.ClearField(deviceinterface.FieldLinkLastSeen, field.TypeTime)
 	}
 	if _u.mutation.DeviceCleared() {
 		edge := &sqlgraph.EdgeSpec{

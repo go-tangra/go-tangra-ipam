@@ -32,6 +32,20 @@ const (
 	FieldSpeedMbps = "speed_mbps"
 	// FieldDescription holds the string denoting the description field in the database.
 	FieldDescription = "description"
+	// FieldIfIndex holds the string denoting the if_index field in the database.
+	FieldIfIndex = "if_index"
+	// FieldRemoteDeviceID holds the string denoting the remote_device_id field in the database.
+	FieldRemoteDeviceID = "remote_device_id"
+	// FieldRemoteInterfaceID holds the string denoting the remote_interface_id field in the database.
+	FieldRemoteInterfaceID = "remote_interface_id"
+	// FieldRemotePortName holds the string denoting the remote_port_name field in the database.
+	FieldRemotePortName = "remote_port_name"
+	// FieldLinkSource holds the string denoting the link_source field in the database.
+	FieldLinkSource = "link_source"
+	// FieldLinkVlan holds the string denoting the link_vlan field in the database.
+	FieldLinkVlan = "link_vlan"
+	// FieldLinkLastSeen holds the string denoting the link_last_seen field in the database.
+	FieldLinkLastSeen = "link_last_seen"
 	// EdgeDevice holds the string denoting the device edge name in mutations.
 	EdgeDevice = "device"
 	// Table holds the table name of the deviceinterface in the database.
@@ -58,6 +72,13 @@ var Columns = []string{
 	FieldEnabled,
 	FieldSpeedMbps,
 	FieldDescription,
+	FieldIfIndex,
+	FieldRemoteDeviceID,
+	FieldRemoteInterfaceID,
+	FieldRemotePortName,
+	FieldLinkSource,
+	FieldLinkVlan,
+	FieldLinkLastSeen,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -137,6 +158,41 @@ func BySpeedMbps(opts ...sql.OrderTermOption) OrderOption {
 // ByDescription orders the results by the description field.
 func ByDescription(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDescription, opts...).ToFunc()
+}
+
+// ByIfIndex orders the results by the if_index field.
+func ByIfIndex(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIfIndex, opts...).ToFunc()
+}
+
+// ByRemoteDeviceID orders the results by the remote_device_id field.
+func ByRemoteDeviceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRemoteDeviceID, opts...).ToFunc()
+}
+
+// ByRemoteInterfaceID orders the results by the remote_interface_id field.
+func ByRemoteInterfaceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRemoteInterfaceID, opts...).ToFunc()
+}
+
+// ByRemotePortName orders the results by the remote_port_name field.
+func ByRemotePortName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRemotePortName, opts...).ToFunc()
+}
+
+// ByLinkSource orders the results by the link_source field.
+func ByLinkSource(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLinkSource, opts...).ToFunc()
+}
+
+// ByLinkVlan orders the results by the link_vlan field.
+func ByLinkVlan(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLinkVlan, opts...).ToFunc()
+}
+
+// ByLinkLastSeen orders the results by the link_last_seen field.
+func ByLinkLastSeen(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLinkLastSeen, opts...).ToFunc()
 }
 
 // ByDeviceField orders the results by device field.

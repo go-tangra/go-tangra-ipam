@@ -115,6 +115,41 @@ func Description(v string) predicate.DeviceInterface {
 	return predicate.DeviceInterface(sql.FieldEQ(FieldDescription, v))
 }
 
+// IfIndex applies equality check predicate on the "if_index" field. It's identical to IfIndexEQ.
+func IfIndex(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldIfIndex, v))
+}
+
+// RemoteDeviceID applies equality check predicate on the "remote_device_id" field. It's identical to RemoteDeviceIDEQ.
+func RemoteDeviceID(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldRemoteDeviceID, v))
+}
+
+// RemoteInterfaceID applies equality check predicate on the "remote_interface_id" field. It's identical to RemoteInterfaceIDEQ.
+func RemoteInterfaceID(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldRemoteInterfaceID, v))
+}
+
+// RemotePortName applies equality check predicate on the "remote_port_name" field. It's identical to RemotePortNameEQ.
+func RemotePortName(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldRemotePortName, v))
+}
+
+// LinkSource applies equality check predicate on the "link_source" field. It's identical to LinkSourceEQ.
+func LinkSource(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldLinkSource, v))
+}
+
+// LinkVlan applies equality check predicate on the "link_vlan" field. It's identical to LinkVlanEQ.
+func LinkVlan(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldLinkVlan, v))
+}
+
+// LinkLastSeen applies equality check predicate on the "link_last_seen" field. It's identical to LinkLastSeenEQ.
+func LinkLastSeen(v time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldLinkLastSeen, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.DeviceInterface {
 	return predicate.DeviceInterface(sql.FieldEQ(FieldCreateTime, v))
@@ -678,6 +713,456 @@ func DescriptionEqualFold(v string) predicate.DeviceInterface {
 // DescriptionContainsFold applies the ContainsFold predicate on the "description" field.
 func DescriptionContainsFold(v string) predicate.DeviceInterface {
 	return predicate.DeviceInterface(sql.FieldContainsFold(FieldDescription, v))
+}
+
+// IfIndexEQ applies the EQ predicate on the "if_index" field.
+func IfIndexEQ(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldIfIndex, v))
+}
+
+// IfIndexNEQ applies the NEQ predicate on the "if_index" field.
+func IfIndexNEQ(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNEQ(FieldIfIndex, v))
+}
+
+// IfIndexIn applies the In predicate on the "if_index" field.
+func IfIndexIn(vs ...int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIn(FieldIfIndex, vs...))
+}
+
+// IfIndexNotIn applies the NotIn predicate on the "if_index" field.
+func IfIndexNotIn(vs ...int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotIn(FieldIfIndex, vs...))
+}
+
+// IfIndexGT applies the GT predicate on the "if_index" field.
+func IfIndexGT(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGT(FieldIfIndex, v))
+}
+
+// IfIndexGTE applies the GTE predicate on the "if_index" field.
+func IfIndexGTE(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGTE(FieldIfIndex, v))
+}
+
+// IfIndexLT applies the LT predicate on the "if_index" field.
+func IfIndexLT(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLT(FieldIfIndex, v))
+}
+
+// IfIndexLTE applies the LTE predicate on the "if_index" field.
+func IfIndexLTE(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLTE(FieldIfIndex, v))
+}
+
+// IfIndexIsNil applies the IsNil predicate on the "if_index" field.
+func IfIndexIsNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIsNull(FieldIfIndex))
+}
+
+// IfIndexNotNil applies the NotNil predicate on the "if_index" field.
+func IfIndexNotNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotNull(FieldIfIndex))
+}
+
+// RemoteDeviceIDEQ applies the EQ predicate on the "remote_device_id" field.
+func RemoteDeviceIDEQ(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDNEQ applies the NEQ predicate on the "remote_device_id" field.
+func RemoteDeviceIDNEQ(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNEQ(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDIn applies the In predicate on the "remote_device_id" field.
+func RemoteDeviceIDIn(vs ...string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIn(FieldRemoteDeviceID, vs...))
+}
+
+// RemoteDeviceIDNotIn applies the NotIn predicate on the "remote_device_id" field.
+func RemoteDeviceIDNotIn(vs ...string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotIn(FieldRemoteDeviceID, vs...))
+}
+
+// RemoteDeviceIDGT applies the GT predicate on the "remote_device_id" field.
+func RemoteDeviceIDGT(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGT(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDGTE applies the GTE predicate on the "remote_device_id" field.
+func RemoteDeviceIDGTE(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGTE(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDLT applies the LT predicate on the "remote_device_id" field.
+func RemoteDeviceIDLT(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLT(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDLTE applies the LTE predicate on the "remote_device_id" field.
+func RemoteDeviceIDLTE(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLTE(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDContains applies the Contains predicate on the "remote_device_id" field.
+func RemoteDeviceIDContains(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldContains(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDHasPrefix applies the HasPrefix predicate on the "remote_device_id" field.
+func RemoteDeviceIDHasPrefix(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldHasPrefix(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDHasSuffix applies the HasSuffix predicate on the "remote_device_id" field.
+func RemoteDeviceIDHasSuffix(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldHasSuffix(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDIsNil applies the IsNil predicate on the "remote_device_id" field.
+func RemoteDeviceIDIsNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIsNull(FieldRemoteDeviceID))
+}
+
+// RemoteDeviceIDNotNil applies the NotNil predicate on the "remote_device_id" field.
+func RemoteDeviceIDNotNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotNull(FieldRemoteDeviceID))
+}
+
+// RemoteDeviceIDEqualFold applies the EqualFold predicate on the "remote_device_id" field.
+func RemoteDeviceIDEqualFold(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEqualFold(FieldRemoteDeviceID, v))
+}
+
+// RemoteDeviceIDContainsFold applies the ContainsFold predicate on the "remote_device_id" field.
+func RemoteDeviceIDContainsFold(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldContainsFold(FieldRemoteDeviceID, v))
+}
+
+// RemoteInterfaceIDEQ applies the EQ predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDEQ(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDNEQ applies the NEQ predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDNEQ(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNEQ(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDIn applies the In predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDIn(vs ...string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIn(FieldRemoteInterfaceID, vs...))
+}
+
+// RemoteInterfaceIDNotIn applies the NotIn predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDNotIn(vs ...string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotIn(FieldRemoteInterfaceID, vs...))
+}
+
+// RemoteInterfaceIDGT applies the GT predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDGT(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGT(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDGTE applies the GTE predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDGTE(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGTE(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDLT applies the LT predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDLT(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLT(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDLTE applies the LTE predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDLTE(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLTE(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDContains applies the Contains predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDContains(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldContains(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDHasPrefix applies the HasPrefix predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDHasPrefix(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldHasPrefix(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDHasSuffix applies the HasSuffix predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDHasSuffix(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldHasSuffix(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDIsNil applies the IsNil predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDIsNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIsNull(FieldRemoteInterfaceID))
+}
+
+// RemoteInterfaceIDNotNil applies the NotNil predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDNotNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotNull(FieldRemoteInterfaceID))
+}
+
+// RemoteInterfaceIDEqualFold applies the EqualFold predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDEqualFold(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEqualFold(FieldRemoteInterfaceID, v))
+}
+
+// RemoteInterfaceIDContainsFold applies the ContainsFold predicate on the "remote_interface_id" field.
+func RemoteInterfaceIDContainsFold(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldContainsFold(FieldRemoteInterfaceID, v))
+}
+
+// RemotePortNameEQ applies the EQ predicate on the "remote_port_name" field.
+func RemotePortNameEQ(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldRemotePortName, v))
+}
+
+// RemotePortNameNEQ applies the NEQ predicate on the "remote_port_name" field.
+func RemotePortNameNEQ(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNEQ(FieldRemotePortName, v))
+}
+
+// RemotePortNameIn applies the In predicate on the "remote_port_name" field.
+func RemotePortNameIn(vs ...string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIn(FieldRemotePortName, vs...))
+}
+
+// RemotePortNameNotIn applies the NotIn predicate on the "remote_port_name" field.
+func RemotePortNameNotIn(vs ...string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotIn(FieldRemotePortName, vs...))
+}
+
+// RemotePortNameGT applies the GT predicate on the "remote_port_name" field.
+func RemotePortNameGT(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGT(FieldRemotePortName, v))
+}
+
+// RemotePortNameGTE applies the GTE predicate on the "remote_port_name" field.
+func RemotePortNameGTE(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGTE(FieldRemotePortName, v))
+}
+
+// RemotePortNameLT applies the LT predicate on the "remote_port_name" field.
+func RemotePortNameLT(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLT(FieldRemotePortName, v))
+}
+
+// RemotePortNameLTE applies the LTE predicate on the "remote_port_name" field.
+func RemotePortNameLTE(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLTE(FieldRemotePortName, v))
+}
+
+// RemotePortNameContains applies the Contains predicate on the "remote_port_name" field.
+func RemotePortNameContains(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldContains(FieldRemotePortName, v))
+}
+
+// RemotePortNameHasPrefix applies the HasPrefix predicate on the "remote_port_name" field.
+func RemotePortNameHasPrefix(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldHasPrefix(FieldRemotePortName, v))
+}
+
+// RemotePortNameHasSuffix applies the HasSuffix predicate on the "remote_port_name" field.
+func RemotePortNameHasSuffix(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldHasSuffix(FieldRemotePortName, v))
+}
+
+// RemotePortNameIsNil applies the IsNil predicate on the "remote_port_name" field.
+func RemotePortNameIsNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIsNull(FieldRemotePortName))
+}
+
+// RemotePortNameNotNil applies the NotNil predicate on the "remote_port_name" field.
+func RemotePortNameNotNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotNull(FieldRemotePortName))
+}
+
+// RemotePortNameEqualFold applies the EqualFold predicate on the "remote_port_name" field.
+func RemotePortNameEqualFold(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEqualFold(FieldRemotePortName, v))
+}
+
+// RemotePortNameContainsFold applies the ContainsFold predicate on the "remote_port_name" field.
+func RemotePortNameContainsFold(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldContainsFold(FieldRemotePortName, v))
+}
+
+// LinkSourceEQ applies the EQ predicate on the "link_source" field.
+func LinkSourceEQ(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldLinkSource, v))
+}
+
+// LinkSourceNEQ applies the NEQ predicate on the "link_source" field.
+func LinkSourceNEQ(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNEQ(FieldLinkSource, v))
+}
+
+// LinkSourceIn applies the In predicate on the "link_source" field.
+func LinkSourceIn(vs ...string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIn(FieldLinkSource, vs...))
+}
+
+// LinkSourceNotIn applies the NotIn predicate on the "link_source" field.
+func LinkSourceNotIn(vs ...string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotIn(FieldLinkSource, vs...))
+}
+
+// LinkSourceGT applies the GT predicate on the "link_source" field.
+func LinkSourceGT(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGT(FieldLinkSource, v))
+}
+
+// LinkSourceGTE applies the GTE predicate on the "link_source" field.
+func LinkSourceGTE(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGTE(FieldLinkSource, v))
+}
+
+// LinkSourceLT applies the LT predicate on the "link_source" field.
+func LinkSourceLT(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLT(FieldLinkSource, v))
+}
+
+// LinkSourceLTE applies the LTE predicate on the "link_source" field.
+func LinkSourceLTE(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLTE(FieldLinkSource, v))
+}
+
+// LinkSourceContains applies the Contains predicate on the "link_source" field.
+func LinkSourceContains(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldContains(FieldLinkSource, v))
+}
+
+// LinkSourceHasPrefix applies the HasPrefix predicate on the "link_source" field.
+func LinkSourceHasPrefix(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldHasPrefix(FieldLinkSource, v))
+}
+
+// LinkSourceHasSuffix applies the HasSuffix predicate on the "link_source" field.
+func LinkSourceHasSuffix(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldHasSuffix(FieldLinkSource, v))
+}
+
+// LinkSourceIsNil applies the IsNil predicate on the "link_source" field.
+func LinkSourceIsNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIsNull(FieldLinkSource))
+}
+
+// LinkSourceNotNil applies the NotNil predicate on the "link_source" field.
+func LinkSourceNotNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotNull(FieldLinkSource))
+}
+
+// LinkSourceEqualFold applies the EqualFold predicate on the "link_source" field.
+func LinkSourceEqualFold(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEqualFold(FieldLinkSource, v))
+}
+
+// LinkSourceContainsFold applies the ContainsFold predicate on the "link_source" field.
+func LinkSourceContainsFold(v string) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldContainsFold(FieldLinkSource, v))
+}
+
+// LinkVlanEQ applies the EQ predicate on the "link_vlan" field.
+func LinkVlanEQ(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldLinkVlan, v))
+}
+
+// LinkVlanNEQ applies the NEQ predicate on the "link_vlan" field.
+func LinkVlanNEQ(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNEQ(FieldLinkVlan, v))
+}
+
+// LinkVlanIn applies the In predicate on the "link_vlan" field.
+func LinkVlanIn(vs ...int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIn(FieldLinkVlan, vs...))
+}
+
+// LinkVlanNotIn applies the NotIn predicate on the "link_vlan" field.
+func LinkVlanNotIn(vs ...int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotIn(FieldLinkVlan, vs...))
+}
+
+// LinkVlanGT applies the GT predicate on the "link_vlan" field.
+func LinkVlanGT(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGT(FieldLinkVlan, v))
+}
+
+// LinkVlanGTE applies the GTE predicate on the "link_vlan" field.
+func LinkVlanGTE(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGTE(FieldLinkVlan, v))
+}
+
+// LinkVlanLT applies the LT predicate on the "link_vlan" field.
+func LinkVlanLT(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLT(FieldLinkVlan, v))
+}
+
+// LinkVlanLTE applies the LTE predicate on the "link_vlan" field.
+func LinkVlanLTE(v int32) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLTE(FieldLinkVlan, v))
+}
+
+// LinkVlanIsNil applies the IsNil predicate on the "link_vlan" field.
+func LinkVlanIsNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIsNull(FieldLinkVlan))
+}
+
+// LinkVlanNotNil applies the NotNil predicate on the "link_vlan" field.
+func LinkVlanNotNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotNull(FieldLinkVlan))
+}
+
+// LinkLastSeenEQ applies the EQ predicate on the "link_last_seen" field.
+func LinkLastSeenEQ(v time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldEQ(FieldLinkLastSeen, v))
+}
+
+// LinkLastSeenNEQ applies the NEQ predicate on the "link_last_seen" field.
+func LinkLastSeenNEQ(v time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNEQ(FieldLinkLastSeen, v))
+}
+
+// LinkLastSeenIn applies the In predicate on the "link_last_seen" field.
+func LinkLastSeenIn(vs ...time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIn(FieldLinkLastSeen, vs...))
+}
+
+// LinkLastSeenNotIn applies the NotIn predicate on the "link_last_seen" field.
+func LinkLastSeenNotIn(vs ...time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotIn(FieldLinkLastSeen, vs...))
+}
+
+// LinkLastSeenGT applies the GT predicate on the "link_last_seen" field.
+func LinkLastSeenGT(v time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGT(FieldLinkLastSeen, v))
+}
+
+// LinkLastSeenGTE applies the GTE predicate on the "link_last_seen" field.
+func LinkLastSeenGTE(v time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldGTE(FieldLinkLastSeen, v))
+}
+
+// LinkLastSeenLT applies the LT predicate on the "link_last_seen" field.
+func LinkLastSeenLT(v time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLT(FieldLinkLastSeen, v))
+}
+
+// LinkLastSeenLTE applies the LTE predicate on the "link_last_seen" field.
+func LinkLastSeenLTE(v time.Time) predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldLTE(FieldLinkLastSeen, v))
+}
+
+// LinkLastSeenIsNil applies the IsNil predicate on the "link_last_seen" field.
+func LinkLastSeenIsNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldIsNull(FieldLinkLastSeen))
+}
+
+// LinkLastSeenNotNil applies the NotNil predicate on the "link_last_seen" field.
+func LinkLastSeenNotNil() predicate.DeviceInterface {
+	return predicate.DeviceInterface(sql.FieldNotNull(FieldLinkLastSeen))
 }
 
 // HasDevice applies the HasEdge predicate on the "device" edge.

@@ -22,6 +22,7 @@ import {
 } from 'ant-design-vue';
 
 import { type ipamservicev1_Device } from '../../api/proto-types';
+import { DeviceService, type DeviceInterface } from '../../api/services';
 import { $t } from 'shell/locales';
 import { useIpamDeviceStore } from '../../stores/ipam-device.state';
 import { useIpamLocationStore } from '../../stores/ipam-location.state';
@@ -379,10 +380,17 @@ const [Drawer, drawerApi] = useVbenDrawer({
 
       await loadLocations();
 
+      deviceInterfaces.value = [];
+      remoteDeviceNames.value = {};
+
       if (data.value?.mode === 'create') {
         resetForm();
         rackDevices.value = [];
       } else if (data.value?.row) {
+        // Load SNMP-discovered ports/links for view mode.
+        if (data.value.mode === 'view' && data.value.row.id) {
+          await loadDeviceInterfaces(data.value.row.id);
+        }
         formState.value = {
           name: data.value.row.name ?? '',
           description: data.value.row.description ?? '',
@@ -412,6 +420,91 @@ const [Drawer, drawerApi] = useVbenDrawer({
 });
 
 const device = computed(() => data.value?.row);
+
+// Persisted (SNMP-discovered) interfaces — distinct from the agent-reported
+// interfaces embedded in device metadata. These carry the switch-port ifIndex
+// and the discovered layer-2 link to a switch.
+const deviceInterfaces = ref<DeviceInterface[]>([]);
+const loadingInterfaces = ref(false);
+const remoteDeviceNames = ref<Record<string, string>>({});
+
+const isSwitchDevice = computed(
+  () => device.value?.deviceType === 'DEVICE_TYPE_SWITCH',
+);
+const hasDiscoveredInterfaces = computed(() => deviceInterfaces.value.length > 0);
+const hasDiscoveredLinks = computed(() =>
+  deviceInterfaces.value.some((i) => !!i.remotePortName || !!i.remoteInterfaceId),
+);
+
+async function loadDeviceInterfaces(deviceId: string): Promise<void> {
+  loadingInterfaces.value = true;
+  try {
+    const resp = await DeviceService.getInterfaces(deviceId);
+    deviceInterfaces.value = resp.interfaces ?? [];
+    await resolveRemoteDeviceNames();
+  } catch (error: unknown) {
+    console.error('Failed to load device interfaces:', error);
+    deviceInterfaces.value = [];
+  } finally {
+    loadingInterfaces.value = false;
+  }
+}
+
+// Resolve neighbor (switch) device names for the "Connected To" column.
+async function resolveRemoteDeviceNames(): Promise<void> {
+  const ids = [
+    ...new Set(
+      deviceInterfaces.value
+        .map((i) => i.remoteDeviceId)
+        .filter((v): v is string => !!v),
+    ),
+  ];
+  const names: Record<string, string> = { ...remoteDeviceNames.value };
+  await Promise.all(
+    ids.map(async (id) => {
+      if (names[id]) return;
+      try {
+        const resp = await DeviceService.get(id);
+        if (resp.device?.name) names[id] = resp.device.name;
+      } catch {
+        // Best effort — fall back to showing the port name only.
+      }
+    }),
+  );
+  remoteDeviceNames.value = names;
+}
+
+function formatSpeed(speedMbps: number | undefined): string {
+  if (!speedMbps || speedMbps <= 0) return '-';
+  if (speedMbps >= 1000 && speedMbps % 1000 === 0) {
+    return `${speedMbps / 1000} Gbps`;
+  }
+  return `${speedMbps} Mbps`;
+}
+
+function connectedToLabel(row: DeviceInterface): string {
+  if (!row.remotePortName && !row.remoteInterfaceId) return '';
+  const switchName = row.remoteDeviceId
+    ? remoteDeviceNames.value[row.remoteDeviceId]
+    : undefined;
+  const port = row.remotePortName ?? row.remoteInterfaceId ?? '';
+  return switchName ? `${switchName} · ${port}` : port;
+}
+
+const discoveredInterfaceColumns = computed(() => {
+  const cols: Record<string, unknown>[] = [
+    { title: $t('ipam.page.device.portIfIndex'), dataIndex: 'ifIndex', key: 'ifIndex', width: 70 },
+    { title: $t('ipam.page.device.name'), dataIndex: 'name', key: 'name', width: 130 },
+    { title: $t('ipam.page.device.macAddress'), dataIndex: 'macAddress', key: 'macAddress', width: 150 },
+    { title: $t('ipam.page.device.portSpeed'), dataIndex: 'speedMbps', key: 'speedMbps', width: 90 },
+    { title: $t('ipam.page.device.portStatus'), dataIndex: 'enabled', key: 'enabled', width: 80 },
+  ];
+  // Only physical servers carry discovered links — show the column when present.
+  if (hasDiscoveredLinks.value) {
+    cols.push({ title: $t('ipam.page.device.connectedTo'), key: 'connectedTo' });
+  }
+  return cols;
+});
 
 // Parse metadata JSON from the device
 interface BoardMetadata {
@@ -696,6 +789,53 @@ const interfaceColumns = [
             :row-key="(r: any) => r.name"
           />
         </template>
+      </template>
+
+      <!-- Switch ports / discovered interfaces & links (SNMP) -->
+      <template v-if="hasDiscoveredInterfaces">
+        <Divider orientation="left">
+          {{ isSwitchDevice ? $t('ipam.page.device.sectionPorts') : $t('ipam.page.device.sectionDiscoveredInterfaces') }}
+        </Divider>
+        <p style="margin: -4px 0 8px; color: #8c8c8c; font-size: 12px;">
+          {{ $t('ipam.page.device.discoveredInterfacesHint') }}
+        </p>
+        <Table
+          :columns="discoveredInterfaceColumns"
+          :data-source="deviceInterfaces"
+          :loading="loadingInterfaces"
+          :pagination="false"
+          size="small"
+          bordered
+          :row-key="(r: DeviceInterface) => r.id ?? r.name ?? ''"
+          :scroll="{ y: 320 }"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'ifIndex'">
+              {{ (record as DeviceInterface).ifIndex ?? '-' }}
+            </template>
+            <template v-else-if="column.key === 'macAddress'">
+              <code v-if="(record as DeviceInterface).macAddress">{{ (record as DeviceInterface).macAddress }}</code>
+              <span v-else>-</span>
+            </template>
+            <template v-else-if="column.key === 'speedMbps'">
+              {{ formatSpeed((record as DeviceInterface).speedMbps) }}
+            </template>
+            <template v-else-if="column.key === 'enabled'">
+              <Tag :color="(record as DeviceInterface).enabled ? 'green' : 'default'">
+                {{ (record as DeviceInterface).enabled ? $t('ipam.page.device.portUp') : $t('ipam.page.device.portDown') }}
+              </Tag>
+            </template>
+            <template v-else-if="column.key === 'connectedTo'">
+              <template v-if="connectedToLabel(record as DeviceInterface)">
+                <Tag color="blue">{{ connectedToLabel(record as DeviceInterface) }}</Tag>
+                <Tag v-if="(record as DeviceInterface).linkVlan" color="geekblue">
+                  {{ $t('ipam.page.device.linkVlan') }} {{ (record as DeviceInterface).linkVlan }}
+                </Tag>
+              </template>
+              <span v-else>-</span>
+            </template>
+          </template>
+        </Table>
       </template>
 
       <!-- Notes / Contact / Tags -->

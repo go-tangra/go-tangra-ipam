@@ -174,6 +174,13 @@ var (
 		{Name: "enabled", Type: field.TypeBool, Comment: "Is interface enabled", Default: true},
 		{Name: "speed_mbps", Type: field.TypeInt32, Nullable: true, Comment: "Speed in Mbps"},
 		{Name: "description", Type: field.TypeString, Nullable: true, Comment: "Description"},
+		{Name: "if_index", Type: field.TypeInt32, Nullable: true, Comment: "SNMP ifIndex — identifies a switch port / interface within its device"},
+		{Name: "remote_device_id", Type: field.TypeString, Nullable: true, Comment: "Connected neighbor device ID (e.g. the switch this server port plugs into)"},
+		{Name: "remote_interface_id", Type: field.TypeString, Nullable: true, Comment: "Connected neighbor interface ID (e.g. the switch port)"},
+		{Name: "remote_port_name", Type: field.TypeString, Nullable: true, Comment: "Connected neighbor port name (denormalized for display)"},
+		{Name: "link_source", Type: field.TypeString, Nullable: true, Comment: "How the link was discovered: snmp_fdb, lldp, manual"},
+		{Name: "link_vlan", Type: field.TypeInt32, Nullable: true, Comment: "VLAN the neighbor MAC was learned on (Q-BRIDGE FDB)"},
+		{Name: "link_last_seen", Type: field.TypeTime, Nullable: true, Comment: "When the neighbor link was last observed"},
 		{Name: "device_id", Type: field.TypeString, Comment: "Device ID"},
 	}
 	// IpamDeviceInterfacesTable holds the schema information for the "ipam_device_interfaces" table.
@@ -184,7 +191,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "ipam_device_interfaces_ipam_devices_interfaces",
-				Columns:    []*schema.Column{IpamDeviceInterfacesColumns[10]},
+				Columns:    []*schema.Column{IpamDeviceInterfacesColumns[17]},
 				RefColumns: []*schema.Column{IpamDevicesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -193,17 +200,27 @@ var (
 			{
 				Name:    "deviceinterface_device_id_name",
 				Unique:  true,
-				Columns: []*schema.Column{IpamDeviceInterfacesColumns[10], IpamDeviceInterfacesColumns[4]},
+				Columns: []*schema.Column{IpamDeviceInterfacesColumns[17], IpamDeviceInterfacesColumns[4]},
 			},
 			{
 				Name:    "deviceinterface_device_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamDeviceInterfacesColumns[10]},
+				Columns: []*schema.Column{IpamDeviceInterfacesColumns[17]},
 			},
 			{
 				Name:    "deviceinterface_mac_address",
 				Unique:  false,
 				Columns: []*schema.Column{IpamDeviceInterfacesColumns[5]},
+			},
+			{
+				Name:    "deviceinterface_device_id_if_index",
+				Unique:  false,
+				Columns: []*schema.Column{IpamDeviceInterfacesColumns[17], IpamDeviceInterfacesColumns[10]},
+			},
+			{
+				Name:    "deviceinterface_remote_device_id",
+				Unique:  false,
+				Columns: []*schema.Column{IpamDeviceInterfacesColumns[11]},
 			},
 		},
 	}

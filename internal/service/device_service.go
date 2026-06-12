@@ -353,12 +353,29 @@ func deviceInterfaceToProto(e *ent.DeviceInterface) *ipamV1.DeviceInterface {
 		Enabled:       &e.Enabled,
 		SpeedMbps:     e.SpeedMbps,
 		Description:   ptrString(e.Description),
+		IfIndex:       e.IfIndex,
+		LinkVlan:      e.LinkVlan,
+	}
+	if e.RemoteDeviceID != "" {
+		result.RemoteDeviceId = &e.RemoteDeviceID
+	}
+	if e.RemoteInterfaceID != "" {
+		result.RemoteInterfaceId = &e.RemoteInterfaceID
+	}
+	if e.RemotePortName != "" {
+		result.RemotePortName = &e.RemotePortName
+	}
+	if e.LinkSource != "" {
+		result.LinkSource = &e.LinkSource
 	}
 	if e.CreateTime != nil {
 		result.CreatedAt = timestamppb.New(*e.CreateTime)
 	}
 	if e.UpdateTime != nil {
 		result.UpdatedAt = timestamppb.New(*e.UpdateTime)
+	}
+	if e.LinkLastSeen != nil {
+		result.LinkLastSeen = timestamppb.New(*e.LinkLastSeen)
 	}
 	return result
 }

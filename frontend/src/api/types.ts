@@ -1116,6 +1116,16 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
+            /** Format: int32 */
+            ifIndex?: number;
+            remoteDeviceId?: string;
+            remoteInterfaceId?: string;
+            remotePortName?: string;
+            linkSource?: string;
+            /** Format: int32 */
+            linkVlan?: number;
+            /** Format: date-time */
+            linkLastSeen?: string;
         };
         /** @description DnsConfig holds DNS server configuration for reverse DNS lookups */
         DnsConfig: {

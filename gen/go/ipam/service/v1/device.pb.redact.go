@@ -249,6 +249,20 @@ func (x *DeviceInterface) Redact() string {
 	// Safe field: CreatedAt
 
 	// Safe field: UpdatedAt
+
+	// Safe field: IfIndex
+
+	// Safe field: RemoteDeviceId
+
+	// Safe field: RemoteInterfaceId
+
+	// Safe field: RemotePortName
+
+	// Safe field: LinkSource
+
+	// Safe field: LinkVlan
+
+	// Safe field: LinkLastSeen
 	return x.String()
 }
 
