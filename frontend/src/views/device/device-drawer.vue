@@ -484,13 +484,26 @@ function formatSpeed(speedMbps: number | undefined): string {
   return `${speedMbps} Mbps`;
 }
 
+// Short host label (first DNS label): "cs1.infra.verax.net" -> "cs1".
+function shortHost(name: string): string {
+  return name.split('.')[0] || name;
+}
+
+// Some switches report a verbose ifDescr that prefixes the chassis model, e.g.
+// "X670G2-48x-4q Port 29". Keep the meaningful "Port 29" so the port number —
+// the part that matters — is always visible.
+function shortPortName(port: string): string {
+  const m = port.match(/\bPort\s+.+$/i);
+  return m ? m[0] : port;
+}
+
 function connectedToLabel(row: DeviceInterface): string {
   if (!row.remotePortName && !row.remoteInterfaceId) return '';
   const switchName = row.remoteDeviceId
     ? remoteDeviceNames.value[row.remoteDeviceId]
     : undefined;
-  const port = row.remotePortName ?? row.remoteInterfaceId ?? '';
-  return switchName ? `${switchName} · ${port}` : port;
+  const port = shortPortName(row.remotePortName ?? row.remoteInterfaceId ?? '');
+  return switchName ? `${shortHost(switchName)} · ${port}` : port;
 }
 
 // Adaptive, slim columns so the table fits the drawer without horizontal
@@ -507,8 +520,9 @@ const discoveredInterfaceColumns = computed(() => {
     cols.push({ title: $t('ipam.page.device.portSpeed'), dataIndex: 'speedMbps', key: 'speedMbps', width: 80 });
   }
   // Discovered links live on the server side; show the column when present.
+  // No ellipsis — the port must always be readable, even if it wraps.
   if (hasDiscoveredLinks.value) {
-    cols.push({ title: $t('ipam.page.device.connectedTo'), key: 'connectedTo', ellipsis: true });
+    cols.push({ title: $t('ipam.page.device.connectedTo'), key: 'connectedTo', width: 200 });
   }
   return cols;
 });
@@ -619,7 +633,7 @@ const interfaceColumns = [
 </script>
 
 <template>
-  <Drawer :title="title" :footer="false">
+  <Drawer :title="title" :footer="false" class="w-full max-w-[860px]">
     <!-- View Mode -->
     <template v-if="device && isViewMode">
       <!-- Basic Info -->
@@ -847,7 +861,9 @@ const interfaceColumns = [
                 </template>
                 <template v-else-if="column.key === 'connectedTo'">
                   <template v-if="connectedToLabel(record as DeviceInterface)">
-                    <Tag color="blue">{{ connectedToLabel(record as DeviceInterface) }}</Tag>
+                    <Tag color="blue" style="white-space: normal; height: auto; margin: 0;">
+                      {{ connectedToLabel(record as DeviceInterface) }}
+                    </Tag>
                     <Tag v-if="(record as DeviceInterface).linkVlan" color="geekblue">
                       {{ $t('ipam.page.device.linkVlan') }} {{ (record as DeviceInterface).linkVlan }}
                     </Tag>
