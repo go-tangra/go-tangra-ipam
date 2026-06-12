@@ -25,6 +25,7 @@ import {
 
 import { type ipamservicev1_Device } from '../../api/proto-types';
 import { DeviceService, type DeviceInterface } from '../../api/services';
+import { WardenService, type WardenSecretRef } from '../../api/warden';
 import { $t } from 'shell/locales';
 import { useIpamDeviceStore } from '../../stores/ipam-device.state';
 import { useIpamLocationStore } from '../../stores/ipam-location.state';
@@ -83,6 +84,7 @@ const formState = ref<{
   rackPosition?: number;
   deviceHeightU?: number;
   managementIp: string;
+  ipmiSecretRef?: string;
 }>({
   name: '',
   description: '',
@@ -94,6 +96,7 @@ const formState = ref<{
   model: '',
   rackPosition: undefined,
   deviceHeightU: 1,
+  ipmiSecretRef: undefined,
   managementIp: '',
 });
 
@@ -307,13 +310,14 @@ async function handleSubmit() {
           manufacturer: formState.value.manufacturer || undefined,
           model: formState.value.model || undefined,
           managementIp,
+          ipmiSecretRef: formState.value.ipmiSecretRef || undefined,
         },
       );
       notification.success({
         message: $t('ipam.page.device.createSuccess'),
       });
     } else if (isEditMode.value && data.value?.row?.id) {
-      const updateMask = ['name', 'description', 'deviceType', 'status', 'locationId', 'serialNumber', 'manufacturer', 'model', 'managementIp'];
+      const updateMask = ['name', 'description', 'deviceType', 'status', 'locationId', 'serialNumber', 'manufacturer', 'model', 'managementIp', 'ipmiSecretRef'];
       if (isRackLocation.value) {
         updateMask.push('rackId', 'rackPosition', 'deviceHeightU');
       }
@@ -332,6 +336,7 @@ async function handleSubmit() {
           manufacturer: formState.value.manufacturer || undefined,
           model: formState.value.model || undefined,
           managementIp,
+          ipmiSecretRef: formState.value.ipmiSecretRef || undefined,
         },
         updateMask,
       );
@@ -365,7 +370,10 @@ function resetForm() {
     rackPosition: undefined,
     deviceHeightU: 1,
     managementIp: '',
+    ipmiSecretRef: undefined,
   };
+  ipmiSecretName.value = '';
+  wardenSecretOptions.value = [];
 }
 
 const [Drawer, drawerApi] = useVbenDrawer({
@@ -405,7 +413,11 @@ const [Drawer, drawerApi] = useVbenDrawer({
           rackPosition: data.value.row.rackPosition ?? undefined,
           deviceHeightU: data.value.row.deviceHeightU ?? 1,
           managementIp: data.value.row.managementIp ?? '',
+          ipmiSecretRef: data.value.row.ipmiSecretRef || undefined,
         };
+
+        // Resolve the linked IPMI secret's display name (view + edit).
+        void resolveIpmiSecret(data.value.row.ipmiSecretRef || undefined);
 
         // Load rack devices for validation if editing a device in a rack
         if (data.value.row.locationId) {
@@ -437,6 +449,51 @@ const hasDiscoveredInterfaces = computed(() => deviceInterfaces.value.length > 0
 const hasDiscoveredLinks = computed(() =>
   deviceInterfaces.value.some((i) => !!i.remotePortName || !!i.remoteInterfaceId),
 );
+
+// --- IPMI Warden secret reference (a pointer to a secret, never the value) ---
+const wardenSecretOptions = ref<{ value: string; label: string }[]>([]);
+const loadingSecrets = ref(false);
+const ipmiSecretName = ref(''); // resolved name for view mode
+let secretSearchTimer: ReturnType<typeof setTimeout> | undefined;
+
+function secretLabel(s: WardenSecretRef): string {
+  const path = s.folderPath && s.folderPath !== '/' ? `${s.folderPath} · ` : '';
+  return `${path}${s.name ?? s.id ?? ''}`;
+}
+
+function searchWardenSecrets(term: string): void {
+  if (secretSearchTimer) clearTimeout(secretSearchTimer);
+  secretSearchTimer = setTimeout(async () => {
+    loadingSecrets.value = true;
+    try {
+      const secrets = await WardenService.searchSecrets(term || undefined);
+      wardenSecretOptions.value = secrets
+        .filter((s): s is WardenSecretRef & { id: string } => !!s.id)
+        .map((s) => ({ value: s.id, label: secretLabel(s) }));
+    } catch (error: unknown) {
+      console.error('Failed to search Warden secrets:', error);
+    } finally {
+      loadingSecrets.value = false;
+    }
+  }, 300);
+}
+
+// Resolve a secret id to a display name (and seed the picker option so an
+// already-linked secret shows its name in edit mode).
+async function resolveIpmiSecret(id: string | undefined): Promise<void> {
+  ipmiSecretName.value = '';
+  if (!id) return;
+  try {
+    const secret = await WardenService.getSecret(id);
+    const label = secret ? secretLabel(secret) : id;
+    ipmiSecretName.value = label;
+    if (!wardenSecretOptions.value.some((o) => o.value === id)) {
+      wardenSecretOptions.value = [{ value: id, label }, ...wardenSecretOptions.value];
+    }
+  } catch {
+    ipmiSecretName.value = id; // fall back to the raw reference
+  }
+}
 
 // Switch port the BMC is connected to, discovered by SNMP from the IPMI MAC.
 // The link lands on the synthetic "ipmi" interface row.
@@ -708,20 +765,23 @@ const interfaceColumns = [
       </template>
 
       <!-- IPMI / BMC management interface -->
-      <template v-if="parsedMetadata?.ipmi?.ip || parsedMetadata?.ipmi?.mac">
+      <template v-if="parsedMetadata?.ipmi?.ip || parsedMetadata?.ipmi?.mac || device.ipmiSecretRef">
         <Divider orientation="left">{{ $t('ipam.page.device.sectionIpmi') }}</Divider>
         <Descriptions :column="1" bordered size="small">
-          <DescriptionsItem v-if="parsedMetadata.ipmi.ip" :label="$t('ipam.page.device.ipmiIp')">
-            <Tag color="purple">{{ parsedMetadata.ipmi.ip }}</Tag>
+          <DescriptionsItem v-if="device.ipmiSecretRef" :label="$t('ipam.page.device.ipmiSecret')">
+            <Tag color="gold">🔑 {{ ipmiSecretName || device.ipmiSecretRef }}</Tag>
           </DescriptionsItem>
-          <DescriptionsItem v-if="parsedMetadata.ipmi.mac" :label="$t('ipam.page.device.ipmiMac')">
-            <code>{{ parsedMetadata.ipmi.mac }}</code>
+          <DescriptionsItem v-if="parsedMetadata?.ipmi?.ip" :label="$t('ipam.page.device.ipmiIp')">
+            <Tag color="purple">{{ parsedMetadata?.ipmi?.ip }}</Tag>
           </DescriptionsItem>
-          <DescriptionsItem v-if="parsedMetadata.ipmi.gateway" :label="$t('ipam.page.device.ipmiGateway')">
-            {{ parsedMetadata.ipmi.gateway }}
+          <DescriptionsItem v-if="parsedMetadata?.ipmi?.mac" :label="$t('ipam.page.device.ipmiMac')">
+            <code>{{ parsedMetadata?.ipmi?.mac }}</code>
           </DescriptionsItem>
-          <DescriptionsItem v-if="parsedMetadata.ipmi.subnet" :label="$t('ipam.page.device.ipmiSubnet')">
-            {{ parsedMetadata.ipmi.subnet }}
+          <DescriptionsItem v-if="parsedMetadata?.ipmi?.gateway" :label="$t('ipam.page.device.ipmiGateway')">
+            {{ parsedMetadata?.ipmi?.gateway }}
+          </DescriptionsItem>
+          <DescriptionsItem v-if="parsedMetadata?.ipmi?.subnet" :label="$t('ipam.page.device.ipmiSubnet')">
+            {{ parsedMetadata?.ipmi?.subnet }}
           </DescriptionsItem>
           <DescriptionsItem v-if="ipmiLink" :label="$t('ipam.page.device.connectedTo')">
             <Tag color="blue" style="white-space: normal; height: auto;">{{ ipmiLink }}</Tag>
@@ -1031,6 +1091,23 @@ const interfaceColumns = [
             :maxlength="45"
             allow-clear
           />
+        </FormItem>
+
+        <FormItem :label="$t('ipam.page.device.ipmiSecret')" name="ipmiSecretRef">
+          <Select
+            v-model:value="formState.ipmiSecretRef"
+            :options="wardenSecretOptions"
+            :loading="loadingSecrets"
+            show-search
+            allow-clear
+            :filter-option="false"
+            :placeholder="$t('ipam.page.device.ipmiSecretPlaceholder')"
+            @search="searchWardenSecrets"
+            @focus="() => { if (!wardenSecretOptions.length) searchWardenSecrets(''); }"
+          />
+          <div style="margin-top: 4px; color: #8c8c8c; font-size: 12px;">
+            {{ $t('ipam.page.device.ipmiSecretHint') }}
+          </div>
         </FormItem>
 
         <FormItem :label="$t('ipam.page.device.manufacturer')" name="manufacturer">

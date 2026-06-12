@@ -2295,6 +2295,8 @@ components:
                     type: string
                 notes:
                     type: string
+                ipmiSecretRef:
+                    type: string
                 deviceHeightU:
                     type: integer
                     format: int32
@@ -2733,6 +2735,9 @@ components:
                 notes:
                     type: string
                     description: Notes
+                ipmiSecretRef:
+                    type: string
+                    description: Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value
                 lastSeen:
                     type: string
                     description: Last discovered/seen

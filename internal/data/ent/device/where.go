@@ -185,6 +185,11 @@ func FirmwareVersion(v string) predicate.Device {
 	return predicate.Device(sql.FieldEQ(FieldFirmwareVersion, v))
 }
 
+// IpmiSecretRef applies equality check predicate on the "ipmi_secret_ref" field. It's identical to IpmiSecretRefEQ.
+func IpmiSecretRef(v string) predicate.Device {
+	return predicate.Device(sql.FieldEQ(FieldIpmiSecretRef, v))
+}
+
 // Contact applies equality check predicate on the "contact" field. It's identical to ContactEQ.
 func Contact(v string) predicate.Device {
 	return predicate.Device(sql.FieldEQ(FieldContact, v))
@@ -1728,6 +1733,81 @@ func FirmwareVersionEqualFold(v string) predicate.Device {
 // FirmwareVersionContainsFold applies the ContainsFold predicate on the "firmware_version" field.
 func FirmwareVersionContainsFold(v string) predicate.Device {
 	return predicate.Device(sql.FieldContainsFold(FieldFirmwareVersion, v))
+}
+
+// IpmiSecretRefEQ applies the EQ predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefEQ(v string) predicate.Device {
+	return predicate.Device(sql.FieldEQ(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefNEQ applies the NEQ predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefNEQ(v string) predicate.Device {
+	return predicate.Device(sql.FieldNEQ(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefIn applies the In predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefIn(vs ...string) predicate.Device {
+	return predicate.Device(sql.FieldIn(FieldIpmiSecretRef, vs...))
+}
+
+// IpmiSecretRefNotIn applies the NotIn predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefNotIn(vs ...string) predicate.Device {
+	return predicate.Device(sql.FieldNotIn(FieldIpmiSecretRef, vs...))
+}
+
+// IpmiSecretRefGT applies the GT predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefGT(v string) predicate.Device {
+	return predicate.Device(sql.FieldGT(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefGTE applies the GTE predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefGTE(v string) predicate.Device {
+	return predicate.Device(sql.FieldGTE(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefLT applies the LT predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefLT(v string) predicate.Device {
+	return predicate.Device(sql.FieldLT(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefLTE applies the LTE predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefLTE(v string) predicate.Device {
+	return predicate.Device(sql.FieldLTE(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefContains applies the Contains predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefContains(v string) predicate.Device {
+	return predicate.Device(sql.FieldContains(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefHasPrefix applies the HasPrefix predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefHasPrefix(v string) predicate.Device {
+	return predicate.Device(sql.FieldHasPrefix(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefHasSuffix applies the HasSuffix predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefHasSuffix(v string) predicate.Device {
+	return predicate.Device(sql.FieldHasSuffix(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefIsNil applies the IsNil predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefIsNil() predicate.Device {
+	return predicate.Device(sql.FieldIsNull(FieldIpmiSecretRef))
+}
+
+// IpmiSecretRefNotNil applies the NotNil predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefNotNil() predicate.Device {
+	return predicate.Device(sql.FieldNotNull(FieldIpmiSecretRef))
+}
+
+// IpmiSecretRefEqualFold applies the EqualFold predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefEqualFold(v string) predicate.Device {
+	return predicate.Device(sql.FieldEqualFold(FieldIpmiSecretRef, v))
+}
+
+// IpmiSecretRefContainsFold applies the ContainsFold predicate on the "ipmi_secret_ref" field.
+func IpmiSecretRefContainsFold(v string) predicate.Device {
+	return predicate.Device(sql.FieldContainsFold(FieldIpmiSecretRef, v))
 }
 
 // ContactEQ applies the EQ predicate on the "contact" field.

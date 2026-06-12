@@ -819,6 +819,7 @@ export interface components {
             notes?: string;
             /** Format: int32 */
             deviceHeightU?: number;
+            ipmiSecretRef?: string;
         };
         CreateDeviceResponse: {
             device?: components["schemas"]["Device"];
@@ -1065,6 +1066,8 @@ export interface components {
             metadata?: string;
             /** @description Notes */
             notes?: string;
+            /** @description Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value */
+            ipmiSecretRef?: string;
             /**
              * Format: date-time
              * @description Last discovered/seen

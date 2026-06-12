@@ -9,6 +9,7 @@ package main
 import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-tangra/go-tangra-ipam/internal/cert"
+	"github.com/go-tangra/go-tangra-ipam/internal/client"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/event"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
@@ -20,7 +21,7 @@ import (
 // Injectors from wire.go:
 
 func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
-	v, err := cert.NewCertManager(context)
+	certManager, err := cert.NewCertManager(context)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -42,15 +43,27 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	deviceInterfaceRepo := data.NewDeviceInterfaceRepo(context, entClient)
 	ipAddressRepo := data.NewIpAddressRepo(context, entClient)
 	devicePackageRepo := data.NewDevicePackageRepo(context, entClient)
-	deviceService := service.NewDeviceService(context, deviceRepo, deviceInterfaceRepo, ipAddressRepo, devicePackageRepo, collector)
-	locationRepo := data.NewLocationRepo(context, entClient)
-	locationService := service.NewLocationService(context, locationRepo, collector)
-	client, cleanup2, err := data.NewRedisClient(context)
+	registrationClient, err := client.NewRegistrationClient(context)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	publisher := event.NewPublisher(context, client)
+	moduleDialer := client.NewModuleDialer(context, registrationClient)
+	wardenClient, cleanup2, err := client.NewWardenClient(context, moduleDialer)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	deviceService := service.NewDeviceService(context, deviceRepo, deviceInterfaceRepo, ipAddressRepo, devicePackageRepo, wardenClient, collector)
+	locationRepo := data.NewLocationRepo(context, entClient)
+	locationService := service.NewLocationService(context, locationRepo, collector)
+	redisClient, cleanup3, err := data.NewRedisClient(context)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	publisher := event.NewPublisher(context, redisClient)
 	ipAddressService := service.NewIpAddressService(context, ipAddressRepo, subnetRepo, collector, publisher)
 	ipScanService := service.NewIpScanService(context, ipScanJobRepo, subnetRepo, ipAddressRepo)
 	ipGroupRepo := data.NewIpGroupRepo(context, entClient)
@@ -59,11 +72,12 @@ func initApp(context *bootstrap.Context) (*kratos.App, func(), error) {
 	hostGroupService := service.NewHostGroupService(context, hostGroupRepo)
 	backupService := service.NewBackupService(context, entClient)
 	devicePackageService := service.NewDevicePackageService(context, deviceRepo, devicePackageRepo)
-	grpcServer := server.NewGRPCServer(context, v, collector, auditLogRepo, systemService, subnetService, vlanService, deviceService, locationService, ipAddressService, ipScanService, ipGroupService, hostGroupService, backupService, devicePackageService)
+	grpcServer := server.NewGRPCServer(context, certManager, collector, auditLogRepo, systemService, subnetService, vlanService, deviceService, locationService, ipAddressService, ipScanService, ipGroupService, hostGroupService, backupService, devicePackageService)
 	httpServer := server.NewHTTPServer(context)
 	scanExecutor := service.NewScanExecutor(context, ipScanJobRepo, subnetRepo, ipAddressRepo, deviceRepo, deviceInterfaceRepo, publisher)
 	app := newApp(context, grpcServer, httpServer, scanExecutor)
 	return app, func() {
+		cleanup3()
 		cleanup2()
 		cleanup()
 	}, nil

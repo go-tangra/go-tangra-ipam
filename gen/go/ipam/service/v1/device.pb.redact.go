@@ -148,6 +148,28 @@ func (s *redactedDeviceServiceServer) DeleteDeviceInterface(ctx context.Context,
 	return res, err
 }
 
+// SearchWardenSecrets is the redacted wrapper for the actual DeviceServiceServer.SearchWardenSecrets method
+// Unary RPC
+func (s *redactedDeviceServiceServer) SearchWardenSecrets(ctx context.Context, in *SearchWardenSecretsRequest) (*SearchWardenSecretsResponse, error) {
+	res, err := s.srv.SearchWardenSecrets(ctx, in)
+	if !s.bypass.CheckInternal(ctx) {
+		// Apply redaction to the response
+		redact.Apply(res)
+	}
+	return res, err
+}
+
+// GetWardenSecret is the redacted wrapper for the actual DeviceServiceServer.GetWardenSecret method
+// Unary RPC
+func (s *redactedDeviceServiceServer) GetWardenSecret(ctx context.Context, in *GetWardenSecretRequest) (*GetWardenSecretResponse, error) {
+	res, err := s.srv.GetWardenSecret(ctx, in)
+	if !s.bypass.CheckInternal(ctx) {
+		// Apply redaction to the response
+		redact.Apply(res)
+	}
+	return res, err
+}
+
 // Redact method implementation for Device
 func (x *Device) Redact() string {
 	if x == nil {
@@ -217,6 +239,8 @@ func (x *Device) Redact() string {
 	// Safe field: CreatedBy
 
 	// Safe field: UpdatedBy
+
+	// Safe field: IpmiSecretRef
 
 	// Safe field: PackageUpdateCount
 
@@ -315,6 +339,8 @@ func (x *CreateDeviceRequest) Redact() string {
 	// Safe field: Notes
 
 	// Safe field: DeviceHeightU
+
+	// Safe field: IpmiSecretRef
 	return x.String()
 }
 
@@ -509,5 +535,63 @@ func (x *DeleteDeviceInterfaceRequest) Redact() string {
 	// Safe field: DeviceId
 
 	// Safe field: Id
+	return x.String()
+}
+
+// Redact method implementation for WardenSecretRef
+func (x *WardenSecretRef) Redact() string {
+	if x == nil {
+		return ""
+	}
+
+	// Safe field: Id
+
+	// Safe field: Name
+
+	// Safe field: FolderPath
+
+	// Safe field: Username
+	return x.String()
+}
+
+// Redact method implementation for SearchWardenSecretsRequest
+func (x *SearchWardenSecretsRequest) Redact() string {
+	if x == nil {
+		return ""
+	}
+
+	// Safe field: Query
+
+	// Safe field: Limit
+	return x.String()
+}
+
+// Redact method implementation for SearchWardenSecretsResponse
+func (x *SearchWardenSecretsResponse) Redact() string {
+	if x == nil {
+		return ""
+	}
+
+	// Safe field: Secrets
+	return x.String()
+}
+
+// Redact method implementation for GetWardenSecretRequest
+func (x *GetWardenSecretRequest) Redact() string {
+	if x == nil {
+		return ""
+	}
+
+	// Safe field: Id
+	return x.String()
+}
+
+// Redact method implementation for GetWardenSecretResponse
+func (x *GetWardenSecretResponse) Redact() string {
+	if x == nil {
+		return ""
+	}
+
+	// Safe field: Secret
 	return x.String()
 }

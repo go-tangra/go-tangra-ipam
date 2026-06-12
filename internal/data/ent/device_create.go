@@ -354,6 +354,20 @@ func (_c *DeviceCreate) SetNillableFirmwareVersion(v *string) *DeviceCreate {
 	return _c
 }
 
+// SetIpmiSecretRef sets the "ipmi_secret_ref" field.
+func (_c *DeviceCreate) SetIpmiSecretRef(v string) *DeviceCreate {
+	_c.mutation.SetIpmiSecretRef(v)
+	return _c
+}
+
+// SetNillableIpmiSecretRef sets the "ipmi_secret_ref" field if the given value is not nil.
+func (_c *DeviceCreate) SetNillableIpmiSecretRef(v *string) *DeviceCreate {
+	if v != nil {
+		_c.SetIpmiSecretRef(*v)
+	}
+	return _c
+}
+
 // SetContact sets the "contact" field.
 func (_c *DeviceCreate) SetContact(v string) *DeviceCreate {
 	_c.mutation.SetContact(v)
@@ -669,6 +683,10 @@ func (_c *DeviceCreate) createSpec() (*Device, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.FirmwareVersion(); ok {
 		_spec.SetField(device.FieldFirmwareVersion, field.TypeString, value)
 		_node.FirmwareVersion = value
+	}
+	if value, ok := _c.mutation.IpmiSecretRef(); ok {
+		_spec.SetField(device.FieldIpmiSecretRef, field.TypeString, value)
+		_node.IpmiSecretRef = value
 	}
 	if value, ok := _c.mutation.Contact(); ok {
 		_spec.SetField(device.FieldContact, field.TypeString, value)
@@ -1202,6 +1220,24 @@ func (u *DeviceUpsert) UpdateFirmwareVersion() *DeviceUpsert {
 // ClearFirmwareVersion clears the value of the "firmware_version" field.
 func (u *DeviceUpsert) ClearFirmwareVersion() *DeviceUpsert {
 	u.SetNull(device.FieldFirmwareVersion)
+	return u
+}
+
+// SetIpmiSecretRef sets the "ipmi_secret_ref" field.
+func (u *DeviceUpsert) SetIpmiSecretRef(v string) *DeviceUpsert {
+	u.Set(device.FieldIpmiSecretRef, v)
+	return u
+}
+
+// UpdateIpmiSecretRef sets the "ipmi_secret_ref" field to the value that was provided on create.
+func (u *DeviceUpsert) UpdateIpmiSecretRef() *DeviceUpsert {
+	u.SetExcluded(device.FieldIpmiSecretRef)
+	return u
+}
+
+// ClearIpmiSecretRef clears the value of the "ipmi_secret_ref" field.
+func (u *DeviceUpsert) ClearIpmiSecretRef() *DeviceUpsert {
+	u.SetNull(device.FieldIpmiSecretRef)
 	return u
 }
 
@@ -1829,6 +1865,27 @@ func (u *DeviceUpsertOne) UpdateFirmwareVersion() *DeviceUpsertOne {
 func (u *DeviceUpsertOne) ClearFirmwareVersion() *DeviceUpsertOne {
 	return u.Update(func(s *DeviceUpsert) {
 		s.ClearFirmwareVersion()
+	})
+}
+
+// SetIpmiSecretRef sets the "ipmi_secret_ref" field.
+func (u *DeviceUpsertOne) SetIpmiSecretRef(v string) *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.SetIpmiSecretRef(v)
+	})
+}
+
+// UpdateIpmiSecretRef sets the "ipmi_secret_ref" field to the value that was provided on create.
+func (u *DeviceUpsertOne) UpdateIpmiSecretRef() *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.UpdateIpmiSecretRef()
+	})
+}
+
+// ClearIpmiSecretRef clears the value of the "ipmi_secret_ref" field.
+func (u *DeviceUpsertOne) ClearIpmiSecretRef() *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.ClearIpmiSecretRef()
 	})
 }
 
@@ -2638,6 +2695,27 @@ func (u *DeviceUpsertBulk) UpdateFirmwareVersion() *DeviceUpsertBulk {
 func (u *DeviceUpsertBulk) ClearFirmwareVersion() *DeviceUpsertBulk {
 	return u.Update(func(s *DeviceUpsert) {
 		s.ClearFirmwareVersion()
+	})
+}
+
+// SetIpmiSecretRef sets the "ipmi_secret_ref" field.
+func (u *DeviceUpsertBulk) SetIpmiSecretRef(v string) *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.SetIpmiSecretRef(v)
+	})
+}
+
+// UpdateIpmiSecretRef sets the "ipmi_secret_ref" field to the value that was provided on create.
+func (u *DeviceUpsertBulk) UpdateIpmiSecretRef() *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.UpdateIpmiSecretRef()
+	})
+}
+
+// ClearIpmiSecretRef clears the value of the "ipmi_secret_ref" field.
+func (u *DeviceUpsertBulk) ClearIpmiSecretRef() *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.ClearIpmiSecretRef()
 	})
 }
 

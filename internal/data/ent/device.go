@@ -67,6 +67,8 @@ type Device struct {
 	OsVersion string `json:"os_version,omitempty"`
 	// Firmware version
 	FirmwareVersion string `json:"firmware_version,omitempty"`
+	// Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value
+	IpmiSecretRef string `json:"ipmi_secret_ref,omitempty"`
 	// Contact person
 	Contact string `json:"contact,omitempty"`
 	// Custom tags (JSON)
@@ -132,7 +134,7 @@ func (*Device) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case device.FieldCreateBy, device.FieldUpdateBy, device.FieldTenantID, device.FieldDeviceType, device.FieldRackPosition, device.FieldDeviceHeightU, device.FieldStatus:
 			values[i] = new(sql.NullInt64)
-		case device.FieldID, device.FieldName, device.FieldDescription, device.FieldManufacturer, device.FieldModel, device.FieldSerialNumber, device.FieldAssetTag, device.FieldLocationID, device.FieldRackID, device.FieldPrimaryIP, device.FieldPrimaryIpv6, device.FieldManagementIP, device.FieldOsType, device.FieldOsVersion, device.FieldFirmwareVersion, device.FieldContact, device.FieldTags, device.FieldMetadata, device.FieldNotes:
+		case device.FieldID, device.FieldName, device.FieldDescription, device.FieldManufacturer, device.FieldModel, device.FieldSerialNumber, device.FieldAssetTag, device.FieldLocationID, device.FieldRackID, device.FieldPrimaryIP, device.FieldPrimaryIpv6, device.FieldManagementIP, device.FieldOsType, device.FieldOsVersion, device.FieldFirmwareVersion, device.FieldIpmiSecretRef, device.FieldContact, device.FieldTags, device.FieldMetadata, device.FieldNotes:
 			values[i] = new(sql.NullString)
 		case device.FieldCreateTime, device.FieldUpdateTime, device.FieldDeleteTime, device.FieldLastSeen:
 			values[i] = new(sql.NullTime)
@@ -309,6 +311,12 @@ func (_m *Device) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.FirmwareVersion = value.String
 			}
+		case device.FieldIpmiSecretRef:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field ipmi_secret_ref", values[i])
+			} else if value.Valid {
+				_m.IpmiSecretRef = value.String
+			}
 		case device.FieldContact:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field contact", values[i])
@@ -478,6 +486,9 @@ func (_m *Device) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("firmware_version=")
 	builder.WriteString(_m.FirmwareVersion)
+	builder.WriteString(", ")
+	builder.WriteString("ipmi_secret_ref=")
+	builder.WriteString(_m.IpmiSecretRef)
 	builder.WriteString(", ")
 	builder.WriteString("contact=")
 	builder.WriteString(_m.Contact)

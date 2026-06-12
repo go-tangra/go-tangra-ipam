@@ -105,6 +105,10 @@ message Device {
   // Last updater user ID
   optional uint32 updated_by = 33 [json_name = "updatedBy"];
 
+  // Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only,
+  // never the secret value.
+  optional string ipmi_secret_ref = 34 [json_name = "ipmiSecretRef"];
+
   // Package update counts (populated in list responses)
   optional int32 package_update_count = 40 [json_name = "packageUpdateCount"];
   optional int32 security_update_count = 41 [json_name = "securityUpdateCount"];
@@ -199,6 +203,7 @@ message CreateDeviceRequest {
   optional string metadata = 19 [json_name = "metadata"];
   optional string notes = 20 [json_name = "notes"];
   optional int32 device_height_u = 21 [json_name = "deviceHeightU"];
+  optional string ipmi_secret_ref = 22 [json_name = "ipmiSecretRef"];
 }
 
 message CreateDeviceResponse {
@@ -411,4 +416,50 @@ service DeviceService {
       delete: "/v1/devices/{device_id}/interfaces/{id}"
     };
   }
+
+  // Search Warden secrets (metadata only) so a device can reference one as its
+  // IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
+  // returns secret values.
+  rpc SearchWardenSecrets(SearchWardenSecretsRequest) returns (SearchWardenSecretsResponse) {
+    option (google.api.http) = {
+      get: "/v1/warden-secrets"
+    };
+  }
+
+  // Resolve a single Warden secret's metadata by id (for display).
+  rpc GetWardenSecret(GetWardenSecretRequest) returns (GetWardenSecretResponse) {
+    option (google.api.http) = {
+      get: "/v1/warden-secrets/{id}"
+    };
+  }
+}
+
+// WardenSecretRef is the minimal Warden secret metadata used to pick/display a
+// reference. It never carries the secret value.
+message WardenSecretRef {
+  string id = 1 [json_name = "id"];
+  string name = 2 [json_name = "name"];
+  string folder_path = 3 [json_name = "folderPath"];
+  string username = 4 [json_name = "username"];
+}
+
+message SearchWardenSecretsRequest {
+  optional string query = 1 [json_name = "query"];
+  optional uint32 limit = 2 [json_name = "limit"];
+}
+
+message SearchWardenSecretsResponse {
+  repeated WardenSecretRef secrets = 1 [json_name = "secrets"];
+}
+
+message GetWardenSecretRequest {
+  string id = 1 [
+    json_name = "id",
+    (buf.validate.field).string.min_len = 1,
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message GetWardenSecretResponse {
+  optional WardenSecretRef secret = 1 [json_name = "secret"];
 }

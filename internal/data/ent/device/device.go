@@ -61,6 +61,8 @@ const (
 	FieldOsVersion = "os_version"
 	// FieldFirmwareVersion holds the string denoting the firmware_version field in the database.
 	FieldFirmwareVersion = "firmware_version"
+	// FieldIpmiSecretRef holds the string denoting the ipmi_secret_ref field in the database.
+	FieldIpmiSecretRef = "ipmi_secret_ref"
 	// FieldContact holds the string denoting the contact field in the database.
 	FieldContact = "contact"
 	// FieldTags holds the string denoting the tags field in the database.
@@ -129,6 +131,7 @@ var Columns = []string{
 	FieldOsType,
 	FieldOsVersion,
 	FieldFirmwareVersion,
+	FieldIpmiSecretRef,
 	FieldContact,
 	FieldTags,
 	FieldMetadata,
@@ -294,6 +297,11 @@ func ByOsVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByFirmwareVersion orders the results by the firmware_version field.
 func ByFirmwareVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFirmwareVersion, opts...).ToFunc()
+}
+
+// ByIpmiSecretRef orders the results by the ipmi_secret_ref field.
+func ByIpmiSecretRef(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIpmiSecretRef, opts...).ToFunc()
 }
 
 // ByContact orders the results by the contact field.

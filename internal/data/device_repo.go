@@ -240,6 +240,9 @@ func (r *DeviceRepo) Update(ctx context.Context, id string, updates map[string]i
 	if firmwareVersion, ok := updates["firmware_version"].(string); ok {
 		update = update.SetFirmwareVersion(firmwareVersion)
 	}
+	if ipmiSecretRef, ok := updates["ipmi_secret_ref"].(string); ok {
+		update = update.SetIpmiSecretRef(ipmiSecretRef)
+	}
 	if contact, ok := updates["contact"].(string); ok {
 		update = update.SetContact(contact)
 	}

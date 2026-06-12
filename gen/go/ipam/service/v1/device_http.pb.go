@@ -27,7 +27,9 @@ const OperationDeviceServiceDeleteDeviceInterface = "/ipam.service.v1.DeviceServ
 const OperationDeviceServiceGetDevice = "/ipam.service.v1.DeviceService/GetDevice"
 const OperationDeviceServiceGetDeviceAddresses = "/ipam.service.v1.DeviceService/GetDeviceAddresses"
 const OperationDeviceServiceGetDeviceInterfaces = "/ipam.service.v1.DeviceService/GetDeviceInterfaces"
+const OperationDeviceServiceGetWardenSecret = "/ipam.service.v1.DeviceService/GetWardenSecret"
 const OperationDeviceServiceListDevices = "/ipam.service.v1.DeviceService/ListDevices"
+const OperationDeviceServiceSearchWardenSecrets = "/ipam.service.v1.DeviceService/SearchWardenSecrets"
 const OperationDeviceServiceUpdateDevice = "/ipam.service.v1.DeviceService/UpdateDevice"
 
 type DeviceServiceHTTPServer interface {
@@ -45,8 +47,14 @@ type DeviceServiceHTTPServer interface {
 	GetDeviceAddresses(context.Context, *GetDeviceAddressesRequest) (*GetDeviceAddressesResponse, error)
 	// GetDeviceInterfaces Get interfaces of a device
 	GetDeviceInterfaces(context.Context, *GetDeviceInterfacesRequest) (*GetDeviceInterfacesResponse, error)
+	// GetWardenSecret Resolve a single Warden secret's metadata by id (for display).
+	GetWardenSecret(context.Context, *GetWardenSecretRequest) (*GetWardenSecretResponse, error)
 	// ListDevices List devices with filtering
 	ListDevices(context.Context, *ListDevicesRequest) (*ListDevicesResponse, error)
+	// SearchWardenSecrets Search Warden secrets (metadata only) so a device can reference one as its
+	// IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
+	// returns secret values.
+	SearchWardenSecrets(context.Context, *SearchWardenSecretsRequest) (*SearchWardenSecretsResponse, error)
 	// UpdateDevice Update a device
 	UpdateDevice(context.Context, *UpdateDeviceRequest) (*UpdateDeviceResponse, error)
 }
@@ -62,6 +70,8 @@ func RegisterDeviceServiceHTTPServer(s *http.Server, srv DeviceServiceHTTPServer
 	r.GET("/v1/devices/{device_id}/interfaces", _DeviceService_GetDeviceInterfaces0_HTTP_Handler(srv))
 	r.POST("/v1/devices/{device_id}/interfaces", _DeviceService_CreateDeviceInterface0_HTTP_Handler(srv))
 	r.DELETE("/v1/devices/{device_id}/interfaces/{id}", _DeviceService_DeleteDeviceInterface0_HTTP_Handler(srv))
+	r.GET("/v1/warden-secrets", _DeviceService_SearchWardenSecrets0_HTTP_Handler(srv))
+	r.GET("/v1/warden-secrets/{id}", _DeviceService_GetWardenSecret0_HTTP_Handler(srv))
 }
 
 func _DeviceService_CreateDevice0_HTTP_Handler(srv DeviceServiceHTTPServer) func(ctx http.Context) error {
@@ -265,6 +275,47 @@ func _DeviceService_DeleteDeviceInterface0_HTTP_Handler(srv DeviceServiceHTTPSer
 	}
 }
 
+func _DeviceService_SearchWardenSecrets0_HTTP_Handler(srv DeviceServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in SearchWardenSecretsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationDeviceServiceSearchWardenSecrets)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.SearchWardenSecrets(ctx, req.(*SearchWardenSecretsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*SearchWardenSecretsResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _DeviceService_GetWardenSecret0_HTTP_Handler(srv DeviceServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetWardenSecretRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationDeviceServiceGetWardenSecret)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetWardenSecret(ctx, req.(*GetWardenSecretRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*GetWardenSecretResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type DeviceServiceHTTPClient interface {
 	// CreateDevice Create a new device
 	CreateDevice(ctx context.Context, req *CreateDeviceRequest, opts ...http.CallOption) (rsp *CreateDeviceResponse, err error)
@@ -280,8 +331,14 @@ type DeviceServiceHTTPClient interface {
 	GetDeviceAddresses(ctx context.Context, req *GetDeviceAddressesRequest, opts ...http.CallOption) (rsp *GetDeviceAddressesResponse, err error)
 	// GetDeviceInterfaces Get interfaces of a device
 	GetDeviceInterfaces(ctx context.Context, req *GetDeviceInterfacesRequest, opts ...http.CallOption) (rsp *GetDeviceInterfacesResponse, err error)
+	// GetWardenSecret Resolve a single Warden secret's metadata by id (for display).
+	GetWardenSecret(ctx context.Context, req *GetWardenSecretRequest, opts ...http.CallOption) (rsp *GetWardenSecretResponse, err error)
 	// ListDevices List devices with filtering
 	ListDevices(ctx context.Context, req *ListDevicesRequest, opts ...http.CallOption) (rsp *ListDevicesResponse, err error)
+	// SearchWardenSecrets Search Warden secrets (metadata only) so a device can reference one as its
+	// IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
+	// returns secret values.
+	SearchWardenSecrets(ctx context.Context, req *SearchWardenSecretsRequest, opts ...http.CallOption) (rsp *SearchWardenSecretsResponse, err error)
 	// UpdateDevice Update a device
 	UpdateDevice(ctx context.Context, req *UpdateDeviceRequest, opts ...http.CallOption) (rsp *UpdateDeviceResponse, err error)
 }
@@ -392,12 +449,42 @@ func (c *DeviceServiceHTTPClientImpl) GetDeviceInterfaces(ctx context.Context, i
 	return &out, nil
 }
 
+// GetWardenSecret Resolve a single Warden secret's metadata by id (for display).
+func (c *DeviceServiceHTTPClientImpl) GetWardenSecret(ctx context.Context, in *GetWardenSecretRequest, opts ...http.CallOption) (*GetWardenSecretResponse, error) {
+	var out GetWardenSecretResponse
+	pattern := "/v1/warden-secrets/{id}"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationDeviceServiceGetWardenSecret))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ListDevices List devices with filtering
 func (c *DeviceServiceHTTPClientImpl) ListDevices(ctx context.Context, in *ListDevicesRequest, opts ...http.CallOption) (*ListDevicesResponse, error) {
 	var out ListDevicesResponse
 	pattern := "/v1/devices"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationDeviceServiceListDevices))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SearchWardenSecrets Search Warden secrets (metadata only) so a device can reference one as its
+// IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
+// returns secret values.
+func (c *DeviceServiceHTTPClientImpl) SearchWardenSecrets(ctx context.Context, in *SearchWardenSecretsRequest, opts ...http.CallOption) (*SearchWardenSecretsResponse, error) {
+	var out SearchWardenSecretsResponse
+	pattern := "/v1/warden-secrets"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationDeviceServiceSearchWardenSecrets))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {

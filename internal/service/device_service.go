@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/go-tangra/go-tangra-ipam/internal/client"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
@@ -22,17 +23,62 @@ type DeviceService struct {
 	deviceInterfaceRepo *data.DeviceInterfaceRepo
 	ipAddressRepo       *data.IpAddressRepo
 	devicePackageRepo   *data.DevicePackageRepo
+	wardenClient        *client.WardenClient
 	metrics             *metrics.Collector
 }
 
-func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo, devicePackageRepo *data.DevicePackageRepo, metrics *metrics.Collector) *DeviceService {
+func NewDeviceService(ctx *bootstrap.Context, deviceRepo *data.DeviceRepo, deviceInterfaceRepo *data.DeviceInterfaceRepo, ipAddressRepo *data.IpAddressRepo, devicePackageRepo *data.DevicePackageRepo, wardenClient *client.WardenClient, metrics *metrics.Collector) *DeviceService {
 	return &DeviceService{
 		log:                 ctx.NewLoggerHelper("ipam/service/device"),
 		deviceRepo:          deviceRepo,
 		deviceInterfaceRepo: deviceInterfaceRepo,
 		ipAddressRepo:       ipAddressRepo,
 		devicePackageRepo:   devicePackageRepo,
+		wardenClient:        wardenClient,
 		metrics:             metrics,
+	}
+}
+
+// SearchWardenSecrets proxies a metadata-only secret search to the Warden module
+// so a device can reference a secret as its IPMI credentials. Never returns
+// secret values.
+func (s *DeviceService) SearchWardenSecrets(ctx context.Context, req *ipamV1.SearchWardenSecretsRequest) (*ipamV1.SearchWardenSecretsResponse, error) {
+	limit := req.GetLimit()
+	if limit == 0 || limit > 50 {
+		limit = 25
+	}
+	refs, err := s.wardenClient.SearchSecrets(ctx, req.GetQuery(), limit)
+	if err != nil {
+		s.log.Warnf("warden secret search failed: %v", err)
+		return nil, ipamV1.ErrorInternalServerError("failed to search secrets")
+	}
+	out := make([]*ipamV1.WardenSecretRef, 0, len(refs))
+	for _, r := range refs {
+		out = append(out, secretRefToProto(r))
+	}
+	return &ipamV1.SearchWardenSecretsResponse{Secrets: out}, nil
+}
+
+// GetWardenSecret proxies a metadata-only secret lookup to the Warden module.
+func (s *DeviceService) GetWardenSecret(ctx context.Context, req *ipamV1.GetWardenSecretRequest) (*ipamV1.GetWardenSecretResponse, error) {
+	ref, err := s.wardenClient.GetSecret(ctx, req.GetId())
+	if err != nil {
+		s.log.Warnf("warden secret get failed: %v", err)
+		return nil, ipamV1.ErrorInternalServerError("failed to resolve secret")
+	}
+	resp := &ipamV1.GetWardenSecretResponse{}
+	if ref != nil {
+		resp.Secret = secretRefToProto(*ref)
+	}
+	return resp, nil
+}
+
+func secretRefToProto(r client.SecretRef) *ipamV1.WardenSecretRef {
+	return &ipamV1.WardenSecretRef{
+		Id:         r.ID,
+		Name:       r.Name,
+		FolderPath: r.FolderPath,
+		Username:   r.Username,
 	}
 }
 
@@ -89,6 +135,9 @@ func (s *DeviceService) CreateDevice(ctx context.Context, req *ipamV1.CreateDevi
 	}
 	if req.Metadata != nil {
 		opts = append(opts, func(c *ent.DeviceCreate) { c.SetMetadata(*req.Metadata) })
+	}
+	if req.IpmiSecretRef != nil {
+		opts = append(opts, func(c *ent.DeviceCreate) { c.SetIpmiSecretRef(*req.IpmiSecretRef) })
 	}
 	if req.Notes != nil {
 		opts = append(opts, func(c *ent.DeviceCreate) { c.SetNotes(*req.Notes) })
@@ -239,6 +288,9 @@ func (s *DeviceService) UpdateDevice(ctx context.Context, req *ipamV1.UpdateDevi
 		}
 		if req.Data.Notes != nil {
 			updates["notes"] = *req.Data.Notes
+		}
+		if req.Data.IpmiSecretRef != nil {
+			updates["ipmi_secret_ref"] = *req.Data.IpmiSecretRef
 		}
 		if req.Data.LocationId != nil {
 			updates["location_id"] = *req.Data.LocationId
@@ -425,6 +477,7 @@ func deviceToProto(e *ent.Device) *ipamV1.Device {
 		Tags:            ptrString(e.Tags),
 		Metadata:        ptrString(e.Metadata),
 		Notes:           ptrString(e.Notes),
+		IpmiSecretRef:   ptrString(e.IpmiSecretRef),
 		CreatedBy:       e.CreateBy,
 		UpdatedBy:       e.UpdateBy,
 	}

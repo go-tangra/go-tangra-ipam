@@ -29,6 +29,8 @@ const (
 	DeviceService_GetDeviceInterfaces_FullMethodName   = "/ipam.service.v1.DeviceService/GetDeviceInterfaces"
 	DeviceService_CreateDeviceInterface_FullMethodName = "/ipam.service.v1.DeviceService/CreateDeviceInterface"
 	DeviceService_DeleteDeviceInterface_FullMethodName = "/ipam.service.v1.DeviceService/DeleteDeviceInterface"
+	DeviceService_SearchWardenSecrets_FullMethodName   = "/ipam.service.v1.DeviceService/SearchWardenSecrets"
+	DeviceService_GetWardenSecret_FullMethodName       = "/ipam.service.v1.DeviceService/GetWardenSecret"
 )
 
 // DeviceServiceClient is the client API for DeviceService service.
@@ -55,6 +57,12 @@ type DeviceServiceClient interface {
 	CreateDeviceInterface(ctx context.Context, in *CreateDeviceInterfaceRequest, opts ...grpc.CallOption) (*CreateDeviceInterfaceResponse, error)
 	// Delete an interface
 	DeleteDeviceInterface(ctx context.Context, in *DeleteDeviceInterfaceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Search Warden secrets (metadata only) so a device can reference one as its
+	// IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
+	// returns secret values.
+	SearchWardenSecrets(ctx context.Context, in *SearchWardenSecretsRequest, opts ...grpc.CallOption) (*SearchWardenSecretsResponse, error)
+	// Resolve a single Warden secret's metadata by id (for display).
+	GetWardenSecret(ctx context.Context, in *GetWardenSecretRequest, opts ...grpc.CallOption) (*GetWardenSecretResponse, error)
 }
 
 type deviceServiceClient struct {
@@ -155,6 +163,26 @@ func (c *deviceServiceClient) DeleteDeviceInterface(ctx context.Context, in *Del
 	return out, nil
 }
 
+func (c *deviceServiceClient) SearchWardenSecrets(ctx context.Context, in *SearchWardenSecretsRequest, opts ...grpc.CallOption) (*SearchWardenSecretsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchWardenSecretsResponse)
+	err := c.cc.Invoke(ctx, DeviceService_SearchWardenSecrets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deviceServiceClient) GetWardenSecret(ctx context.Context, in *GetWardenSecretRequest, opts ...grpc.CallOption) (*GetWardenSecretResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetWardenSecretResponse)
+	err := c.cc.Invoke(ctx, DeviceService_GetWardenSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DeviceServiceServer is the server API for DeviceService service.
 // All implementations must embed UnimplementedDeviceServiceServer
 // for forward compatibility.
@@ -179,6 +207,12 @@ type DeviceServiceServer interface {
 	CreateDeviceInterface(context.Context, *CreateDeviceInterfaceRequest) (*CreateDeviceInterfaceResponse, error)
 	// Delete an interface
 	DeleteDeviceInterface(context.Context, *DeleteDeviceInterfaceRequest) (*emptypb.Empty, error)
+	// Search Warden secrets (metadata only) so a device can reference one as its
+	// IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
+	// returns secret values.
+	SearchWardenSecrets(context.Context, *SearchWardenSecretsRequest) (*SearchWardenSecretsResponse, error)
+	// Resolve a single Warden secret's metadata by id (for display).
+	GetWardenSecret(context.Context, *GetWardenSecretRequest) (*GetWardenSecretResponse, error)
 	mustEmbedUnimplementedDeviceServiceServer()
 }
 
@@ -215,6 +249,12 @@ func (UnimplementedDeviceServiceServer) CreateDeviceInterface(context.Context, *
 }
 func (UnimplementedDeviceServiceServer) DeleteDeviceInterface(context.Context, *DeleteDeviceInterfaceRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteDeviceInterface not implemented")
+}
+func (UnimplementedDeviceServiceServer) SearchWardenSecrets(context.Context, *SearchWardenSecretsRequest) (*SearchWardenSecretsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchWardenSecrets not implemented")
+}
+func (UnimplementedDeviceServiceServer) GetWardenSecret(context.Context, *GetWardenSecretRequest) (*GetWardenSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWardenSecret not implemented")
 }
 func (UnimplementedDeviceServiceServer) mustEmbedUnimplementedDeviceServiceServer() {}
 func (UnimplementedDeviceServiceServer) testEmbeddedByValue()                       {}
@@ -399,6 +439,42 @@ func _DeviceService_DeleteDeviceInterface_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DeviceService_SearchWardenSecrets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchWardenSecretsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeviceServiceServer).SearchWardenSecrets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeviceService_SearchWardenSecrets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeviceServiceServer).SearchWardenSecrets(ctx, req.(*SearchWardenSecretsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeviceService_GetWardenSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWardenSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeviceServiceServer).GetWardenSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeviceService_GetWardenSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeviceServiceServer).GetWardenSecret(ctx, req.(*GetWardenSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DeviceService_ServiceDesc is the grpc.ServiceDesc for DeviceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -441,6 +517,14 @@ var DeviceService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteDeviceInterface",
 			Handler:    _DeviceService_DeleteDeviceInterface_Handler,
+		},
+		{
+			MethodName: "SearchWardenSecrets",
+			Handler:    _DeviceService_SearchWardenSecrets_Handler,
+		},
+		{
+			MethodName: "GetWardenSecret",
+			Handler:    _DeviceService_GetWardenSecret_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

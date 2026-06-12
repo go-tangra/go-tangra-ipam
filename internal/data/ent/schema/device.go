@@ -106,6 +106,10 @@ func (Device) Fields() []ent.Field {
 			Optional().
 			Comment("Firmware version"),
 
+		field.String("ipmi_secret_ref").
+			Optional().
+			Comment("Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value"),
+
 		field.String("contact").
 			Optional().
 			Comment("Contact person"),

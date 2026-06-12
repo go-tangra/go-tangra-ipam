@@ -3,6 +3,7 @@ package providers
 import (
 	"github.com/google/wire"
 
+	"github.com/go-tangra/go-tangra-ipam/internal/client"
 	"github.com/go-tangra/go-tangra-ipam/internal/event"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
 	"github.com/go-tangra/go-tangra-ipam/internal/service"
@@ -11,6 +12,9 @@ import (
 var ProviderSet = wire.NewSet(
 	event.NewPublisher,
 	metrics.NewCollector,
+	client.NewRegistrationClient,
+	client.NewModuleDialer,
+	client.NewWardenClient,
 	service.NewSystemService,
 	service.NewSubnetService,
 	service.NewVlanService,

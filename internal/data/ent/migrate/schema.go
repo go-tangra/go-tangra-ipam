@@ -109,6 +109,7 @@ var (
 		{Name: "os_type", Type: field.TypeString, Nullable: true, Comment: "Operating system"},
 		{Name: "os_version", Type: field.TypeString, Nullable: true, Comment: "OS version"},
 		{Name: "firmware_version", Type: field.TypeString, Nullable: true, Comment: "Firmware version"},
+		{Name: "ipmi_secret_ref", Type: field.TypeString, Nullable: true, Comment: "Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value"},
 		{Name: "contact", Type: field.TypeString, Nullable: true, Comment: "Contact person"},
 		{Name: "tags", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "Custom tags (JSON)"},
 		{Name: "metadata", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "Custom metadata (JSON)"},
@@ -124,7 +125,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "ipam_devices_ipam_locations_location",
-				Columns:    []*schema.Column{IpamDevicesColumns[29]},
+				Columns:    []*schema.Column{IpamDevicesColumns[30]},
 				RefColumns: []*schema.Column{IpamLocationsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -143,7 +144,7 @@ var (
 			{
 				Name:    "device_location_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamDevicesColumns[29]},
+				Columns: []*schema.Column{IpamDevicesColumns[30]},
 			},
 			{
 				Name:    "device_status",

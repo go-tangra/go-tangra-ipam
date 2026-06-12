@@ -240,6 +240,9 @@ type Device struct {
 	CreatedBy *uint32 `protobuf:"varint,32,opt,name=created_by,json=createdBy,proto3,oneof" json:"created_by,omitempty"`
 	// Last updater user ID
 	UpdatedBy *uint32 `protobuf:"varint,33,opt,name=updated_by,json=updatedBy,proto3,oneof" json:"updated_by,omitempty"`
+	// Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only,
+	// never the secret value.
+	IpmiSecretRef *string `protobuf:"bytes,34,opt,name=ipmi_secret_ref,json=ipmiSecretRef,proto3,oneof" json:"ipmi_secret_ref,omitempty"`
 	// Package update counts (populated in list responses)
 	PackageUpdateCount  *int32 `protobuf:"varint,40,opt,name=package_update_count,json=packageUpdateCount,proto3,oneof" json:"package_update_count,omitempty"`
 	SecurityUpdateCount *int32 `protobuf:"varint,41,opt,name=security_update_count,json=securityUpdateCount,proto3,oneof" json:"security_update_count,omitempty"`
@@ -494,6 +497,13 @@ func (x *Device) GetUpdatedBy() uint32 {
 	return 0
 }
 
+func (x *Device) GetIpmiSecretRef() string {
+	if x != nil && x.IpmiSecretRef != nil {
+		return *x.IpmiSecretRef
+	}
+	return ""
+}
+
 func (x *Device) GetPackageUpdateCount() int32 {
 	if x != nil && x.PackageUpdateCount != nil {
 		return *x.PackageUpdateCount
@@ -708,6 +718,7 @@ type CreateDeviceRequest struct {
 	Metadata      *string                `protobuf:"bytes,19,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
 	Notes         *string                `protobuf:"bytes,20,opt,name=notes,proto3,oneof" json:"notes,omitempty"`
 	DeviceHeightU *int32                 `protobuf:"varint,21,opt,name=device_height_u,json=deviceHeightU,proto3,oneof" json:"device_height_u,omitempty"`
+	IpmiSecretRef *string                `protobuf:"bytes,22,opt,name=ipmi_secret_ref,json=ipmiSecretRef,proto3,oneof" json:"ipmi_secret_ref,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -887,6 +898,13 @@ func (x *CreateDeviceRequest) GetDeviceHeightU() int32 {
 		return *x.DeviceHeightU
 	}
 	return 0
+}
+
+func (x *CreateDeviceRequest) GetIpmiSecretRef() string {
+	if x != nil && x.IpmiSecretRef != nil {
+		return *x.IpmiSecretRef
+	}
+	return ""
 }
 
 type CreateDeviceResponse struct {
@@ -1739,11 +1757,265 @@ func (x *DeleteDeviceInterfaceRequest) GetId() string {
 	return ""
 }
 
+// WardenSecretRef is the minimal Warden secret metadata used to pick/display a
+// reference. It never carries the secret value.
+type WardenSecretRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	FolderPath    string                 `protobuf:"bytes,3,opt,name=folder_path,json=folderPath,proto3" json:"folder_path,omitempty"`
+	Username      string                 `protobuf:"bytes,4,opt,name=username,proto3" json:"username,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WardenSecretRef) Reset() {
+	*x = WardenSecretRef{}
+	mi := &file_ipam_service_v1_device_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WardenSecretRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WardenSecretRef) ProtoMessage() {}
+
+func (x *WardenSecretRef) ProtoReflect() protoreflect.Message {
+	mi := &file_ipam_service_v1_device_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WardenSecretRef.ProtoReflect.Descriptor instead.
+func (*WardenSecretRef) Descriptor() ([]byte, []int) {
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *WardenSecretRef) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *WardenSecretRef) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WardenSecretRef) GetFolderPath() string {
+	if x != nil {
+		return x.FolderPath
+	}
+	return ""
+}
+
+func (x *WardenSecretRef) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+type SearchWardenSecretsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Query         *string                `protobuf:"bytes,1,opt,name=query,proto3,oneof" json:"query,omitempty"`
+	Limit         *uint32                `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchWardenSecretsRequest) Reset() {
+	*x = SearchWardenSecretsRequest{}
+	mi := &file_ipam_service_v1_device_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchWardenSecretsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchWardenSecretsRequest) ProtoMessage() {}
+
+func (x *SearchWardenSecretsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ipam_service_v1_device_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchWardenSecretsRequest.ProtoReflect.Descriptor instead.
+func (*SearchWardenSecretsRequest) Descriptor() ([]byte, []int) {
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SearchWardenSecretsRequest) GetQuery() string {
+	if x != nil && x.Query != nil {
+		return *x.Query
+	}
+	return ""
+}
+
+func (x *SearchWardenSecretsRequest) GetLimit() uint32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+type SearchWardenSecretsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Secrets       []*WardenSecretRef     `protobuf:"bytes,1,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchWardenSecretsResponse) Reset() {
+	*x = SearchWardenSecretsResponse{}
+	mi := &file_ipam_service_v1_device_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchWardenSecretsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchWardenSecretsResponse) ProtoMessage() {}
+
+func (x *SearchWardenSecretsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ipam_service_v1_device_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchWardenSecretsResponse.ProtoReflect.Descriptor instead.
+func (*SearchWardenSecretsResponse) Descriptor() ([]byte, []int) {
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SearchWardenSecretsResponse) GetSecrets() []*WardenSecretRef {
+	if x != nil {
+		return x.Secrets
+	}
+	return nil
+}
+
+type GetWardenSecretRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWardenSecretRequest) Reset() {
+	*x = GetWardenSecretRequest{}
+	mi := &file_ipam_service_v1_device_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWardenSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWardenSecretRequest) ProtoMessage() {}
+
+func (x *GetWardenSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ipam_service_v1_device_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWardenSecretRequest.ProtoReflect.Descriptor instead.
+func (*GetWardenSecretRequest) Descriptor() ([]byte, []int) {
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetWardenSecretRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetWardenSecretResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Secret        *WardenSecretRef       `protobuf:"bytes,1,opt,name=secret,proto3,oneof" json:"secret,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWardenSecretResponse) Reset() {
+	*x = GetWardenSecretResponse{}
+	mi := &file_ipam_service_v1_device_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWardenSecretResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWardenSecretResponse) ProtoMessage() {}
+
+func (x *GetWardenSecretResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ipam_service_v1_device_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWardenSecretResponse.ProtoReflect.Descriptor instead.
+func (*GetWardenSecretResponse) Descriptor() ([]byte, []int) {
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetWardenSecretResponse) GetSecret() *WardenSecretRef {
+	if x != nil {
+		return x.Secret
+	}
+	return nil
+}
+
 var File_ipam_service_v1_device_proto protoreflect.FileDescriptor
 
 const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\n" +
-	"\x1cipam/service/v1/device.proto\x12\x0fipam.service.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x16redact/v3/redact.proto\"\xd2\x0e\n" +
+	"\x1cipam/service/v1/device.proto\x12\x0fipam.service.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x16redact/v3/redact.proto\"\x93\x0f\n" +
 	"\x06Device\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
 	"\ttenant_id\x18\x02 \x01(\rH\x01R\btenantId\x88\x01\x01\x12\x17\n" +
@@ -1785,9 +2057,10 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18  \x01(\rH\x1dR\tcreatedBy\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"updated_by\x18! \x01(\rH\x1eR\tupdatedBy\x88\x01\x01\x125\n" +
-	"\x14package_update_count\x18( \x01(\x05H\x1fR\x12packageUpdateCount\x88\x01\x01\x127\n" +
-	"\x15security_update_count\x18) \x01(\x05H R\x13securityUpdateCount\x88\x01\x01B\x05\n" +
+	"updated_by\x18! \x01(\rH\x1eR\tupdatedBy\x88\x01\x01\x12+\n" +
+	"\x0fipmi_secret_ref\x18\" \x01(\tH\x1fR\ripmiSecretRef\x88\x01\x01\x125\n" +
+	"\x14package_update_count\x18( \x01(\x05H R\x12packageUpdateCount\x88\x01\x01\x127\n" +
+	"\x15security_update_count\x18) \x01(\x05H!R\x13securityUpdateCount\x88\x01\x01B\x05\n" +
 	"\x03_idB\f\n" +
 	"\n" +
 	"_tenant_idB\a\n" +
@@ -1824,7 +2097,8 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\v_created_atB\r\n" +
 	"\v_updated_atB\r\n" +
 	"\v_created_byB\r\n" +
-	"\v_updated_byB\x17\n" +
+	"\v_updated_byB\x12\n" +
+	"\x10_ipmi_secret_refB\x17\n" +
 	"\x15_package_update_countB\x18\n" +
 	"\x16_security_update_count\"\xe9\a\n" +
 	"\x0fDeviceInterface\x12\x13\n" +
@@ -1871,7 +2145,7 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\f_link_sourceB\f\n" +
 	"\n" +
 	"_link_vlanB\x11\n" +
-	"\x0f_link_last_seen\"\xe8\b\n" +
+	"\x0f_link_last_seen\"\xa9\t\n" +
 	"\x13CreateDeviceRequest\x12%\n" +
 	"\ttenant_id\x18\x01 \x01(\rB\x03\xe0A\x02H\x00R\btenantId\x88\x01\x01\x12&\n" +
 	"\x04name\x18\x02 \x01(\tB\r\xe0A\x02\xbaH\ar\x05\x10\x01\x18\xff\x01H\x01R\x04name\x88\x01\x01\x12A\n" +
@@ -1899,7 +2173,8 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\x04tags\x18\x12 \x01(\tH\x11R\x04tags\x88\x01\x01\x12\x1f\n" +
 	"\bmetadata\x18\x13 \x01(\tH\x12R\bmetadata\x88\x01\x01\x12\x19\n" +
 	"\x05notes\x18\x14 \x01(\tH\x13R\x05notes\x88\x01\x01\x12+\n" +
-	"\x0fdevice_height_u\x18\x15 \x01(\x05H\x14R\rdeviceHeightU\x88\x01\x01B\f\n" +
+	"\x0fdevice_height_u\x18\x15 \x01(\x05H\x14R\rdeviceHeightU\x88\x01\x01\x12+\n" +
+	"\x0fipmi_secret_ref\x18\x16 \x01(\tH\x15R\ripmiSecretRef\x88\x01\x01B\f\n" +
 	"\n" +
 	"_tenant_idB\a\n" +
 	"\x05_nameB\x0e\n" +
@@ -1925,7 +2200,8 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\x05_tagsB\v\n" +
 	"\t_metadataB\b\n" +
 	"\x06_notesB\x12\n" +
-	"\x10_device_height_u\"G\n" +
+	"\x10_device_height_uB\x12\n" +
+	"\x10_ipmi_secret_ref\"G\n" +
 	"\x14CreateDeviceResponse\x12/\n" +
 	"\x06device\x18\x01 \x01(\v2\x17.ipam.service.v1.DeviceR\x06device\".\n" +
 	"\x10GetDeviceRequest\x12\x1a\n" +
@@ -2022,7 +2298,26 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\tdevice_id\x18\x01 \x01(\tB\n" +
 	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\bdeviceId\x12\x1a\n" +
 	"\x02id\x18\x02 \x01(\tB\n" +
-	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x02id*\xf4\x02\n" +
+	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x02id\"r\n" +
+	"\x0fWardenSecretRef\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vfolder_path\x18\x03 \x01(\tR\n" +
+	"folderPath\x12\x1a\n" +
+	"\busername\x18\x04 \x01(\tR\busername\"f\n" +
+	"\x1aSearchWardenSecretsRequest\x12\x19\n" +
+	"\x05query\x18\x01 \x01(\tH\x00R\x05query\x88\x01\x01\x12\x19\n" +
+	"\x05limit\x18\x02 \x01(\rH\x01R\x05limit\x88\x01\x01B\b\n" +
+	"\x06_queryB\b\n" +
+	"\x06_limit\"Y\n" +
+	"\x1bSearchWardenSecretsResponse\x12:\n" +
+	"\asecrets\x18\x01 \x03(\v2 .ipam.service.v1.WardenSecretRefR\asecrets\"4\n" +
+	"\x16GetWardenSecretRequest\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x02id\"c\n" +
+	"\x17GetWardenSecretResponse\x12=\n" +
+	"\x06secret\x18\x01 \x01(\v2 .ipam.service.v1.WardenSecretRefH\x00R\x06secret\x88\x01\x01B\t\n" +
+	"\a_secret*\xf4\x02\n" +
 	"\n" +
 	"DeviceType\x12\x1b\n" +
 	"\x17DEVICE_TYPE_UNSPECIFIED\x10\x00\x12\x16\n" +
@@ -2048,7 +2343,7 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\x1cDEVICE_STATUS_DECOMMISSIONED\x10\x04\x12\x19\n" +
 	"\x15DEVICE_STATUS_OFFLINE\x10\x05\x12\x18\n" +
 	"\x14DEVICE_STATUS_FAILED\x10\x06\x12\x1b\n" +
-	"\x17DEVICE_STATUS_AVAILABLE\x10\a2\xb0\t\n" +
+	"\x17DEVICE_STATUS_AVAILABLE\x10\a2\xc7\v\n" +
 	"\rDeviceService\x12s\n" +
 	"\fCreateDevice\x12$.ipam.service.v1.CreateDeviceRequest\x1a%.ipam.service.v1.CreateDeviceResponse\"\x16\x82\xd3\xe4\x93\x02\x10:\x01*\"\v/v1/devices\x12l\n" +
 	"\tGetDevice\x12!.ipam.service.v1.GetDeviceRequest\x1a\".ipam.service.v1.GetDeviceResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/devices/{id}\x12m\n" +
@@ -2058,7 +2353,9 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\x12GetDeviceAddresses\x12*.ipam.service.v1.GetDeviceAddressesRequest\x1a+.ipam.service.v1.GetDeviceAddressesResponse\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/devices/{id}/addresses\x12\x9c\x01\n" +
 	"\x13GetDeviceInterfaces\x12+.ipam.service.v1.GetDeviceInterfacesRequest\x1a,.ipam.service.v1.GetDeviceInterfacesResponse\"*\x82\xd3\xe4\x93\x02$\x12\"/v1/devices/{device_id}/interfaces\x12\xa5\x01\n" +
 	"\x15CreateDeviceInterface\x12-.ipam.service.v1.CreateDeviceInterfaceRequest\x1a..ipam.service.v1.CreateDeviceInterfaceResponse\"-\x82\xd3\xe4\x93\x02':\x01*\"\"/v1/devices/{device_id}/interfaces\x12\x8f\x01\n" +
-	"\x15DeleteDeviceInterface\x12-.ipam.service.v1.DeleteDeviceInterfaceRequest\x1a\x16.google.protobuf.Empty\"/\x82\xd3\xe4\x93\x02)*'/v1/devices/{device_id}/interfaces/{id}B\xc3\x01\n" +
+	"\x15DeleteDeviceInterface\x12-.ipam.service.v1.DeleteDeviceInterfaceRequest\x1a\x16.google.protobuf.Empty\"/\x82\xd3\xe4\x93\x02)*'/v1/devices/{device_id}/interfaces/{id}\x12\x8c\x01\n" +
+	"\x13SearchWardenSecrets\x12+.ipam.service.v1.SearchWardenSecretsRequest\x1a,.ipam.service.v1.SearchWardenSecretsResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/warden-secrets\x12\x85\x01\n" +
+	"\x0fGetWardenSecret\x12'.ipam.service.v1.GetWardenSecretRequest\x1a(.ipam.service.v1.GetWardenSecretResponse\"\x1f\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/warden-secrets/{id}B\xc3\x01\n" +
 	"\x13com.ipam.service.v1B\vDeviceProtoP\x01ZAgithub.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1;ipampb\xa2\x02\x03ISX\xaa\x02\x0fIpam.Service.V1\xca\x02\x0fIpam\\Service\\V1\xe2\x02\x1bIpam\\Service\\V1\\GPBMetadata\xea\x02\x11Ipam::Service::V1b\x06proto3"
 
 var (
@@ -2074,7 +2371,7 @@ func file_ipam_service_v1_device_proto_rawDescGZIP() []byte {
 }
 
 var file_ipam_service_v1_device_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_ipam_service_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_ipam_service_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_ipam_service_v1_device_proto_goTypes = []any{
 	(DeviceType)(0),                       // 0: ipam.service.v1.DeviceType
 	(DeviceStatus)(0),                     // 1: ipam.service.v1.DeviceStatus
@@ -2096,19 +2393,24 @@ var file_ipam_service_v1_device_proto_goTypes = []any{
 	(*CreateDeviceInterfaceRequest)(nil),  // 17: ipam.service.v1.CreateDeviceInterfaceRequest
 	(*CreateDeviceInterfaceResponse)(nil), // 18: ipam.service.v1.CreateDeviceInterfaceResponse
 	(*DeleteDeviceInterfaceRequest)(nil),  // 19: ipam.service.v1.DeleteDeviceInterfaceRequest
-	(*timestamppb.Timestamp)(nil),         // 20: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),         // 21: google.protobuf.FieldMask
-	(*emptypb.Empty)(nil),                 // 22: google.protobuf.Empty
+	(*WardenSecretRef)(nil),               // 20: ipam.service.v1.WardenSecretRef
+	(*SearchWardenSecretsRequest)(nil),    // 21: ipam.service.v1.SearchWardenSecretsRequest
+	(*SearchWardenSecretsResponse)(nil),   // 22: ipam.service.v1.SearchWardenSecretsResponse
+	(*GetWardenSecretRequest)(nil),        // 23: ipam.service.v1.GetWardenSecretRequest
+	(*GetWardenSecretResponse)(nil),       // 24: ipam.service.v1.GetWardenSecretResponse
+	(*timestamppb.Timestamp)(nil),         // 25: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),         // 26: google.protobuf.FieldMask
+	(*emptypb.Empty)(nil),                 // 27: google.protobuf.Empty
 }
 var file_ipam_service_v1_device_proto_depIdxs = []int32{
 	0,  // 0: ipam.service.v1.Device.device_type:type_name -> ipam.service.v1.DeviceType
 	1,  // 1: ipam.service.v1.Device.status:type_name -> ipam.service.v1.DeviceStatus
-	20, // 2: ipam.service.v1.Device.last_seen:type_name -> google.protobuf.Timestamp
-	20, // 3: ipam.service.v1.Device.created_at:type_name -> google.protobuf.Timestamp
-	20, // 4: ipam.service.v1.Device.updated_at:type_name -> google.protobuf.Timestamp
-	20, // 5: ipam.service.v1.DeviceInterface.created_at:type_name -> google.protobuf.Timestamp
-	20, // 6: ipam.service.v1.DeviceInterface.updated_at:type_name -> google.protobuf.Timestamp
-	20, // 7: ipam.service.v1.DeviceInterface.link_last_seen:type_name -> google.protobuf.Timestamp
+	25, // 2: ipam.service.v1.Device.last_seen:type_name -> google.protobuf.Timestamp
+	25, // 3: ipam.service.v1.Device.created_at:type_name -> google.protobuf.Timestamp
+	25, // 4: ipam.service.v1.Device.updated_at:type_name -> google.protobuf.Timestamp
+	25, // 5: ipam.service.v1.DeviceInterface.created_at:type_name -> google.protobuf.Timestamp
+	25, // 6: ipam.service.v1.DeviceInterface.updated_at:type_name -> google.protobuf.Timestamp
+	25, // 7: ipam.service.v1.DeviceInterface.link_last_seen:type_name -> google.protobuf.Timestamp
 	0,  // 8: ipam.service.v1.CreateDeviceRequest.device_type:type_name -> ipam.service.v1.DeviceType
 	1,  // 9: ipam.service.v1.CreateDeviceRequest.status:type_name -> ipam.service.v1.DeviceStatus
 	2,  // 10: ipam.service.v1.CreateDeviceResponse.device:type_name -> ipam.service.v1.Device
@@ -2117,33 +2419,39 @@ var file_ipam_service_v1_device_proto_depIdxs = []int32{
 	1,  // 13: ipam.service.v1.ListDevicesRequest.status:type_name -> ipam.service.v1.DeviceStatus
 	2,  // 14: ipam.service.v1.ListDevicesResponse.items:type_name -> ipam.service.v1.Device
 	2,  // 15: ipam.service.v1.UpdateDeviceRequest.data:type_name -> ipam.service.v1.Device
-	21, // 16: ipam.service.v1.UpdateDeviceRequest.update_mask:type_name -> google.protobuf.FieldMask
+	26, // 16: ipam.service.v1.UpdateDeviceRequest.update_mask:type_name -> google.protobuf.FieldMask
 	2,  // 17: ipam.service.v1.UpdateDeviceResponse.device:type_name -> ipam.service.v1.Device
 	3,  // 18: ipam.service.v1.GetDeviceInterfacesResponse.interfaces:type_name -> ipam.service.v1.DeviceInterface
 	3,  // 19: ipam.service.v1.CreateDeviceInterfaceResponse.interface:type_name -> ipam.service.v1.DeviceInterface
-	4,  // 20: ipam.service.v1.DeviceService.CreateDevice:input_type -> ipam.service.v1.CreateDeviceRequest
-	6,  // 21: ipam.service.v1.DeviceService.GetDevice:input_type -> ipam.service.v1.GetDeviceRequest
-	8,  // 22: ipam.service.v1.DeviceService.ListDevices:input_type -> ipam.service.v1.ListDevicesRequest
-	10, // 23: ipam.service.v1.DeviceService.UpdateDevice:input_type -> ipam.service.v1.UpdateDeviceRequest
-	12, // 24: ipam.service.v1.DeviceService.DeleteDevice:input_type -> ipam.service.v1.DeleteDeviceRequest
-	13, // 25: ipam.service.v1.DeviceService.GetDeviceAddresses:input_type -> ipam.service.v1.GetDeviceAddressesRequest
-	15, // 26: ipam.service.v1.DeviceService.GetDeviceInterfaces:input_type -> ipam.service.v1.GetDeviceInterfacesRequest
-	17, // 27: ipam.service.v1.DeviceService.CreateDeviceInterface:input_type -> ipam.service.v1.CreateDeviceInterfaceRequest
-	19, // 28: ipam.service.v1.DeviceService.DeleteDeviceInterface:input_type -> ipam.service.v1.DeleteDeviceInterfaceRequest
-	5,  // 29: ipam.service.v1.DeviceService.CreateDevice:output_type -> ipam.service.v1.CreateDeviceResponse
-	7,  // 30: ipam.service.v1.DeviceService.GetDevice:output_type -> ipam.service.v1.GetDeviceResponse
-	9,  // 31: ipam.service.v1.DeviceService.ListDevices:output_type -> ipam.service.v1.ListDevicesResponse
-	11, // 32: ipam.service.v1.DeviceService.UpdateDevice:output_type -> ipam.service.v1.UpdateDeviceResponse
-	22, // 33: ipam.service.v1.DeviceService.DeleteDevice:output_type -> google.protobuf.Empty
-	14, // 34: ipam.service.v1.DeviceService.GetDeviceAddresses:output_type -> ipam.service.v1.GetDeviceAddressesResponse
-	16, // 35: ipam.service.v1.DeviceService.GetDeviceInterfaces:output_type -> ipam.service.v1.GetDeviceInterfacesResponse
-	18, // 36: ipam.service.v1.DeviceService.CreateDeviceInterface:output_type -> ipam.service.v1.CreateDeviceInterfaceResponse
-	22, // 37: ipam.service.v1.DeviceService.DeleteDeviceInterface:output_type -> google.protobuf.Empty
-	29, // [29:38] is the sub-list for method output_type
-	20, // [20:29] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	20, // 20: ipam.service.v1.SearchWardenSecretsResponse.secrets:type_name -> ipam.service.v1.WardenSecretRef
+	20, // 21: ipam.service.v1.GetWardenSecretResponse.secret:type_name -> ipam.service.v1.WardenSecretRef
+	4,  // 22: ipam.service.v1.DeviceService.CreateDevice:input_type -> ipam.service.v1.CreateDeviceRequest
+	6,  // 23: ipam.service.v1.DeviceService.GetDevice:input_type -> ipam.service.v1.GetDeviceRequest
+	8,  // 24: ipam.service.v1.DeviceService.ListDevices:input_type -> ipam.service.v1.ListDevicesRequest
+	10, // 25: ipam.service.v1.DeviceService.UpdateDevice:input_type -> ipam.service.v1.UpdateDeviceRequest
+	12, // 26: ipam.service.v1.DeviceService.DeleteDevice:input_type -> ipam.service.v1.DeleteDeviceRequest
+	13, // 27: ipam.service.v1.DeviceService.GetDeviceAddresses:input_type -> ipam.service.v1.GetDeviceAddressesRequest
+	15, // 28: ipam.service.v1.DeviceService.GetDeviceInterfaces:input_type -> ipam.service.v1.GetDeviceInterfacesRequest
+	17, // 29: ipam.service.v1.DeviceService.CreateDeviceInterface:input_type -> ipam.service.v1.CreateDeviceInterfaceRequest
+	19, // 30: ipam.service.v1.DeviceService.DeleteDeviceInterface:input_type -> ipam.service.v1.DeleteDeviceInterfaceRequest
+	21, // 31: ipam.service.v1.DeviceService.SearchWardenSecrets:input_type -> ipam.service.v1.SearchWardenSecretsRequest
+	23, // 32: ipam.service.v1.DeviceService.GetWardenSecret:input_type -> ipam.service.v1.GetWardenSecretRequest
+	5,  // 33: ipam.service.v1.DeviceService.CreateDevice:output_type -> ipam.service.v1.CreateDeviceResponse
+	7,  // 34: ipam.service.v1.DeviceService.GetDevice:output_type -> ipam.service.v1.GetDeviceResponse
+	9,  // 35: ipam.service.v1.DeviceService.ListDevices:output_type -> ipam.service.v1.ListDevicesResponse
+	11, // 36: ipam.service.v1.DeviceService.UpdateDevice:output_type -> ipam.service.v1.UpdateDeviceResponse
+	27, // 37: ipam.service.v1.DeviceService.DeleteDevice:output_type -> google.protobuf.Empty
+	14, // 38: ipam.service.v1.DeviceService.GetDeviceAddresses:output_type -> ipam.service.v1.GetDeviceAddressesResponse
+	16, // 39: ipam.service.v1.DeviceService.GetDeviceInterfaces:output_type -> ipam.service.v1.GetDeviceInterfacesResponse
+	18, // 40: ipam.service.v1.DeviceService.CreateDeviceInterface:output_type -> ipam.service.v1.CreateDeviceInterfaceResponse
+	27, // 41: ipam.service.v1.DeviceService.DeleteDeviceInterface:output_type -> google.protobuf.Empty
+	22, // 42: ipam.service.v1.DeviceService.SearchWardenSecrets:output_type -> ipam.service.v1.SearchWardenSecretsResponse
+	24, // 43: ipam.service.v1.DeviceService.GetWardenSecret:output_type -> ipam.service.v1.GetWardenSecretResponse
+	33, // [33:44] is the sub-list for method output_type
+	22, // [22:33] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_ipam_service_v1_device_proto_init() }
@@ -2159,13 +2467,15 @@ func file_ipam_service_v1_device_proto_init() {
 	file_ipam_service_v1_device_proto_msgTypes[8].OneofWrappers = []any{}
 	file_ipam_service_v1_device_proto_msgTypes[10].OneofWrappers = []any{}
 	file_ipam_service_v1_device_proto_msgTypes[15].OneofWrappers = []any{}
+	file_ipam_service_v1_device_proto_msgTypes[19].OneofWrappers = []any{}
+	file_ipam_service_v1_device_proto_msgTypes[22].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipam_service_v1_device_proto_rawDesc), len(file_ipam_service_v1_device_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   18,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

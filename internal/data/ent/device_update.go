@@ -496,6 +496,26 @@ func (_u *DeviceUpdate) ClearFirmwareVersion() *DeviceUpdate {
 	return _u
 }
 
+// SetIpmiSecretRef sets the "ipmi_secret_ref" field.
+func (_u *DeviceUpdate) SetIpmiSecretRef(v string) *DeviceUpdate {
+	_u.mutation.SetIpmiSecretRef(v)
+	return _u
+}
+
+// SetNillableIpmiSecretRef sets the "ipmi_secret_ref" field if the given value is not nil.
+func (_u *DeviceUpdate) SetNillableIpmiSecretRef(v *string) *DeviceUpdate {
+	if v != nil {
+		_u.SetIpmiSecretRef(*v)
+	}
+	return _u
+}
+
+// ClearIpmiSecretRef clears the value of the "ipmi_secret_ref" field.
+func (_u *DeviceUpdate) ClearIpmiSecretRef() *DeviceUpdate {
+	_u.mutation.ClearIpmiSecretRef()
+	return _u
+}
+
 // SetContact sets the "contact" field.
 func (_u *DeviceUpdate) SetContact(v string) *DeviceUpdate {
 	_u.mutation.SetContact(v)
@@ -879,6 +899,12 @@ func (_u *DeviceUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.FirmwareVersionCleared() {
 		_spec.ClearField(device.FieldFirmwareVersion, field.TypeString)
+	}
+	if value, ok := _u.mutation.IpmiSecretRef(); ok {
+		_spec.SetField(device.FieldIpmiSecretRef, field.TypeString, value)
+	}
+	if _u.mutation.IpmiSecretRefCleared() {
+		_spec.ClearField(device.FieldIpmiSecretRef, field.TypeString)
 	}
 	if value, ok := _u.mutation.Contact(); ok {
 		_spec.SetField(device.FieldContact, field.TypeString, value)
@@ -1515,6 +1541,26 @@ func (_u *DeviceUpdateOne) ClearFirmwareVersion() *DeviceUpdateOne {
 	return _u
 }
 
+// SetIpmiSecretRef sets the "ipmi_secret_ref" field.
+func (_u *DeviceUpdateOne) SetIpmiSecretRef(v string) *DeviceUpdateOne {
+	_u.mutation.SetIpmiSecretRef(v)
+	return _u
+}
+
+// SetNillableIpmiSecretRef sets the "ipmi_secret_ref" field if the given value is not nil.
+func (_u *DeviceUpdateOne) SetNillableIpmiSecretRef(v *string) *DeviceUpdateOne {
+	if v != nil {
+		_u.SetIpmiSecretRef(*v)
+	}
+	return _u
+}
+
+// ClearIpmiSecretRef clears the value of the "ipmi_secret_ref" field.
+func (_u *DeviceUpdateOne) ClearIpmiSecretRef() *DeviceUpdateOne {
+	_u.mutation.ClearIpmiSecretRef()
+	return _u
+}
+
 // SetContact sets the "contact" field.
 func (_u *DeviceUpdateOne) SetContact(v string) *DeviceUpdateOne {
 	_u.mutation.SetContact(v)
@@ -1928,6 +1974,12 @@ func (_u *DeviceUpdateOne) sqlSave(ctx context.Context) (_node *Device, err erro
 	}
 	if _u.mutation.FirmwareVersionCleared() {
 		_spec.ClearField(device.FieldFirmwareVersion, field.TypeString)
+	}
+	if value, ok := _u.mutation.IpmiSecretRef(); ok {
+		_spec.SetField(device.FieldIpmiSecretRef, field.TypeString, value)
+	}
+	if _u.mutation.IpmiSecretRefCleared() {
+		_spec.ClearField(device.FieldIpmiSecretRef, field.TypeString)
 	}
 	if value, ok := _u.mutation.Contact(); ok {
 		_spec.SetField(device.FieldContact, field.TypeString, value)

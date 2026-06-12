@@ -1966,6 +1966,7 @@ type DeviceMutation struct {
 	os_type            *string
 	os_version         *string
 	firmware_version   *string
+	ipmi_secret_ref    *string
 	contact            *string
 	tags               *string
 	metadata           *string
@@ -3371,6 +3372,55 @@ func (m *DeviceMutation) ResetFirmwareVersion() {
 	delete(m.clearedFields, device.FieldFirmwareVersion)
 }
 
+// SetIpmiSecretRef sets the "ipmi_secret_ref" field.
+func (m *DeviceMutation) SetIpmiSecretRef(s string) {
+	m.ipmi_secret_ref = &s
+}
+
+// IpmiSecretRef returns the value of the "ipmi_secret_ref" field in the mutation.
+func (m *DeviceMutation) IpmiSecretRef() (r string, exists bool) {
+	v := m.ipmi_secret_ref
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIpmiSecretRef returns the old "ipmi_secret_ref" field's value of the Device entity.
+// If the Device object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceMutation) OldIpmiSecretRef(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIpmiSecretRef is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIpmiSecretRef requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIpmiSecretRef: %w", err)
+	}
+	return oldValue.IpmiSecretRef, nil
+}
+
+// ClearIpmiSecretRef clears the value of the "ipmi_secret_ref" field.
+func (m *DeviceMutation) ClearIpmiSecretRef() {
+	m.ipmi_secret_ref = nil
+	m.clearedFields[device.FieldIpmiSecretRef] = struct{}{}
+}
+
+// IpmiSecretRefCleared returns if the "ipmi_secret_ref" field was cleared in this mutation.
+func (m *DeviceMutation) IpmiSecretRefCleared() bool {
+	_, ok := m.clearedFields[device.FieldIpmiSecretRef]
+	return ok
+}
+
+// ResetIpmiSecretRef resets all changes to the "ipmi_secret_ref" field.
+func (m *DeviceMutation) ResetIpmiSecretRef() {
+	m.ipmi_secret_ref = nil
+	delete(m.clearedFields, device.FieldIpmiSecretRef)
+}
+
 // SetContact sets the "contact" field.
 func (m *DeviceMutation) SetContact(s string) {
 	m.contact = &s
@@ -3785,7 +3835,7 @@ func (m *DeviceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DeviceMutation) Fields() []string {
-	fields := make([]string, 0, 29)
+	fields := make([]string, 0, 30)
 	if m.create_by != nil {
 		fields = append(fields, device.FieldCreateBy)
 	}
@@ -3858,6 +3908,9 @@ func (m *DeviceMutation) Fields() []string {
 	if m.firmware_version != nil {
 		fields = append(fields, device.FieldFirmwareVersion)
 	}
+	if m.ipmi_secret_ref != nil {
+		fields = append(fields, device.FieldIpmiSecretRef)
+	}
 	if m.contact != nil {
 		fields = append(fields, device.FieldContact)
 	}
@@ -3929,6 +3982,8 @@ func (m *DeviceMutation) Field(name string) (ent.Value, bool) {
 		return m.OsVersion()
 	case device.FieldFirmwareVersion:
 		return m.FirmwareVersion()
+	case device.FieldIpmiSecretRef:
+		return m.IpmiSecretRef()
 	case device.FieldContact:
 		return m.Contact()
 	case device.FieldTags:
@@ -3996,6 +4051,8 @@ func (m *DeviceMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldOsVersion(ctx)
 	case device.FieldFirmwareVersion:
 		return m.OldFirmwareVersion(ctx)
+	case device.FieldIpmiSecretRef:
+		return m.OldIpmiSecretRef(ctx)
 	case device.FieldContact:
 		return m.OldContact(ctx)
 	case device.FieldTags:
@@ -4182,6 +4239,13 @@ func (m *DeviceMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetFirmwareVersion(v)
+		return nil
+	case device.FieldIpmiSecretRef:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIpmiSecretRef(v)
 		return nil
 	case device.FieldContact:
 		v, ok := value.(string)
@@ -4398,6 +4462,9 @@ func (m *DeviceMutation) ClearedFields() []string {
 	if m.FieldCleared(device.FieldFirmwareVersion) {
 		fields = append(fields, device.FieldFirmwareVersion)
 	}
+	if m.FieldCleared(device.FieldIpmiSecretRef) {
+		fields = append(fields, device.FieldIpmiSecretRef)
+	}
 	if m.FieldCleared(device.FieldContact) {
 		fields = append(fields, device.FieldContact)
 	}
@@ -4489,6 +4556,9 @@ func (m *DeviceMutation) ClearField(name string) error {
 		return nil
 	case device.FieldFirmwareVersion:
 		m.ClearFirmwareVersion()
+		return nil
+	case device.FieldIpmiSecretRef:
+		m.ClearIpmiSecretRef()
 		return nil
 	case device.FieldContact:
 		m.ClearContact()
@@ -4584,6 +4654,9 @@ func (m *DeviceMutation) ResetField(name string) error {
 		return nil
 	case device.FieldFirmwareVersion:
 		m.ResetFirmwareVersion()
+		return nil
+	case device.FieldIpmiSecretRef:
+		m.ResetIpmiSecretRef()
 		return nil
 	case device.FieldContact:
 		m.ResetContact()

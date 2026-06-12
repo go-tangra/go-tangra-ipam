@@ -267,6 +267,10 @@ func (m *Device) validate(all bool) error {
 		// no validation rules for UpdatedBy
 	}
 
+	if m.IpmiSecretRef != nil {
+		// no validation rules for IpmiSecretRef
+	}
+
 	if m.PackageUpdateCount != nil {
 		// no validation rules for PackageUpdateCount
 	}
@@ -711,6 +715,10 @@ func (m *CreateDeviceRequest) validate(all bool) error {
 
 	if m.DeviceHeightU != nil {
 		// no validation rules for DeviceHeightU
+	}
+
+	if m.IpmiSecretRef != nil {
+		// no validation rules for IpmiSecretRef
 	}
 
 	if len(errors) > 0 {
@@ -2662,3 +2670,597 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = DeleteDeviceInterfaceRequestValidationError{}
+
+// Validate checks the field values on WardenSecretRef with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *WardenSecretRef) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on WardenSecretRef with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// WardenSecretRefMultiError, or nil if none found.
+func (m *WardenSecretRef) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *WardenSecretRef) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Id
+
+	// no validation rules for Name
+
+	// no validation rules for FolderPath
+
+	// no validation rules for Username
+
+	if len(errors) > 0 {
+		return WardenSecretRefMultiError(errors)
+	}
+
+	return nil
+}
+
+// WardenSecretRefMultiError is an error wrapping multiple validation errors
+// returned by WardenSecretRef.ValidateAll() if the designated constraints
+// aren't met.
+type WardenSecretRefMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m WardenSecretRefMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m WardenSecretRefMultiError) AllErrors() []error { return m }
+
+// WardenSecretRefValidationError is the validation error returned by
+// WardenSecretRef.Validate if the designated constraints aren't met.
+type WardenSecretRefValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e WardenSecretRefValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e WardenSecretRefValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e WardenSecretRefValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e WardenSecretRefValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e WardenSecretRefValidationError) ErrorName() string { return "WardenSecretRefValidationError" }
+
+// Error satisfies the builtin error interface
+func (e WardenSecretRefValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sWardenSecretRef.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = WardenSecretRefValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = WardenSecretRefValidationError{}
+
+// Validate checks the field values on SearchWardenSecretsRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SearchWardenSecretsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SearchWardenSecretsRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SearchWardenSecretsRequestMultiError, or nil if none found.
+func (m *SearchWardenSecretsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SearchWardenSecretsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.Query != nil {
+		// no validation rules for Query
+	}
+
+	if m.Limit != nil {
+		// no validation rules for Limit
+	}
+
+	if len(errors) > 0 {
+		return SearchWardenSecretsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SearchWardenSecretsRequestMultiError is an error wrapping multiple
+// validation errors returned by SearchWardenSecretsRequest.ValidateAll() if
+// the designated constraints aren't met.
+type SearchWardenSecretsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SearchWardenSecretsRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SearchWardenSecretsRequestMultiError) AllErrors() []error { return m }
+
+// SearchWardenSecretsRequestValidationError is the validation error returned
+// by SearchWardenSecretsRequest.Validate if the designated constraints aren't met.
+type SearchWardenSecretsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SearchWardenSecretsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SearchWardenSecretsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SearchWardenSecretsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SearchWardenSecretsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SearchWardenSecretsRequestValidationError) ErrorName() string {
+	return "SearchWardenSecretsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SearchWardenSecretsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSearchWardenSecretsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SearchWardenSecretsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SearchWardenSecretsRequestValidationError{}
+
+// Validate checks the field values on SearchWardenSecretsResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SearchWardenSecretsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SearchWardenSecretsResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SearchWardenSecretsResponseMultiError, or nil if none found.
+func (m *SearchWardenSecretsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SearchWardenSecretsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetSecrets() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SearchWardenSecretsResponseValidationError{
+						field:  fmt.Sprintf("Secrets[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SearchWardenSecretsResponseValidationError{
+						field:  fmt.Sprintf("Secrets[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SearchWardenSecretsResponseValidationError{
+					field:  fmt.Sprintf("Secrets[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return SearchWardenSecretsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// SearchWardenSecretsResponseMultiError is an error wrapping multiple
+// validation errors returned by SearchWardenSecretsResponse.ValidateAll() if
+// the designated constraints aren't met.
+type SearchWardenSecretsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SearchWardenSecretsResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SearchWardenSecretsResponseMultiError) AllErrors() []error { return m }
+
+// SearchWardenSecretsResponseValidationError is the validation error returned
+// by SearchWardenSecretsResponse.Validate if the designated constraints
+// aren't met.
+type SearchWardenSecretsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SearchWardenSecretsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SearchWardenSecretsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SearchWardenSecretsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SearchWardenSecretsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SearchWardenSecretsResponseValidationError) ErrorName() string {
+	return "SearchWardenSecretsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SearchWardenSecretsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSearchWardenSecretsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SearchWardenSecretsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SearchWardenSecretsResponseValidationError{}
+
+// Validate checks the field values on GetWardenSecretRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetWardenSecretRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetWardenSecretRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetWardenSecretRequestMultiError, or nil if none found.
+func (m *GetWardenSecretRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetWardenSecretRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Id
+
+	if len(errors) > 0 {
+		return GetWardenSecretRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetWardenSecretRequestMultiError is an error wrapping multiple validation
+// errors returned by GetWardenSecretRequest.ValidateAll() if the designated
+// constraints aren't met.
+type GetWardenSecretRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetWardenSecretRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetWardenSecretRequestMultiError) AllErrors() []error { return m }
+
+// GetWardenSecretRequestValidationError is the validation error returned by
+// GetWardenSecretRequest.Validate if the designated constraints aren't met.
+type GetWardenSecretRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetWardenSecretRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetWardenSecretRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetWardenSecretRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetWardenSecretRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetWardenSecretRequestValidationError) ErrorName() string {
+	return "GetWardenSecretRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetWardenSecretRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetWardenSecretRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetWardenSecretRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetWardenSecretRequestValidationError{}
+
+// Validate checks the field values on GetWardenSecretResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetWardenSecretResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetWardenSecretResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetWardenSecretResponseMultiError, or nil if none found.
+func (m *GetWardenSecretResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetWardenSecretResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.Secret != nil {
+
+		if all {
+			switch v := interface{}(m.GetSecret()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GetWardenSecretResponseValidationError{
+						field:  "Secret",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GetWardenSecretResponseValidationError{
+						field:  "Secret",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSecret()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GetWardenSecretResponseValidationError{
+					field:  "Secret",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return GetWardenSecretResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetWardenSecretResponseMultiError is an error wrapping multiple validation
+// errors returned by GetWardenSecretResponse.ValidateAll() if the designated
+// constraints aren't met.
+type GetWardenSecretResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetWardenSecretResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetWardenSecretResponseMultiError) AllErrors() []error { return m }
+
+// GetWardenSecretResponseValidationError is the validation error returned by
+// GetWardenSecretResponse.Validate if the designated constraints aren't met.
+type GetWardenSecretResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetWardenSecretResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetWardenSecretResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetWardenSecretResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetWardenSecretResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetWardenSecretResponseValidationError) ErrorName() string {
+	return "GetWardenSecretResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetWardenSecretResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetWardenSecretResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetWardenSecretResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetWardenSecretResponseValidationError{}
