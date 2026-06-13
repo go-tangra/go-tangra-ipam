@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httputil"
@@ -172,7 +173,7 @@ func (s *Service) handleConsoleProxy(w http.ResponseWriter, r *http.Request) {
 		ModifyResponse: func(resp *http.Response) error {
 			resp.Header.Del("X-Frame-Options")
 			if isBootstrapResponse(resp) {
-				return injectWSRedirect(resp)
+				return injectBootstrap(resp, auth.xAuthToken)
 			}
 			return nil
 		},
@@ -193,17 +194,31 @@ func isBootstrapResponse(resp *http.Response) bool {
 		bytes.Contains([]byte(resp.Request.URL.RawQuery), []byte("man_ikvm_html5_bootstrap"))
 }
 
-// injectWSRedirect rewrites the H5Viewer's WebSocket so it connects back through
-// our proxy's __kvmws endpoint, computed *relative to the current page* so it is
-// agnostic to the gateway's public path prefix (/modules/ipam/...).
-func injectWSRedirect(resp *http.Response) error {
+// injectBootstrap rewrites the H5Viewer bootstrap so it works behind our proxy:
+//   - the WebSocket is redirected to our __kvmws endpoint, computed relative to
+//     the current page so it is agnostic to the gateway's path prefix; and
+//   - when the BMC uses a Redfish-based viewer, the X-Auth-Token is seeded into
+//     sessionStorage['_x_auth'] before the viewer's scripts run. We log in
+//     server-side, so the browser never stored the token; without it the viewer's
+//     own client-side Redfish calls go out unauthenticated and it pops "session
+//     timed out". Seeding the token lets the client-side viewer authenticate too.
+//
+// The injected snippet is spliced right after <head> so it executes before
+// redfish.js and the page's init code read the token.
+func injectBootstrap(resp *http.Response, xAuthToken string) error {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 	_ = resp.Body.Close()
 
-	const script = `<head><script>(function(){var O=window.WebSocket;` +
+	var seed string
+	if xAuthToken != "" {
+		tok, _ := json.Marshal(xAuthToken) // safe JS string literal
+		seed = `try{sessionStorage.setItem('_x_auth',` + string(tok) + `);}catch(e){}`
+	}
+
+	script := `<head><script>` + seed + `(function(){var O=window.WebSocket;` +
 		`var dir=location.pathname.replace(/[^/]*$/,'');` + // .../bmc/{id}/cgi/
 		`var wsPath=new URL('../__kvmws',location.origin+dir).pathname;` + // .../bmc/{id}/__kvmws
 		`var P=(location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+wsPath;` +

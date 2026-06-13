@@ -116,25 +116,51 @@ func (m *sessionManager) Invalidate(t bmcTarget) {
 	m.mu.Unlock()
 }
 
-// login authenticates to the BMC web UI, supporting both firmware generations:
-// the legacy form login (POST /cgi/login.cgi -> SID cookie) and the newer
-// Redfish session login (POST /redfish/v1/SessionService/Sessions -> X-Auth-Token
-// + SSO cookie). It tries legacy first, then falls back to Redfish.
+// login authenticates to the BMC web UI, supporting both firmware generations
+// at once. Modern Supermicro firmware drives its HTML5 viewer entirely through
+// Redfish and rejects API calls (and the viewer's session check) without an
+// X-Auth-Token; older firmware authenticates asset/CGI requests with the SID
+// cookie from the form login. We attempt BOTH and merge whatever each yields, so
+// the proxied requests carry every credential the BMC might require — earlier we
+// stopped at the legacy SID, leaving Redfish-based viewers unauthenticated
+// (their API calls redirected to login -> "session timed out").
 func (m *sessionManager) login(ctx context.Context, t bmcTarget) (bmcAuth, error) {
 	if t.Username == "" || t.Password == "" {
 		return bmcAuth{}, errors.New("kvm: missing BMC credentials")
 	}
 
-	auth, legacyErr := m.loginLegacy(ctx, t)
-	if legacyErr == nil {
-		return auth, nil
+	var auth bmcAuth
+	var errs []string
+
+	if a, err := m.loginRedfish(ctx, t); err == nil {
+		auth.xAuthToken = a.xAuthToken
+		auth.cookie = a.cookie
+	} else {
+		errs = append(errs, "redfish="+err.Error())
 	}
 
-	auth, redfishErr := m.loginRedfish(ctx, t)
-	if redfishErr == nil {
-		return auth, nil
+	if a, err := m.loginLegacy(ctx, t); err == nil {
+		auth.cookie = mergeCookies(auth.cookie, a.cookie)
+	} else {
+		errs = append(errs, "legacy="+err.Error())
 	}
-	return bmcAuth{}, fmt.Errorf("kvm: login %s failed: legacy=%v; redfish=%v", t.Host, legacyErr, redfishErr)
+
+	if auth.empty() {
+		return bmcAuth{}, fmt.Errorf("kvm: login %s failed: %s", t.Host, strings.Join(errs, "; "))
+	}
+	return auth, nil
+}
+
+// mergeCookies joins two Cookie header values, dropping empties.
+func mergeCookies(a, b string) string {
+	switch {
+	case a == "":
+		return b
+	case b == "":
+		return a
+	default:
+		return a + "; " + b
+	}
 }
 
 // loginLegacy is the older Supermicro form login -> SID cookie.
