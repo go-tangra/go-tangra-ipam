@@ -314,6 +314,34 @@ func (r *IpScanJobRepo) CleanupOld(ctx context.Context, days int) (int, error) {
 	return affected, nil
 }
 
+// ReapStaleScanning marks SCANNING jobs whose last update predates cutoff as
+// FAILED. A SCANNING job is only ever advanced by a live worker (which bumps
+// update_time as it progresses), so a SCANNING row that has gone quiet past the
+// cutoff is orphaned — typically left behind when the service was restarted
+// mid-scan, or by a worker that hung. Without this, HasActiveScan keeps seeing
+// it and rejects every new scan of that subnet with "scan already in progress".
+// Pass a cutoff of time.Now() at startup (no live workers yet, so every
+// SCANNING job is orphaned); pass now-minus-threshold for the periodic sweep.
+func (r *IpScanJobRepo) ReapStaleScanning(ctx context.Context, cutoff time.Time) (int, error) {
+	now := time.Now()
+	affected, err := r.entClient.Client().IpScanJob.Update().
+		Where(
+			ipscanjob.StatusEQ(ipscanjob.StatusSCANNING),
+			ipscanjob.UpdateTimeLT(cutoff),
+		).
+		SetStatus(ipscanjob.StatusFAILED).
+		SetStatusMessage("Reaped: scan interrupted (service restart or stalled worker)").
+		SetCompletedAt(now).
+		SetUpdateTime(now).
+		Save(ctx)
+
+	if err != nil {
+		r.log.Errorf("reap stale scanning jobs failed: %s", err.Error())
+		return 0, ipamV1.ErrorInternalServerError("reap stale scanning jobs failed")
+	}
+	return affected, nil
+}
+
 // GetLatestBySubnet gets the most recent scan job for a subnet
 func (r *IpScanJobRepo) GetLatestBySubnet(ctx context.Context, tenantID uint32, subnetID string) (*ent.IpScanJob, error) {
 	entity, err := r.entClient.Client().IpScanJob.Query().

@@ -26,6 +26,14 @@ const (
 	defaultBackoffMultiplier = 2.0
 	defaultCleanupDays       = 30
 	defaultPollInterval      = 5 * time.Second
+
+	// staleScanTimeout is how long a SCANNING job may go without a progress
+	// update before the reaper treats it as stalled and fails it. Scans of a
+	// valid (size-capped) subnet finish well within this, and a healthy scan
+	// bumps update_time as it progresses, so only genuinely hung jobs are hit.
+	staleScanTimeout = 30 * time.Minute
+	// reaperInterval is how often the periodic stale-scan sweep runs.
+	reaperInterval = 5 * time.Minute
 )
 
 // ScanExecutorConfig holds configuration for the scan executor
@@ -107,6 +115,17 @@ func (e *ScanExecutor) Start() error {
 
 	e.log.Infof("Starting scan executor with %d workers", workerCount)
 
+	// Reap scans orphaned by a previous run. No worker is live yet, so any job
+	// still marked SCANNING was interrupted (typically a service restart
+	// mid-scan) and would otherwise block every new scan of its subnet via the
+	// HasActiveScan check ("scan already in progress"). Done synchronously
+	// before workers start so there is no race with a worker claiming a job.
+	if n, err := e.scanJobRepo.ReapStaleScanning(e.ctx, time.Now()); err != nil {
+		e.log.Errorf("startup reap of orphaned scans failed: %v", err)
+	} else if n > 0 {
+		e.log.Infof("Reaped %d orphaned scan job(s) left SCANNING by a previous run", n)
+	}
+
 	// Start worker goroutines
 	for i := int32(0); i < workerCount; i++ {
 		e.wg.Add(1)
@@ -116,6 +135,10 @@ func (e *ScanExecutor) Start() error {
 	// Start cleanup goroutine
 	e.wg.Add(1)
 	go e.cleanupWorker()
+
+	// Start the stale-scan reaper (handles hung workers while running)
+	e.wg.Add(1)
+	go e.reaperWorker()
 
 	// One-time backfill: promote agent-reported metadata interfaces to rows so
 	// previously-collected server data participates in link discovery.
@@ -577,6 +600,32 @@ func (e *ScanExecutor) cleanupWorker() {
 			return
 		case <-ticker.C:
 			e.runCleanup()
+		}
+	}
+}
+
+// reaperWorker periodically fails SCANNING jobs that have stopped making
+// progress (a hung or wedged worker). It complements the one-shot startup reap,
+// which handles jobs orphaned by a restart; together they ensure a stuck job
+// never blocks new scans of its subnet indefinitely.
+func (e *ScanExecutor) reaperWorker() {
+	defer e.wg.Done()
+
+	ticker := time.NewTicker(reaperInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-e.ctx.Done():
+			return
+		case <-ticker.C:
+			cutoff := time.Now().Add(-staleScanTimeout)
+			n, err := e.scanJobRepo.ReapStaleScanning(e.ctx, cutoff)
+			if err != nil {
+				e.log.Errorf("periodic reap of stale scans failed: %v", err)
+			} else if n > 0 {
+				e.log.Warnf("Reaped %d stalled scan job(s) with no progress for over %s", n, staleScanTimeout)
+			}
 		}
 	}
 }
