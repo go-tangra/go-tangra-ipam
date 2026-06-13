@@ -136,7 +136,18 @@ func (m *sessionManager) login(ctx context.Context, t bmcTarget) (string, error)
 		}
 	}
 	if sid == "" {
-		return "", fmt.Errorf("kvm: login %s failed (bad credentials?)", t.Host)
+		// Diagnostic (no secret values): which cookies/status the BMC returned,
+		// so we can spot firmware that names the session cookie differently.
+		var names []string
+		for _, c := range resp.Cookies() {
+			n := c.Name
+			if c.Value == "" {
+				n += "(empty)"
+			}
+			names = append(names, n)
+		}
+		return "", fmt.Errorf("kvm: login %s: no SID (status=%d, cookies=%v, bodyLen=%d)",
+			t.Host, resp.StatusCode, names, resp.ContentLength)
 	}
 	return sid, nil
 }
