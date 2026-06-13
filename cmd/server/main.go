@@ -61,6 +61,9 @@ func newApp(
 		MaxRetries:        60,
 	})
 
+	// Advertise schedulable task types (e.g. ipam:scan-network) to the scheduler.
+	service.RegisterTasksWithScheduler(ctx.GetLogger())
+
 	return bootstrap.NewApp(ctx, gs, hs)
 }
 

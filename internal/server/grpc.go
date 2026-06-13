@@ -18,6 +18,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/service"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 
+	commonV1 "github.com/go-tangra/go-tangra-common/gen/go/common/service/v1"
 	appViewer "github.com/go-tangra/go-tangra-common/viewer"
 	"github.com/go-tangra/go-tangra-common/middleware/audit"
 	"github.com/go-tangra/go-tangra-common/middleware/mtls"
@@ -64,6 +65,7 @@ func NewGRPCServer(
 	hostGroupSvc *service.HostGroupService,
 	backupSvc *service.BackupService,
 	devicePackageSvc *service.DevicePackageService,
+	taskExecutor *service.TaskExecutor,
 ) *grpc.Server {
 	cfg := ctx.GetConfig()
 	logger := ctx.GetLogger()
@@ -148,6 +150,10 @@ func NewGRPCServer(
 	ipamV1.RegisterRedactedHostGroupServiceServer(srv, hostGroupSvc, nil)
 	ipamV1.RegisterRedactedBackupServiceServer(srv, backupSvc, nil)
 	ipamV1.RegisterRedactedDevicePackageServiceServer(srv, devicePackageSvc, nil)
+
+	// TaskExecutorService lets the scheduler trigger IPAM tasks (e.g. network
+	// scans) on a cron or one-off basis.
+	commonV1.RegisterTaskExecutorServiceServer(srv, taskExecutor)
 
 	return srv
 }

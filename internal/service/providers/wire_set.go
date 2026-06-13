@@ -29,4 +29,5 @@ var ProviderSet = wire.NewSet(
 	service.NewHostGroupService,
 	service.NewBackupService,
 	service.NewDevicePackageService,
+	service.NewTaskExecutor,
 )
