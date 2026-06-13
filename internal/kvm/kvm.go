@@ -25,9 +25,10 @@ type Service struct {
 // NewService constructs the KVM service. Single instance shared between the
 // gRPC RPC (mint) and the HTTP server (proxy).
 func NewService(ctx *bootstrap.Context) *Service {
+	logger := ctx.NewLoggerHelper("ipam/kvm")
 	s := &Service{
-		log:      ctx.NewLoggerHelper("ipam/kvm"),
-		sessions: newSessionManager(),
+		log:      logger,
+		sessions: newSessionManager(logger),
 		tokens:   newTokenStore(),
 		mux:      http.NewServeMux(),
 	}

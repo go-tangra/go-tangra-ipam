@@ -22,13 +22,16 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-kratos/kratos/v2/log"
 )
 
 // sessionTTL is how long a cached BMC SID is trusted before re-login.
 const sessionTTL = 15 * time.Minute
 
-// loginTimeout bounds a single BMC login round-trip.
-const loginTimeout = 10 * time.Second
+// loginTimeout bounds a single BMC login round-trip. Generous because older BMC
+// web servers are slow to create a Redfish session.
+const loginTimeout = 20 * time.Second
 
 // bmcTarget identifies a BMC web endpoint and the credentials to log in with.
 type bmcTarget struct {
@@ -59,6 +62,7 @@ type bmcSession struct {
 type sessionManager struct {
 	client *http.Client
 	now    func() time.Time
+	log    *log.Helper
 
 	mu       sync.Mutex
 	sessions map[string]bmcSession
@@ -67,7 +71,7 @@ type sessionManager struct {
 // newSessionManager constructs a manager with a TLS-skip-verify client (BMC
 // certs are self-signed) that does not follow redirects (so Set-Cookie is
 // observable on the login response).
-func newSessionManager() *sessionManager {
+func newSessionManager(logger *log.Helper) *sessionManager {
 	return &sessionManager{
 		client: &http.Client{
 			Timeout: loginTimeout,
@@ -80,6 +84,7 @@ func newSessionManager() *sessionManager {
 			},
 		},
 		now:      time.Now,
+		log:      logger,
 		sessions: make(map[string]bmcSession),
 	}
 }
@@ -143,6 +148,11 @@ func (m *sessionManager) login(ctx context.Context, t bmcTarget) (bmcAuth, error
 		auth.cookie = mergeCookies(auth.cookie, a.cookie)
 	} else {
 		errs = append(errs, "legacy="+err.Error())
+	}
+
+	if m.log != nil {
+		m.log.Infof("BMC login %s: xAuthToken=%t cookie=%t (%s)",
+			t.Host, auth.xAuthToken != "", auth.cookie != "", strings.Join(errs, "; "))
 	}
 
 	if auth.empty() {
