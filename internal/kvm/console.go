@@ -56,7 +56,7 @@ func (s *Service) handleConsoleProxy(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
-	sid, err := s.sessions.SID(ctx, kt.target)
+	auth, err := s.sessions.Auth(ctx, kt.target)
 	if err != nil {
 		s.log.Warnf("console login %s: %v", kt.target.Host, err)
 		http.Error(w, "could not log in to BMC", http.StatusBadGateway)
@@ -82,7 +82,12 @@ func (s *Service) handleConsoleProxy(w http.ResponseWriter, r *http.Request) {
 			req.URL.Host = host
 			req.URL.Path = upstreamPath
 			req.Host = host
-			req.Header.Set("Cookie", "SID="+sid)
+			if auth.cookie != "" {
+				req.Header.Set("Cookie", auth.cookie)
+			}
+			if auth.xAuthToken != "" {
+				req.Header.Set("X-Auth-Token", auth.xAuthToken)
+			}
 			req.Header.Set("Accept-Encoding", "identity") // uncompressed so we can splice
 			req.Header.Del("Referer")
 		},
@@ -153,7 +158,7 @@ func (s *Service) handleConsoleWS(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 14*time.Second)
 	defer cancel()
-	sid, err := s.sessions.SID(ctx, kt.target)
+	auth, err := s.sessions.Auth(ctx, kt.target)
 	if err != nil {
 		s.log.Warnf("console ws login %s: %v", kt.target.Host, err)
 		http.Error(w, "could not log in to BMC", http.StatusBadGateway)
@@ -161,9 +166,12 @@ func (s *Service) handleConsoleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	upstreamURL := "wss://" + kt.target.Host + ":" + bmcWebPort + "/"
-	hdr := http.Header{
-		"Cookie": {"SID=" + sid},
-		"Origin": {"https://" + kt.target.Host},
+	hdr := http.Header{"Origin": {"https://" + kt.target.Host}}
+	if auth.cookie != "" {
+		hdr.Set("Cookie", auth.cookie)
+	}
+	if auth.xAuthToken != "" {
+		hdr.Set("X-Auth-Token", auth.xAuthToken)
 	}
 	upstream, resp, err := bootstrapWSDialer.DialContext(ctx, upstreamURL, hdr)
 	if err != nil {

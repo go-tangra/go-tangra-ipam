@@ -10,8 +10,10 @@
 package kvm
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -37,8 +39,18 @@ type bmcTarget struct {
 
 func (t bmcTarget) key() string { return t.Host + "\x00" + t.Username }
 
+// bmcAuth carries the credentials to attach to proxied requests: a Cookie
+// header value (legacy SID, or the newer firmware's SSO) and, for Redfish-based
+// firmware, the X-Auth-Token header.
+type bmcAuth struct {
+	cookie     string // e.g. "SID=xxx" or "SSO=yyy"
+	xAuthToken string // Redfish X-Auth-Token (newer Supermicro firmware)
+}
+
+func (a bmcAuth) empty() bool { return a.cookie == "" && a.xAuthToken == "" }
+
 type bmcSession struct {
-	sid     string
+	auth    bmcAuth
 	expires time.Time
 }
 
@@ -72,82 +84,122 @@ func newSessionManager() *sessionManager {
 	}
 }
 
-// SID returns a valid session id for the target, logging in if there is no
+// Auth returns valid session auth for the target, logging in if there is no
 // cached session or it has expired.
-func (m *sessionManager) SID(ctx context.Context, t bmcTarget) (string, error) {
+func (m *sessionManager) Auth(ctx context.Context, t bmcTarget) (bmcAuth, error) {
 	key := t.key()
 
 	m.mu.Lock()
 	if s, ok := m.sessions[key]; ok && m.now().Before(s.expires) {
-		sid := s.sid
+		auth := s.auth
 		m.mu.Unlock()
-		return sid, nil
+		return auth, nil
 	}
 	m.mu.Unlock()
 
-	sid, err := m.login(ctx, t)
+	auth, err := m.login(ctx, t)
 	if err != nil {
-		return "", err
+		return bmcAuth{}, err
 	}
 
 	m.mu.Lock()
-	m.sessions[key] = bmcSession{sid: sid, expires: m.now().Add(sessionTTL)}
+	m.sessions[key] = bmcSession{auth: auth, expires: m.now().Add(sessionTTL)}
 	m.mu.Unlock()
-	return sid, nil
+	return auth, nil
 }
 
 // Invalidate drops any cached session for the target, forcing re-login on the
-// next SID call. Used when the proxy detects an expired session.
+// next Auth call. Used when the proxy detects an expired session.
 func (m *sessionManager) Invalidate(t bmcTarget) {
 	m.mu.Lock()
 	delete(m.sessions, t.key())
 	m.mu.Unlock()
 }
 
-// login performs the POST /cgi/login.cgi form login and extracts the SID cookie.
-func (m *sessionManager) login(ctx context.Context, t bmcTarget) (string, error) {
+// login authenticates to the BMC web UI, supporting both firmware generations:
+// the legacy form login (POST /cgi/login.cgi -> SID cookie) and the newer
+// Redfish session login (POST /redfish/v1/SessionService/Sessions -> X-Auth-Token
+// + SSO cookie). It tries legacy first, then falls back to Redfish.
+func (m *sessionManager) login(ctx context.Context, t bmcTarget) (bmcAuth, error) {
 	if t.Username == "" || t.Password == "" {
-		return "", errors.New("kvm: missing BMC credentials")
+		return bmcAuth{}, errors.New("kvm: missing BMC credentials")
 	}
-	form := url.Values{"name": {t.Username}, "pwd": {t.Password}}
-	endpoint := "https://" + t.Host + "/cgi/login.cgi"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+	auth, legacyErr := m.loginLegacy(ctx, t)
+	if legacyErr == nil {
+		return auth, nil
+	}
+
+	auth, redfishErr := m.loginRedfish(ctx, t)
+	if redfishErr == nil {
+		return auth, nil
+	}
+	return bmcAuth{}, fmt.Errorf("kvm: login %s failed: legacy=%v; redfish=%v", t.Host, legacyErr, redfishErr)
+}
+
+// loginLegacy is the older Supermicro form login -> SID cookie.
+func (m *sessionManager) loginLegacy(ctx context.Context, t bmcTarget) (bmcAuth, error) {
+	form := url.Values{"name": {t.Username}, "pwd": {t.Password}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"https://"+t.Host+"/cgi/login.cgi", strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", fmt.Errorf("kvm: build login request: %w", err)
+		return bmcAuth{}, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := m.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("kvm: login %s: %w", t.Host, err)
+		return bmcAuth{}, err
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer drain(resp)
 
-	// On success the BMC sets a non-empty SID cookie (it also clears any prior
-	// SID with an expired empty one, so take the last non-empty value).
-	sid := ""
 	for _, c := range resp.Cookies() {
 		if c.Name == "SID" && c.Value != "" {
-			sid = c.Value
+			return bmcAuth{cookie: "SID=" + c.Value}, nil
 		}
 	}
-	if sid == "" {
-		// Diagnostic (no secret values): which cookies/status the BMC returned,
-		// so we can spot firmware that names the session cookie differently.
-		var names []string
-		for _, c := range resp.Cookies() {
-			n := c.Name
-			if c.Value == "" {
-				n += "(empty)"
-			}
-			names = append(names, n)
-		}
-		return "", fmt.Errorf("kvm: login %s: no SID (status=%d, cookies=%v, bodyLen=%d)",
-			t.Host, resp.StatusCode, names, resp.ContentLength)
+	return bmcAuth{}, fmt.Errorf("no SID cookie (status %d)", resp.StatusCode)
+}
+
+// loginRedfish is the newer Supermicro Redfish session login -> X-Auth-Token
+// header plus a session cookie (SSO).
+func (m *sessionManager) loginRedfish(ctx context.Context, t bmcTarget) (bmcAuth, error) {
+	body, _ := json.Marshal(map[string]string{"UserName": t.Username, "Password": t.Password})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"https://"+t.Host+"/redfish/v1/SessionService/Sessions", bytes.NewReader(body))
+	if err != nil {
+		return bmcAuth{}, err
 	}
-	return sid, nil
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := m.client.Do(req)
+	if err != nil {
+		return bmcAuth{}, err
+	}
+	defer drain(resp)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return bmcAuth{}, fmt.Errorf("redfish session status %d", resp.StatusCode)
+	}
+
+	var auth bmcAuth
+	auth.xAuthToken = resp.Header.Get("X-Auth-Token")
+	// The session cookie the H5Viewer/KVM WebSocket authenticates with.
+	var cookies []string
+	for _, c := range resp.Cookies() {
+		if c.Value != "" {
+			cookies = append(cookies, c.Name+"="+c.Value)
+		}
+	}
+	auth.cookie = strings.Join(cookies, "; ")
+
+	if auth.empty() {
+		return bmcAuth{}, fmt.Errorf("redfish login returned no token/cookie (status %d)", resp.StatusCode)
+	}
+	return auth, nil
+}
+
+func drain(resp *http.Response) {
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
 }
