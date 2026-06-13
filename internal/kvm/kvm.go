@@ -32,6 +32,12 @@ func NewService(ctx *bootstrap.Context) *Service {
 		mux:      http.NewServeMux(),
 	}
 	s.mux.HandleFunc("/bmc/{id}/__kvmws", s.handleConsoleWS)
+	// IPMI LAN (UDP 623) management endpoints — distinct __ipmi/ prefix so they
+	// are not proxied to the BMC web UI by the catch-all below.
+	s.mux.HandleFunc("/bmc/{id}/__ipmi/info", s.handleIpmiInfo)
+	s.mux.HandleFunc("/bmc/{id}/__ipmi/power", s.handleIpmiPower)
+	s.mux.HandleFunc("/bmc/{id}/__ipmi/sensors", s.handleIpmiSensors)
+	s.mux.HandleFunc("/bmc/{id}/__ipmi/sel", s.handleIpmiSel)
 	s.mux.HandleFunc("/bmc/{id}/{path...}", s.handleConsoleProxy)
 	return s
 }
