@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -28,14 +29,23 @@ const ipmiInterfaceName = "ipmi"
 type deviceMetadataEnvelope struct {
 	Interfaces []metadataInterface `json:"interfaces"`
 	IPMI       struct {
-		MAC string `json:"mac"`
+		MAC  string   `json:"mac"`
+		MACs []string `json:"macs"`
 	} `json:"ipmi"`
 }
 
 // parseMetadataInterfaces extracts the interface list from a device metadata
-// JSON blob, including a synthetic "ipmi" entry for the BMC MAC when present.
-// Malformed JSON yields no interfaces rather than an error — the metadata is
-// free-form and best-effort.
+// JSON blob, including a synthetic entry per BMC LAN MAC when present. Malformed
+// JSON yields no interfaces rather than an error — the metadata is free-form and
+// best-effort.
+//
+// A BMC may expose more than one LAN channel (e.g. a shared/LOM port and a
+// dedicated port) with different MACs; the agent reports them all in ipmi.macs.
+// Only the MAC of the cabled interface is in the switch's forwarding table, so
+// we materialize one interface per MAC and let link correlation resolve
+// whichever the switch actually learned. The active interface keeps the
+// canonical "ipmi" name; the rest get "ipmi-2", "ipmi-3", … (stable across syncs
+// because the agent reports channels in a fixed order).
 func parseMetadataInterfaces(metadataJSON string) []metadataInterface {
 	metadataJSON = strings.TrimSpace(metadataJSON)
 	if metadataJSON == "" {
@@ -46,8 +56,28 @@ func parseMetadataInterfaces(metadataJSON string) []metadataInterface {
 		return nil
 	}
 	ifaces := env.Interfaces
-	if strings.TrimSpace(env.IPMI.MAC) != "" {
-		ifaces = append(ifaces, metadataInterface{Name: ipmiInterfaceName, MACAddress: env.IPMI.MAC})
+
+	// Candidate BMC MACs in stable order: the active (primary) MAC first, then
+	// every reported LAN-channel MAC. The first distinct MAC becomes "ipmi"; any
+	// further ones become "ipmi-2", "ipmi-3", …
+	macs := make([]string, 0, 1+len(env.IPMI.MACs))
+	macs = append(macs, strings.TrimSpace(env.IPMI.MAC))
+	macs = append(macs, env.IPMI.MACs...)
+
+	seen := make(map[string]bool)
+	idx := 0
+	for _, m := range macs {
+		m = strings.TrimSpace(m)
+		if m == "" || seen[strings.ToLower(m)] {
+			continue
+		}
+		seen[strings.ToLower(m)] = true
+		idx++
+		name := ipmiInterfaceName
+		if idx > 1 {
+			name = fmt.Sprintf("%s-%d", ipmiInterfaceName, idx)
+		}
+		ifaces = append(ifaces, metadataInterface{Name: name, MACAddress: m})
 	}
 	return ifaces
 }

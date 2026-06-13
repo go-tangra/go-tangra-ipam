@@ -38,6 +38,25 @@ func TestParseMetadataInterfacesIncludesIPMI(t *testing.T) {
 	}
 }
 
+func TestParseMetadataInterfacesMultipleIPMIMACs(t *testing.T) {
+	// BMC with a shared (active, IP-configured) channel and a dedicated channel,
+	// each with its own MAC. The primary becomes "ipmi"; the extra becomes
+	// "ipmi-2"; duplicates of the primary are not repeated.
+	const md = `{"interfaces":[],"ipmi":{"ip":"10.1.112.237","mac":"3c:ec:ef:ef:09:3d",` +
+		`"macs":["3c:ec:ef:ef:09:3d","3c:ec:ef:ef:09:3e"]}}`
+
+	got := parseMetadataInterfaces(md)
+	if len(got) != 2 {
+		t.Fatalf("expected ipmi + ipmi-2, got %d: %+v", len(got), got)
+	}
+	if got[0].Name != "ipmi" || got[0].MACAddress != "3c:ec:ef:ef:09:3d" {
+		t.Fatalf("unexpected primary ipmi interface: %+v", got[0])
+	}
+	if got[1].Name != "ipmi-2" || got[1].MACAddress != "3c:ec:ef:ef:09:3e" {
+		t.Fatalf("unexpected dedicated ipmi-2 interface: %+v", got[1])
+	}
+}
+
 func TestParseMetadataInterfacesEmptyOrInvalid(t *testing.T) {
 	for _, in := range []string{"", "   ", "not json", `{"interfaces":null}`, `{}`} {
 		if got := parseMetadataInterfaces(in); len(got) != 0 {
