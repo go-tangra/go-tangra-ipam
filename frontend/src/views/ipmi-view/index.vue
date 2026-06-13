@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { Spin, Result, Button } from 'ant-design-vue';
@@ -14,6 +14,47 @@ const loading = ref(true);
 const error = ref('');
 const consoleUrl = ref('');
 const bmcHost = ref('');
+const frameEl = ref<HTMLIFrameElement | null>(null);
+let focusTimer: ReturnType<typeof setInterval> | undefined;
+
+// The BMC's HTML5 viewer captures the keyboard via document-level handlers that
+// only fire when the iframe is the focused frame, and its noVNC canvas has no
+// tabindex (so a click can't focus it). Make the canvas focusable and focus it
+// once it appears, so the physical keyboard works without the virtual-keyboard
+// workaround. Same-origin (served through our proxy), so this is allowed.
+function focusConsole(): void {
+  const iframe = frameEl.value;
+  if (!iframe) return;
+  try {
+    iframe.contentWindow?.focus();
+    const canvas = iframe.contentDocument?.getElementById('noVNC_canvas');
+    if (canvas) {
+      if (!canvas.getAttribute('tabindex')) canvas.setAttribute('tabindex', '0');
+      (canvas as HTMLElement).focus();
+    }
+  } catch {
+    // viewer not ready yet / cross-origin — ignore.
+  }
+}
+
+// The canvas appears a couple seconds after the iframe loads (after the RFB
+// handshake), so poll briefly until it exists, then focus it.
+function onFrameLoad(): void {
+  if (focusTimer) clearInterval(focusTimer);
+  let tries = 0;
+  focusTimer = setInterval(() => {
+    tries += 1;
+    const canvas = frameEl.value?.contentDocument?.getElementById('noVNC_canvas');
+    if (canvas) {
+      focusConsole();
+      clearInterval(focusTimer);
+      focusTimer = undefined;
+    } else if (tries > 40) {
+      clearInterval(focusTimer);
+      focusTimer = undefined;
+    }
+  }, 500);
+}
 
 async function start(): Promise<void> {
   loading.value = true;
@@ -34,6 +75,9 @@ async function start(): Promise<void> {
 }
 
 onMounted(start);
+onBeforeUnmount(() => {
+  if (focusTimer) clearInterval(focusTimer);
+});
 </script>
 
 <template>
@@ -65,10 +109,13 @@ onMounted(start);
 
       <iframe
         v-else-if="consoleUrl"
+        ref="frameEl"
         :src="consoleUrl"
         class="ipmi-view__frame"
         allow="fullscreen"
         title="IPMI KVM Console"
+        @load="onFrameLoad"
+        @mouseenter="focusConsole"
       />
     </div>
   </div>
