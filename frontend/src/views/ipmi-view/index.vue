@@ -498,26 +498,31 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* Vben Admin exposes its palette as HSL triplets on :root; wrapping them in
+   hsl(...) lets the page track both light and dark themes without hardcoded
+   colors bleeding through. */
 .ipmi-view {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #fff;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 .ipmi-view__bar {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 6px 12px;
-  background: #141414;
-  color: #e6e6e6;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--border));
   font-size: 13px;
 }
 .ipmi-view__title {
   font-weight: 600;
 }
 .ipmi-view__host {
-  color: #8c8c8c;
+  color: hsl(var(--muted-foreground));
   font-family: monospace;
 }
 .ipmi-view__spacer {
@@ -549,7 +554,7 @@ onBeforeUnmount(() => {
 }
 .ipmi-view__frame-wrap {
   height: 100%;
-  background: #1e1e1e;
+  background: #1e1e1e; /* neutral backdrop behind the BMC console during load */
 }
 .ipmi-view__frame {
   width: 100%;
@@ -567,11 +572,11 @@ onBeforeUnmount(() => {
   margin-bottom: 12px;
 }
 .ipmi-view__count {
-  color: #8c8c8c;
+  color: hsl(var(--muted-foreground));
   font-size: 13px;
 }
 .ipmi-view__muted {
-  color: #bfbfbf;
+  color: hsl(var(--muted-foreground));
 }
 .ipmi-view__power-state {
   display: flex;
