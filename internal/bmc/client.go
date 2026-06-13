@@ -61,6 +61,3 @@ func (c *Client) Close(ctx context.Context) error {
 	}
 	return c.ipmi.Close(ctx)
 }
-
-// raw exposes the underlying go-ipmi client for advanced flows (e.g. SOL).
-func (c *Client) raw() *goipmi.Client { return c.ipmi }
