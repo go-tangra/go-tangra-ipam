@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -19,11 +20,88 @@ import (
 const bmcWebPort = "443"
 
 // insecureTransport reaches BMC web UIs (self-signed certs). Shared, concurrent-safe.
+// Keep-alives are disabled because old BMC web servers mishandle connection reuse
+// (a reused, server-closed connection surfaces as a spurious 502).
 var insecureTransport = &http.Transport{
 	//nolint:gosec // BMC web UIs use self-signed certificates.
-	TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-	ForceAttemptHTTP2:   false,
-	MaxIdleConnsPerHost: 4,
+	TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+	ForceAttemptHTTP2: false,
+	DisableKeepAlives: true,
+}
+
+// bmcConsoleTransport wraps insecureTransport with per-host concurrency limiting
+// and retries. Older Supermicro BMCs (e.g. firmware 1.x) service only ~1 HTTP
+// request at a time, but the HTML5 viewer loads ~15 noVNC scripts in parallel;
+// without throttling the BMC drops all but one and the viewer never initializes
+// (the failed .js loads return our proxy's 502 body, which the browser then
+// refuses to execute). Bounding concurrency and retrying transient upstream
+// failures lets every asset load on flaky BMCs while staying fast on healthy ones.
+var bmcConsoleTransport = newBMCConsoleTransport(insecureTransport)
+
+const (
+	// bmcMaxConcurrentPerHost caps simultaneous requests to one BMC web server.
+	bmcMaxConcurrentPerHost = 2
+	// bmcMaxAttempts is the total tries for an idempotent request before failing.
+	bmcMaxAttempts = 4
+)
+
+type bmcConsoleRoundTripper struct {
+	base http.RoundTripper
+	mu   sync.Mutex
+	sems map[string]chan struct{}
+}
+
+func newBMCConsoleTransport(base http.RoundTripper) *bmcConsoleRoundTripper {
+	return &bmcConsoleRoundTripper{base: base, sems: make(map[string]chan struct{})}
+}
+
+func (t *bmcConsoleRoundTripper) hostSem(host string) chan struct{} {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	s := t.sems[host]
+	if s == nil {
+		s = make(chan struct{}, bmcMaxConcurrentPerHost)
+		t.sems[host] = s
+	}
+	return s
+}
+
+func (t *bmcConsoleRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	sem := t.hostSem(req.URL.Host)
+	select {
+	case sem <- struct{}{}:
+	case <-req.Context().Done():
+		return nil, req.Context().Err()
+	}
+	defer func() { <-sem }()
+
+	// Only GET/HEAD (the viewer's asset and CGI loads) are safe to retry.
+	idempotent := req.Method == http.MethodGet || req.Method == http.MethodHead
+
+	var resp *http.Response
+	var err error
+	for attempt := 1; attempt <= bmcMaxAttempts; attempt++ {
+		resp, err = t.base.RoundTrip(req)
+		if (err == nil && resp.StatusCode < 500) || !idempotent {
+			return resp, err
+		}
+		if resp != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+			resp = nil
+		}
+		if req.Context().Err() != nil {
+			return nil, req.Context().Err()
+		}
+		if attempt < bmcMaxAttempts {
+			select {
+			case <-time.After(time.Duration(attempt) * 120 * time.Millisecond):
+			case <-req.Context().Done():
+				return nil, req.Context().Err()
+			}
+		}
+	}
+	return resp, err
 }
 
 // headInjectRe finds the opening <head> tag to splice the WebSocket-redirect script.
@@ -76,7 +154,7 @@ func (s *Service) handleConsoleProxy(w http.ResponseWriter, r *http.Request) {
 	host := kt.target.Host
 
 	proxy := &httputil.ReverseProxy{
-		Transport: insecureTransport,
+		Transport: bmcConsoleTransport,
 		Director: func(req *http.Request) {
 			req.URL.Scheme = "https"
 			req.URL.Host = host
