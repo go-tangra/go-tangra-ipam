@@ -182,7 +182,15 @@ func (s *Service) handleConsoleProxy(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "BMC console unreachable", http.StatusBadGateway)
 		},
 	}
-	proxy.ServeHTTP(w, r)
+
+	// Detach from the module HTTP server's short per-request timeout (the /bmc/
+	// HandlePrefix still inherits the router-level deadline). Slow/old BMC web
+	// servers can take several seconds to serve a CGI page or asset; bound the
+	// proxied request with our own generous deadline instead so it isn't killed
+	// mid-load with "context deadline exceeded".
+	pctx, pcancel := context.WithTimeout(context.WithoutCancel(r.Context()), 30*time.Second)
+	defer pcancel()
+	proxy.ServeHTTP(w, r.WithContext(pctx))
 }
 
 // isBootstrapResponse reports whether this is the H5Viewer bootstrap HTML.
