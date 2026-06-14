@@ -585,11 +585,22 @@ function shortPortName(port: string): string {
 
 function connectedToLabel(row: DeviceInterface): string {
   if (!row.remotePortName && !row.remoteInterfaceId) return '';
-  const switchName = row.remoteDeviceId
+  const remoteName = row.remoteDeviceId
     ? remoteDeviceNames.value[row.remoteDeviceId]
     : undefined;
+  // Hypervisor links: the guest is hosted on the remote (Proxmox) device. Show
+  // the host prominently — the "port" carries the VM/CT id (e.g. "VM 101").
+  if (row.linkSource === 'hypervisor' && remoteName) {
+    const slot = row.remotePortName ? ` (${row.remotePortName})` : '';
+    return `${shortHost(remoteName)}${slot}`;
+  }
   const port = shortPortName(row.remotePortName ?? row.remoteInterfaceId ?? '');
-  return switchName ? `${shortHost(switchName)} · ${port}` : port;
+  return remoteName ? `${shortHost(remoteName)} · ${port}` : port;
+}
+
+// Tag colour distinguishes a hypervisor "hosted on" link from an SNMP switch link.
+function linkTagColor(row: DeviceInterface): string {
+  return row.linkSource === 'hypervisor' ? 'purple' : 'blue';
 }
 
 // Adaptive, slim columns so the table fits the drawer without horizontal
@@ -981,7 +992,7 @@ const interfaceColumns = [
                 </template>
                 <template v-else-if="column.key === 'connectedTo'">
                   <template v-if="connectedToLabel(record as DeviceInterface)">
-                    <Tag color="blue" style="white-space: normal; height: auto; margin: 0;">
+                    <Tag :color="linkTagColor(record as DeviceInterface)" style="white-space: normal; height: auto; margin: 0;">
                       {{ connectedToLabel(record as DeviceInterface) }}
                     </Tag>
                     <Tag v-if="(record as DeviceInterface).linkVlan" color="geekblue">

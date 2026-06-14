@@ -115,6 +115,35 @@ func (r *DeviceInterfaceRepo) FindServerInterfaceByMAC(ctx context.Context, tena
 	return entity, nil
 }
 
+// FindGuestInterfaceByMAC returns the interface with the given MAC within the
+// tenant, regardless of device type, with the owning device eager-loaded.
+// Matching is case-insensitive. Used to attach VM/container -> hypervisor-host
+// links: the guest's NIC MAC (as declared in the host's Proxmox config) is
+// matched to the guest device's own reported interface. Returns (nil, nil) when
+// no interface owns that MAC.
+func (r *DeviceInterfaceRepo) FindGuestInterfaceByMAC(ctx context.Context, tenantID uint32, mac string) (*ent.DeviceInterface, error) {
+	if mac == "" {
+		return nil, nil
+	}
+	entity, err := r.entClient.Client().DeviceInterface.Query().
+		Where(
+			deviceinterface.MACAddressEqualFold(mac),
+			deviceinterface.HasDeviceWith(
+				device.TenantID(tenantID),
+			),
+		).
+		WithDevice().
+		First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil
+		}
+		r.log.Errorf("find guest interface by MAC failed: %s", err.Error())
+		return nil, ipamV1.ErrorInternalServerError("find interface by MAC failed")
+	}
+	return entity, nil
+}
+
 // Update updates a device interface
 func (r *DeviceInterfaceRepo) Update(ctx context.Context, id string, updates map[string]any) (*ent.DeviceInterface, error) {
 	update := r.entClient.Client().DeviceInterface.UpdateOneID(id)

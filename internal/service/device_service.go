@@ -236,6 +236,9 @@ func (s *DeviceService) CreateDevice(ctx context.Context, req *ipamV1.CreateDevi
 	// are visible to SNMP bridge-FDB link correlation.
 	if req.Metadata != nil {
 		materializeMetadataInterfaces(ctx, s.deviceInterfaceRepo, s.log, entity.ID, *req.Metadata)
+		// Link any guests this host reports (Proxmox) to it, so each VM's
+		// "Connected To" shows its hypervisor host.
+		correlateHostedVMs(ctx, s.deviceInterfaceRepo, s.log, entity.ID, derefTenantID(entity.TenantID), *req.Metadata)
 	}
 
 	return &ipamV1.CreateDeviceResponse{
@@ -393,6 +396,9 @@ func (s *DeviceService) UpdateDevice(ctx context.Context, req *ipamV1.UpdateDevi
 	// Keep interface rows in sync with agent-reported metadata interfaces.
 	if req.Data != nil && req.Data.Metadata != nil {
 		materializeMetadataInterfaces(ctx, s.deviceInterfaceRepo, s.log, entity.ID, *req.Data.Metadata)
+		// Re-link guests reported by this host (Proxmox) so VMs that appeared
+		// since the last sync get their hypervisor "Connected To".
+		correlateHostedVMs(ctx, s.deviceInterfaceRepo, s.log, entity.ID, derefTenantID(entity.TenantID), *req.Data.Metadata)
 	}
 
 	return &ipamV1.UpdateDeviceResponse{
