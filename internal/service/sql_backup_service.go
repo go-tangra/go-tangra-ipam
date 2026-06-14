@@ -49,7 +49,7 @@ func (s *SqlBackupService) ExportBackup(req *commonV1.ExportBackupRequest, strea
 		s.log.Errorf("export backup: %v", err)
 		return err
 	}
-	return nil
+	return w.flush()
 }
 
 // ImportBackup restores a dump archive streamed from the caller. The first
@@ -87,25 +87,39 @@ func (s *SqlBackupService) ImportBackup(stream commonV1.BackupService_ImportBack
 	return stream.SendAndClose(out)
 }
 
-// grpcExportWriter adapts the server stream to io.Writer, splitting large writes
-// to stay well under the gRPC max message size.
+// grpcExportWriter adapts the server stream to io.Writer, coalescing the engine's
+// many small framed writes into ~256 KB gRPC messages (the engine frames every
+// COPY write, so without buffering a large table becomes hundreds of thousands of
+// tiny messages). flush() must be called once at the end.
 type grpcExportWriter struct {
 	stream commonV1.BackupService_ExportBackupServer
+	buf    []byte
 }
 
+const exportSendSize = 256 * 1024
+
 func (w *grpcExportWriter) Write(p []byte) (int, error) {
-	const maxSend = 256 * 1024
-	for off := 0; off < len(p); {
-		end := off + maxSend
-		if end > len(p) {
-			end = len(p)
+	w.buf = append(w.buf, p...)
+	for len(w.buf) >= exportSendSize {
+		if err := w.stream.Send(&commonV1.ExportBackupResponse{Content: w.buf[:exportSendSize]}); err != nil {
+			return 0, err
 		}
-		if err := w.stream.Send(&commonV1.ExportBackupResponse{Content: p[off:end]}); err != nil {
-			return off, err
-		}
-		off = end
+		// Drop the sent prefix; copy the remainder to a fresh slice so the sent
+		// bytes aren't aliased by a later append.
+		w.buf = append([]byte(nil), w.buf[exportSendSize:]...)
 	}
 	return len(p), nil
+}
+
+func (w *grpcExportWriter) flush() error {
+	if len(w.buf) == 0 {
+		return nil
+	}
+	if err := w.stream.Send(&commonV1.ExportBackupResponse{Content: w.buf}); err != nil {
+		return err
+	}
+	w.buf = nil
+	return nil
 }
 
 // grpcImportReader adapts the client stream's content chunks to io.Reader.
