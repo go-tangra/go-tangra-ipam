@@ -149,13 +149,23 @@ func (e *ScanExecutor) Start() error {
 }
 
 // backfillMetadataInterfaces promotes agent-reported metadata interfaces into
-// interface rows for existing physical-server devices. tangra-client reports
-// NICs inside device metadata JSON rather than as interface records; without
-// this, their MACs are invisible to bridge-FDB link correlation until the agent
-// next re-syncs. It is idempotent (rows matched by name; only the MAC is set).
+// interface rows for existing devices. tangra-client reports NICs inside device
+// metadata JSON rather than as interface records; without this, their MACs are
+// invisible to link correlation until the agent next re-syncs (which only
+// happens on a hardware change). Servers and VMs are both processed: server NICs
+// feed SNMP bridge-FDB correlation, VM NICs feed hypervisor hosted-VM
+// correlation. After materializing, hosted-VM links are (re)built so guests get
+// their "Connected To" host without every guest having to re-sync. Idempotent.
 func (e *ScanExecutor) backfillMetadataInterfaces() {
 	defer e.wg.Done()
 
+	e.backfillTypeInterfaces(data.DeviceTypeServer, "server")
+	e.backfillTypeInterfaces(data.DeviceTypeVM, "vm")
+	e.backfillHostedVMLinks()
+}
+
+// backfillTypeInterfaces materializes metadata NICs for all devices of one type.
+func (e *ScanExecutor) backfillTypeInterfaces(deviceType int32, label string) {
 	const pageSize = 100
 	afterID := ""
 	devicesTouched, ifacesApplied := 0, 0
@@ -166,9 +176,9 @@ func (e *ScanExecutor) backfillMetadataInterfaces() {
 		default:
 		}
 
-		devices, err := e.deviceRepo.ListByTypeWithMetadataCursor(e.ctx, data.DeviceTypeServer, afterID, pageSize)
+		devices, err := e.deviceRepo.ListByTypeWithMetadataCursor(e.ctx, deviceType, afterID, pageSize)
 		if err != nil {
-			e.log.Warnf("interface backfill: list failed: %v", err)
+			e.log.Warnf("interface backfill (%s): list failed: %v", label, err)
 			return
 		}
 		if len(devices) == 0 {
@@ -186,7 +196,43 @@ func (e *ScanExecutor) backfillMetadataInterfaces() {
 		}
 	}
 	if ifacesApplied > 0 {
-		e.log.Infof("interface backfill: materialized %d interfaces across %d server devices", ifacesApplied, devicesTouched)
+		e.log.Infof("interface backfill (%s): materialized %d interfaces across %d devices", label, ifacesApplied, devicesTouched)
+	}
+}
+
+// backfillHostedVMLinks re-runs hosted-VM correlation for every hypervisor host
+// (servers carrying a hosted_vms metadata list), linking their guests now that
+// guest interfaces are materialized. correlateHostedVMs is a no-op for servers
+// without hosted_vms.
+func (e *ScanExecutor) backfillHostedVMLinks() {
+	const pageSize = 100
+	afterID := ""
+	linked := 0
+	for {
+		select {
+		case <-e.ctx.Done():
+			return
+		default:
+		}
+
+		devices, err := e.deviceRepo.ListByTypeWithMetadataCursor(e.ctx, data.DeviceTypeServer, afterID, pageSize)
+		if err != nil {
+			e.log.Warnf("hosted-vm backfill: list failed: %v", err)
+			return
+		}
+		if len(devices) == 0 {
+			break
+		}
+		for _, d := range devices {
+			linked += correlateHostedVMs(e.ctx, e.deviceInterfaceRepo, e.log, d.ID, derefTenantID(d.TenantID), d.Metadata)
+			afterID = d.ID
+		}
+		if len(devices) < pageSize {
+			break
+		}
+	}
+	if linked > 0 {
+		e.log.Infof("hosted-vm backfill: linked %d guest interfaces to their hosts", linked)
 	}
 }
 

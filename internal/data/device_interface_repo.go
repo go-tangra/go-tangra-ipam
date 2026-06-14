@@ -19,6 +19,11 @@ import (
 // discovery only attaches links to physical servers, not VMs (device_type=2).
 const DeviceTypeServer int32 = 1
 
+// DeviceTypeVM is the device_type value for a virtual machine. VM NICs are
+// materialized too (for hypervisor hosted-VM link correlation), but they are
+// excluded from SNMP bridge-FDB correlation.
+const DeviceTypeVM int32 = 2
+
 type DeviceInterfaceRepo struct {
 	entClient *entCrud.EntClient[*ent.Client]
 	log       *log.Helper
