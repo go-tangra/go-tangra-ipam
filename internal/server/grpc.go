@@ -66,6 +66,7 @@ func NewGRPCServer(
 	backupSvc *service.BackupService,
 	devicePackageSvc *service.DevicePackageService,
 	taskExecutor *service.TaskExecutor,
+	sqlBackupSvc *service.SqlBackupService,
 ) *grpc.Server {
 	cfg := ctx.GetConfig()
 	logger := ctx.GetLogger()
@@ -154,6 +155,10 @@ func NewGRPCServer(
 	// TaskExecutorService lets the scheduler trigger IPAM tasks (e.g. network
 	// scans) on a cron or one-off basis.
 	commonV1.RegisterTaskExecutorServiceServer(srv, taskExecutor)
+
+	// Streaming SQL-dump backup (schema-agnostic; replaces the legacy per-field
+	// ipam.service.v1.BackupService, which stays registered during transition).
+	commonV1.RegisterBackupServiceServer(srv, sqlBackupSvc)
 
 	return srv
 }

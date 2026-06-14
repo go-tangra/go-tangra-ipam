@@ -30,4 +30,5 @@ var ProviderSet = wire.NewSet(
 	service.NewBackupService,
 	service.NewDevicePackageService,
 	service.NewTaskExecutor,
+	service.NewSqlBackupService,
 )
