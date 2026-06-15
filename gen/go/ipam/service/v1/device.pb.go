@@ -541,8 +541,13 @@ type DeviceInterface struct {
 	LinkSource        *string                `protobuf:"bytes,16,opt,name=link_source,json=linkSource,proto3,oneof" json:"link_source,omitempty"`
 	LinkVlan          *int32                 `protobuf:"varint,17,opt,name=link_vlan,json=linkVlan,proto3,oneof" json:"link_vlan,omitempty"`
 	LinkLastSeen      *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=link_last_seen,json=linkLastSeen,proto3,oneof" json:"link_last_seen,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// All discovered Layer-2 links for this interface. An interface can connect to
+	// multiple switches (an LACP bond across an MLAG pair is learned on both), so
+	// the single remote_* fields above only carry the "best" link. When empty,
+	// clients should fall back to the remote_* fields.
+	Links         []*DeviceLink `protobuf:"bytes,19,rep,name=links,proto3" json:"links,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeviceInterface) Reset() {
@@ -694,6 +699,98 @@ func (x *DeviceInterface) GetLinkLastSeen() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *DeviceInterface) GetLinks() []*DeviceLink {
+	if x != nil {
+		return x.Links
+	}
+	return nil
+}
+
+// DeviceLink is one discovered Layer-2 neighbor link (interface -> remote port).
+type DeviceLink struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	RemoteDeviceId    *string                `protobuf:"bytes,1,opt,name=remote_device_id,json=remoteDeviceId,proto3,oneof" json:"remote_device_id,omitempty"`
+	RemoteInterfaceId *string                `protobuf:"bytes,2,opt,name=remote_interface_id,json=remoteInterfaceId,proto3,oneof" json:"remote_interface_id,omitempty"`
+	RemotePortName    *string                `protobuf:"bytes,3,opt,name=remote_port_name,json=remotePortName,proto3,oneof" json:"remote_port_name,omitempty"`
+	LinkSource        *string                `protobuf:"bytes,4,opt,name=link_source,json=linkSource,proto3,oneof" json:"link_source,omitempty"`
+	LinkVlan          *int32                 `protobuf:"varint,5,opt,name=link_vlan,json=linkVlan,proto3,oneof" json:"link_vlan,omitempty"`
+	LinkLastSeen      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=link_last_seen,json=linkLastSeen,proto3,oneof" json:"link_last_seen,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *DeviceLink) Reset() {
+	*x = DeviceLink{}
+	mi := &file_ipam_service_v1_device_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeviceLink) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeviceLink) ProtoMessage() {}
+
+func (x *DeviceLink) ProtoReflect() protoreflect.Message {
+	mi := &file_ipam_service_v1_device_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeviceLink.ProtoReflect.Descriptor instead.
+func (*DeviceLink) Descriptor() ([]byte, []int) {
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *DeviceLink) GetRemoteDeviceId() string {
+	if x != nil && x.RemoteDeviceId != nil {
+		return *x.RemoteDeviceId
+	}
+	return ""
+}
+
+func (x *DeviceLink) GetRemoteInterfaceId() string {
+	if x != nil && x.RemoteInterfaceId != nil {
+		return *x.RemoteInterfaceId
+	}
+	return ""
+}
+
+func (x *DeviceLink) GetRemotePortName() string {
+	if x != nil && x.RemotePortName != nil {
+		return *x.RemotePortName
+	}
+	return ""
+}
+
+func (x *DeviceLink) GetLinkSource() string {
+	if x != nil && x.LinkSource != nil {
+		return *x.LinkSource
+	}
+	return ""
+}
+
+func (x *DeviceLink) GetLinkVlan() int32 {
+	if x != nil && x.LinkVlan != nil {
+		return *x.LinkVlan
+	}
+	return 0
+}
+
+func (x *DeviceLink) GetLinkLastSeen() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LinkLastSeen
+	}
+	return nil
+}
+
 // CreateDeviceRequest creates a new device
 type CreateDeviceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -725,7 +822,7 @@ type CreateDeviceRequest struct {
 
 func (x *CreateDeviceRequest) Reset() {
 	*x = CreateDeviceRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[2]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -737,7 +834,7 @@ func (x *CreateDeviceRequest) String() string {
 func (*CreateDeviceRequest) ProtoMessage() {}
 
 func (x *CreateDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[2]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -750,7 +847,7 @@ func (x *CreateDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDeviceRequest.ProtoReflect.Descriptor instead.
 func (*CreateDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{2}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateDeviceRequest) GetTenantId() uint32 {
@@ -916,7 +1013,7 @@ type CreateDeviceResponse struct {
 
 func (x *CreateDeviceResponse) Reset() {
 	*x = CreateDeviceResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[3]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -928,7 +1025,7 @@ func (x *CreateDeviceResponse) String() string {
 func (*CreateDeviceResponse) ProtoMessage() {}
 
 func (x *CreateDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[3]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -941,7 +1038,7 @@ func (x *CreateDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDeviceResponse.ProtoReflect.Descriptor instead.
 func (*CreateDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{3}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateDeviceResponse) GetDevice() *Device {
@@ -961,7 +1058,7 @@ type GetDeviceRequest struct {
 
 func (x *GetDeviceRequest) Reset() {
 	*x = GetDeviceRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[4]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -973,7 +1070,7 @@ func (x *GetDeviceRequest) String() string {
 func (*GetDeviceRequest) ProtoMessage() {}
 
 func (x *GetDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[4]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -986,7 +1083,7 @@ func (x *GetDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{4}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetDeviceRequest) GetId() string {
@@ -1005,7 +1102,7 @@ type GetDeviceResponse struct {
 
 func (x *GetDeviceResponse) Reset() {
 	*x = GetDeviceResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[5]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1017,7 +1114,7 @@ func (x *GetDeviceResponse) String() string {
 func (*GetDeviceResponse) ProtoMessage() {}
 
 func (x *GetDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[5]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1030,7 +1127,7 @@ func (x *GetDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceResponse.ProtoReflect.Descriptor instead.
 func (*GetDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{5}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetDeviceResponse) GetDevice() *Device {
@@ -1066,7 +1163,7 @@ type ListDevicesRequest struct {
 
 func (x *ListDevicesRequest) Reset() {
 	*x = ListDevicesRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[6]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1078,7 +1175,7 @@ func (x *ListDevicesRequest) String() string {
 func (*ListDevicesRequest) ProtoMessage() {}
 
 func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[6]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1091,7 +1188,7 @@ func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesRequest.ProtoReflect.Descriptor instead.
 func (*ListDevicesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{6}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListDevicesRequest) GetTenantId() uint32 {
@@ -1188,7 +1285,7 @@ type ListDevicesResponse struct {
 
 func (x *ListDevicesResponse) Reset() {
 	*x = ListDevicesResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[7]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1200,7 +1297,7 @@ func (x *ListDevicesResponse) String() string {
 func (*ListDevicesResponse) ProtoMessage() {}
 
 func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[7]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1213,7 +1310,7 @@ func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesResponse.ProtoReflect.Descriptor instead.
 func (*ListDevicesResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{7}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListDevicesResponse) GetItems() []*Device {
@@ -1242,7 +1339,7 @@ type UpdateDeviceRequest struct {
 
 func (x *UpdateDeviceRequest) Reset() {
 	*x = UpdateDeviceRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[8]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1254,7 +1351,7 @@ func (x *UpdateDeviceRequest) String() string {
 func (*UpdateDeviceRequest) ProtoMessage() {}
 
 func (x *UpdateDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[8]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1267,7 +1364,7 @@ func (x *UpdateDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDeviceRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{8}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateDeviceRequest) GetId() string {
@@ -1300,7 +1397,7 @@ type UpdateDeviceResponse struct {
 
 func (x *UpdateDeviceResponse) Reset() {
 	*x = UpdateDeviceResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[9]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1312,7 +1409,7 @@ func (x *UpdateDeviceResponse) String() string {
 func (*UpdateDeviceResponse) ProtoMessage() {}
 
 func (x *UpdateDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[9]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1325,7 +1422,7 @@ func (x *UpdateDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDeviceResponse.ProtoReflect.Descriptor instead.
 func (*UpdateDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{9}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateDeviceResponse) GetDevice() *Device {
@@ -1347,7 +1444,7 @@ type DeleteDeviceRequest struct {
 
 func (x *DeleteDeviceRequest) Reset() {
 	*x = DeleteDeviceRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[10]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1359,7 +1456,7 @@ func (x *DeleteDeviceRequest) String() string {
 func (*DeleteDeviceRequest) ProtoMessage() {}
 
 func (x *DeleteDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[10]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1372,7 +1469,7 @@ func (x *DeleteDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDeviceRequest.ProtoReflect.Descriptor instead.
 func (*DeleteDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{10}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DeleteDeviceRequest) GetId() string {
@@ -1399,7 +1496,7 @@ type GetDeviceAddressesRequest struct {
 
 func (x *GetDeviceAddressesRequest) Reset() {
 	*x = GetDeviceAddressesRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[11]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1411,7 +1508,7 @@ func (x *GetDeviceAddressesRequest) String() string {
 func (*GetDeviceAddressesRequest) ProtoMessage() {}
 
 func (x *GetDeviceAddressesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[11]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1424,7 +1521,7 @@ func (x *GetDeviceAddressesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceAddressesRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceAddressesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{11}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetDeviceAddressesRequest) GetId() string {
@@ -1443,7 +1540,7 @@ type GetDeviceAddressesResponse struct {
 
 func (x *GetDeviceAddressesResponse) Reset() {
 	*x = GetDeviceAddressesResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[12]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1455,7 +1552,7 @@ func (x *GetDeviceAddressesResponse) String() string {
 func (*GetDeviceAddressesResponse) ProtoMessage() {}
 
 func (x *GetDeviceAddressesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[12]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1468,7 +1565,7 @@ func (x *GetDeviceAddressesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceAddressesResponse.ProtoReflect.Descriptor instead.
 func (*GetDeviceAddressesResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{12}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetDeviceAddressesResponse) GetAddressIds() []string {
@@ -1488,7 +1585,7 @@ type GetDeviceInterfacesRequest struct {
 
 func (x *GetDeviceInterfacesRequest) Reset() {
 	*x = GetDeviceInterfacesRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[13]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1500,7 +1597,7 @@ func (x *GetDeviceInterfacesRequest) String() string {
 func (*GetDeviceInterfacesRequest) ProtoMessage() {}
 
 func (x *GetDeviceInterfacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[13]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1513,7 +1610,7 @@ func (x *GetDeviceInterfacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceInterfacesRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceInterfacesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{13}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetDeviceInterfacesRequest) GetDeviceId() string {
@@ -1532,7 +1629,7 @@ type GetDeviceInterfacesResponse struct {
 
 func (x *GetDeviceInterfacesResponse) Reset() {
 	*x = GetDeviceInterfacesResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[14]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1544,7 +1641,7 @@ func (x *GetDeviceInterfacesResponse) String() string {
 func (*GetDeviceInterfacesResponse) ProtoMessage() {}
 
 func (x *GetDeviceInterfacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[14]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1557,7 +1654,7 @@ func (x *GetDeviceInterfacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceInterfacesResponse.ProtoReflect.Descriptor instead.
 func (*GetDeviceInterfacesResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{14}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetDeviceInterfacesResponse) GetInterfaces() []*DeviceInterface {
@@ -1583,7 +1680,7 @@ type CreateDeviceInterfaceRequest struct {
 
 func (x *CreateDeviceInterfaceRequest) Reset() {
 	*x = CreateDeviceInterfaceRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[15]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1595,7 +1692,7 @@ func (x *CreateDeviceInterfaceRequest) String() string {
 func (*CreateDeviceInterfaceRequest) ProtoMessage() {}
 
 func (x *CreateDeviceInterfaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[15]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1608,7 +1705,7 @@ func (x *CreateDeviceInterfaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDeviceInterfaceRequest.ProtoReflect.Descriptor instead.
 func (*CreateDeviceInterfaceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{15}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CreateDeviceInterfaceRequest) GetDeviceId() string {
@@ -1669,7 +1766,7 @@ type CreateDeviceInterfaceResponse struct {
 
 func (x *CreateDeviceInterfaceResponse) Reset() {
 	*x = CreateDeviceInterfaceResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[16]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1681,7 +1778,7 @@ func (x *CreateDeviceInterfaceResponse) String() string {
 func (*CreateDeviceInterfaceResponse) ProtoMessage() {}
 
 func (x *CreateDeviceInterfaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[16]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1694,7 +1791,7 @@ func (x *CreateDeviceInterfaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDeviceInterfaceResponse.ProtoReflect.Descriptor instead.
 func (*CreateDeviceInterfaceResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{16}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CreateDeviceInterfaceResponse) GetInterface() *DeviceInterface {
@@ -1715,7 +1812,7 @@ type DeleteDeviceInterfaceRequest struct {
 
 func (x *DeleteDeviceInterfaceRequest) Reset() {
 	*x = DeleteDeviceInterfaceRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[17]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1727,7 +1824,7 @@ func (x *DeleteDeviceInterfaceRequest) String() string {
 func (*DeleteDeviceInterfaceRequest) ProtoMessage() {}
 
 func (x *DeleteDeviceInterfaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[17]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1740,7 +1837,7 @@ func (x *DeleteDeviceInterfaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDeviceInterfaceRequest.ProtoReflect.Descriptor instead.
 func (*DeleteDeviceInterfaceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{17}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *DeleteDeviceInterfaceRequest) GetDeviceId() string {
@@ -1766,7 +1863,7 @@ type StartKvmSessionRequest struct {
 
 func (x *StartKvmSessionRequest) Reset() {
 	*x = StartKvmSessionRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[18]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1778,7 +1875,7 @@ func (x *StartKvmSessionRequest) String() string {
 func (*StartKvmSessionRequest) ProtoMessage() {}
 
 func (x *StartKvmSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[18]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1791,7 +1888,7 @@ func (x *StartKvmSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartKvmSessionRequest.ProtoReflect.Descriptor instead.
 func (*StartKvmSessionRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{18}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *StartKvmSessionRequest) GetId() string {
@@ -1815,7 +1912,7 @@ type StartKvmSessionResponse struct {
 
 func (x *StartKvmSessionResponse) Reset() {
 	*x = StartKvmSessionResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[19]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1827,7 +1924,7 @@ func (x *StartKvmSessionResponse) String() string {
 func (*StartKvmSessionResponse) ProtoMessage() {}
 
 func (x *StartKvmSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[19]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1840,7 +1937,7 @@ func (x *StartKvmSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartKvmSessionResponse.ProtoReflect.Descriptor instead.
 func (*StartKvmSessionResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{19}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *StartKvmSessionResponse) GetToken() string {
@@ -1878,7 +1975,7 @@ type WardenSecretRef struct {
 
 func (x *WardenSecretRef) Reset() {
 	*x = WardenSecretRef{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[20]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1890,7 +1987,7 @@ func (x *WardenSecretRef) String() string {
 func (*WardenSecretRef) ProtoMessage() {}
 
 func (x *WardenSecretRef) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[20]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1903,7 +2000,7 @@ func (x *WardenSecretRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WardenSecretRef.ProtoReflect.Descriptor instead.
 func (*WardenSecretRef) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{20}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *WardenSecretRef) GetId() string {
@@ -1944,7 +2041,7 @@ type SearchWardenSecretsRequest struct {
 
 func (x *SearchWardenSecretsRequest) Reset() {
 	*x = SearchWardenSecretsRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[21]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1956,7 +2053,7 @@ func (x *SearchWardenSecretsRequest) String() string {
 func (*SearchWardenSecretsRequest) ProtoMessage() {}
 
 func (x *SearchWardenSecretsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[21]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1969,7 +2066,7 @@ func (x *SearchWardenSecretsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchWardenSecretsRequest.ProtoReflect.Descriptor instead.
 func (*SearchWardenSecretsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{21}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SearchWardenSecretsRequest) GetQuery() string {
@@ -1995,7 +2092,7 @@ type SearchWardenSecretsResponse struct {
 
 func (x *SearchWardenSecretsResponse) Reset() {
 	*x = SearchWardenSecretsResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[22]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2007,7 +2104,7 @@ func (x *SearchWardenSecretsResponse) String() string {
 func (*SearchWardenSecretsResponse) ProtoMessage() {}
 
 func (x *SearchWardenSecretsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[22]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2020,7 +2117,7 @@ func (x *SearchWardenSecretsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchWardenSecretsResponse.ProtoReflect.Descriptor instead.
 func (*SearchWardenSecretsResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{22}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SearchWardenSecretsResponse) GetSecrets() []*WardenSecretRef {
@@ -2039,7 +2136,7 @@ type GetWardenSecretRequest struct {
 
 func (x *GetWardenSecretRequest) Reset() {
 	*x = GetWardenSecretRequest{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[23]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2051,7 +2148,7 @@ func (x *GetWardenSecretRequest) String() string {
 func (*GetWardenSecretRequest) ProtoMessage() {}
 
 func (x *GetWardenSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[23]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2064,7 +2161,7 @@ func (x *GetWardenSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWardenSecretRequest.ProtoReflect.Descriptor instead.
 func (*GetWardenSecretRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{23}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetWardenSecretRequest) GetId() string {
@@ -2083,7 +2180,7 @@ type GetWardenSecretResponse struct {
 
 func (x *GetWardenSecretResponse) Reset() {
 	*x = GetWardenSecretResponse{}
-	mi := &file_ipam_service_v1_device_proto_msgTypes[24]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2095,7 +2192,7 @@ func (x *GetWardenSecretResponse) String() string {
 func (*GetWardenSecretResponse) ProtoMessage() {}
 
 func (x *GetWardenSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_service_v1_device_proto_msgTypes[24]
+	mi := &file_ipam_service_v1_device_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2108,7 +2205,7 @@ func (x *GetWardenSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWardenSecretResponse.ProtoReflect.Descriptor instead.
 func (*GetWardenSecretResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{24}
+	return file_ipam_service_v1_device_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetWardenSecretResponse) GetSecret() *WardenSecretRef {
@@ -2207,7 +2304,7 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\v_updated_byB\x12\n" +
 	"\x10_ipmi_secret_refB\x17\n" +
 	"\x15_package_update_countB\x18\n" +
-	"\x16_security_update_count\"\xe9\a\n" +
+	"\x16_security_update_count\"\x9c\b\n" +
 	"\x0fDeviceInterface\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
 	"\tdevice_id\x18\x02 \x01(\tH\x01R\bdeviceId\x88\x01\x01\x12\x17\n" +
@@ -2232,7 +2329,8 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\vlink_source\x18\x10 \x01(\tH\x0eR\n" +
 	"linkSource\x88\x01\x01\x12 \n" +
 	"\tlink_vlan\x18\x11 \x01(\x05H\x0fR\blinkVlan\x88\x01\x01\x12E\n" +
-	"\x0elink_last_seen\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampH\x10R\flinkLastSeen\x88\x01\x01B\x05\n" +
+	"\x0elink_last_seen\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampH\x10R\flinkLastSeen\x88\x01\x01\x121\n" +
+	"\x05links\x18\x13 \x03(\v2\x1b.ipam.service.v1.DeviceLinkR\x05linksB\x05\n" +
 	"\x03_idB\f\n" +
 	"\n" +
 	"_device_idB\a\n" +
@@ -2246,6 +2344,22 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\v_created_atB\r\n" +
 	"\v_updated_atB\v\n" +
 	"\t_if_indexB\x13\n" +
+	"\x11_remote_device_idB\x16\n" +
+	"\x14_remote_interface_idB\x13\n" +
+	"\x11_remote_port_nameB\x0e\n" +
+	"\f_link_sourceB\f\n" +
+	"\n" +
+	"_link_vlanB\x11\n" +
+	"\x0f_link_last_seen\"\xa1\x03\n" +
+	"\n" +
+	"DeviceLink\x12-\n" +
+	"\x10remote_device_id\x18\x01 \x01(\tH\x00R\x0eremoteDeviceId\x88\x01\x01\x123\n" +
+	"\x13remote_interface_id\x18\x02 \x01(\tH\x01R\x11remoteInterfaceId\x88\x01\x01\x12-\n" +
+	"\x10remote_port_name\x18\x03 \x01(\tH\x02R\x0eremotePortName\x88\x01\x01\x12$\n" +
+	"\vlink_source\x18\x04 \x01(\tH\x03R\n" +
+	"linkSource\x88\x01\x01\x12 \n" +
+	"\tlink_vlan\x18\x05 \x01(\x05H\x04R\blinkVlan\x88\x01\x01\x12E\n" +
+	"\x0elink_last_seen\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x05R\flinkLastSeen\x88\x01\x01B\x13\n" +
 	"\x11_remote_device_idB\x16\n" +
 	"\x14_remote_interface_idB\x13\n" +
 	"\x11_remote_port_nameB\x0e\n" +
@@ -2487,91 +2601,94 @@ func file_ipam_service_v1_device_proto_rawDescGZIP() []byte {
 }
 
 var file_ipam_service_v1_device_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_ipam_service_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_ipam_service_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_ipam_service_v1_device_proto_goTypes = []any{
 	(DeviceType)(0),                       // 0: ipam.service.v1.DeviceType
 	(DeviceStatus)(0),                     // 1: ipam.service.v1.DeviceStatus
 	(*Device)(nil),                        // 2: ipam.service.v1.Device
 	(*DeviceInterface)(nil),               // 3: ipam.service.v1.DeviceInterface
-	(*CreateDeviceRequest)(nil),           // 4: ipam.service.v1.CreateDeviceRequest
-	(*CreateDeviceResponse)(nil),          // 5: ipam.service.v1.CreateDeviceResponse
-	(*GetDeviceRequest)(nil),              // 6: ipam.service.v1.GetDeviceRequest
-	(*GetDeviceResponse)(nil),             // 7: ipam.service.v1.GetDeviceResponse
-	(*ListDevicesRequest)(nil),            // 8: ipam.service.v1.ListDevicesRequest
-	(*ListDevicesResponse)(nil),           // 9: ipam.service.v1.ListDevicesResponse
-	(*UpdateDeviceRequest)(nil),           // 10: ipam.service.v1.UpdateDeviceRequest
-	(*UpdateDeviceResponse)(nil),          // 11: ipam.service.v1.UpdateDeviceResponse
-	(*DeleteDeviceRequest)(nil),           // 12: ipam.service.v1.DeleteDeviceRequest
-	(*GetDeviceAddressesRequest)(nil),     // 13: ipam.service.v1.GetDeviceAddressesRequest
-	(*GetDeviceAddressesResponse)(nil),    // 14: ipam.service.v1.GetDeviceAddressesResponse
-	(*GetDeviceInterfacesRequest)(nil),    // 15: ipam.service.v1.GetDeviceInterfacesRequest
-	(*GetDeviceInterfacesResponse)(nil),   // 16: ipam.service.v1.GetDeviceInterfacesResponse
-	(*CreateDeviceInterfaceRequest)(nil),  // 17: ipam.service.v1.CreateDeviceInterfaceRequest
-	(*CreateDeviceInterfaceResponse)(nil), // 18: ipam.service.v1.CreateDeviceInterfaceResponse
-	(*DeleteDeviceInterfaceRequest)(nil),  // 19: ipam.service.v1.DeleteDeviceInterfaceRequest
-	(*StartKvmSessionRequest)(nil),        // 20: ipam.service.v1.StartKvmSessionRequest
-	(*StartKvmSessionResponse)(nil),       // 21: ipam.service.v1.StartKvmSessionResponse
-	(*WardenSecretRef)(nil),               // 22: ipam.service.v1.WardenSecretRef
-	(*SearchWardenSecretsRequest)(nil),    // 23: ipam.service.v1.SearchWardenSecretsRequest
-	(*SearchWardenSecretsResponse)(nil),   // 24: ipam.service.v1.SearchWardenSecretsResponse
-	(*GetWardenSecretRequest)(nil),        // 25: ipam.service.v1.GetWardenSecretRequest
-	(*GetWardenSecretResponse)(nil),       // 26: ipam.service.v1.GetWardenSecretResponse
-	(*timestamppb.Timestamp)(nil),         // 27: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),         // 28: google.protobuf.FieldMask
-	(*emptypb.Empty)(nil),                 // 29: google.protobuf.Empty
+	(*DeviceLink)(nil),                    // 4: ipam.service.v1.DeviceLink
+	(*CreateDeviceRequest)(nil),           // 5: ipam.service.v1.CreateDeviceRequest
+	(*CreateDeviceResponse)(nil),          // 6: ipam.service.v1.CreateDeviceResponse
+	(*GetDeviceRequest)(nil),              // 7: ipam.service.v1.GetDeviceRequest
+	(*GetDeviceResponse)(nil),             // 8: ipam.service.v1.GetDeviceResponse
+	(*ListDevicesRequest)(nil),            // 9: ipam.service.v1.ListDevicesRequest
+	(*ListDevicesResponse)(nil),           // 10: ipam.service.v1.ListDevicesResponse
+	(*UpdateDeviceRequest)(nil),           // 11: ipam.service.v1.UpdateDeviceRequest
+	(*UpdateDeviceResponse)(nil),          // 12: ipam.service.v1.UpdateDeviceResponse
+	(*DeleteDeviceRequest)(nil),           // 13: ipam.service.v1.DeleteDeviceRequest
+	(*GetDeviceAddressesRequest)(nil),     // 14: ipam.service.v1.GetDeviceAddressesRequest
+	(*GetDeviceAddressesResponse)(nil),    // 15: ipam.service.v1.GetDeviceAddressesResponse
+	(*GetDeviceInterfacesRequest)(nil),    // 16: ipam.service.v1.GetDeviceInterfacesRequest
+	(*GetDeviceInterfacesResponse)(nil),   // 17: ipam.service.v1.GetDeviceInterfacesResponse
+	(*CreateDeviceInterfaceRequest)(nil),  // 18: ipam.service.v1.CreateDeviceInterfaceRequest
+	(*CreateDeviceInterfaceResponse)(nil), // 19: ipam.service.v1.CreateDeviceInterfaceResponse
+	(*DeleteDeviceInterfaceRequest)(nil),  // 20: ipam.service.v1.DeleteDeviceInterfaceRequest
+	(*StartKvmSessionRequest)(nil),        // 21: ipam.service.v1.StartKvmSessionRequest
+	(*StartKvmSessionResponse)(nil),       // 22: ipam.service.v1.StartKvmSessionResponse
+	(*WardenSecretRef)(nil),               // 23: ipam.service.v1.WardenSecretRef
+	(*SearchWardenSecretsRequest)(nil),    // 24: ipam.service.v1.SearchWardenSecretsRequest
+	(*SearchWardenSecretsResponse)(nil),   // 25: ipam.service.v1.SearchWardenSecretsResponse
+	(*GetWardenSecretRequest)(nil),        // 26: ipam.service.v1.GetWardenSecretRequest
+	(*GetWardenSecretResponse)(nil),       // 27: ipam.service.v1.GetWardenSecretResponse
+	(*timestamppb.Timestamp)(nil),         // 28: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),         // 29: google.protobuf.FieldMask
+	(*emptypb.Empty)(nil),                 // 30: google.protobuf.Empty
 }
 var file_ipam_service_v1_device_proto_depIdxs = []int32{
 	0,  // 0: ipam.service.v1.Device.device_type:type_name -> ipam.service.v1.DeviceType
 	1,  // 1: ipam.service.v1.Device.status:type_name -> ipam.service.v1.DeviceStatus
-	27, // 2: ipam.service.v1.Device.last_seen:type_name -> google.protobuf.Timestamp
-	27, // 3: ipam.service.v1.Device.created_at:type_name -> google.protobuf.Timestamp
-	27, // 4: ipam.service.v1.Device.updated_at:type_name -> google.protobuf.Timestamp
-	27, // 5: ipam.service.v1.DeviceInterface.created_at:type_name -> google.protobuf.Timestamp
-	27, // 6: ipam.service.v1.DeviceInterface.updated_at:type_name -> google.protobuf.Timestamp
-	27, // 7: ipam.service.v1.DeviceInterface.link_last_seen:type_name -> google.protobuf.Timestamp
-	0,  // 8: ipam.service.v1.CreateDeviceRequest.device_type:type_name -> ipam.service.v1.DeviceType
-	1,  // 9: ipam.service.v1.CreateDeviceRequest.status:type_name -> ipam.service.v1.DeviceStatus
-	2,  // 10: ipam.service.v1.CreateDeviceResponse.device:type_name -> ipam.service.v1.Device
-	2,  // 11: ipam.service.v1.GetDeviceResponse.device:type_name -> ipam.service.v1.Device
-	0,  // 12: ipam.service.v1.ListDevicesRequest.device_type:type_name -> ipam.service.v1.DeviceType
-	1,  // 13: ipam.service.v1.ListDevicesRequest.status:type_name -> ipam.service.v1.DeviceStatus
-	2,  // 14: ipam.service.v1.ListDevicesResponse.items:type_name -> ipam.service.v1.Device
-	2,  // 15: ipam.service.v1.UpdateDeviceRequest.data:type_name -> ipam.service.v1.Device
-	28, // 16: ipam.service.v1.UpdateDeviceRequest.update_mask:type_name -> google.protobuf.FieldMask
-	2,  // 17: ipam.service.v1.UpdateDeviceResponse.device:type_name -> ipam.service.v1.Device
-	3,  // 18: ipam.service.v1.GetDeviceInterfacesResponse.interfaces:type_name -> ipam.service.v1.DeviceInterface
-	3,  // 19: ipam.service.v1.CreateDeviceInterfaceResponse.interface:type_name -> ipam.service.v1.DeviceInterface
-	22, // 20: ipam.service.v1.SearchWardenSecretsResponse.secrets:type_name -> ipam.service.v1.WardenSecretRef
-	22, // 21: ipam.service.v1.GetWardenSecretResponse.secret:type_name -> ipam.service.v1.WardenSecretRef
-	4,  // 22: ipam.service.v1.DeviceService.CreateDevice:input_type -> ipam.service.v1.CreateDeviceRequest
-	6,  // 23: ipam.service.v1.DeviceService.GetDevice:input_type -> ipam.service.v1.GetDeviceRequest
-	8,  // 24: ipam.service.v1.DeviceService.ListDevices:input_type -> ipam.service.v1.ListDevicesRequest
-	10, // 25: ipam.service.v1.DeviceService.UpdateDevice:input_type -> ipam.service.v1.UpdateDeviceRequest
-	12, // 26: ipam.service.v1.DeviceService.DeleteDevice:input_type -> ipam.service.v1.DeleteDeviceRequest
-	13, // 27: ipam.service.v1.DeviceService.GetDeviceAddresses:input_type -> ipam.service.v1.GetDeviceAddressesRequest
-	15, // 28: ipam.service.v1.DeviceService.GetDeviceInterfaces:input_type -> ipam.service.v1.GetDeviceInterfacesRequest
-	17, // 29: ipam.service.v1.DeviceService.CreateDeviceInterface:input_type -> ipam.service.v1.CreateDeviceInterfaceRequest
-	19, // 30: ipam.service.v1.DeviceService.DeleteDeviceInterface:input_type -> ipam.service.v1.DeleteDeviceInterfaceRequest
-	23, // 31: ipam.service.v1.DeviceService.SearchWardenSecrets:input_type -> ipam.service.v1.SearchWardenSecretsRequest
-	25, // 32: ipam.service.v1.DeviceService.GetWardenSecret:input_type -> ipam.service.v1.GetWardenSecretRequest
-	20, // 33: ipam.service.v1.DeviceService.StartKvmSession:input_type -> ipam.service.v1.StartKvmSessionRequest
-	5,  // 34: ipam.service.v1.DeviceService.CreateDevice:output_type -> ipam.service.v1.CreateDeviceResponse
-	7,  // 35: ipam.service.v1.DeviceService.GetDevice:output_type -> ipam.service.v1.GetDeviceResponse
-	9,  // 36: ipam.service.v1.DeviceService.ListDevices:output_type -> ipam.service.v1.ListDevicesResponse
-	11, // 37: ipam.service.v1.DeviceService.UpdateDevice:output_type -> ipam.service.v1.UpdateDeviceResponse
-	29, // 38: ipam.service.v1.DeviceService.DeleteDevice:output_type -> google.protobuf.Empty
-	14, // 39: ipam.service.v1.DeviceService.GetDeviceAddresses:output_type -> ipam.service.v1.GetDeviceAddressesResponse
-	16, // 40: ipam.service.v1.DeviceService.GetDeviceInterfaces:output_type -> ipam.service.v1.GetDeviceInterfacesResponse
-	18, // 41: ipam.service.v1.DeviceService.CreateDeviceInterface:output_type -> ipam.service.v1.CreateDeviceInterfaceResponse
-	29, // 42: ipam.service.v1.DeviceService.DeleteDeviceInterface:output_type -> google.protobuf.Empty
-	24, // 43: ipam.service.v1.DeviceService.SearchWardenSecrets:output_type -> ipam.service.v1.SearchWardenSecretsResponse
-	26, // 44: ipam.service.v1.DeviceService.GetWardenSecret:output_type -> ipam.service.v1.GetWardenSecretResponse
-	21, // 45: ipam.service.v1.DeviceService.StartKvmSession:output_type -> ipam.service.v1.StartKvmSessionResponse
-	34, // [34:46] is the sub-list for method output_type
-	22, // [22:34] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	28, // 2: ipam.service.v1.Device.last_seen:type_name -> google.protobuf.Timestamp
+	28, // 3: ipam.service.v1.Device.created_at:type_name -> google.protobuf.Timestamp
+	28, // 4: ipam.service.v1.Device.updated_at:type_name -> google.protobuf.Timestamp
+	28, // 5: ipam.service.v1.DeviceInterface.created_at:type_name -> google.protobuf.Timestamp
+	28, // 6: ipam.service.v1.DeviceInterface.updated_at:type_name -> google.protobuf.Timestamp
+	28, // 7: ipam.service.v1.DeviceInterface.link_last_seen:type_name -> google.protobuf.Timestamp
+	4,  // 8: ipam.service.v1.DeviceInterface.links:type_name -> ipam.service.v1.DeviceLink
+	28, // 9: ipam.service.v1.DeviceLink.link_last_seen:type_name -> google.protobuf.Timestamp
+	0,  // 10: ipam.service.v1.CreateDeviceRequest.device_type:type_name -> ipam.service.v1.DeviceType
+	1,  // 11: ipam.service.v1.CreateDeviceRequest.status:type_name -> ipam.service.v1.DeviceStatus
+	2,  // 12: ipam.service.v1.CreateDeviceResponse.device:type_name -> ipam.service.v1.Device
+	2,  // 13: ipam.service.v1.GetDeviceResponse.device:type_name -> ipam.service.v1.Device
+	0,  // 14: ipam.service.v1.ListDevicesRequest.device_type:type_name -> ipam.service.v1.DeviceType
+	1,  // 15: ipam.service.v1.ListDevicesRequest.status:type_name -> ipam.service.v1.DeviceStatus
+	2,  // 16: ipam.service.v1.ListDevicesResponse.items:type_name -> ipam.service.v1.Device
+	2,  // 17: ipam.service.v1.UpdateDeviceRequest.data:type_name -> ipam.service.v1.Device
+	29, // 18: ipam.service.v1.UpdateDeviceRequest.update_mask:type_name -> google.protobuf.FieldMask
+	2,  // 19: ipam.service.v1.UpdateDeviceResponse.device:type_name -> ipam.service.v1.Device
+	3,  // 20: ipam.service.v1.GetDeviceInterfacesResponse.interfaces:type_name -> ipam.service.v1.DeviceInterface
+	3,  // 21: ipam.service.v1.CreateDeviceInterfaceResponse.interface:type_name -> ipam.service.v1.DeviceInterface
+	23, // 22: ipam.service.v1.SearchWardenSecretsResponse.secrets:type_name -> ipam.service.v1.WardenSecretRef
+	23, // 23: ipam.service.v1.GetWardenSecretResponse.secret:type_name -> ipam.service.v1.WardenSecretRef
+	5,  // 24: ipam.service.v1.DeviceService.CreateDevice:input_type -> ipam.service.v1.CreateDeviceRequest
+	7,  // 25: ipam.service.v1.DeviceService.GetDevice:input_type -> ipam.service.v1.GetDeviceRequest
+	9,  // 26: ipam.service.v1.DeviceService.ListDevices:input_type -> ipam.service.v1.ListDevicesRequest
+	11, // 27: ipam.service.v1.DeviceService.UpdateDevice:input_type -> ipam.service.v1.UpdateDeviceRequest
+	13, // 28: ipam.service.v1.DeviceService.DeleteDevice:input_type -> ipam.service.v1.DeleteDeviceRequest
+	14, // 29: ipam.service.v1.DeviceService.GetDeviceAddresses:input_type -> ipam.service.v1.GetDeviceAddressesRequest
+	16, // 30: ipam.service.v1.DeviceService.GetDeviceInterfaces:input_type -> ipam.service.v1.GetDeviceInterfacesRequest
+	18, // 31: ipam.service.v1.DeviceService.CreateDeviceInterface:input_type -> ipam.service.v1.CreateDeviceInterfaceRequest
+	20, // 32: ipam.service.v1.DeviceService.DeleteDeviceInterface:input_type -> ipam.service.v1.DeleteDeviceInterfaceRequest
+	24, // 33: ipam.service.v1.DeviceService.SearchWardenSecrets:input_type -> ipam.service.v1.SearchWardenSecretsRequest
+	26, // 34: ipam.service.v1.DeviceService.GetWardenSecret:input_type -> ipam.service.v1.GetWardenSecretRequest
+	21, // 35: ipam.service.v1.DeviceService.StartKvmSession:input_type -> ipam.service.v1.StartKvmSessionRequest
+	6,  // 36: ipam.service.v1.DeviceService.CreateDevice:output_type -> ipam.service.v1.CreateDeviceResponse
+	8,  // 37: ipam.service.v1.DeviceService.GetDevice:output_type -> ipam.service.v1.GetDeviceResponse
+	10, // 38: ipam.service.v1.DeviceService.ListDevices:output_type -> ipam.service.v1.ListDevicesResponse
+	12, // 39: ipam.service.v1.DeviceService.UpdateDevice:output_type -> ipam.service.v1.UpdateDeviceResponse
+	30, // 40: ipam.service.v1.DeviceService.DeleteDevice:output_type -> google.protobuf.Empty
+	15, // 41: ipam.service.v1.DeviceService.GetDeviceAddresses:output_type -> ipam.service.v1.GetDeviceAddressesResponse
+	17, // 42: ipam.service.v1.DeviceService.GetDeviceInterfaces:output_type -> ipam.service.v1.GetDeviceInterfacesResponse
+	19, // 43: ipam.service.v1.DeviceService.CreateDeviceInterface:output_type -> ipam.service.v1.CreateDeviceInterfaceResponse
+	30, // 44: ipam.service.v1.DeviceService.DeleteDeviceInterface:output_type -> google.protobuf.Empty
+	25, // 45: ipam.service.v1.DeviceService.SearchWardenSecrets:output_type -> ipam.service.v1.SearchWardenSecretsResponse
+	27, // 46: ipam.service.v1.DeviceService.GetWardenSecret:output_type -> ipam.service.v1.GetWardenSecretResponse
+	22, // 47: ipam.service.v1.DeviceService.StartKvmSession:output_type -> ipam.service.v1.StartKvmSessionResponse
+	36, // [36:48] is the sub-list for method output_type
+	24, // [24:36] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_ipam_service_v1_device_proto_init() }
@@ -2582,20 +2699,21 @@ func file_ipam_service_v1_device_proto_init() {
 	file_ipam_service_v1_device_proto_msgTypes[0].OneofWrappers = []any{}
 	file_ipam_service_v1_device_proto_msgTypes[1].OneofWrappers = []any{}
 	file_ipam_service_v1_device_proto_msgTypes[2].OneofWrappers = []any{}
-	file_ipam_service_v1_device_proto_msgTypes[6].OneofWrappers = []any{}
+	file_ipam_service_v1_device_proto_msgTypes[3].OneofWrappers = []any{}
 	file_ipam_service_v1_device_proto_msgTypes[7].OneofWrappers = []any{}
 	file_ipam_service_v1_device_proto_msgTypes[8].OneofWrappers = []any{}
-	file_ipam_service_v1_device_proto_msgTypes[10].OneofWrappers = []any{}
-	file_ipam_service_v1_device_proto_msgTypes[15].OneofWrappers = []any{}
-	file_ipam_service_v1_device_proto_msgTypes[21].OneofWrappers = []any{}
-	file_ipam_service_v1_device_proto_msgTypes[24].OneofWrappers = []any{}
+	file_ipam_service_v1_device_proto_msgTypes[9].OneofWrappers = []any{}
+	file_ipam_service_v1_device_proto_msgTypes[11].OneofWrappers = []any{}
+	file_ipam_service_v1_device_proto_msgTypes[16].OneofWrappers = []any{}
+	file_ipam_service_v1_device_proto_msgTypes[22].OneofWrappers = []any{}
+	file_ipam_service_v1_device_proto_msgTypes[25].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipam_service_v1_device_proto_rawDesc), len(file_ipam_service_v1_device_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   25,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

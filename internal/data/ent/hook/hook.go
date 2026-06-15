@@ -45,6 +45,18 @@ func (f DeviceInterfaceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeviceInterfaceMutation", m)
 }
 
+// The DeviceInterfaceLinkFunc type is an adapter to allow the use of ordinary
+// function as DeviceInterfaceLink mutator.
+type DeviceInterfaceLinkFunc func(context.Context, *ent.DeviceInterfaceLinkMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DeviceInterfaceLinkFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DeviceInterfaceLinkMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeviceInterfaceLinkMutation", m)
+}
+
 // The DevicePackageFunc type is an adapter to allow the use of ordinary
 // function as DevicePackage mutator.
 type DevicePackageFunc func(context.Context, *ent.DevicePackageMutation) (ent.Value, error)

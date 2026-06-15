@@ -447,7 +447,7 @@ const isSwitchDevice = computed(
 );
 const hasDiscoveredInterfaces = computed(() => deviceInterfaces.value.length > 0);
 const hasDiscoveredLinks = computed(() =>
-  deviceInterfaces.value.some((i) => !!i.remotePortName || !!i.remoteInterfaceId),
+  deviceInterfaces.value.some((i) => interfaceLinks(i).length > 0),
 );
 
 // --- IPMI Warden secret reference (a pointer to a secret, never the value) ---
@@ -538,12 +538,16 @@ async function loadDeviceInterfaces(deviceId: string): Promise<void> {
   }
 }
 
-// Resolve neighbor (switch) device names for the "Connected To" column.
+// Resolve neighbor (switch) device names for the "Connected To" column —
+// including every link, since an interface can connect to multiple switches.
 async function resolveRemoteDeviceNames(): Promise<void> {
   const ids = [
     ...new Set(
       deviceInterfaces.value
-        .map((i) => i.remoteDeviceId)
+        .flatMap((i) => [
+          i.remoteDeviceId,
+          ...interfaceLinks(i).map((l) => l.remoteDeviceId),
+        ])
         .filter((v): v is string => !!v),
     ),
   ];
@@ -583,22 +587,57 @@ function shortPortName(port: string): string {
   return m ? m[0] : port;
 }
 
-function connectedToLabel(row: DeviceInterface): string {
-  if (!row.remotePortName && !row.remoteInterfaceId) return '';
-  const remoteName = row.remoteDeviceId
-    ? remoteDeviceNames.value[row.remoteDeviceId]
+// One discovered link, structurally identical whether it comes from the
+// structured `links` array or the legacy flat remote_* fields.
+type InterfaceLink = NonNullable<DeviceInterface['links']>[number];
+
+// All links for an interface: the structured list when present (multiple
+// switches via LACP/MLAG), otherwise a single synthesized link from the flat
+// remote_* fields (hypervisor / manual / legacy single link).
+function interfaceLinks(row: DeviceInterface): InterfaceLink[] {
+  if (row.links && row.links.length > 0) return row.links;
+  if (row.remotePortName || row.remoteInterfaceId) {
+    return [
+      {
+        remoteDeviceId: row.remoteDeviceId,
+        remoteInterfaceId: row.remoteInterfaceId,
+        remotePortName: row.remotePortName,
+        linkSource: row.linkSource,
+        linkVlan: row.linkVlan,
+      },
+    ];
+  }
+  return [];
+}
+
+// Label for a single link, e.g. "cs1 · Port 27" (switch) or "b1 (VM 101)"
+// (hypervisor).
+function linkLabel(link: InterfaceLink): string {
+  const remoteName = link.remoteDeviceId
+    ? remoteDeviceNames.value[link.remoteDeviceId]
     : undefined;
   // Hypervisor links: the guest is hosted on the remote (Proxmox) device. Show
   // the host prominently — the "port" carries the VM/CT id (e.g. "VM 101").
-  if (row.linkSource === 'hypervisor' && remoteName) {
-    const slot = row.remotePortName ? ` (${row.remotePortName})` : '';
+  if (link.linkSource === 'hypervisor' && remoteName) {
+    const slot = link.remotePortName ? ` (${link.remotePortName})` : '';
     return `${shortHost(remoteName)}${slot}`;
   }
-  const port = shortPortName(row.remotePortName ?? row.remoteInterfaceId ?? '');
+  const port = shortPortName(link.remotePortName ?? link.remoteInterfaceId ?? '');
   return remoteName ? `${shortHost(remoteName)} · ${port}` : port;
 }
 
 // Tag colour distinguishes a hypervisor "hosted on" link from an SNMP switch link.
+function linkColor(link: InterfaceLink): string {
+  return link.linkSource === 'hypervisor' ? 'purple' : 'blue';
+}
+
+// Single-link label, kept for the IPMI "Connected To" descriptions item.
+function connectedToLabel(row: DeviceInterface): string {
+  const links = interfaceLinks(row);
+  return links.length > 0 ? linkLabel(links[0]!) : '';
+}
+
+// Tag colour for the single-link (IPMI) display.
 function linkTagColor(row: DeviceInterface): string {
   return row.linkSource === 'hypervisor' ? 'purple' : 'blue';
 }
@@ -991,12 +1030,14 @@ const interfaceColumns = [
                   {{ formatSpeed((record as DeviceInterface).speedMbps) }}
                 </template>
                 <template v-else-if="column.key === 'connectedTo'">
-                  <template v-if="connectedToLabel(record as DeviceInterface)">
-                    <Tag :color="linkTagColor(record as DeviceInterface)" style="white-space: normal; height: auto; margin: 0;">
-                      {{ connectedToLabel(record as DeviceInterface) }}
-                    </Tag>
-                    <Tag v-if="(record as DeviceInterface).linkVlan" color="geekblue">
-                      {{ $t('ipam.page.device.linkVlan') }} {{ (record as DeviceInterface).linkVlan }}
+                  <template v-if="interfaceLinks(record as DeviceInterface).length">
+                    <Tag
+                      v-for="(lnk, idx) in interfaceLinks(record as DeviceInterface)"
+                      :key="idx"
+                      :color="linkColor(lnk)"
+                      style="white-space: normal; height: auto; margin: 0 4px 4px 0;"
+                    >
+                      {{ linkLabel(lnk) }}<template v-if="lnk.linkVlan"> · {{ $t('ipam.page.device.linkVlan') }} {{ lnk.linkVlan }}</template>
                     </Tag>
                   </template>
                   <span v-else>-</span>

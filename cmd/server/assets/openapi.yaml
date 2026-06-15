@@ -452,6 +452,35 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/GetDeviceAddressesResponse'
+    /v1/devices/{id}/kvm-session:
+        post:
+            tags:
+                - DeviceService
+            description: |-
+                Start an IPMI/BMC KVM session for a device. Platform-admin only. Resolves
+                 the device's BMC IP + linked Warden credentials, logs into the BMC, and
+                 returns a short-lived token + the proxy console URL. The credentials never
+                 leave the server.
+            operationId: DeviceService_StartKvmSession
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/StartKvmSessionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/StartKvmSessionResponse'
     /v1/dns-config:
         get:
             tags:
@@ -2056,6 +2085,51 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/GetVlanSubnetsResponse'
+    /v1/warden-secrets:
+        get:
+            tags:
+                - DeviceService
+            description: |-
+                Search Warden secrets (metadata only) so a device can reference one as its
+                 IPMI/BMC credentials. Proxies to the Warden module over the mTLS mesh; never
+                 returns secret values.
+            operationId: DeviceService_SearchWardenSecrets
+            parameters:
+                - name: query
+                  in: query
+                  schema:
+                    type: string
+                - name: limit
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SearchWardenSecretsResponse'
+    /v1/warden-secrets/{id}:
+        get:
+            tags:
+                - DeviceService
+            description: Resolve a single Warden secret's metadata by id (for display).
+            operationId: DeviceService_GetWardenSecret
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetWardenSecretResponse'
 components:
     schemas:
         AddHostGroupMemberRequest:
@@ -2295,11 +2369,11 @@ components:
                     type: string
                 notes:
                     type: string
-                ipmiSecretRef:
-                    type: string
                 deviceHeightU:
                     type: integer
                     format: int32
+                ipmiSecretRef:
+                    type: string
             description: CreateDeviceRequest creates a new device
         CreateDeviceResponse:
             type: object
@@ -2735,9 +2809,6 @@ components:
                 notes:
                     type: string
                     description: Notes
-                ipmiSecretRef:
-                    type: string
-                    description: Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value
                 lastSeen:
                     type: string
                     description: Last discovered/seen
@@ -2758,6 +2829,11 @@ components:
                     type: integer
                     description: Last updater user ID
                     format: uint32
+                ipmiSecretRef:
+                    type: string
+                    description: |-
+                        Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only,
+                         never the secret value.
                 packageUpdateCount:
                     type: integer
                     description: Package update counts (populated in list responses)
@@ -2794,7 +2870,38 @@ components:
                     format: date-time
                 ifIndex:
                     type: integer
+                    description: SNMP ifIndex — identifies a switch port / interface within its device.
                     format: int32
+                remoteDeviceId:
+                    type: string
+                    description: |-
+                        Layer-2 neighbor link (e.g. server NIC -> switch port), discovered via the
+                         bridge forwarding database during a network scan.
+                remoteInterfaceId:
+                    type: string
+                remotePortName:
+                    type: string
+                linkSource:
+                    type: string
+                linkVlan:
+                    type: integer
+                    format: int32
+                linkLastSeen:
+                    type: string
+                    format: date-time
+                links:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/DeviceLink'
+                    description: |-
+                        All discovered Layer-2 links for this interface. An interface can connect to
+                         multiple switches (an LACP bond across an MLAG pair is learned on both), so
+                         the single remote_* fields above only carry the "best" link. When empty,
+                         clients should fall back to the remote_* fields.
+            description: DeviceInterface represents a network interface on a device
+        DeviceLink:
+            type: object
+            properties:
                 remoteDeviceId:
                     type: string
                 remoteInterfaceId:
@@ -2809,7 +2916,7 @@ components:
                 linkLastSeen:
                     type: string
                     format: date-time
-            description: DeviceInterface represents a network interface on a device
+            description: DeviceLink is one discovered Layer-2 neighbor link (interface -> remote port).
         DevicePackage:
             type: object
             properties:
@@ -3064,6 +3171,11 @@ components:
                     type: array
                     items:
                         type: string
+        GetWardenSecretResponse:
+            type: object
+            properties:
+                secret:
+                    $ref: '#/components/schemas/WardenSecretRef'
         HealthCheckResponse:
             type: object
             properties:
@@ -3498,6 +3610,9 @@ components:
                 snmpDiscoveredCount:
                     type: string
                     description: Number of SNMP devices discovered
+                enableDnsUpdate:
+                    type: boolean
+                    description: Whether DNS-sync events were fired for discovered hosts
                 startedAt:
                     type: string
                     description: When the scan started
@@ -3809,6 +3924,32 @@ components:
                 newAddresses:
                     type: integer
                     format: int32
+        SearchWardenSecretsResponse:
+            type: object
+            properties:
+                secrets:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/WardenSecretRef'
+        StartKvmSessionRequest:
+            required:
+                - id
+            type: object
+            properties:
+                id:
+                    type: string
+        StartKvmSessionResponse:
+            type: object
+            properties:
+                token:
+                    type: string
+                    description: Opaque short-lived session token.
+                consoleUrl:
+                    type: string
+                    description: Relative URL (under the module asset path) to load in an iframe/new tab.
+                bmcHost:
+                    type: string
+                    description: The BMC host the session targets (for display).
         StartScanRequest:
             required:
                 - tenantId
@@ -3827,6 +3968,11 @@ components:
                 enableSnmp:
                     type: boolean
                     description: Enable SNMP device discovery during scan
+                enableDnsUpdate:
+                    type: boolean
+                    description: |-
+                        Fire DNS-sync events for discovered hosts (handled by go-tangra-dns,
+                         which creates/updates A + PTR records). Optional, like enable_snmp.
             description: StartScanRequest starts a new scan for a subnet
         StartScanResponse:
             type: object
@@ -4295,6 +4441,20 @@ components:
                     description: Last updater user ID
                     format: uint32
             description: Vlan represents a Virtual LAN
+        WardenSecretRef:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                folderPath:
+                    type: string
+                username:
+                    type: string
+            description: |-
+                WardenSecretRef is the minimal Warden secret metadata used to pick/display a
+                 reference. It never carries the secret value.
 tags:
     - name: BackupService
     - name: DevicePackageService

@@ -63,9 +63,11 @@ type DeviceInterface struct {
 type DeviceInterfaceEdges struct {
 	// Device holds the value of the device edge.
 	Device *Device `json:"device,omitempty"`
+	// Links holds the value of the links edge.
+	Links []*DeviceInterfaceLink `json:"links,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // DeviceOrErr returns the Device value or an error if the edge
@@ -77,6 +79,15 @@ func (e DeviceInterfaceEdges) DeviceOrErr() (*Device, error) {
 		return nil, &NotFoundError{label: device.Label}
 	}
 	return nil, &NotLoadedError{edge: "device"}
+}
+
+// LinksOrErr returns the Links value or an error if the edge
+// was not loaded in eager-loading.
+func (e DeviceInterfaceEdges) LinksOrErr() ([]*DeviceInterfaceLink, error) {
+	if e.loadedTypes[1] {
+		return e.Links, nil
+	}
+	return nil, &NotLoadedError{edge: "links"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -238,6 +249,11 @@ func (_m *DeviceInterface) Value(name string) (ent.Value, error) {
 // QueryDevice queries the "device" edge of the DeviceInterface entity.
 func (_m *DeviceInterface) QueryDevice() *DeviceQuery {
 	return NewDeviceInterfaceClient(_m.config).QueryDevice(_m)
+}
+
+// QueryLinks queries the "links" edge of the DeviceInterface entity.
+func (_m *DeviceInterface) QueryLinks() *DeviceInterfaceLinkQuery {
+	return NewDeviceInterfaceClient(_m.config).QueryLinks(_m)
 }
 
 // Update returns a builder for updating this DeviceInterface.

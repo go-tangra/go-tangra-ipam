@@ -102,6 +102,11 @@ func (DeviceInterface) Edges() []ent.Edge {
 			Field("device_id").
 			Unique().
 			Required(),
+		// Discovered Layer-2 links to remote ports. An interface can connect to
+		// multiple switches (LACP bond across an MLAG pair). Cascade-delete the
+		// links when the interface is removed.
+		edge.To("links", DeviceInterfaceLink.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
 	}
 }
 

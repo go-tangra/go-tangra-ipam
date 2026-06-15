@@ -168,6 +168,22 @@ message DeviceInterface {
   optional string link_source = 16 [json_name = "linkSource"];
   optional int32 link_vlan = 17 [json_name = "linkVlan"];
   optional google.protobuf.Timestamp link_last_seen = 18 [json_name = "linkLastSeen"];
+
+  // All discovered Layer-2 links for this interface. An interface can connect to
+  // multiple switches (an LACP bond across an MLAG pair is learned on both), so
+  // the single remote_* fields above only carry the "best" link. When empty,
+  // clients should fall back to the remote_* fields.
+  repeated DeviceLink links = 19 [json_name = "links"];
+}
+
+// DeviceLink is one discovered Layer-2 neighbor link (interface -> remote port).
+message DeviceLink {
+  optional string remote_device_id = 1 [json_name = "remoteDeviceId"];
+  optional string remote_interface_id = 2 [json_name = "remoteInterfaceId"];
+  optional string remote_port_name = 3 [json_name = "remotePortName"];
+  optional string link_source = 4 [json_name = "linkSource"];
+  optional int32 link_vlan = 5 [json_name = "linkVlan"];
+  optional google.protobuf.Timestamp link_last_seen = 6 [json_name = "linkLastSeen"];
 }
 
 // CreateDeviceRequest creates a new device

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
@@ -358,6 +359,21 @@ func (_u *DeviceInterfaceUpdate) SetDevice(v *Device) *DeviceInterfaceUpdate {
 	return _u.SetDeviceID(v.ID)
 }
 
+// AddLinkIDs adds the "links" edge to the DeviceInterfaceLink entity by IDs.
+func (_u *DeviceInterfaceUpdate) AddLinkIDs(ids ...string) *DeviceInterfaceUpdate {
+	_u.mutation.AddLinkIDs(ids...)
+	return _u
+}
+
+// AddLinks adds the "links" edges to the DeviceInterfaceLink entity.
+func (_u *DeviceInterfaceUpdate) AddLinks(v ...*DeviceInterfaceLink) *DeviceInterfaceUpdate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddLinkIDs(ids...)
+}
+
 // Mutation returns the DeviceInterfaceMutation object of the builder.
 func (_u *DeviceInterfaceUpdate) Mutation() *DeviceInterfaceMutation {
 	return _u.mutation
@@ -367,6 +383,27 @@ func (_u *DeviceInterfaceUpdate) Mutation() *DeviceInterfaceMutation {
 func (_u *DeviceInterfaceUpdate) ClearDevice() *DeviceInterfaceUpdate {
 	_u.mutation.ClearDevice()
 	return _u
+}
+
+// ClearLinks clears all "links" edges to the DeviceInterfaceLink entity.
+func (_u *DeviceInterfaceUpdate) ClearLinks() *DeviceInterfaceUpdate {
+	_u.mutation.ClearLinks()
+	return _u
+}
+
+// RemoveLinkIDs removes the "links" edge to DeviceInterfaceLink entities by IDs.
+func (_u *DeviceInterfaceUpdate) RemoveLinkIDs(ids ...string) *DeviceInterfaceUpdate {
+	_u.mutation.RemoveLinkIDs(ids...)
+	return _u
+}
+
+// RemoveLinks removes "links" edges to DeviceInterfaceLink entities.
+func (_u *DeviceInterfaceUpdate) RemoveLinks(v ...*DeviceInterfaceLink) *DeviceInterfaceUpdate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveLinkIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -550,6 +587,51 @@ func (_u *DeviceInterfaceUpdate) sqlSave(ctx context.Context) (_node int, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(device.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.LinksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deviceinterface.LinksTable,
+			Columns: []string{deviceinterface.LinksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deviceinterfacelink.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedLinksIDs(); len(nodes) > 0 && !_u.mutation.LinksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deviceinterface.LinksTable,
+			Columns: []string{deviceinterface.LinksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deviceinterfacelink.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.LinksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deviceinterface.LinksTable,
+			Columns: []string{deviceinterface.LinksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deviceinterfacelink.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {
@@ -907,6 +989,21 @@ func (_u *DeviceInterfaceUpdateOne) SetDevice(v *Device) *DeviceInterfaceUpdateO
 	return _u.SetDeviceID(v.ID)
 }
 
+// AddLinkIDs adds the "links" edge to the DeviceInterfaceLink entity by IDs.
+func (_u *DeviceInterfaceUpdateOne) AddLinkIDs(ids ...string) *DeviceInterfaceUpdateOne {
+	_u.mutation.AddLinkIDs(ids...)
+	return _u
+}
+
+// AddLinks adds the "links" edges to the DeviceInterfaceLink entity.
+func (_u *DeviceInterfaceUpdateOne) AddLinks(v ...*DeviceInterfaceLink) *DeviceInterfaceUpdateOne {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddLinkIDs(ids...)
+}
+
 // Mutation returns the DeviceInterfaceMutation object of the builder.
 func (_u *DeviceInterfaceUpdateOne) Mutation() *DeviceInterfaceMutation {
 	return _u.mutation
@@ -916,6 +1013,27 @@ func (_u *DeviceInterfaceUpdateOne) Mutation() *DeviceInterfaceMutation {
 func (_u *DeviceInterfaceUpdateOne) ClearDevice() *DeviceInterfaceUpdateOne {
 	_u.mutation.ClearDevice()
 	return _u
+}
+
+// ClearLinks clears all "links" edges to the DeviceInterfaceLink entity.
+func (_u *DeviceInterfaceUpdateOne) ClearLinks() *DeviceInterfaceUpdateOne {
+	_u.mutation.ClearLinks()
+	return _u
+}
+
+// RemoveLinkIDs removes the "links" edge to DeviceInterfaceLink entities by IDs.
+func (_u *DeviceInterfaceUpdateOne) RemoveLinkIDs(ids ...string) *DeviceInterfaceUpdateOne {
+	_u.mutation.RemoveLinkIDs(ids...)
+	return _u
+}
+
+// RemoveLinks removes "links" edges to DeviceInterfaceLink entities.
+func (_u *DeviceInterfaceUpdateOne) RemoveLinks(v ...*DeviceInterfaceLink) *DeviceInterfaceUpdateOne {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveLinkIDs(ids...)
 }
 
 // Where appends a list predicates to the DeviceInterfaceUpdate builder.
@@ -1129,6 +1247,51 @@ func (_u *DeviceInterfaceUpdateOne) sqlSave(ctx context.Context) (_node *DeviceI
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(device.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.LinksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deviceinterface.LinksTable,
+			Columns: []string{deviceinterface.LinksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deviceinterfacelink.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedLinksIDs(); len(nodes) > 0 && !_u.mutation.LinksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deviceinterface.LinksTable,
+			Columns: []string{deviceinterface.LinksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deviceinterfacelink.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.LinksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deviceinterface.LinksTable,
+			Columns: []string{deviceinterface.LinksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deviceinterfacelink.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {

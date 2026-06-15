@@ -4,7 +4,6 @@ package ent
 
 import (
 	"context"
-	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -13,61 +12,59 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/predicate"
 )
 
-// DeviceInterfaceQuery is the builder for querying DeviceInterface entities.
-type DeviceInterfaceQuery struct {
+// DeviceInterfaceLinkQuery is the builder for querying DeviceInterfaceLink entities.
+type DeviceInterfaceLinkQuery struct {
 	config
-	ctx        *QueryContext
-	order      []deviceinterface.OrderOption
-	inters     []Interceptor
-	predicates []predicate.DeviceInterface
-	withDevice *DeviceQuery
-	withLinks  *DeviceInterfaceLinkQuery
-	modifiers  []func(*sql.Selector)
+	ctx           *QueryContext
+	order         []deviceinterfacelink.OrderOption
+	inters        []Interceptor
+	predicates    []predicate.DeviceInterfaceLink
+	withInterface *DeviceInterfaceQuery
+	modifiers     []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
 }
 
-// Where adds a new predicate for the DeviceInterfaceQuery builder.
-func (_q *DeviceInterfaceQuery) Where(ps ...predicate.DeviceInterface) *DeviceInterfaceQuery {
+// Where adds a new predicate for the DeviceInterfaceLinkQuery builder.
+func (_q *DeviceInterfaceLinkQuery) Where(ps ...predicate.DeviceInterfaceLink) *DeviceInterfaceLinkQuery {
 	_q.predicates = append(_q.predicates, ps...)
 	return _q
 }
 
 // Limit the number of records to be returned by this query.
-func (_q *DeviceInterfaceQuery) Limit(limit int) *DeviceInterfaceQuery {
+func (_q *DeviceInterfaceLinkQuery) Limit(limit int) *DeviceInterfaceLinkQuery {
 	_q.ctx.Limit = &limit
 	return _q
 }
 
 // Offset to start from.
-func (_q *DeviceInterfaceQuery) Offset(offset int) *DeviceInterfaceQuery {
+func (_q *DeviceInterfaceLinkQuery) Offset(offset int) *DeviceInterfaceLinkQuery {
 	_q.ctx.Offset = &offset
 	return _q
 }
 
 // Unique configures the query builder to filter duplicate records on query.
 // By default, unique is set to true, and can be disabled using this method.
-func (_q *DeviceInterfaceQuery) Unique(unique bool) *DeviceInterfaceQuery {
+func (_q *DeviceInterfaceLinkQuery) Unique(unique bool) *DeviceInterfaceLinkQuery {
 	_q.ctx.Unique = &unique
 	return _q
 }
 
 // Order specifies how the records should be ordered.
-func (_q *DeviceInterfaceQuery) Order(o ...deviceinterface.OrderOption) *DeviceInterfaceQuery {
+func (_q *DeviceInterfaceLinkQuery) Order(o ...deviceinterfacelink.OrderOption) *DeviceInterfaceLinkQuery {
 	_q.order = append(_q.order, o...)
 	return _q
 }
 
-// QueryDevice chains the current query on the "device" edge.
-func (_q *DeviceInterfaceQuery) QueryDevice() *DeviceQuery {
-	query := (&DeviceClient{config: _q.config}).Query()
+// QueryInterface chains the current query on the "interface" edge.
+func (_q *DeviceInterfaceLinkQuery) QueryInterface() *DeviceInterfaceQuery {
+	query := (&DeviceInterfaceClient{config: _q.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := _q.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -77,9 +74,9 @@ func (_q *DeviceInterfaceQuery) QueryDevice() *DeviceQuery {
 			return nil, err
 		}
 		step := sqlgraph.NewStep(
-			sqlgraph.From(deviceinterface.Table, deviceinterface.FieldID, selector),
-			sqlgraph.To(device.Table, device.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, deviceinterface.DeviceTable, deviceinterface.DeviceColumn),
+			sqlgraph.From(deviceinterfacelink.Table, deviceinterfacelink.FieldID, selector),
+			sqlgraph.To(deviceinterface.Table, deviceinterface.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, deviceinterfacelink.InterfaceTable, deviceinterfacelink.InterfaceColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -87,43 +84,21 @@ func (_q *DeviceInterfaceQuery) QueryDevice() *DeviceQuery {
 	return query
 }
 
-// QueryLinks chains the current query on the "links" edge.
-func (_q *DeviceInterfaceQuery) QueryLinks() *DeviceInterfaceLinkQuery {
-	query := (&DeviceInterfaceLinkClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(deviceinterface.Table, deviceinterface.FieldID, selector),
-			sqlgraph.To(deviceinterfacelink.Table, deviceinterfacelink.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, deviceinterface.LinksTable, deviceinterface.LinksColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// First returns the first DeviceInterface entity from the query.
-// Returns a *NotFoundError when no DeviceInterface was found.
-func (_q *DeviceInterfaceQuery) First(ctx context.Context) (*DeviceInterface, error) {
+// First returns the first DeviceInterfaceLink entity from the query.
+// Returns a *NotFoundError when no DeviceInterfaceLink was found.
+func (_q *DeviceInterfaceLinkQuery) First(ctx context.Context) (*DeviceInterfaceLink, error) {
 	nodes, err := _q.Limit(1).All(setContextOp(ctx, _q.ctx, ent.OpQueryFirst))
 	if err != nil {
 		return nil, err
 	}
 	if len(nodes) == 0 {
-		return nil, &NotFoundError{deviceinterface.Label}
+		return nil, &NotFoundError{deviceinterfacelink.Label}
 	}
 	return nodes[0], nil
 }
 
 // FirstX is like First, but panics if an error occurs.
-func (_q *DeviceInterfaceQuery) FirstX(ctx context.Context) *DeviceInterface {
+func (_q *DeviceInterfaceLinkQuery) FirstX(ctx context.Context) *DeviceInterfaceLink {
 	node, err := _q.First(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -131,22 +106,22 @@ func (_q *DeviceInterfaceQuery) FirstX(ctx context.Context) *DeviceInterface {
 	return node
 }
 
-// FirstID returns the first DeviceInterface ID from the query.
-// Returns a *NotFoundError when no DeviceInterface ID was found.
-func (_q *DeviceInterfaceQuery) FirstID(ctx context.Context) (id string, err error) {
+// FirstID returns the first DeviceInterfaceLink ID from the query.
+// Returns a *NotFoundError when no DeviceInterfaceLink ID was found.
+func (_q *DeviceInterfaceLinkQuery) FirstID(ctx context.Context) (id string, err error) {
 	var ids []string
 	if ids, err = _q.Limit(1).IDs(setContextOp(ctx, _q.ctx, ent.OpQueryFirstID)); err != nil {
 		return
 	}
 	if len(ids) == 0 {
-		err = &NotFoundError{deviceinterface.Label}
+		err = &NotFoundError{deviceinterfacelink.Label}
 		return
 	}
 	return ids[0], nil
 }
 
 // FirstIDX is like FirstID, but panics if an error occurs.
-func (_q *DeviceInterfaceQuery) FirstIDX(ctx context.Context) string {
+func (_q *DeviceInterfaceLinkQuery) FirstIDX(ctx context.Context) string {
 	id, err := _q.FirstID(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -154,10 +129,10 @@ func (_q *DeviceInterfaceQuery) FirstIDX(ctx context.Context) string {
 	return id
 }
 
-// Only returns a single DeviceInterface entity found by the query, ensuring it only returns one.
-// Returns a *NotSingularError when more than one DeviceInterface entity is found.
-// Returns a *NotFoundError when no DeviceInterface entities are found.
-func (_q *DeviceInterfaceQuery) Only(ctx context.Context) (*DeviceInterface, error) {
+// Only returns a single DeviceInterfaceLink entity found by the query, ensuring it only returns one.
+// Returns a *NotSingularError when more than one DeviceInterfaceLink entity is found.
+// Returns a *NotFoundError when no DeviceInterfaceLink entities are found.
+func (_q *DeviceInterfaceLinkQuery) Only(ctx context.Context) (*DeviceInterfaceLink, error) {
 	nodes, err := _q.Limit(2).All(setContextOp(ctx, _q.ctx, ent.OpQueryOnly))
 	if err != nil {
 		return nil, err
@@ -166,14 +141,14 @@ func (_q *DeviceInterfaceQuery) Only(ctx context.Context) (*DeviceInterface, err
 	case 1:
 		return nodes[0], nil
 	case 0:
-		return nil, &NotFoundError{deviceinterface.Label}
+		return nil, &NotFoundError{deviceinterfacelink.Label}
 	default:
-		return nil, &NotSingularError{deviceinterface.Label}
+		return nil, &NotSingularError{deviceinterfacelink.Label}
 	}
 }
 
 // OnlyX is like Only, but panics if an error occurs.
-func (_q *DeviceInterfaceQuery) OnlyX(ctx context.Context) *DeviceInterface {
+func (_q *DeviceInterfaceLinkQuery) OnlyX(ctx context.Context) *DeviceInterfaceLink {
 	node, err := _q.Only(ctx)
 	if err != nil {
 		panic(err)
@@ -181,10 +156,10 @@ func (_q *DeviceInterfaceQuery) OnlyX(ctx context.Context) *DeviceInterface {
 	return node
 }
 
-// OnlyID is like Only, but returns the only DeviceInterface ID in the query.
-// Returns a *NotSingularError when more than one DeviceInterface ID is found.
+// OnlyID is like Only, but returns the only DeviceInterfaceLink ID in the query.
+// Returns a *NotSingularError when more than one DeviceInterfaceLink ID is found.
 // Returns a *NotFoundError when no entities are found.
-func (_q *DeviceInterfaceQuery) OnlyID(ctx context.Context) (id string, err error) {
+func (_q *DeviceInterfaceLinkQuery) OnlyID(ctx context.Context) (id string, err error) {
 	var ids []string
 	if ids, err = _q.Limit(2).IDs(setContextOp(ctx, _q.ctx, ent.OpQueryOnlyID)); err != nil {
 		return
@@ -193,15 +168,15 @@ func (_q *DeviceInterfaceQuery) OnlyID(ctx context.Context) (id string, err erro
 	case 1:
 		id = ids[0]
 	case 0:
-		err = &NotFoundError{deviceinterface.Label}
+		err = &NotFoundError{deviceinterfacelink.Label}
 	default:
-		err = &NotSingularError{deviceinterface.Label}
+		err = &NotSingularError{deviceinterfacelink.Label}
 	}
 	return
 }
 
 // OnlyIDX is like OnlyID, but panics if an error occurs.
-func (_q *DeviceInterfaceQuery) OnlyIDX(ctx context.Context) string {
+func (_q *DeviceInterfaceLinkQuery) OnlyIDX(ctx context.Context) string {
 	id, err := _q.OnlyID(ctx)
 	if err != nil {
 		panic(err)
@@ -209,18 +184,18 @@ func (_q *DeviceInterfaceQuery) OnlyIDX(ctx context.Context) string {
 	return id
 }
 
-// All executes the query and returns a list of DeviceInterfaces.
-func (_q *DeviceInterfaceQuery) All(ctx context.Context) ([]*DeviceInterface, error) {
+// All executes the query and returns a list of DeviceInterfaceLinks.
+func (_q *DeviceInterfaceLinkQuery) All(ctx context.Context) ([]*DeviceInterfaceLink, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryAll)
 	if err := _q.prepareQuery(ctx); err != nil {
 		return nil, err
 	}
-	qr := querierAll[[]*DeviceInterface, *DeviceInterfaceQuery]()
-	return withInterceptors[[]*DeviceInterface](ctx, _q, qr, _q.inters)
+	qr := querierAll[[]*DeviceInterfaceLink, *DeviceInterfaceLinkQuery]()
+	return withInterceptors[[]*DeviceInterfaceLink](ctx, _q, qr, _q.inters)
 }
 
 // AllX is like All, but panics if an error occurs.
-func (_q *DeviceInterfaceQuery) AllX(ctx context.Context) []*DeviceInterface {
+func (_q *DeviceInterfaceLinkQuery) AllX(ctx context.Context) []*DeviceInterfaceLink {
 	nodes, err := _q.All(ctx)
 	if err != nil {
 		panic(err)
@@ -228,20 +203,20 @@ func (_q *DeviceInterfaceQuery) AllX(ctx context.Context) []*DeviceInterface {
 	return nodes
 }
 
-// IDs executes the query and returns a list of DeviceInterface IDs.
-func (_q *DeviceInterfaceQuery) IDs(ctx context.Context) (ids []string, err error) {
+// IDs executes the query and returns a list of DeviceInterfaceLink IDs.
+func (_q *DeviceInterfaceLinkQuery) IDs(ctx context.Context) (ids []string, err error) {
 	if _q.ctx.Unique == nil && _q.path != nil {
 		_q.Unique(true)
 	}
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryIDs)
-	if err = _q.Select(deviceinterface.FieldID).Scan(ctx, &ids); err != nil {
+	if err = _q.Select(deviceinterfacelink.FieldID).Scan(ctx, &ids); err != nil {
 		return nil, err
 	}
 	return ids, nil
 }
 
 // IDsX is like IDs, but panics if an error occurs.
-func (_q *DeviceInterfaceQuery) IDsX(ctx context.Context) []string {
+func (_q *DeviceInterfaceLinkQuery) IDsX(ctx context.Context) []string {
 	ids, err := _q.IDs(ctx)
 	if err != nil {
 		panic(err)
@@ -250,16 +225,16 @@ func (_q *DeviceInterfaceQuery) IDsX(ctx context.Context) []string {
 }
 
 // Count returns the count of the given query.
-func (_q *DeviceInterfaceQuery) Count(ctx context.Context) (int, error) {
+func (_q *DeviceInterfaceLinkQuery) Count(ctx context.Context) (int, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryCount)
 	if err := _q.prepareQuery(ctx); err != nil {
 		return 0, err
 	}
-	return withInterceptors[int](ctx, _q, querierCount[*DeviceInterfaceQuery](), _q.inters)
+	return withInterceptors[int](ctx, _q, querierCount[*DeviceInterfaceLinkQuery](), _q.inters)
 }
 
 // CountX is like Count, but panics if an error occurs.
-func (_q *DeviceInterfaceQuery) CountX(ctx context.Context) int {
+func (_q *DeviceInterfaceLinkQuery) CountX(ctx context.Context) int {
 	count, err := _q.Count(ctx)
 	if err != nil {
 		panic(err)
@@ -268,7 +243,7 @@ func (_q *DeviceInterfaceQuery) CountX(ctx context.Context) int {
 }
 
 // Exist returns true if the query has elements in the graph.
-func (_q *DeviceInterfaceQuery) Exist(ctx context.Context) (bool, error) {
+func (_q *DeviceInterfaceLinkQuery) Exist(ctx context.Context) (bool, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryExist)
 	switch _, err := _q.FirstID(ctx); {
 	case IsNotFound(err):
@@ -281,7 +256,7 @@ func (_q *DeviceInterfaceQuery) Exist(ctx context.Context) (bool, error) {
 }
 
 // ExistX is like Exist, but panics if an error occurs.
-func (_q *DeviceInterfaceQuery) ExistX(ctx context.Context) bool {
+func (_q *DeviceInterfaceLinkQuery) ExistX(ctx context.Context) bool {
 	exist, err := _q.Exist(ctx)
 	if err != nil {
 		panic(err)
@@ -289,20 +264,19 @@ func (_q *DeviceInterfaceQuery) ExistX(ctx context.Context) bool {
 	return exist
 }
 
-// Clone returns a duplicate of the DeviceInterfaceQuery builder, including all associated steps. It can be
+// Clone returns a duplicate of the DeviceInterfaceLinkQuery builder, including all associated steps. It can be
 // used to prepare common query builders and use them differently after the clone is made.
-func (_q *DeviceInterfaceQuery) Clone() *DeviceInterfaceQuery {
+func (_q *DeviceInterfaceLinkQuery) Clone() *DeviceInterfaceLinkQuery {
 	if _q == nil {
 		return nil
 	}
-	return &DeviceInterfaceQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]deviceinterface.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.DeviceInterface{}, _q.predicates...),
-		withDevice: _q.withDevice.Clone(),
-		withLinks:  _q.withLinks.Clone(),
+	return &DeviceInterfaceLinkQuery{
+		config:        _q.config,
+		ctx:           _q.ctx.Clone(),
+		order:         append([]deviceinterfacelink.OrderOption{}, _q.order...),
+		inters:        append([]Interceptor{}, _q.inters...),
+		predicates:    append([]predicate.DeviceInterfaceLink{}, _q.predicates...),
+		withInterface: _q.withInterface.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
 		path:      _q.path,
@@ -310,25 +284,14 @@ func (_q *DeviceInterfaceQuery) Clone() *DeviceInterfaceQuery {
 	}
 }
 
-// WithDevice tells the query-builder to eager-load the nodes that are connected to
-// the "device" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *DeviceInterfaceQuery) WithDevice(opts ...func(*DeviceQuery)) *DeviceInterfaceQuery {
-	query := (&DeviceClient{config: _q.config}).Query()
+// WithInterface tells the query-builder to eager-load the nodes that are connected to
+// the "interface" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *DeviceInterfaceLinkQuery) WithInterface(opts ...func(*DeviceInterfaceQuery)) *DeviceInterfaceLinkQuery {
+	query := (&DeviceInterfaceClient{config: _q.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	_q.withDevice = query
-	return _q
-}
-
-// WithLinks tells the query-builder to eager-load the nodes that are connected to
-// the "links" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *DeviceInterfaceQuery) WithLinks(opts ...func(*DeviceInterfaceLinkQuery)) *DeviceInterfaceQuery {
-	query := (&DeviceInterfaceLinkClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withLinks = query
+	_q.withInterface = query
 	return _q
 }
 
@@ -342,15 +305,15 @@ func (_q *DeviceInterfaceQuery) WithLinks(opts ...func(*DeviceInterfaceLinkQuery
 //		Count int `json:"count,omitempty"`
 //	}
 //
-//	client.DeviceInterface.Query().
-//		GroupBy(deviceinterface.FieldCreateTime).
+//	client.DeviceInterfaceLink.Query().
+//		GroupBy(deviceinterfacelink.FieldCreateTime).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
-func (_q *DeviceInterfaceQuery) GroupBy(field string, fields ...string) *DeviceInterfaceGroupBy {
+func (_q *DeviceInterfaceLinkQuery) GroupBy(field string, fields ...string) *DeviceInterfaceLinkGroupBy {
 	_q.ctx.Fields = append([]string{field}, fields...)
-	grbuild := &DeviceInterfaceGroupBy{build: _q}
+	grbuild := &DeviceInterfaceLinkGroupBy{build: _q}
 	grbuild.flds = &_q.ctx.Fields
-	grbuild.label = deviceinterface.Label
+	grbuild.label = deviceinterfacelink.Label
 	grbuild.scan = grbuild.Scan
 	return grbuild
 }
@@ -364,23 +327,23 @@ func (_q *DeviceInterfaceQuery) GroupBy(field string, fields ...string) *DeviceI
 //		CreateTime time.Time `json:"create_time,omitempty"`
 //	}
 //
-//	client.DeviceInterface.Query().
-//		Select(deviceinterface.FieldCreateTime).
+//	client.DeviceInterfaceLink.Query().
+//		Select(deviceinterfacelink.FieldCreateTime).
 //		Scan(ctx, &v)
-func (_q *DeviceInterfaceQuery) Select(fields ...string) *DeviceInterfaceSelect {
+func (_q *DeviceInterfaceLinkQuery) Select(fields ...string) *DeviceInterfaceLinkSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
-	sbuild := &DeviceInterfaceSelect{DeviceInterfaceQuery: _q}
-	sbuild.label = deviceinterface.Label
+	sbuild := &DeviceInterfaceLinkSelect{DeviceInterfaceLinkQuery: _q}
+	sbuild.label = deviceinterfacelink.Label
 	sbuild.flds, sbuild.scan = &_q.ctx.Fields, sbuild.Scan
 	return sbuild
 }
 
-// Aggregate returns a DeviceInterfaceSelect configured with the given aggregations.
-func (_q *DeviceInterfaceQuery) Aggregate(fns ...AggregateFunc) *DeviceInterfaceSelect {
+// Aggregate returns a DeviceInterfaceLinkSelect configured with the given aggregations.
+func (_q *DeviceInterfaceLinkQuery) Aggregate(fns ...AggregateFunc) *DeviceInterfaceLinkSelect {
 	return _q.Select().Aggregate(fns...)
 }
 
-func (_q *DeviceInterfaceQuery) prepareQuery(ctx context.Context) error {
+func (_q *DeviceInterfaceLinkQuery) prepareQuery(ctx context.Context) error {
 	for _, inter := range _q.inters {
 		if inter == nil {
 			return fmt.Errorf("ent: uninitialized interceptor (forgotten import ent/runtime?)")
@@ -392,7 +355,7 @@ func (_q *DeviceInterfaceQuery) prepareQuery(ctx context.Context) error {
 		}
 	}
 	for _, f := range _q.ctx.Fields {
-		if !deviceinterface.ValidColumn(f) {
+		if !deviceinterfacelink.ValidColumn(f) {
 			return &ValidationError{Name: f, err: fmt.Errorf("ent: invalid field %q for query", f)}
 		}
 	}
@@ -406,20 +369,19 @@ func (_q *DeviceInterfaceQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (_q *DeviceInterfaceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*DeviceInterface, error) {
+func (_q *DeviceInterfaceLinkQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*DeviceInterfaceLink, error) {
 	var (
-		nodes       = []*DeviceInterface{}
+		nodes       = []*DeviceInterfaceLink{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
-			_q.withDevice != nil,
-			_q.withLinks != nil,
+		loadedTypes = [1]bool{
+			_q.withInterface != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
-		return (*DeviceInterface).scanValues(nil, columns)
+		return (*DeviceInterfaceLink).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
-		node := &DeviceInterface{config: _q.config}
+		node := &DeviceInterfaceLink{config: _q.config}
 		nodes = append(nodes, node)
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
@@ -436,27 +398,20 @@ func (_q *DeviceInterfaceQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := _q.withDevice; query != nil {
-		if err := _q.loadDevice(ctx, query, nodes, nil,
-			func(n *DeviceInterface, e *Device) { n.Edges.Device = e }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withLinks; query != nil {
-		if err := _q.loadLinks(ctx, query, nodes,
-			func(n *DeviceInterface) { n.Edges.Links = []*DeviceInterfaceLink{} },
-			func(n *DeviceInterface, e *DeviceInterfaceLink) { n.Edges.Links = append(n.Edges.Links, e) }); err != nil {
+	if query := _q.withInterface; query != nil {
+		if err := _q.loadInterface(ctx, query, nodes, nil,
+			func(n *DeviceInterfaceLink, e *DeviceInterface) { n.Edges.Interface = e }); err != nil {
 			return nil, err
 		}
 	}
 	return nodes, nil
 }
 
-func (_q *DeviceInterfaceQuery) loadDevice(ctx context.Context, query *DeviceQuery, nodes []*DeviceInterface, init func(*DeviceInterface), assign func(*DeviceInterface, *Device)) error {
+func (_q *DeviceInterfaceLinkQuery) loadInterface(ctx context.Context, query *DeviceInterfaceQuery, nodes []*DeviceInterfaceLink, init func(*DeviceInterfaceLink), assign func(*DeviceInterfaceLink, *DeviceInterface)) error {
 	ids := make([]string, 0, len(nodes))
-	nodeids := make(map[string][]*DeviceInterface)
+	nodeids := make(map[string][]*DeviceInterfaceLink)
 	for i := range nodes {
-		fk := nodes[i].DeviceID
+		fk := nodes[i].InterfaceID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -465,7 +420,7 @@ func (_q *DeviceInterfaceQuery) loadDevice(ctx context.Context, query *DeviceQue
 	if len(ids) == 0 {
 		return nil
 	}
-	query.Where(device.IDIn(ids...))
+	query.Where(deviceinterface.IDIn(ids...))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
@@ -473,7 +428,7 @@ func (_q *DeviceInterfaceQuery) loadDevice(ctx context.Context, query *DeviceQue
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "device_id" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "interface_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -481,38 +436,8 @@ func (_q *DeviceInterfaceQuery) loadDevice(ctx context.Context, query *DeviceQue
 	}
 	return nil
 }
-func (_q *DeviceInterfaceQuery) loadLinks(ctx context.Context, query *DeviceInterfaceLinkQuery, nodes []*DeviceInterface, init func(*DeviceInterface), assign func(*DeviceInterface, *DeviceInterfaceLink)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[string]*DeviceInterface)
-	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
-		}
-	}
-	if len(query.ctx.Fields) > 0 {
-		query.ctx.AppendFieldOnce(deviceinterfacelink.FieldInterfaceID)
-	}
-	query.Where(predicate.DeviceInterfaceLink(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(deviceinterface.LinksColumn), fks...))
-	}))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		fk := n.InterfaceID
-		node, ok := nodeids[fk]
-		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "interface_id" returned %v for node %v`, fk, n.ID)
-		}
-		assign(node, n)
-	}
-	return nil
-}
 
-func (_q *DeviceInterfaceQuery) sqlCount(ctx context.Context) (int, error) {
+func (_q *DeviceInterfaceLinkQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -524,8 +449,8 @@ func (_q *DeviceInterfaceQuery) sqlCount(ctx context.Context) (int, error) {
 	return sqlgraph.CountNodes(ctx, _q.driver, _spec)
 }
 
-func (_q *DeviceInterfaceQuery) querySpec() *sqlgraph.QuerySpec {
-	_spec := sqlgraph.NewQuerySpec(deviceinterface.Table, deviceinterface.Columns, sqlgraph.NewFieldSpec(deviceinterface.FieldID, field.TypeString))
+func (_q *DeviceInterfaceLinkQuery) querySpec() *sqlgraph.QuerySpec {
+	_spec := sqlgraph.NewQuerySpec(deviceinterfacelink.Table, deviceinterfacelink.Columns, sqlgraph.NewFieldSpec(deviceinterfacelink.FieldID, field.TypeString))
 	_spec.From = _q.sql
 	if unique := _q.ctx.Unique; unique != nil {
 		_spec.Unique = *unique
@@ -534,14 +459,14 @@ func (_q *DeviceInterfaceQuery) querySpec() *sqlgraph.QuerySpec {
 	}
 	if fields := _q.ctx.Fields; len(fields) > 0 {
 		_spec.Node.Columns = make([]string, 0, len(fields))
-		_spec.Node.Columns = append(_spec.Node.Columns, deviceinterface.FieldID)
+		_spec.Node.Columns = append(_spec.Node.Columns, deviceinterfacelink.FieldID)
 		for i := range fields {
-			if fields[i] != deviceinterface.FieldID {
+			if fields[i] != deviceinterfacelink.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
 		}
-		if _q.withDevice != nil {
-			_spec.Node.AddColumnOnce(deviceinterface.FieldDeviceID)
+		if _q.withInterface != nil {
+			_spec.Node.AddColumnOnce(deviceinterfacelink.FieldInterfaceID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {
@@ -567,12 +492,12 @@ func (_q *DeviceInterfaceQuery) querySpec() *sqlgraph.QuerySpec {
 	return _spec
 }
 
-func (_q *DeviceInterfaceQuery) sqlQuery(ctx context.Context) *sql.Selector {
+func (_q *DeviceInterfaceLinkQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	builder := sql.Dialect(_q.driver.Dialect())
-	t1 := builder.Table(deviceinterface.Table)
+	t1 := builder.Table(deviceinterfacelink.Table)
 	columns := _q.ctx.Fields
 	if len(columns) == 0 {
-		columns = deviceinterface.Columns
+		columns = deviceinterfacelink.Columns
 	}
 	selector := builder.Select(t1.Columns(columns...)...).From(t1)
 	if _q.sql != nil {
@@ -605,7 +530,7 @@ func (_q *DeviceInterfaceQuery) sqlQuery(ctx context.Context) *sql.Selector {
 // ForUpdate locks the selected rows against concurrent updates, and prevent them from being
 // updated, deleted or "selected ... for update" by other sessions, until the transaction is
 // either committed or rolled-back.
-func (_q *DeviceInterfaceQuery) ForUpdate(opts ...sql.LockOption) *DeviceInterfaceQuery {
+func (_q *DeviceInterfaceLinkQuery) ForUpdate(opts ...sql.LockOption) *DeviceInterfaceLinkQuery {
 	if _q.driver.Dialect() == dialect.Postgres {
 		_q.Unique(false)
 	}
@@ -618,7 +543,7 @@ func (_q *DeviceInterfaceQuery) ForUpdate(opts ...sql.LockOption) *DeviceInterfa
 // ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
 // on any rows that are read. Other sessions can read the rows, but cannot modify them
 // until your transaction commits.
-func (_q *DeviceInterfaceQuery) ForShare(opts ...sql.LockOption) *DeviceInterfaceQuery {
+func (_q *DeviceInterfaceLinkQuery) ForShare(opts ...sql.LockOption) *DeviceInterfaceLinkQuery {
 	if _q.driver.Dialect() == dialect.Postgres {
 		_q.Unique(false)
 	}
@@ -629,33 +554,33 @@ func (_q *DeviceInterfaceQuery) ForShare(opts ...sql.LockOption) *DeviceInterfac
 }
 
 // Modify adds a query modifier for attaching custom logic to queries.
-func (_q *DeviceInterfaceQuery) Modify(modifiers ...func(s *sql.Selector)) *DeviceInterfaceSelect {
+func (_q *DeviceInterfaceLinkQuery) Modify(modifiers ...func(s *sql.Selector)) *DeviceInterfaceLinkSelect {
 	_q.modifiers = append(_q.modifiers, modifiers...)
 	return _q.Select()
 }
 
-// DeviceInterfaceGroupBy is the group-by builder for DeviceInterface entities.
-type DeviceInterfaceGroupBy struct {
+// DeviceInterfaceLinkGroupBy is the group-by builder for DeviceInterfaceLink entities.
+type DeviceInterfaceLinkGroupBy struct {
 	selector
-	build *DeviceInterfaceQuery
+	build *DeviceInterfaceLinkQuery
 }
 
 // Aggregate adds the given aggregation functions to the group-by query.
-func (_g *DeviceInterfaceGroupBy) Aggregate(fns ...AggregateFunc) *DeviceInterfaceGroupBy {
+func (_g *DeviceInterfaceLinkGroupBy) Aggregate(fns ...AggregateFunc) *DeviceInterfaceLinkGroupBy {
 	_g.fns = append(_g.fns, fns...)
 	return _g
 }
 
 // Scan applies the selector query and scans the result into the given value.
-func (_g *DeviceInterfaceGroupBy) Scan(ctx context.Context, v any) error {
+func (_g *DeviceInterfaceLinkGroupBy) Scan(ctx context.Context, v any) error {
 	ctx = setContextOp(ctx, _g.build.ctx, ent.OpQueryGroupBy)
 	if err := _g.build.prepareQuery(ctx); err != nil {
 		return err
 	}
-	return scanWithInterceptors[*DeviceInterfaceQuery, *DeviceInterfaceGroupBy](ctx, _g.build, _g, _g.build.inters, v)
+	return scanWithInterceptors[*DeviceInterfaceLinkQuery, *DeviceInterfaceLinkGroupBy](ctx, _g.build, _g, _g.build.inters, v)
 }
 
-func (_g *DeviceInterfaceGroupBy) sqlScan(ctx context.Context, root *DeviceInterfaceQuery, v any) error {
+func (_g *DeviceInterfaceLinkGroupBy) sqlScan(ctx context.Context, root *DeviceInterfaceLinkQuery, v any) error {
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -682,28 +607,28 @@ func (_g *DeviceInterfaceGroupBy) sqlScan(ctx context.Context, root *DeviceInter
 	return sql.ScanSlice(rows, v)
 }
 
-// DeviceInterfaceSelect is the builder for selecting fields of DeviceInterface entities.
-type DeviceInterfaceSelect struct {
-	*DeviceInterfaceQuery
+// DeviceInterfaceLinkSelect is the builder for selecting fields of DeviceInterfaceLink entities.
+type DeviceInterfaceLinkSelect struct {
+	*DeviceInterfaceLinkQuery
 	selector
 }
 
 // Aggregate adds the given aggregation functions to the selector query.
-func (_s *DeviceInterfaceSelect) Aggregate(fns ...AggregateFunc) *DeviceInterfaceSelect {
+func (_s *DeviceInterfaceLinkSelect) Aggregate(fns ...AggregateFunc) *DeviceInterfaceLinkSelect {
 	_s.fns = append(_s.fns, fns...)
 	return _s
 }
 
 // Scan applies the selector query and scans the result into the given value.
-func (_s *DeviceInterfaceSelect) Scan(ctx context.Context, v any) error {
+func (_s *DeviceInterfaceLinkSelect) Scan(ctx context.Context, v any) error {
 	ctx = setContextOp(ctx, _s.ctx, ent.OpQuerySelect)
 	if err := _s.prepareQuery(ctx); err != nil {
 		return err
 	}
-	return scanWithInterceptors[*DeviceInterfaceQuery, *DeviceInterfaceSelect](ctx, _s.DeviceInterfaceQuery, _s, _s.inters, v)
+	return scanWithInterceptors[*DeviceInterfaceLinkQuery, *DeviceInterfaceLinkSelect](ctx, _s.DeviceInterfaceLinkQuery, _s, _s.inters, v)
 }
 
-func (_s *DeviceInterfaceSelect) sqlScan(ctx context.Context, root *DeviceInterfaceQuery, v any) error {
+func (_s *DeviceInterfaceLinkSelect) sqlScan(ctx context.Context, root *DeviceInterfaceLinkQuery, v any) error {
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -725,7 +650,7 @@ func (_s *DeviceInterfaceSelect) sqlScan(ctx context.Context, root *DeviceInterf
 }
 
 // Modify adds a query modifier for attaching custom logic to queries.
-func (_s *DeviceInterfaceSelect) Modify(modifiers ...func(s *sql.Selector)) *DeviceInterfaceSelect {
+func (_s *DeviceInterfaceLinkSelect) Modify(modifiers ...func(s *sql.Selector)) *DeviceInterfaceLinkSelect {
 	_s.modifiers = append(_s.modifiers, modifiers...)
 	return _s
 }

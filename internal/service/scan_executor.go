@@ -827,6 +827,11 @@ const (
 	// host. Ports above this are uplinks/trunks carrying many MACs, where a host
 	// MAC is seen transitively rather than directly — those are not linked.
 	fdbEdgePortMaxMACs = 16
+
+	// linkStaleAfter is how long a discovered link survives without being seen in
+	// any FDB before it is pruned. Generous so partial (single-subnet) scans that
+	// omit a switch don't evict that switch's still-valid link prematurely.
+	linkStaleAfter = 14 * 24 * time.Hour
 )
 
 // switchFDB pairs a discovered switch with its bridge forwarding database for
@@ -840,11 +845,15 @@ type switchFDB struct {
 // scan at once.
 //
 // A host MAC appears on its access switch's edge port (few MACs) AND on a core
-// switch's uplink port (many MACs). Correlating per switch and writing
-// immediately lets whichever switch is processed last overwrite the link with
-// an uplink port. This pass instead compares the candidate ports across every
-// switch and keeps the one with the fewest learned MACs (the globally most
-// direct connection), writing each server's link exactly once.
+// switch's uplink port (many MACs). For each switch we keep that switch's most
+// direct (fewest-MAC) edge port for the MAC, and persist ONE link per switch.
+// This is what lets an LACP bond across an MLAG pair show up as connected to
+// BOTH switches: the same server MAC is learned on an edge port of each, so we
+// record a link to each rather than letting one switch overwrite the other.
+//
+// The flat remote_* columns on the interface are also set to the single globally
+// best link, for backward compatibility and clients that don't read the link
+// list.
 func (e *ScanExecutor) correlateLinks(tenantID uint32, switches []switchFDB) {
 	type candidate struct {
 		switchID string
@@ -852,7 +861,8 @@ func (e *ScanExecutor) correlateLinks(tenantID uint32, switches []switchFDB) {
 		macCount int
 		vlan     int
 	}
-	best := make(map[string]candidate)
+	// mac -> switchID -> best edge port on that switch.
+	perMAC := make(map[string]map[string]candidate)
 
 	for _, sw := range switches {
 		ports, err := e.deviceInterfaceRepo.ListByDeviceID(e.ctx, sw.deviceID)
@@ -875,46 +885,79 @@ func (e *ScanExecutor) correlateLinks(tenantID uint32, switches []switchFDB) {
 			if !ok {
 				continue // switch port for this ifIndex not modeled
 			}
-			if cur, exists := best[mac]; !exists || ap.MACCount < cur.macCount {
-				best[mac] = candidate{switchID: sw.deviceID, port: port, macCount: ap.MACCount, vlan: ap.VLAN}
+			bySwitch := perMAC[mac]
+			if bySwitch == nil {
+				bySwitch = make(map[string]candidate)
+				perMAC[mac] = bySwitch
+			}
+			if cur, exists := bySwitch[sw.deviceID]; !exists || ap.MACCount < cur.macCount {
+				bySwitch[sw.deviceID] = candidate{switchID: sw.deviceID, port: port, macCount: ap.MACCount, vlan: ap.VLAN}
 			}
 		}
 	}
 
+	now := time.Now()
 	linked := 0
-	for mac, c := range best {
-		if c.macCount > fdbEdgePortMaxMACs {
-			continue // only seen on uplinks/trunks — host is behind another switch
-		}
+	for mac, bySwitch := range perMAC {
 		serverIface, err := e.deviceInterfaceRepo.FindServerInterfaceByMAC(e.ctx, tenantID, mac)
 		if err != nil {
 			e.log.Warnf("Link correlation: lookup for MAC %s failed: %v", mac, err)
 			continue
 		}
-		if serverIface == nil || serverIface.DeviceID == c.switchID {
-			continue // not a known physical server (or the switch's own MAC)
+		if serverIface == nil {
+			continue // not a known physical server
 		}
 
-		updates := map[string]any{
-			"remote_device_id":    c.switchID,
-			"remote_interface_id": c.port.ID,
-			"remote_port_name":    c.port.Name,
-			"link_source":         linkSourceSNMPFDB,
-			"link_last_seen":      time.Now(),
+		var best *candidate
+		for _, c := range bySwitch {
+			if c.macCount > fdbEdgePortMaxMACs {
+				continue // only seen on an uplink/trunk here — host is behind another switch
+			}
+			if c.switchID == serverIface.DeviceID {
+				continue // the switch's own MAC
+			}
+			if err := e.deviceInterfaceRepo.UpsertLink(e.ctx, serverIface.ID, c.switchID, c.port.ID, c.port.Name, linkSourceSNMPFDB, c.vlan, now); err != nil {
+				e.log.Warnf("Link correlation: failed to upsert link on interface %s: %v", serverIface.ID, err)
+				continue
+			}
+			linked++
+			e.log.Infof("Link discovered: server interface %s (MAC %s) -> switch %s port %s (macs %d, vlan %d)",
+				serverIface.Name, mac, c.switchID, c.port.Name, c.macCount, c.vlan)
+			cc := c
+			if best == nil || cc.macCount < best.macCount {
+				best = &cc
+			}
 		}
-		if c.vlan > 0 {
-			updates["link_vlan"] = int32(c.vlan)
+
+		// Mirror the globally best link into the flat columns for backward compat.
+		if best != nil {
+			updates := map[string]any{
+				"remote_device_id":    best.switchID,
+				"remote_interface_id": best.port.ID,
+				"remote_port_name":    best.port.Name,
+				"link_source":         linkSourceSNMPFDB,
+				"link_last_seen":      now,
+			}
+			if best.vlan > 0 {
+				updates["link_vlan"] = int32(best.vlan)
+			}
+			if _, err := e.deviceInterfaceRepo.Update(e.ctx, serverIface.ID, updates); err != nil {
+				e.log.Warnf("Link correlation: failed to set primary link on interface %s: %v", serverIface.ID, err)
+			}
 		}
-		if _, err := e.deviceInterfaceRepo.Update(e.ctx, serverIface.ID, updates); err != nil {
-			e.log.Warnf("Link correlation: failed to set link on interface %s: %v", serverIface.ID, err)
-			continue
-		}
-		linked++
-		e.log.Infof("Link discovered: server interface %s (MAC %s) -> switch %s port %s (macs %d, vlan %d)",
-			serverIface.Name, mac, c.switchID, c.port.Name, c.macCount, c.vlan)
 	}
 
-	e.log.Infof("Link correlation: %d server links discovered across %d switches", linked, len(switches))
+	// Drop links no longer observed in any FDB. The window is generous so a
+	// partial (single-subnet) scan that didn't include a switch doesn't evict
+	// that switch's still-valid link before its own scan refreshes it.
+	cutoff := now.Add(-linkStaleAfter)
+	if pruned, err := e.deviceInterfaceRepo.PruneStaleLinks(e.ctx, linkSourceSNMPFDB, cutoff); err != nil {
+		e.log.Warnf("Link correlation: prune stale links failed: %v", err)
+	} else if pruned > 0 {
+		e.log.Infof("Link correlation: pruned %d stale links", pruned)
+	}
+
+	e.log.Infof("Link correlation: %d server links upserted across %d switches", linked, len(switches))
 }
 
 // maskString masks a string for logging, showing only first 2 chars

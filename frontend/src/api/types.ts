@@ -1129,6 +1129,19 @@ export interface components {
             linkVlan?: number;
             /** Format: date-time */
             linkLastSeen?: string;
+            /** @description All discovered Layer-2 links (an interface may connect to multiple switches via LACP/MLAG). */
+            links?: components['schemas']['DeviceLink'][];
+        };
+        /** @description DeviceLink is one discovered Layer-2 neighbor link (interface -> remote port). */
+        DeviceLink: {
+            remoteDeviceId?: string;
+            remoteInterfaceId?: string;
+            remotePortName?: string;
+            linkSource?: string;
+            /** Format: int32 */
+            linkVlan?: number;
+            /** Format: date-time */
+            linkLastSeen?: string;
         };
         /** @description DnsConfig holds DNS server configuration for reverse DNS lookups */
         DnsConfig: {

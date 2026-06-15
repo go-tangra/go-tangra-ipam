@@ -525,6 +525,27 @@ func deviceInterfaceToProto(e *ent.DeviceInterface) *ipamV1.DeviceInterface {
 	if e.LinkLastSeen != nil {
 		result.LinkLastSeen = timestamppb.New(*e.LinkLastSeen)
 	}
+	// Map the full set of discovered links (an interface may connect to several
+	// switches via an LACP bond / MLAG pair). Only present when eager-loaded.
+	for _, l := range e.Edges.Links {
+		dl := &ipamV1.DeviceLink{LinkVlan: l.LinkVlan}
+		if l.RemoteDeviceID != "" {
+			dl.RemoteDeviceId = &l.RemoteDeviceID
+		}
+		if l.RemoteInterfaceID != "" {
+			dl.RemoteInterfaceId = &l.RemoteInterfaceID
+		}
+		if l.RemotePortName != "" {
+			dl.RemotePortName = &l.RemotePortName
+		}
+		if l.LinkSource != "" {
+			dl.LinkSource = &l.LinkSource
+		}
+		if l.LinkLastSeen != nil {
+			dl.LinkLastSeen = timestamppb.New(*l.LinkLastSeen)
+		}
+		result.Links = append(result.Links, dl)
+	}
 	return result
 }
 

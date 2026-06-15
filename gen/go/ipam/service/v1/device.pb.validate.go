@@ -378,6 +378,40 @@ func (m *DeviceInterface) validate(all bool) error {
 
 	var errors []error
 
+	for idx, item := range m.GetLinks() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DeviceInterfaceValidationError{
+						field:  fmt.Sprintf("Links[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DeviceInterfaceValidationError{
+						field:  fmt.Sprintf("Links[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DeviceInterfaceValidationError{
+					field:  fmt.Sprintf("Links[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if m.Id != nil {
 		// no validation rules for Id
 	}
@@ -610,6 +644,158 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = DeviceInterfaceValidationError{}
+
+// Validate checks the field values on DeviceLink with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DeviceLink) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DeviceLink with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DeviceLinkMultiError, or
+// nil if none found.
+func (m *DeviceLink) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DeviceLink) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.RemoteDeviceId != nil {
+		// no validation rules for RemoteDeviceId
+	}
+
+	if m.RemoteInterfaceId != nil {
+		// no validation rules for RemoteInterfaceId
+	}
+
+	if m.RemotePortName != nil {
+		// no validation rules for RemotePortName
+	}
+
+	if m.LinkSource != nil {
+		// no validation rules for LinkSource
+	}
+
+	if m.LinkVlan != nil {
+		// no validation rules for LinkVlan
+	}
+
+	if m.LinkLastSeen != nil {
+
+		if all {
+			switch v := interface{}(m.GetLinkLastSeen()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DeviceLinkValidationError{
+						field:  "LinkLastSeen",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DeviceLinkValidationError{
+						field:  "LinkLastSeen",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetLinkLastSeen()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DeviceLinkValidationError{
+					field:  "LinkLastSeen",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return DeviceLinkMultiError(errors)
+	}
+
+	return nil
+}
+
+// DeviceLinkMultiError is an error wrapping multiple validation errors
+// returned by DeviceLink.ValidateAll() if the designated constraints aren't met.
+type DeviceLinkMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DeviceLinkMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DeviceLinkMultiError) AllErrors() []error { return m }
+
+// DeviceLinkValidationError is the validation error returned by
+// DeviceLink.Validate if the designated constraints aren't met.
+type DeviceLinkValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DeviceLinkValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DeviceLinkValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DeviceLinkValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DeviceLinkValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DeviceLinkValidationError) ErrorName() string { return "DeviceLinkValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DeviceLinkValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDeviceLink.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DeviceLinkValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DeviceLinkValidationError{}
 
 // Validate checks the field values on CreateDeviceRequest with the rules
 // defined in the proto definition for this message. If any rules are

@@ -8,6 +8,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
@@ -161,6 +162,16 @@ func init() {
 	deviceinterfaceDescID := deviceinterfaceFields[0].Descriptor()
 	// deviceinterface.IDValidator is a validator for the "id" field. It is called by the builders before save.
 	deviceinterface.IDValidator = deviceinterfaceDescID.Validators[0].(func(string) error)
+	deviceinterfacelinkFields := schema.DeviceInterfaceLink{}.Fields()
+	_ = deviceinterfacelinkFields
+	// deviceinterfacelinkDescInterfaceID is the schema descriptor for interface_id field.
+	deviceinterfacelinkDescInterfaceID := deviceinterfacelinkFields[1].Descriptor()
+	// deviceinterfacelink.InterfaceIDValidator is a validator for the "interface_id" field. It is called by the builders before save.
+	deviceinterfacelink.InterfaceIDValidator = deviceinterfacelinkDescInterfaceID.Validators[0].(func(string) error)
+	// deviceinterfacelinkDescID is the schema descriptor for id field.
+	deviceinterfacelinkDescID := deviceinterfacelinkFields[0].Descriptor()
+	// deviceinterfacelink.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	deviceinterfacelink.IDValidator = deviceinterfacelinkDescID.Validators[0].(func(string) error)
 	devicepackageMixin := schema.DevicePackage{}.Mixin()
 	devicepackage.Policy = privacy.NewPolicies(devicepackageMixin[1], schema.DevicePackage{})
 	devicepackage.Hooks[0] = func(next ent.Mutator) ent.Mutator {

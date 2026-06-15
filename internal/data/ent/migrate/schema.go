@@ -225,6 +225,51 @@ var (
 			},
 		},
 	}
+	// IpamDeviceInterfaceLinksColumns holds the columns for the "ipam_device_interface_links" table.
+	IpamDeviceInterfaceLinksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true, Comment: "Unique identifier"},
+		{Name: "create_time", Type: field.TypeTime, Nullable: true, Comment: "创建时间"},
+		{Name: "update_time", Type: field.TypeTime, Nullable: true, Comment: "更新时间"},
+		{Name: "delete_time", Type: field.TypeTime, Nullable: true, Comment: "删除时间"},
+		{Name: "remote_device_id", Type: field.TypeString, Nullable: true, Comment: "Connected neighbor device ID (e.g. the switch this port plugs into)"},
+		{Name: "remote_interface_id", Type: field.TypeString, Nullable: true, Comment: "Connected neighbor interface ID (e.g. the switch port)"},
+		{Name: "remote_port_name", Type: field.TypeString, Nullable: true, Comment: "Connected neighbor port name (denormalized for display)"},
+		{Name: "link_source", Type: field.TypeString, Nullable: true, Comment: "How the link was discovered: snmp_fdb, lldp, manual"},
+		{Name: "link_vlan", Type: field.TypeInt32, Nullable: true, Comment: "VLAN the neighbor MAC was learned on (Q-BRIDGE FDB)"},
+		{Name: "link_last_seen", Type: field.TypeTime, Nullable: true, Comment: "When the neighbor link was last observed"},
+		{Name: "interface_id", Type: field.TypeString, Comment: "Owning local interface ID"},
+	}
+	// IpamDeviceInterfaceLinksTable holds the schema information for the "ipam_device_interface_links" table.
+	IpamDeviceInterfaceLinksTable = &schema.Table{
+		Name:       "ipam_device_interface_links",
+		Columns:    IpamDeviceInterfaceLinksColumns,
+		PrimaryKey: []*schema.Column{IpamDeviceInterfaceLinksColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "ipam_device_interface_links_ipam_device_interfaces_links",
+				Columns:    []*schema.Column{IpamDeviceInterfaceLinksColumns[10]},
+				RefColumns: []*schema.Column{IpamDeviceInterfacesColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "deviceinterfacelink_interface_id",
+				Unique:  false,
+				Columns: []*schema.Column{IpamDeviceInterfaceLinksColumns[10]},
+			},
+			{
+				Name:    "deviceinterfacelink_interface_id_remote_device_id_link_source",
+				Unique:  true,
+				Columns: []*schema.Column{IpamDeviceInterfaceLinksColumns[10], IpamDeviceInterfaceLinksColumns[4], IpamDeviceInterfaceLinksColumns[7]},
+			},
+			{
+				Name:    "deviceinterfacelink_link_last_seen",
+				Unique:  false,
+				Columns: []*schema.Column{IpamDeviceInterfaceLinksColumns[9]},
+			},
+		},
+	}
 	// IpamDevicePackagesColumns holds the columns for the "ipam_device_packages" table.
 	IpamDevicePackagesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true, Comment: "Unique identifier"},
@@ -871,6 +916,7 @@ var (
 		IpamAuditLogsTable,
 		IpamDevicesTable,
 		IpamDeviceInterfacesTable,
+		IpamDeviceInterfaceLinksTable,
 		IpamDevicePackagesTable,
 		IpamDNSConfigsTable,
 		IpamHostGroupsTable,
@@ -896,6 +942,10 @@ func init() {
 	IpamDeviceInterfacesTable.ForeignKeys[0].RefTable = IpamDevicesTable
 	IpamDeviceInterfacesTable.Annotation = &entsql.Annotation{
 		Table: "ipam_device_interfaces",
+	}
+	IpamDeviceInterfaceLinksTable.ForeignKeys[0].RefTable = IpamDeviceInterfacesTable
+	IpamDeviceInterfaceLinksTable.Annotation = &entsql.Annotation{
+		Table: "ipam_device_interface_links",
 	}
 	IpamDevicePackagesTable.Annotation = &entsql.Annotation{
 		Table: "ipam_device_packages",

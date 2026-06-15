@@ -298,6 +298,28 @@ func (x *DeviceInterface) Redact() string {
 	// Safe field: LinkVlan
 
 	// Safe field: LinkLastSeen
+
+	// Safe field: Links
+	return x.String()
+}
+
+// Redact method implementation for DeviceLink
+func (x *DeviceLink) Redact() string {
+	if x == nil {
+		return ""
+	}
+
+	// Safe field: RemoteDeviceId
+
+	// Safe field: RemoteInterfaceId
+
+	// Safe field: RemotePortName
+
+	// Safe field: LinkSource
+
+	// Safe field: LinkVlan
+
+	// Safe field: LinkLastSeen
 	return x.String()
 }
 

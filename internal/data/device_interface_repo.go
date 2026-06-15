@@ -12,6 +12,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
 	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
@@ -61,10 +62,12 @@ func (r *DeviceInterfaceRepo) Create(ctx context.Context, deviceID, name string,
 	return entity, nil
 }
 
-// ListByDeviceID lists all interfaces for a device
+// ListByDeviceID lists all interfaces for a device, eager-loading their
+// discovered links (an interface may link to multiple switches).
 func (r *DeviceInterfaceRepo) ListByDeviceID(ctx context.Context, deviceID string) ([]*ent.DeviceInterface, error) {
 	entities, err := r.entClient.Client().DeviceInterface.Query().
 		Where(deviceinterface.DeviceID(deviceID)).
+		WithLinks().
 		Order(ent.Asc(deviceinterface.FieldName)).
 		All(ctx)
 	if err != nil {
@@ -201,6 +204,57 @@ func (r *DeviceInterfaceRepo) Update(ctx context.Context, id string, updates map
 		return nil, ipamV1.ErrorInternalServerError("update device interface failed")
 	}
 	return entity, nil
+}
+
+// UpsertLink inserts or refreshes a discovered Layer-2 link for an interface,
+// keyed by (interface, remote device, source). Re-running a scan refreshes the
+// existing row's port/vlan/last_seen instead of creating duplicates, and an
+// interface may accumulate links to several switches (LACP/MLAG).
+func (r *DeviceInterfaceRepo) UpsertLink(ctx context.Context, interfaceID, remoteDeviceID, remoteInterfaceID, remotePortName, source string, vlan int, lastSeen time.Time) error {
+	create := r.entClient.Client().DeviceInterfaceLink.Create().
+		SetID(uuid.New().String()).
+		SetInterfaceID(interfaceID).
+		SetRemoteDeviceID(remoteDeviceID).
+		SetRemoteInterfaceID(remoteInterfaceID).
+		SetRemotePortName(remotePortName).
+		SetLinkSource(source).
+		SetLinkLastSeen(lastSeen)
+	if vlan > 0 {
+		create = create.SetLinkVlan(int32(vlan))
+	}
+	err := create.
+		OnConflictColumns("interface_id", "remote_device_id", "link_source").
+		Update(func(u *ent.DeviceInterfaceLinkUpsert) {
+			u.SetRemoteInterfaceID(remoteInterfaceID)
+			u.SetRemotePortName(remotePortName)
+			u.SetLinkLastSeen(lastSeen)
+			if vlan > 0 {
+				u.SetLinkVlan(int32(vlan))
+			}
+			u.SetUpdateTime(time.Now())
+		}).
+		Exec(ctx)
+	if err != nil {
+		r.log.Errorf("upsert interface link failed: %s", err.Error())
+		return ipamV1.ErrorInternalServerError("upsert interface link failed")
+	}
+	return nil
+}
+
+// PruneStaleLinks removes links of the given source whose last-seen timestamp is
+// older than cutoff, so cabling that no longer appears in any FDB drops off.
+func (r *DeviceInterfaceRepo) PruneStaleLinks(ctx context.Context, source string, cutoff time.Time) (int, error) {
+	n, err := r.entClient.Client().DeviceInterfaceLink.Delete().
+		Where(
+			deviceinterfacelink.LinkSource(source),
+			deviceinterfacelink.LinkLastSeenLT(cutoff),
+		).
+		Exec(ctx)
+	if err != nil {
+		r.log.Errorf("prune stale interface links failed: %s", err.Error())
+		return 0, ipamV1.ErrorInternalServerError("prune stale interface links failed")
+	}
+	return n, nil
 }
 
 // Delete deletes a single device interface

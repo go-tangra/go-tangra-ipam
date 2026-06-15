@@ -18,6 +18,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
@@ -42,6 +43,8 @@ type Client struct {
 	Device *DeviceClient
 	// DeviceInterface is the client for interacting with the DeviceInterface builders.
 	DeviceInterface *DeviceInterfaceClient
+	// DeviceInterfaceLink is the client for interacting with the DeviceInterfaceLink builders.
+	DeviceInterfaceLink *DeviceInterfaceLinkClient
 	// DevicePackage is the client for interacting with the DevicePackage builders.
 	DevicePackage *DevicePackageClient
 	// DnsConfig is the client for interacting with the DnsConfig builders.
@@ -78,6 +81,7 @@ func (c *Client) init() {
 	c.AuditLog = NewAuditLogClient(c.config)
 	c.Device = NewDeviceClient(c.config)
 	c.DeviceInterface = NewDeviceInterfaceClient(c.config)
+	c.DeviceInterfaceLink = NewDeviceInterfaceLinkClient(c.config)
 	c.DevicePackage = NewDevicePackageClient(c.config)
 	c.DnsConfig = NewDnsConfigClient(c.config)
 	c.HostGroup = NewHostGroupClient(c.config)
@@ -179,22 +183,23 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:             ctx,
-		config:          cfg,
-		AuditLog:        NewAuditLogClient(cfg),
-		Device:          NewDeviceClient(cfg),
-		DeviceInterface: NewDeviceInterfaceClient(cfg),
-		DevicePackage:   NewDevicePackageClient(cfg),
-		DnsConfig:       NewDnsConfigClient(cfg),
-		HostGroup:       NewHostGroupClient(cfg),
-		HostGroupMember: NewHostGroupMemberClient(cfg),
-		IpAddress:       NewIpAddressClient(cfg),
-		IpGroup:         NewIpGroupClient(cfg),
-		IpGroupMember:   NewIpGroupMemberClient(cfg),
-		IpScanJob:       NewIpScanJobClient(cfg),
-		Location:        NewLocationClient(cfg),
-		Subnet:          NewSubnetClient(cfg),
-		Vlan:            NewVlanClient(cfg),
+		ctx:                 ctx,
+		config:              cfg,
+		AuditLog:            NewAuditLogClient(cfg),
+		Device:              NewDeviceClient(cfg),
+		DeviceInterface:     NewDeviceInterfaceClient(cfg),
+		DeviceInterfaceLink: NewDeviceInterfaceLinkClient(cfg),
+		DevicePackage:       NewDevicePackageClient(cfg),
+		DnsConfig:           NewDnsConfigClient(cfg),
+		HostGroup:           NewHostGroupClient(cfg),
+		HostGroupMember:     NewHostGroupMemberClient(cfg),
+		IpAddress:           NewIpAddressClient(cfg),
+		IpGroup:             NewIpGroupClient(cfg),
+		IpGroupMember:       NewIpGroupMemberClient(cfg),
+		IpScanJob:           NewIpScanJobClient(cfg),
+		Location:            NewLocationClient(cfg),
+		Subnet:              NewSubnetClient(cfg),
+		Vlan:                NewVlanClient(cfg),
 	}, nil
 }
 
@@ -212,22 +217,23 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:             ctx,
-		config:          cfg,
-		AuditLog:        NewAuditLogClient(cfg),
-		Device:          NewDeviceClient(cfg),
-		DeviceInterface: NewDeviceInterfaceClient(cfg),
-		DevicePackage:   NewDevicePackageClient(cfg),
-		DnsConfig:       NewDnsConfigClient(cfg),
-		HostGroup:       NewHostGroupClient(cfg),
-		HostGroupMember: NewHostGroupMemberClient(cfg),
-		IpAddress:       NewIpAddressClient(cfg),
-		IpGroup:         NewIpGroupClient(cfg),
-		IpGroupMember:   NewIpGroupMemberClient(cfg),
-		IpScanJob:       NewIpScanJobClient(cfg),
-		Location:        NewLocationClient(cfg),
-		Subnet:          NewSubnetClient(cfg),
-		Vlan:            NewVlanClient(cfg),
+		ctx:                 ctx,
+		config:              cfg,
+		AuditLog:            NewAuditLogClient(cfg),
+		Device:              NewDeviceClient(cfg),
+		DeviceInterface:     NewDeviceInterfaceClient(cfg),
+		DeviceInterfaceLink: NewDeviceInterfaceLinkClient(cfg),
+		DevicePackage:       NewDevicePackageClient(cfg),
+		DnsConfig:           NewDnsConfigClient(cfg),
+		HostGroup:           NewHostGroupClient(cfg),
+		HostGroupMember:     NewHostGroupMemberClient(cfg),
+		IpAddress:           NewIpAddressClient(cfg),
+		IpGroup:             NewIpGroupClient(cfg),
+		IpGroupMember:       NewIpGroupMemberClient(cfg),
+		IpScanJob:           NewIpScanJobClient(cfg),
+		Location:            NewLocationClient(cfg),
+		Subnet:              NewSubnetClient(cfg),
+		Vlan:                NewVlanClient(cfg),
 	}, nil
 }
 
@@ -257,9 +263,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.AuditLog, c.Device, c.DeviceInterface, c.DevicePackage, c.DnsConfig,
-		c.HostGroup, c.HostGroupMember, c.IpAddress, c.IpGroup, c.IpGroupMember,
-		c.IpScanJob, c.Location, c.Subnet, c.Vlan,
+		c.AuditLog, c.Device, c.DeviceInterface, c.DeviceInterfaceLink, c.DevicePackage,
+		c.DnsConfig, c.HostGroup, c.HostGroupMember, c.IpAddress, c.IpGroup,
+		c.IpGroupMember, c.IpScanJob, c.Location, c.Subnet, c.Vlan,
 	} {
 		n.Use(hooks...)
 	}
@@ -269,9 +275,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.AuditLog, c.Device, c.DeviceInterface, c.DevicePackage, c.DnsConfig,
-		c.HostGroup, c.HostGroupMember, c.IpAddress, c.IpGroup, c.IpGroupMember,
-		c.IpScanJob, c.Location, c.Subnet, c.Vlan,
+		c.AuditLog, c.Device, c.DeviceInterface, c.DeviceInterfaceLink, c.DevicePackage,
+		c.DnsConfig, c.HostGroup, c.HostGroupMember, c.IpAddress, c.IpGroup,
+		c.IpGroupMember, c.IpScanJob, c.Location, c.Subnet, c.Vlan,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -286,6 +292,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Device.mutate(ctx, m)
 	case *DeviceInterfaceMutation:
 		return c.DeviceInterface.mutate(ctx, m)
+	case *DeviceInterfaceLinkMutation:
+		return c.DeviceInterfaceLink.mutate(ctx, m)
 	case *DevicePackageMutation:
 		return c.DevicePackage.mutate(ctx, m)
 	case *DnsConfigMutation:
@@ -753,6 +761,22 @@ func (c *DeviceInterfaceClient) QueryDevice(_m *DeviceInterface) *DeviceQuery {
 	return query
 }
 
+// QueryLinks queries the links edge of a DeviceInterface.
+func (c *DeviceInterfaceClient) QueryLinks(_m *DeviceInterface) *DeviceInterfaceLinkQuery {
+	query := (&DeviceInterfaceLinkClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(deviceinterface.Table, deviceinterface.FieldID, id),
+			sqlgraph.To(deviceinterfacelink.Table, deviceinterfacelink.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, deviceinterface.LinksTable, deviceinterface.LinksColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *DeviceInterfaceClient) Hooks() []Hook {
 	return c.hooks.DeviceInterface
@@ -775,6 +799,155 @@ func (c *DeviceInterfaceClient) mutate(ctx context.Context, m *DeviceInterfaceMu
 		return (&DeviceInterfaceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown DeviceInterface mutation op: %q", m.Op())
+	}
+}
+
+// DeviceInterfaceLinkClient is a client for the DeviceInterfaceLink schema.
+type DeviceInterfaceLinkClient struct {
+	config
+}
+
+// NewDeviceInterfaceLinkClient returns a client for the DeviceInterfaceLink from the given config.
+func NewDeviceInterfaceLinkClient(c config) *DeviceInterfaceLinkClient {
+	return &DeviceInterfaceLinkClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `deviceinterfacelink.Hooks(f(g(h())))`.
+func (c *DeviceInterfaceLinkClient) Use(hooks ...Hook) {
+	c.hooks.DeviceInterfaceLink = append(c.hooks.DeviceInterfaceLink, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `deviceinterfacelink.Intercept(f(g(h())))`.
+func (c *DeviceInterfaceLinkClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DeviceInterfaceLink = append(c.inters.DeviceInterfaceLink, interceptors...)
+}
+
+// Create returns a builder for creating a DeviceInterfaceLink entity.
+func (c *DeviceInterfaceLinkClient) Create() *DeviceInterfaceLinkCreate {
+	mutation := newDeviceInterfaceLinkMutation(c.config, OpCreate)
+	return &DeviceInterfaceLinkCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DeviceInterfaceLink entities.
+func (c *DeviceInterfaceLinkClient) CreateBulk(builders ...*DeviceInterfaceLinkCreate) *DeviceInterfaceLinkCreateBulk {
+	return &DeviceInterfaceLinkCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DeviceInterfaceLinkClient) MapCreateBulk(slice any, setFunc func(*DeviceInterfaceLinkCreate, int)) *DeviceInterfaceLinkCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DeviceInterfaceLinkCreateBulk{err: fmt.Errorf("calling to DeviceInterfaceLinkClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DeviceInterfaceLinkCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DeviceInterfaceLinkCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DeviceInterfaceLink.
+func (c *DeviceInterfaceLinkClient) Update() *DeviceInterfaceLinkUpdate {
+	mutation := newDeviceInterfaceLinkMutation(c.config, OpUpdate)
+	return &DeviceInterfaceLinkUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DeviceInterfaceLinkClient) UpdateOne(_m *DeviceInterfaceLink) *DeviceInterfaceLinkUpdateOne {
+	mutation := newDeviceInterfaceLinkMutation(c.config, OpUpdateOne, withDeviceInterfaceLink(_m))
+	return &DeviceInterfaceLinkUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DeviceInterfaceLinkClient) UpdateOneID(id string) *DeviceInterfaceLinkUpdateOne {
+	mutation := newDeviceInterfaceLinkMutation(c.config, OpUpdateOne, withDeviceInterfaceLinkID(id))
+	return &DeviceInterfaceLinkUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DeviceInterfaceLink.
+func (c *DeviceInterfaceLinkClient) Delete() *DeviceInterfaceLinkDelete {
+	mutation := newDeviceInterfaceLinkMutation(c.config, OpDelete)
+	return &DeviceInterfaceLinkDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DeviceInterfaceLinkClient) DeleteOne(_m *DeviceInterfaceLink) *DeviceInterfaceLinkDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DeviceInterfaceLinkClient) DeleteOneID(id string) *DeviceInterfaceLinkDeleteOne {
+	builder := c.Delete().Where(deviceinterfacelink.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DeviceInterfaceLinkDeleteOne{builder}
+}
+
+// Query returns a query builder for DeviceInterfaceLink.
+func (c *DeviceInterfaceLinkClient) Query() *DeviceInterfaceLinkQuery {
+	return &DeviceInterfaceLinkQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDeviceInterfaceLink},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DeviceInterfaceLink entity by its id.
+func (c *DeviceInterfaceLinkClient) Get(ctx context.Context, id string) (*DeviceInterfaceLink, error) {
+	return c.Query().Where(deviceinterfacelink.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DeviceInterfaceLinkClient) GetX(ctx context.Context, id string) *DeviceInterfaceLink {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryInterface queries the interface edge of a DeviceInterfaceLink.
+func (c *DeviceInterfaceLinkClient) QueryInterface(_m *DeviceInterfaceLink) *DeviceInterfaceQuery {
+	query := (&DeviceInterfaceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(deviceinterfacelink.Table, deviceinterfacelink.FieldID, id),
+			sqlgraph.To(deviceinterface.Table, deviceinterface.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, deviceinterfacelink.InterfaceTable, deviceinterfacelink.InterfaceColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *DeviceInterfaceLinkClient) Hooks() []Hook {
+	return c.hooks.DeviceInterfaceLink
+}
+
+// Interceptors returns the client interceptors.
+func (c *DeviceInterfaceLinkClient) Interceptors() []Interceptor {
+	return c.inters.DeviceInterfaceLink
+}
+
+func (c *DeviceInterfaceLinkClient) mutate(ctx context.Context, m *DeviceInterfaceLinkMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DeviceInterfaceLinkCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DeviceInterfaceLinkUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DeviceInterfaceLinkUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DeviceInterfaceLinkDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DeviceInterfaceLink mutation op: %q", m.Op())
 	}
 }
 
@@ -2589,13 +2762,13 @@ func (c *VlanClient) mutate(ctx context.Context, m *VlanMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AuditLog, Device, DeviceInterface, DevicePackage, DnsConfig, HostGroup,
-		HostGroupMember, IpAddress, IpGroup, IpGroupMember, IpScanJob, Location,
-		Subnet, Vlan []ent.Hook
+		AuditLog, Device, DeviceInterface, DeviceInterfaceLink, DevicePackage,
+		DnsConfig, HostGroup, HostGroupMember, IpAddress, IpGroup, IpGroupMember,
+		IpScanJob, Location, Subnet, Vlan []ent.Hook
 	}
 	inters struct {
-		AuditLog, Device, DeviceInterface, DevicePackage, DnsConfig, HostGroup,
-		HostGroupMember, IpAddress, IpGroup, IpGroupMember, IpScanJob, Location,
-		Subnet, Vlan []ent.Interceptor
+		AuditLog, Device, DeviceInterface, DeviceInterfaceLink, DevicePackage,
+		DnsConfig, HostGroup, HostGroupMember, IpAddress, IpGroup, IpGroupMember,
+		IpScanJob, Location, Subnet, Vlan []ent.Interceptor
 	}
 )

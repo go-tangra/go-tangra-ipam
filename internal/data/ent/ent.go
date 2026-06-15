@@ -15,6 +15,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
@@ -86,20 +87,21 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			auditlog.Table:        auditlog.ValidColumn,
-			device.Table:          device.ValidColumn,
-			deviceinterface.Table: deviceinterface.ValidColumn,
-			devicepackage.Table:   devicepackage.ValidColumn,
-			dnsconfig.Table:       dnsconfig.ValidColumn,
-			hostgroup.Table:       hostgroup.ValidColumn,
-			hostgroupmember.Table: hostgroupmember.ValidColumn,
-			ipaddress.Table:       ipaddress.ValidColumn,
-			ipgroup.Table:         ipgroup.ValidColumn,
-			ipgroupmember.Table:   ipgroupmember.ValidColumn,
-			ipscanjob.Table:       ipscanjob.ValidColumn,
-			location.Table:        location.ValidColumn,
-			subnet.Table:          subnet.ValidColumn,
-			vlan.Table:            vlan.ValidColumn,
+			auditlog.Table:            auditlog.ValidColumn,
+			device.Table:              device.ValidColumn,
+			deviceinterface.Table:     deviceinterface.ValidColumn,
+			deviceinterfacelink.Table: deviceinterfacelink.ValidColumn,
+			devicepackage.Table:       devicepackage.ValidColumn,
+			dnsconfig.Table:           dnsconfig.ValidColumn,
+			hostgroup.Table:           hostgroup.ValidColumn,
+			hostgroupmember.Table:     hostgroupmember.ValidColumn,
+			ipaddress.Table:           ipaddress.ValidColumn,
+			ipgroup.Table:             ipgroup.ValidColumn,
+			ipgroupmember.Table:       ipgroupmember.ValidColumn,
+			ipscanjob.Table:           ipscanjob.ValidColumn,
+			location.Table:            location.ValidColumn,
+			subnet.Table:              subnet.ValidColumn,
+			vlan.Table:                vlan.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

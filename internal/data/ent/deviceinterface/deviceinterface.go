@@ -48,6 +48,8 @@ const (
 	FieldLinkLastSeen = "link_last_seen"
 	// EdgeDevice holds the string denoting the device edge name in mutations.
 	EdgeDevice = "device"
+	// EdgeLinks holds the string denoting the links edge name in mutations.
+	EdgeLinks = "links"
 	// Table holds the table name of the deviceinterface in the database.
 	Table = "ipam_device_interfaces"
 	// DeviceTable is the table that holds the device relation/edge.
@@ -57,6 +59,13 @@ const (
 	DeviceInverseTable = "ipam_devices"
 	// DeviceColumn is the table column denoting the device relation/edge.
 	DeviceColumn = "device_id"
+	// LinksTable is the table that holds the links relation/edge.
+	LinksTable = "ipam_device_interface_links"
+	// LinksInverseTable is the table name for the DeviceInterfaceLink entity.
+	// It exists in this package in order to avoid circular dependency with the "deviceinterfacelink" package.
+	LinksInverseTable = "ipam_device_interface_links"
+	// LinksColumn is the table column denoting the links relation/edge.
+	LinksColumn = "interface_id"
 )
 
 // Columns holds all SQL columns for deviceinterface fields.
@@ -201,10 +210,31 @@ func ByDeviceField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newDeviceStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByLinksCount orders the results by links count.
+func ByLinksCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newLinksStep(), opts...)
+	}
+}
+
+// ByLinks orders the results by links terms.
+func ByLinks(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newLinksStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newDeviceStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(DeviceInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, DeviceTable, DeviceColumn),
+	)
+}
+func newLinksStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(LinksInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, LinksTable, LinksColumn),
 	)
 }

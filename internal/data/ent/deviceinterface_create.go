@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
 )
 
 // DeviceInterfaceCreate is the builder for creating a DeviceInterface entity.
@@ -257,6 +258,21 @@ func (_c *DeviceInterfaceCreate) SetDevice(v *Device) *DeviceInterfaceCreate {
 	return _c.SetDeviceID(v.ID)
 }
 
+// AddLinkIDs adds the "links" edge to the DeviceInterfaceLink entity by IDs.
+func (_c *DeviceInterfaceCreate) AddLinkIDs(ids ...string) *DeviceInterfaceCreate {
+	_c.mutation.AddLinkIDs(ids...)
+	return _c
+}
+
+// AddLinks adds the "links" edges to the DeviceInterfaceLink entity.
+func (_c *DeviceInterfaceCreate) AddLinks(v ...*DeviceInterfaceLink) *DeviceInterfaceCreate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddLinkIDs(ids...)
+}
+
 // Mutation returns the DeviceInterfaceMutation object of the builder.
 func (_c *DeviceInterfaceCreate) Mutation() *DeviceInterfaceMutation {
 	return _c.mutation
@@ -442,6 +458,22 @@ func (_c *DeviceInterfaceCreate) createSpec() (*DeviceInterface, *sqlgraph.Creat
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.DeviceID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.LinksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deviceinterface.LinksTable,
+			Columns: []string{deviceinterface.LinksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deviceinterfacelink.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

@@ -14,6 +14,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/auditlog"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
+	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/devicepackage"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/dnsconfig"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/hostgroup"
@@ -37,20 +38,21 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeAuditLog        = "AuditLog"
-	TypeDevice          = "Device"
-	TypeDeviceInterface = "DeviceInterface"
-	TypeDevicePackage   = "DevicePackage"
-	TypeDnsConfig       = "DnsConfig"
-	TypeHostGroup       = "HostGroup"
-	TypeHostGroupMember = "HostGroupMember"
-	TypeIpAddress       = "IpAddress"
-	TypeIpGroup         = "IpGroup"
-	TypeIpGroupMember   = "IpGroupMember"
-	TypeIpScanJob       = "IpScanJob"
-	TypeLocation        = "Location"
-	TypeSubnet          = "Subnet"
-	TypeVlan            = "Vlan"
+	TypeAuditLog            = "AuditLog"
+	TypeDevice              = "Device"
+	TypeDeviceInterface     = "DeviceInterface"
+	TypeDeviceInterfaceLink = "DeviceInterfaceLink"
+	TypeDevicePackage       = "DevicePackage"
+	TypeDnsConfig           = "DnsConfig"
+	TypeHostGroup           = "HostGroup"
+	TypeHostGroupMember     = "HostGroupMember"
+	TypeIpAddress           = "IpAddress"
+	TypeIpGroup             = "IpGroup"
+	TypeIpGroupMember       = "IpGroupMember"
+	TypeIpScanJob           = "IpScanJob"
+	TypeLocation            = "Location"
+	TypeSubnet              = "Subnet"
+	TypeVlan                = "Vlan"
 )
 
 // AuditLogMutation represents an operation that mutates the AuditLog nodes in the graph.
@@ -4833,6 +4835,9 @@ type DeviceInterfaceMutation struct {
 	clearedFields       map[string]struct{}
 	device              *string
 	cleareddevice       bool
+	links               map[string]struct{}
+	removedlinks        map[string]struct{}
+	clearedlinks        bool
 	done                bool
 	oldValue            func(context.Context) (*DeviceInterface, error)
 	predicates          []predicate.DeviceInterface
@@ -5826,6 +5831,60 @@ func (m *DeviceInterfaceMutation) ResetDevice() {
 	m.cleareddevice = false
 }
 
+// AddLinkIDs adds the "links" edge to the DeviceInterfaceLink entity by ids.
+func (m *DeviceInterfaceMutation) AddLinkIDs(ids ...string) {
+	if m.links == nil {
+		m.links = make(map[string]struct{})
+	}
+	for i := range ids {
+		m.links[ids[i]] = struct{}{}
+	}
+}
+
+// ClearLinks clears the "links" edge to the DeviceInterfaceLink entity.
+func (m *DeviceInterfaceMutation) ClearLinks() {
+	m.clearedlinks = true
+}
+
+// LinksCleared reports if the "links" edge to the DeviceInterfaceLink entity was cleared.
+func (m *DeviceInterfaceMutation) LinksCleared() bool {
+	return m.clearedlinks
+}
+
+// RemoveLinkIDs removes the "links" edge to the DeviceInterfaceLink entity by IDs.
+func (m *DeviceInterfaceMutation) RemoveLinkIDs(ids ...string) {
+	if m.removedlinks == nil {
+		m.removedlinks = make(map[string]struct{})
+	}
+	for i := range ids {
+		delete(m.links, ids[i])
+		m.removedlinks[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedLinks returns the removed IDs of the "links" edge to the DeviceInterfaceLink entity.
+func (m *DeviceInterfaceMutation) RemovedLinksIDs() (ids []string) {
+	for id := range m.removedlinks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// LinksIDs returns the "links" edge IDs in the mutation.
+func (m *DeviceInterfaceMutation) LinksIDs() (ids []string) {
+	for id := range m.links {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetLinks resets all changes to the "links" edge.
+func (m *DeviceInterfaceMutation) ResetLinks() {
+	m.links = nil
+	m.clearedlinks = false
+	m.removedlinks = nil
+}
+
 // Where appends a list predicates to the DeviceInterfaceMutation builder.
 func (m *DeviceInterfaceMutation) Where(ps ...predicate.DeviceInterface) {
 	m.predicates = append(m.predicates, ps...)
@@ -6357,9 +6416,12 @@ func (m *DeviceInterfaceMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *DeviceInterfaceMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.device != nil {
 		edges = append(edges, deviceinterface.EdgeDevice)
+	}
+	if m.links != nil {
+		edges = append(edges, deviceinterface.EdgeLinks)
 	}
 	return edges
 }
@@ -6372,27 +6434,47 @@ func (m *DeviceInterfaceMutation) AddedIDs(name string) []ent.Value {
 		if id := m.device; id != nil {
 			return []ent.Value{*id}
 		}
+	case deviceinterface.EdgeLinks:
+		ids := make([]ent.Value, 0, len(m.links))
+		for id := range m.links {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *DeviceInterfaceMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
+	if m.removedlinks != nil {
+		edges = append(edges, deviceinterface.EdgeLinks)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *DeviceInterfaceMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case deviceinterface.EdgeLinks:
+		ids := make([]ent.Value, 0, len(m.removedlinks))
+		for id := range m.removedlinks {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *DeviceInterfaceMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.cleareddevice {
 		edges = append(edges, deviceinterface.EdgeDevice)
+	}
+	if m.clearedlinks {
+		edges = append(edges, deviceinterface.EdgeLinks)
 	}
 	return edges
 }
@@ -6403,6 +6485,8 @@ func (m *DeviceInterfaceMutation) EdgeCleared(name string) bool {
 	switch name {
 	case deviceinterface.EdgeDevice:
 		return m.cleareddevice
+	case deviceinterface.EdgeLinks:
+		return m.clearedlinks
 	}
 	return false
 }
@@ -6425,8 +6509,1094 @@ func (m *DeviceInterfaceMutation) ResetEdge(name string) error {
 	case deviceinterface.EdgeDevice:
 		m.ResetDevice()
 		return nil
+	case deviceinterface.EdgeLinks:
+		m.ResetLinks()
+		return nil
 	}
 	return fmt.Errorf("unknown DeviceInterface edge %s", name)
+}
+
+// DeviceInterfaceLinkMutation represents an operation that mutates the DeviceInterfaceLink nodes in the graph.
+type DeviceInterfaceLinkMutation struct {
+	config
+	op                  Op
+	typ                 string
+	id                  *string
+	create_time         *time.Time
+	update_time         *time.Time
+	delete_time         *time.Time
+	remote_device_id    *string
+	remote_interface_id *string
+	remote_port_name    *string
+	link_source         *string
+	link_vlan           *int32
+	addlink_vlan        *int32
+	link_last_seen      *time.Time
+	clearedFields       map[string]struct{}
+	_interface          *string
+	cleared_interface   bool
+	done                bool
+	oldValue            func(context.Context) (*DeviceInterfaceLink, error)
+	predicates          []predicate.DeviceInterfaceLink
+}
+
+var _ ent.Mutation = (*DeviceInterfaceLinkMutation)(nil)
+
+// deviceinterfacelinkOption allows management of the mutation configuration using functional options.
+type deviceinterfacelinkOption func(*DeviceInterfaceLinkMutation)
+
+// newDeviceInterfaceLinkMutation creates new mutation for the DeviceInterfaceLink entity.
+func newDeviceInterfaceLinkMutation(c config, op Op, opts ...deviceinterfacelinkOption) *DeviceInterfaceLinkMutation {
+	m := &DeviceInterfaceLinkMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDeviceInterfaceLink,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDeviceInterfaceLinkID sets the ID field of the mutation.
+func withDeviceInterfaceLinkID(id string) deviceinterfacelinkOption {
+	return func(m *DeviceInterfaceLinkMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DeviceInterfaceLink
+		)
+		m.oldValue = func(ctx context.Context) (*DeviceInterfaceLink, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DeviceInterfaceLink.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDeviceInterfaceLink sets the old DeviceInterfaceLink of the mutation.
+func withDeviceInterfaceLink(node *DeviceInterfaceLink) deviceinterfacelinkOption {
+	return func(m *DeviceInterfaceLinkMutation) {
+		m.oldValue = func(context.Context) (*DeviceInterfaceLink, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DeviceInterfaceLinkMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DeviceInterfaceLinkMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DeviceInterfaceLink entities.
+func (m *DeviceInterfaceLinkMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DeviceInterfaceLinkMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DeviceInterfaceLinkMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DeviceInterfaceLink.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *DeviceInterfaceLinkMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldCreateTime(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ClearCreateTime clears the value of the "create_time" field.
+func (m *DeviceInterfaceLinkMutation) ClearCreateTime() {
+	m.create_time = nil
+	m.clearedFields[deviceinterfacelink.FieldCreateTime] = struct{}{}
+}
+
+// CreateTimeCleared returns if the "create_time" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) CreateTimeCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldCreateTime]
+	return ok
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *DeviceInterfaceLinkMutation) ResetCreateTime() {
+	m.create_time = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldCreateTime)
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *DeviceInterfaceLinkMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldUpdateTime(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ClearUpdateTime clears the value of the "update_time" field.
+func (m *DeviceInterfaceLinkMutation) ClearUpdateTime() {
+	m.update_time = nil
+	m.clearedFields[deviceinterfacelink.FieldUpdateTime] = struct{}{}
+}
+
+// UpdateTimeCleared returns if the "update_time" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) UpdateTimeCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldUpdateTime]
+	return ok
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *DeviceInterfaceLinkMutation) ResetUpdateTime() {
+	m.update_time = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldUpdateTime)
+}
+
+// SetDeleteTime sets the "delete_time" field.
+func (m *DeviceInterfaceLinkMutation) SetDeleteTime(t time.Time) {
+	m.delete_time = &t
+}
+
+// DeleteTime returns the value of the "delete_time" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) DeleteTime() (r time.Time, exists bool) {
+	v := m.delete_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeleteTime returns the old "delete_time" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldDeleteTime(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeleteTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeleteTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeleteTime: %w", err)
+	}
+	return oldValue.DeleteTime, nil
+}
+
+// ClearDeleteTime clears the value of the "delete_time" field.
+func (m *DeviceInterfaceLinkMutation) ClearDeleteTime() {
+	m.delete_time = nil
+	m.clearedFields[deviceinterfacelink.FieldDeleteTime] = struct{}{}
+}
+
+// DeleteTimeCleared returns if the "delete_time" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) DeleteTimeCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldDeleteTime]
+	return ok
+}
+
+// ResetDeleteTime resets all changes to the "delete_time" field.
+func (m *DeviceInterfaceLinkMutation) ResetDeleteTime() {
+	m.delete_time = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldDeleteTime)
+}
+
+// SetInterfaceID sets the "interface_id" field.
+func (m *DeviceInterfaceLinkMutation) SetInterfaceID(s string) {
+	m._interface = &s
+}
+
+// InterfaceID returns the value of the "interface_id" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) InterfaceID() (r string, exists bool) {
+	v := m._interface
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInterfaceID returns the old "interface_id" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldInterfaceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInterfaceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInterfaceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInterfaceID: %w", err)
+	}
+	return oldValue.InterfaceID, nil
+}
+
+// ResetInterfaceID resets all changes to the "interface_id" field.
+func (m *DeviceInterfaceLinkMutation) ResetInterfaceID() {
+	m._interface = nil
+}
+
+// SetRemoteDeviceID sets the "remote_device_id" field.
+func (m *DeviceInterfaceLinkMutation) SetRemoteDeviceID(s string) {
+	m.remote_device_id = &s
+}
+
+// RemoteDeviceID returns the value of the "remote_device_id" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) RemoteDeviceID() (r string, exists bool) {
+	v := m.remote_device_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemoteDeviceID returns the old "remote_device_id" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldRemoteDeviceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemoteDeviceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemoteDeviceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemoteDeviceID: %w", err)
+	}
+	return oldValue.RemoteDeviceID, nil
+}
+
+// ClearRemoteDeviceID clears the value of the "remote_device_id" field.
+func (m *DeviceInterfaceLinkMutation) ClearRemoteDeviceID() {
+	m.remote_device_id = nil
+	m.clearedFields[deviceinterfacelink.FieldRemoteDeviceID] = struct{}{}
+}
+
+// RemoteDeviceIDCleared returns if the "remote_device_id" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) RemoteDeviceIDCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldRemoteDeviceID]
+	return ok
+}
+
+// ResetRemoteDeviceID resets all changes to the "remote_device_id" field.
+func (m *DeviceInterfaceLinkMutation) ResetRemoteDeviceID() {
+	m.remote_device_id = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldRemoteDeviceID)
+}
+
+// SetRemoteInterfaceID sets the "remote_interface_id" field.
+func (m *DeviceInterfaceLinkMutation) SetRemoteInterfaceID(s string) {
+	m.remote_interface_id = &s
+}
+
+// RemoteInterfaceID returns the value of the "remote_interface_id" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) RemoteInterfaceID() (r string, exists bool) {
+	v := m.remote_interface_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemoteInterfaceID returns the old "remote_interface_id" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldRemoteInterfaceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemoteInterfaceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemoteInterfaceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemoteInterfaceID: %w", err)
+	}
+	return oldValue.RemoteInterfaceID, nil
+}
+
+// ClearRemoteInterfaceID clears the value of the "remote_interface_id" field.
+func (m *DeviceInterfaceLinkMutation) ClearRemoteInterfaceID() {
+	m.remote_interface_id = nil
+	m.clearedFields[deviceinterfacelink.FieldRemoteInterfaceID] = struct{}{}
+}
+
+// RemoteInterfaceIDCleared returns if the "remote_interface_id" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) RemoteInterfaceIDCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldRemoteInterfaceID]
+	return ok
+}
+
+// ResetRemoteInterfaceID resets all changes to the "remote_interface_id" field.
+func (m *DeviceInterfaceLinkMutation) ResetRemoteInterfaceID() {
+	m.remote_interface_id = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldRemoteInterfaceID)
+}
+
+// SetRemotePortName sets the "remote_port_name" field.
+func (m *DeviceInterfaceLinkMutation) SetRemotePortName(s string) {
+	m.remote_port_name = &s
+}
+
+// RemotePortName returns the value of the "remote_port_name" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) RemotePortName() (r string, exists bool) {
+	v := m.remote_port_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemotePortName returns the old "remote_port_name" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldRemotePortName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemotePortName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemotePortName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemotePortName: %w", err)
+	}
+	return oldValue.RemotePortName, nil
+}
+
+// ClearRemotePortName clears the value of the "remote_port_name" field.
+func (m *DeviceInterfaceLinkMutation) ClearRemotePortName() {
+	m.remote_port_name = nil
+	m.clearedFields[deviceinterfacelink.FieldRemotePortName] = struct{}{}
+}
+
+// RemotePortNameCleared returns if the "remote_port_name" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) RemotePortNameCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldRemotePortName]
+	return ok
+}
+
+// ResetRemotePortName resets all changes to the "remote_port_name" field.
+func (m *DeviceInterfaceLinkMutation) ResetRemotePortName() {
+	m.remote_port_name = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldRemotePortName)
+}
+
+// SetLinkSource sets the "link_source" field.
+func (m *DeviceInterfaceLinkMutation) SetLinkSource(s string) {
+	m.link_source = &s
+}
+
+// LinkSource returns the value of the "link_source" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) LinkSource() (r string, exists bool) {
+	v := m.link_source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLinkSource returns the old "link_source" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldLinkSource(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLinkSource is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLinkSource requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLinkSource: %w", err)
+	}
+	return oldValue.LinkSource, nil
+}
+
+// ClearLinkSource clears the value of the "link_source" field.
+func (m *DeviceInterfaceLinkMutation) ClearLinkSource() {
+	m.link_source = nil
+	m.clearedFields[deviceinterfacelink.FieldLinkSource] = struct{}{}
+}
+
+// LinkSourceCleared returns if the "link_source" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) LinkSourceCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldLinkSource]
+	return ok
+}
+
+// ResetLinkSource resets all changes to the "link_source" field.
+func (m *DeviceInterfaceLinkMutation) ResetLinkSource() {
+	m.link_source = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldLinkSource)
+}
+
+// SetLinkVlan sets the "link_vlan" field.
+func (m *DeviceInterfaceLinkMutation) SetLinkVlan(i int32) {
+	m.link_vlan = &i
+	m.addlink_vlan = nil
+}
+
+// LinkVlan returns the value of the "link_vlan" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) LinkVlan() (r int32, exists bool) {
+	v := m.link_vlan
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLinkVlan returns the old "link_vlan" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldLinkVlan(ctx context.Context) (v *int32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLinkVlan is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLinkVlan requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLinkVlan: %w", err)
+	}
+	return oldValue.LinkVlan, nil
+}
+
+// AddLinkVlan adds i to the "link_vlan" field.
+func (m *DeviceInterfaceLinkMutation) AddLinkVlan(i int32) {
+	if m.addlink_vlan != nil {
+		*m.addlink_vlan += i
+	} else {
+		m.addlink_vlan = &i
+	}
+}
+
+// AddedLinkVlan returns the value that was added to the "link_vlan" field in this mutation.
+func (m *DeviceInterfaceLinkMutation) AddedLinkVlan() (r int32, exists bool) {
+	v := m.addlink_vlan
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearLinkVlan clears the value of the "link_vlan" field.
+func (m *DeviceInterfaceLinkMutation) ClearLinkVlan() {
+	m.link_vlan = nil
+	m.addlink_vlan = nil
+	m.clearedFields[deviceinterfacelink.FieldLinkVlan] = struct{}{}
+}
+
+// LinkVlanCleared returns if the "link_vlan" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) LinkVlanCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldLinkVlan]
+	return ok
+}
+
+// ResetLinkVlan resets all changes to the "link_vlan" field.
+func (m *DeviceInterfaceLinkMutation) ResetLinkVlan() {
+	m.link_vlan = nil
+	m.addlink_vlan = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldLinkVlan)
+}
+
+// SetLinkLastSeen sets the "link_last_seen" field.
+func (m *DeviceInterfaceLinkMutation) SetLinkLastSeen(t time.Time) {
+	m.link_last_seen = &t
+}
+
+// LinkLastSeen returns the value of the "link_last_seen" field in the mutation.
+func (m *DeviceInterfaceLinkMutation) LinkLastSeen() (r time.Time, exists bool) {
+	v := m.link_last_seen
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLinkLastSeen returns the old "link_last_seen" field's value of the DeviceInterfaceLink entity.
+// If the DeviceInterfaceLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceInterfaceLinkMutation) OldLinkLastSeen(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLinkLastSeen is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLinkLastSeen requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLinkLastSeen: %w", err)
+	}
+	return oldValue.LinkLastSeen, nil
+}
+
+// ClearLinkLastSeen clears the value of the "link_last_seen" field.
+func (m *DeviceInterfaceLinkMutation) ClearLinkLastSeen() {
+	m.link_last_seen = nil
+	m.clearedFields[deviceinterfacelink.FieldLinkLastSeen] = struct{}{}
+}
+
+// LinkLastSeenCleared returns if the "link_last_seen" field was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) LinkLastSeenCleared() bool {
+	_, ok := m.clearedFields[deviceinterfacelink.FieldLinkLastSeen]
+	return ok
+}
+
+// ResetLinkLastSeen resets all changes to the "link_last_seen" field.
+func (m *DeviceInterfaceLinkMutation) ResetLinkLastSeen() {
+	m.link_last_seen = nil
+	delete(m.clearedFields, deviceinterfacelink.FieldLinkLastSeen)
+}
+
+// ClearInterface clears the "interface" edge to the DeviceInterface entity.
+func (m *DeviceInterfaceLinkMutation) ClearInterface() {
+	m.cleared_interface = true
+	m.clearedFields[deviceinterfacelink.FieldInterfaceID] = struct{}{}
+}
+
+// InterfaceCleared reports if the "interface" edge to the DeviceInterface entity was cleared.
+func (m *DeviceInterfaceLinkMutation) InterfaceCleared() bool {
+	return m.cleared_interface
+}
+
+// InterfaceIDs returns the "interface" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// InterfaceID instead. It exists only for internal usage by the builders.
+func (m *DeviceInterfaceLinkMutation) InterfaceIDs() (ids []string) {
+	if id := m._interface; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetInterface resets all changes to the "interface" edge.
+func (m *DeviceInterfaceLinkMutation) ResetInterface() {
+	m._interface = nil
+	m.cleared_interface = false
+}
+
+// Where appends a list predicates to the DeviceInterfaceLinkMutation builder.
+func (m *DeviceInterfaceLinkMutation) Where(ps ...predicate.DeviceInterfaceLink) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DeviceInterfaceLinkMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DeviceInterfaceLinkMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DeviceInterfaceLink, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DeviceInterfaceLinkMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DeviceInterfaceLinkMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DeviceInterfaceLink).
+func (m *DeviceInterfaceLinkMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DeviceInterfaceLinkMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.create_time != nil {
+		fields = append(fields, deviceinterfacelink.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, deviceinterfacelink.FieldUpdateTime)
+	}
+	if m.delete_time != nil {
+		fields = append(fields, deviceinterfacelink.FieldDeleteTime)
+	}
+	if m._interface != nil {
+		fields = append(fields, deviceinterfacelink.FieldInterfaceID)
+	}
+	if m.remote_device_id != nil {
+		fields = append(fields, deviceinterfacelink.FieldRemoteDeviceID)
+	}
+	if m.remote_interface_id != nil {
+		fields = append(fields, deviceinterfacelink.FieldRemoteInterfaceID)
+	}
+	if m.remote_port_name != nil {
+		fields = append(fields, deviceinterfacelink.FieldRemotePortName)
+	}
+	if m.link_source != nil {
+		fields = append(fields, deviceinterfacelink.FieldLinkSource)
+	}
+	if m.link_vlan != nil {
+		fields = append(fields, deviceinterfacelink.FieldLinkVlan)
+	}
+	if m.link_last_seen != nil {
+		fields = append(fields, deviceinterfacelink.FieldLinkLastSeen)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DeviceInterfaceLinkMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case deviceinterfacelink.FieldCreateTime:
+		return m.CreateTime()
+	case deviceinterfacelink.FieldUpdateTime:
+		return m.UpdateTime()
+	case deviceinterfacelink.FieldDeleteTime:
+		return m.DeleteTime()
+	case deviceinterfacelink.FieldInterfaceID:
+		return m.InterfaceID()
+	case deviceinterfacelink.FieldRemoteDeviceID:
+		return m.RemoteDeviceID()
+	case deviceinterfacelink.FieldRemoteInterfaceID:
+		return m.RemoteInterfaceID()
+	case deviceinterfacelink.FieldRemotePortName:
+		return m.RemotePortName()
+	case deviceinterfacelink.FieldLinkSource:
+		return m.LinkSource()
+	case deviceinterfacelink.FieldLinkVlan:
+		return m.LinkVlan()
+	case deviceinterfacelink.FieldLinkLastSeen:
+		return m.LinkLastSeen()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DeviceInterfaceLinkMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case deviceinterfacelink.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case deviceinterfacelink.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case deviceinterfacelink.FieldDeleteTime:
+		return m.OldDeleteTime(ctx)
+	case deviceinterfacelink.FieldInterfaceID:
+		return m.OldInterfaceID(ctx)
+	case deviceinterfacelink.FieldRemoteDeviceID:
+		return m.OldRemoteDeviceID(ctx)
+	case deviceinterfacelink.FieldRemoteInterfaceID:
+		return m.OldRemoteInterfaceID(ctx)
+	case deviceinterfacelink.FieldRemotePortName:
+		return m.OldRemotePortName(ctx)
+	case deviceinterfacelink.FieldLinkSource:
+		return m.OldLinkSource(ctx)
+	case deviceinterfacelink.FieldLinkVlan:
+		return m.OldLinkVlan(ctx)
+	case deviceinterfacelink.FieldLinkLastSeen:
+		return m.OldLinkLastSeen(ctx)
+	}
+	return nil, fmt.Errorf("unknown DeviceInterfaceLink field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DeviceInterfaceLinkMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case deviceinterfacelink.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case deviceinterfacelink.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case deviceinterfacelink.FieldDeleteTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeleteTime(v)
+		return nil
+	case deviceinterfacelink.FieldInterfaceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInterfaceID(v)
+		return nil
+	case deviceinterfacelink.FieldRemoteDeviceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemoteDeviceID(v)
+		return nil
+	case deviceinterfacelink.FieldRemoteInterfaceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemoteInterfaceID(v)
+		return nil
+	case deviceinterfacelink.FieldRemotePortName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemotePortName(v)
+		return nil
+	case deviceinterfacelink.FieldLinkSource:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLinkSource(v)
+		return nil
+	case deviceinterfacelink.FieldLinkVlan:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLinkVlan(v)
+		return nil
+	case deviceinterfacelink.FieldLinkLastSeen:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLinkLastSeen(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DeviceInterfaceLink field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DeviceInterfaceLinkMutation) AddedFields() []string {
+	var fields []string
+	if m.addlink_vlan != nil {
+		fields = append(fields, deviceinterfacelink.FieldLinkVlan)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DeviceInterfaceLinkMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case deviceinterfacelink.FieldLinkVlan:
+		return m.AddedLinkVlan()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DeviceInterfaceLinkMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case deviceinterfacelink.FieldLinkVlan:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLinkVlan(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DeviceInterfaceLink numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DeviceInterfaceLinkMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(deviceinterfacelink.FieldCreateTime) {
+		fields = append(fields, deviceinterfacelink.FieldCreateTime)
+	}
+	if m.FieldCleared(deviceinterfacelink.FieldUpdateTime) {
+		fields = append(fields, deviceinterfacelink.FieldUpdateTime)
+	}
+	if m.FieldCleared(deviceinterfacelink.FieldDeleteTime) {
+		fields = append(fields, deviceinterfacelink.FieldDeleteTime)
+	}
+	if m.FieldCleared(deviceinterfacelink.FieldRemoteDeviceID) {
+		fields = append(fields, deviceinterfacelink.FieldRemoteDeviceID)
+	}
+	if m.FieldCleared(deviceinterfacelink.FieldRemoteInterfaceID) {
+		fields = append(fields, deviceinterfacelink.FieldRemoteInterfaceID)
+	}
+	if m.FieldCleared(deviceinterfacelink.FieldRemotePortName) {
+		fields = append(fields, deviceinterfacelink.FieldRemotePortName)
+	}
+	if m.FieldCleared(deviceinterfacelink.FieldLinkSource) {
+		fields = append(fields, deviceinterfacelink.FieldLinkSource)
+	}
+	if m.FieldCleared(deviceinterfacelink.FieldLinkVlan) {
+		fields = append(fields, deviceinterfacelink.FieldLinkVlan)
+	}
+	if m.FieldCleared(deviceinterfacelink.FieldLinkLastSeen) {
+		fields = append(fields, deviceinterfacelink.FieldLinkLastSeen)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DeviceInterfaceLinkMutation) ClearField(name string) error {
+	switch name {
+	case deviceinterfacelink.FieldCreateTime:
+		m.ClearCreateTime()
+		return nil
+	case deviceinterfacelink.FieldUpdateTime:
+		m.ClearUpdateTime()
+		return nil
+	case deviceinterfacelink.FieldDeleteTime:
+		m.ClearDeleteTime()
+		return nil
+	case deviceinterfacelink.FieldRemoteDeviceID:
+		m.ClearRemoteDeviceID()
+		return nil
+	case deviceinterfacelink.FieldRemoteInterfaceID:
+		m.ClearRemoteInterfaceID()
+		return nil
+	case deviceinterfacelink.FieldRemotePortName:
+		m.ClearRemotePortName()
+		return nil
+	case deviceinterfacelink.FieldLinkSource:
+		m.ClearLinkSource()
+		return nil
+	case deviceinterfacelink.FieldLinkVlan:
+		m.ClearLinkVlan()
+		return nil
+	case deviceinterfacelink.FieldLinkLastSeen:
+		m.ClearLinkLastSeen()
+		return nil
+	}
+	return fmt.Errorf("unknown DeviceInterfaceLink nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DeviceInterfaceLinkMutation) ResetField(name string) error {
+	switch name {
+	case deviceinterfacelink.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case deviceinterfacelink.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case deviceinterfacelink.FieldDeleteTime:
+		m.ResetDeleteTime()
+		return nil
+	case deviceinterfacelink.FieldInterfaceID:
+		m.ResetInterfaceID()
+		return nil
+	case deviceinterfacelink.FieldRemoteDeviceID:
+		m.ResetRemoteDeviceID()
+		return nil
+	case deviceinterfacelink.FieldRemoteInterfaceID:
+		m.ResetRemoteInterfaceID()
+		return nil
+	case deviceinterfacelink.FieldRemotePortName:
+		m.ResetRemotePortName()
+		return nil
+	case deviceinterfacelink.FieldLinkSource:
+		m.ResetLinkSource()
+		return nil
+	case deviceinterfacelink.FieldLinkVlan:
+		m.ResetLinkVlan()
+		return nil
+	case deviceinterfacelink.FieldLinkLastSeen:
+		m.ResetLinkLastSeen()
+		return nil
+	}
+	return fmt.Errorf("unknown DeviceInterfaceLink field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DeviceInterfaceLinkMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m._interface != nil {
+		edges = append(edges, deviceinterfacelink.EdgeInterface)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DeviceInterfaceLinkMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case deviceinterfacelink.EdgeInterface:
+		if id := m._interface; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DeviceInterfaceLinkMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DeviceInterfaceLinkMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.cleared_interface {
+		edges = append(edges, deviceinterfacelink.EdgeInterface)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DeviceInterfaceLinkMutation) EdgeCleared(name string) bool {
+	switch name {
+	case deviceinterfacelink.EdgeInterface:
+		return m.cleared_interface
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DeviceInterfaceLinkMutation) ClearEdge(name string) error {
+	switch name {
+	case deviceinterfacelink.EdgeInterface:
+		m.ClearInterface()
+		return nil
+	}
+	return fmt.Errorf("unknown DeviceInterfaceLink unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DeviceInterfaceLinkMutation) ResetEdge(name string) error {
+	switch name {
+	case deviceinterfacelink.EdgeInterface:
+		m.ResetInterface()
+		return nil
+	}
+	return fmt.Errorf("unknown DeviceInterfaceLink edge %s", name)
 }
 
 // DevicePackageMutation represents an operation that mutates the DevicePackage nodes in the graph.
