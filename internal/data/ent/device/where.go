@@ -185,6 +185,16 @@ func FirmwareVersion(v string) predicate.Device {
 	return predicate.Device(sql.FieldEQ(FieldFirmwareVersion, v))
 }
 
+// RebootRequired applies equality check predicate on the "reboot_required" field. It's identical to RebootRequiredEQ.
+func RebootRequired(v bool) predicate.Device {
+	return predicate.Device(sql.FieldEQ(FieldRebootRequired, v))
+}
+
+// UnattendedUpgrades applies equality check predicate on the "unattended_upgrades" field. It's identical to UnattendedUpgradesEQ.
+func UnattendedUpgrades(v bool) predicate.Device {
+	return predicate.Device(sql.FieldEQ(FieldUnattendedUpgrades, v))
+}
+
 // IpmiSecretRef applies equality check predicate on the "ipmi_secret_ref" field. It's identical to IpmiSecretRefEQ.
 func IpmiSecretRef(v string) predicate.Device {
 	return predicate.Device(sql.FieldEQ(FieldIpmiSecretRef, v))
@@ -1733,6 +1743,46 @@ func FirmwareVersionEqualFold(v string) predicate.Device {
 // FirmwareVersionContainsFold applies the ContainsFold predicate on the "firmware_version" field.
 func FirmwareVersionContainsFold(v string) predicate.Device {
 	return predicate.Device(sql.FieldContainsFold(FieldFirmwareVersion, v))
+}
+
+// RebootRequiredEQ applies the EQ predicate on the "reboot_required" field.
+func RebootRequiredEQ(v bool) predicate.Device {
+	return predicate.Device(sql.FieldEQ(FieldRebootRequired, v))
+}
+
+// RebootRequiredNEQ applies the NEQ predicate on the "reboot_required" field.
+func RebootRequiredNEQ(v bool) predicate.Device {
+	return predicate.Device(sql.FieldNEQ(FieldRebootRequired, v))
+}
+
+// RebootRequiredIsNil applies the IsNil predicate on the "reboot_required" field.
+func RebootRequiredIsNil() predicate.Device {
+	return predicate.Device(sql.FieldIsNull(FieldRebootRequired))
+}
+
+// RebootRequiredNotNil applies the NotNil predicate on the "reboot_required" field.
+func RebootRequiredNotNil() predicate.Device {
+	return predicate.Device(sql.FieldNotNull(FieldRebootRequired))
+}
+
+// UnattendedUpgradesEQ applies the EQ predicate on the "unattended_upgrades" field.
+func UnattendedUpgradesEQ(v bool) predicate.Device {
+	return predicate.Device(sql.FieldEQ(FieldUnattendedUpgrades, v))
+}
+
+// UnattendedUpgradesNEQ applies the NEQ predicate on the "unattended_upgrades" field.
+func UnattendedUpgradesNEQ(v bool) predicate.Device {
+	return predicate.Device(sql.FieldNEQ(FieldUnattendedUpgrades, v))
+}
+
+// UnattendedUpgradesIsNil applies the IsNil predicate on the "unattended_upgrades" field.
+func UnattendedUpgradesIsNil() predicate.Device {
+	return predicate.Device(sql.FieldIsNull(FieldUnattendedUpgrades))
+}
+
+// UnattendedUpgradesNotNil applies the NotNil predicate on the "unattended_upgrades" field.
+func UnattendedUpgradesNotNil() predicate.Device {
+	return predicate.Device(sql.FieldNotNull(FieldUnattendedUpgrades))
 }
 
 // IpmiSecretRefEQ applies the EQ predicate on the "ipmi_secret_ref" field.

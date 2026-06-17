@@ -354,6 +354,34 @@ func (_c *DeviceCreate) SetNillableFirmwareVersion(v *string) *DeviceCreate {
 	return _c
 }
 
+// SetRebootRequired sets the "reboot_required" field.
+func (_c *DeviceCreate) SetRebootRequired(v bool) *DeviceCreate {
+	_c.mutation.SetRebootRequired(v)
+	return _c
+}
+
+// SetNillableRebootRequired sets the "reboot_required" field if the given value is not nil.
+func (_c *DeviceCreate) SetNillableRebootRequired(v *bool) *DeviceCreate {
+	if v != nil {
+		_c.SetRebootRequired(*v)
+	}
+	return _c
+}
+
+// SetUnattendedUpgrades sets the "unattended_upgrades" field.
+func (_c *DeviceCreate) SetUnattendedUpgrades(v bool) *DeviceCreate {
+	_c.mutation.SetUnattendedUpgrades(v)
+	return _c
+}
+
+// SetNillableUnattendedUpgrades sets the "unattended_upgrades" field if the given value is not nil.
+func (_c *DeviceCreate) SetNillableUnattendedUpgrades(v *bool) *DeviceCreate {
+	if v != nil {
+		_c.SetUnattendedUpgrades(*v)
+	}
+	return _c
+}
+
 // SetIpmiSecretRef sets the "ipmi_secret_ref" field.
 func (_c *DeviceCreate) SetIpmiSecretRef(v string) *DeviceCreate {
 	_c.mutation.SetIpmiSecretRef(v)
@@ -532,6 +560,14 @@ func (_c *DeviceCreate) defaults() error {
 		v := device.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.RebootRequired(); !ok {
+		v := device.DefaultRebootRequired
+		_c.mutation.SetRebootRequired(v)
+	}
+	if _, ok := _c.mutation.UnattendedUpgrades(); !ok {
+		v := device.DefaultUnattendedUpgrades
+		_c.mutation.SetUnattendedUpgrades(v)
+	}
 	return nil
 }
 
@@ -683,6 +719,14 @@ func (_c *DeviceCreate) createSpec() (*Device, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.FirmwareVersion(); ok {
 		_spec.SetField(device.FieldFirmwareVersion, field.TypeString, value)
 		_node.FirmwareVersion = value
+	}
+	if value, ok := _c.mutation.RebootRequired(); ok {
+		_spec.SetField(device.FieldRebootRequired, field.TypeBool, value)
+		_node.RebootRequired = value
+	}
+	if value, ok := _c.mutation.UnattendedUpgrades(); ok {
+		_spec.SetField(device.FieldUnattendedUpgrades, field.TypeBool, value)
+		_node.UnattendedUpgrades = value
 	}
 	if value, ok := _c.mutation.IpmiSecretRef(); ok {
 		_spec.SetField(device.FieldIpmiSecretRef, field.TypeString, value)
@@ -1220,6 +1264,42 @@ func (u *DeviceUpsert) UpdateFirmwareVersion() *DeviceUpsert {
 // ClearFirmwareVersion clears the value of the "firmware_version" field.
 func (u *DeviceUpsert) ClearFirmwareVersion() *DeviceUpsert {
 	u.SetNull(device.FieldFirmwareVersion)
+	return u
+}
+
+// SetRebootRequired sets the "reboot_required" field.
+func (u *DeviceUpsert) SetRebootRequired(v bool) *DeviceUpsert {
+	u.Set(device.FieldRebootRequired, v)
+	return u
+}
+
+// UpdateRebootRequired sets the "reboot_required" field to the value that was provided on create.
+func (u *DeviceUpsert) UpdateRebootRequired() *DeviceUpsert {
+	u.SetExcluded(device.FieldRebootRequired)
+	return u
+}
+
+// ClearRebootRequired clears the value of the "reboot_required" field.
+func (u *DeviceUpsert) ClearRebootRequired() *DeviceUpsert {
+	u.SetNull(device.FieldRebootRequired)
+	return u
+}
+
+// SetUnattendedUpgrades sets the "unattended_upgrades" field.
+func (u *DeviceUpsert) SetUnattendedUpgrades(v bool) *DeviceUpsert {
+	u.Set(device.FieldUnattendedUpgrades, v)
+	return u
+}
+
+// UpdateUnattendedUpgrades sets the "unattended_upgrades" field to the value that was provided on create.
+func (u *DeviceUpsert) UpdateUnattendedUpgrades() *DeviceUpsert {
+	u.SetExcluded(device.FieldUnattendedUpgrades)
+	return u
+}
+
+// ClearUnattendedUpgrades clears the value of the "unattended_upgrades" field.
+func (u *DeviceUpsert) ClearUnattendedUpgrades() *DeviceUpsert {
+	u.SetNull(device.FieldUnattendedUpgrades)
 	return u
 }
 
@@ -1865,6 +1945,48 @@ func (u *DeviceUpsertOne) UpdateFirmwareVersion() *DeviceUpsertOne {
 func (u *DeviceUpsertOne) ClearFirmwareVersion() *DeviceUpsertOne {
 	return u.Update(func(s *DeviceUpsert) {
 		s.ClearFirmwareVersion()
+	})
+}
+
+// SetRebootRequired sets the "reboot_required" field.
+func (u *DeviceUpsertOne) SetRebootRequired(v bool) *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.SetRebootRequired(v)
+	})
+}
+
+// UpdateRebootRequired sets the "reboot_required" field to the value that was provided on create.
+func (u *DeviceUpsertOne) UpdateRebootRequired() *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.UpdateRebootRequired()
+	})
+}
+
+// ClearRebootRequired clears the value of the "reboot_required" field.
+func (u *DeviceUpsertOne) ClearRebootRequired() *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.ClearRebootRequired()
+	})
+}
+
+// SetUnattendedUpgrades sets the "unattended_upgrades" field.
+func (u *DeviceUpsertOne) SetUnattendedUpgrades(v bool) *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.SetUnattendedUpgrades(v)
+	})
+}
+
+// UpdateUnattendedUpgrades sets the "unattended_upgrades" field to the value that was provided on create.
+func (u *DeviceUpsertOne) UpdateUnattendedUpgrades() *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.UpdateUnattendedUpgrades()
+	})
+}
+
+// ClearUnattendedUpgrades clears the value of the "unattended_upgrades" field.
+func (u *DeviceUpsertOne) ClearUnattendedUpgrades() *DeviceUpsertOne {
+	return u.Update(func(s *DeviceUpsert) {
+		s.ClearUnattendedUpgrades()
 	})
 }
 
@@ -2695,6 +2817,48 @@ func (u *DeviceUpsertBulk) UpdateFirmwareVersion() *DeviceUpsertBulk {
 func (u *DeviceUpsertBulk) ClearFirmwareVersion() *DeviceUpsertBulk {
 	return u.Update(func(s *DeviceUpsert) {
 		s.ClearFirmwareVersion()
+	})
+}
+
+// SetRebootRequired sets the "reboot_required" field.
+func (u *DeviceUpsertBulk) SetRebootRequired(v bool) *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.SetRebootRequired(v)
+	})
+}
+
+// UpdateRebootRequired sets the "reboot_required" field to the value that was provided on create.
+func (u *DeviceUpsertBulk) UpdateRebootRequired() *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.UpdateRebootRequired()
+	})
+}
+
+// ClearRebootRequired clears the value of the "reboot_required" field.
+func (u *DeviceUpsertBulk) ClearRebootRequired() *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.ClearRebootRequired()
+	})
+}
+
+// SetUnattendedUpgrades sets the "unattended_upgrades" field.
+func (u *DeviceUpsertBulk) SetUnattendedUpgrades(v bool) *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.SetUnattendedUpgrades(v)
+	})
+}
+
+// UpdateUnattendedUpgrades sets the "unattended_upgrades" field to the value that was provided on create.
+func (u *DeviceUpsertBulk) UpdateUnattendedUpgrades() *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.UpdateUnattendedUpgrades()
+	})
+}
+
+// ClearUnattendedUpgrades clears the value of the "unattended_upgrades" field.
+func (u *DeviceUpsertBulk) ClearUnattendedUpgrades() *DeviceUpsertBulk {
+	return u.Update(func(s *DeviceUpsert) {
+		s.ClearUnattendedUpgrades()
 	})
 }
 

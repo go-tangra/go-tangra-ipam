@@ -279,6 +279,14 @@ func (m *Device) validate(all bool) error {
 		// no validation rules for SecurityUpdateCount
 	}
 
+	if m.RebootRequired != nil {
+		// no validation rules for RebootRequired
+	}
+
+	if m.UnattendedUpgrades != nil {
+		// no validation rules for UnattendedUpgrades
+	}
+
 	if len(errors) > 0 {
 		return DeviceMultiError(errors)
 	}
@@ -905,6 +913,14 @@ func (m *CreateDeviceRequest) validate(all bool) error {
 
 	if m.IpmiSecretRef != nil {
 		// no validation rules for IpmiSecretRef
+	}
+
+	if m.RebootRequired != nil {
+		// no validation rules for RebootRequired
+	}
+
+	if m.UnattendedUpgrades != nil {
+		// no validation rules for UnattendedUpgrades
 	}
 
 	if len(errors) > 0 {

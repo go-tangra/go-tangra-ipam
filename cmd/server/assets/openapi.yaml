@@ -2841,6 +2841,12 @@ components:
                 securityUpdateCount:
                     type: integer
                     format: int32
+                rebootRequired:
+                    type: boolean
+                    description: 'Host needs a reboot (agent: /var/run/reboot-required or needrestart)'
+                unattendedUpgrades:
+                    type: boolean
+                    description: 'Automatic/unattended OS updates enabled (agent: unattended-upgrades or dnf-automatic)'
             description: Device represents a network device
         DeviceInterface:
             type: object

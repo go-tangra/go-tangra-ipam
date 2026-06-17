@@ -496,6 +496,46 @@ func (_u *DeviceUpdate) ClearFirmwareVersion() *DeviceUpdate {
 	return _u
 }
 
+// SetRebootRequired sets the "reboot_required" field.
+func (_u *DeviceUpdate) SetRebootRequired(v bool) *DeviceUpdate {
+	_u.mutation.SetRebootRequired(v)
+	return _u
+}
+
+// SetNillableRebootRequired sets the "reboot_required" field if the given value is not nil.
+func (_u *DeviceUpdate) SetNillableRebootRequired(v *bool) *DeviceUpdate {
+	if v != nil {
+		_u.SetRebootRequired(*v)
+	}
+	return _u
+}
+
+// ClearRebootRequired clears the value of the "reboot_required" field.
+func (_u *DeviceUpdate) ClearRebootRequired() *DeviceUpdate {
+	_u.mutation.ClearRebootRequired()
+	return _u
+}
+
+// SetUnattendedUpgrades sets the "unattended_upgrades" field.
+func (_u *DeviceUpdate) SetUnattendedUpgrades(v bool) *DeviceUpdate {
+	_u.mutation.SetUnattendedUpgrades(v)
+	return _u
+}
+
+// SetNillableUnattendedUpgrades sets the "unattended_upgrades" field if the given value is not nil.
+func (_u *DeviceUpdate) SetNillableUnattendedUpgrades(v *bool) *DeviceUpdate {
+	if v != nil {
+		_u.SetUnattendedUpgrades(*v)
+	}
+	return _u
+}
+
+// ClearUnattendedUpgrades clears the value of the "unattended_upgrades" field.
+func (_u *DeviceUpdate) ClearUnattendedUpgrades() *DeviceUpdate {
+	_u.mutation.ClearUnattendedUpgrades()
+	return _u
+}
+
 // SetIpmiSecretRef sets the "ipmi_secret_ref" field.
 func (_u *DeviceUpdate) SetIpmiSecretRef(v string) *DeviceUpdate {
 	_u.mutation.SetIpmiSecretRef(v)
@@ -899,6 +939,18 @@ func (_u *DeviceUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.FirmwareVersionCleared() {
 		_spec.ClearField(device.FieldFirmwareVersion, field.TypeString)
+	}
+	if value, ok := _u.mutation.RebootRequired(); ok {
+		_spec.SetField(device.FieldRebootRequired, field.TypeBool, value)
+	}
+	if _u.mutation.RebootRequiredCleared() {
+		_spec.ClearField(device.FieldRebootRequired, field.TypeBool)
+	}
+	if value, ok := _u.mutation.UnattendedUpgrades(); ok {
+		_spec.SetField(device.FieldUnattendedUpgrades, field.TypeBool, value)
+	}
+	if _u.mutation.UnattendedUpgradesCleared() {
+		_spec.ClearField(device.FieldUnattendedUpgrades, field.TypeBool)
 	}
 	if value, ok := _u.mutation.IpmiSecretRef(); ok {
 		_spec.SetField(device.FieldIpmiSecretRef, field.TypeString, value)
@@ -1541,6 +1593,46 @@ func (_u *DeviceUpdateOne) ClearFirmwareVersion() *DeviceUpdateOne {
 	return _u
 }
 
+// SetRebootRequired sets the "reboot_required" field.
+func (_u *DeviceUpdateOne) SetRebootRequired(v bool) *DeviceUpdateOne {
+	_u.mutation.SetRebootRequired(v)
+	return _u
+}
+
+// SetNillableRebootRequired sets the "reboot_required" field if the given value is not nil.
+func (_u *DeviceUpdateOne) SetNillableRebootRequired(v *bool) *DeviceUpdateOne {
+	if v != nil {
+		_u.SetRebootRequired(*v)
+	}
+	return _u
+}
+
+// ClearRebootRequired clears the value of the "reboot_required" field.
+func (_u *DeviceUpdateOne) ClearRebootRequired() *DeviceUpdateOne {
+	_u.mutation.ClearRebootRequired()
+	return _u
+}
+
+// SetUnattendedUpgrades sets the "unattended_upgrades" field.
+func (_u *DeviceUpdateOne) SetUnattendedUpgrades(v bool) *DeviceUpdateOne {
+	_u.mutation.SetUnattendedUpgrades(v)
+	return _u
+}
+
+// SetNillableUnattendedUpgrades sets the "unattended_upgrades" field if the given value is not nil.
+func (_u *DeviceUpdateOne) SetNillableUnattendedUpgrades(v *bool) *DeviceUpdateOne {
+	if v != nil {
+		_u.SetUnattendedUpgrades(*v)
+	}
+	return _u
+}
+
+// ClearUnattendedUpgrades clears the value of the "unattended_upgrades" field.
+func (_u *DeviceUpdateOne) ClearUnattendedUpgrades() *DeviceUpdateOne {
+	_u.mutation.ClearUnattendedUpgrades()
+	return _u
+}
+
 // SetIpmiSecretRef sets the "ipmi_secret_ref" field.
 func (_u *DeviceUpdateOne) SetIpmiSecretRef(v string) *DeviceUpdateOne {
 	_u.mutation.SetIpmiSecretRef(v)
@@ -1974,6 +2066,18 @@ func (_u *DeviceUpdateOne) sqlSave(ctx context.Context) (_node *Device, err erro
 	}
 	if _u.mutation.FirmwareVersionCleared() {
 		_spec.ClearField(device.FieldFirmwareVersion, field.TypeString)
+	}
+	if value, ok := _u.mutation.RebootRequired(); ok {
+		_spec.SetField(device.FieldRebootRequired, field.TypeBool, value)
+	}
+	if _u.mutation.RebootRequiredCleared() {
+		_spec.ClearField(device.FieldRebootRequired, field.TypeBool)
+	}
+	if value, ok := _u.mutation.UnattendedUpgrades(); ok {
+		_spec.SetField(device.FieldUnattendedUpgrades, field.TypeBool, value)
+	}
+	if _u.mutation.UnattendedUpgradesCleared() {
+		_spec.ClearField(device.FieldUnattendedUpgrades, field.TypeBool)
 	}
 	if value, ok := _u.mutation.IpmiSecretRef(); ok {
 		_spec.SetField(device.FieldIpmiSecretRef, field.TypeString, value)

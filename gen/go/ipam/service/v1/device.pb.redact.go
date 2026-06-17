@@ -256,6 +256,10 @@ func (x *Device) Redact() string {
 	// Safe field: PackageUpdateCount
 
 	// Safe field: SecurityUpdateCount
+
+	// Safe field: RebootRequired
+
+	// Safe field: UnattendedUpgrades
 	return x.String()
 }
 
@@ -374,6 +378,10 @@ func (x *CreateDeviceRequest) Redact() string {
 	// Safe field: DeviceHeightU
 
 	// Safe field: IpmiSecretRef
+
+	// Safe field: RebootRequired
+
+	// Safe field: UnattendedUpgrades
 	return x.String()
 }
 

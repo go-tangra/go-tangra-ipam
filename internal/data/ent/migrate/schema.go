@@ -109,6 +109,8 @@ var (
 		{Name: "os_type", Type: field.TypeString, Nullable: true, Comment: "Operating system"},
 		{Name: "os_version", Type: field.TypeString, Nullable: true, Comment: "OS version"},
 		{Name: "firmware_version", Type: field.TypeString, Nullable: true, Comment: "Firmware version"},
+		{Name: "reboot_required", Type: field.TypeBool, Nullable: true, Comment: "Host needs a reboot (agent: /var/run/reboot-required or needrestart)", Default: false},
+		{Name: "unattended_upgrades", Type: field.TypeBool, Nullable: true, Comment: "Automatic/unattended OS updates enabled (agent: unattended-upgrades or dnf-automatic)", Default: false},
 		{Name: "ipmi_secret_ref", Type: field.TypeString, Nullable: true, Comment: "Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value"},
 		{Name: "contact", Type: field.TypeString, Nullable: true, Comment: "Contact person"},
 		{Name: "tags", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "Custom tags (JSON)"},
@@ -125,7 +127,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "ipam_devices_ipam_locations_location",
-				Columns:    []*schema.Column{IpamDevicesColumns[30]},
+				Columns:    []*schema.Column{IpamDevicesColumns[32]},
 				RefColumns: []*schema.Column{IpamLocationsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -144,7 +146,7 @@ var (
 			{
 				Name:    "device_location_id",
 				Unique:  false,
-				Columns: []*schema.Column{IpamDevicesColumns[30]},
+				Columns: []*schema.Column{IpamDevicesColumns[32]},
 			},
 			{
 				Name:    "device_status",

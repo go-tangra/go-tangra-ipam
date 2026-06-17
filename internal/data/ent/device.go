@@ -67,6 +67,10 @@ type Device struct {
 	OsVersion string `json:"os_version,omitempty"`
 	// Firmware version
 	FirmwareVersion string `json:"firmware_version,omitempty"`
+	// Host needs a reboot (agent: /var/run/reboot-required or needrestart)
+	RebootRequired bool `json:"reboot_required,omitempty"`
+	// Automatic/unattended OS updates enabled (agent: unattended-upgrades or dnf-automatic)
+	UnattendedUpgrades bool `json:"unattended_upgrades,omitempty"`
 	// Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value
 	IpmiSecretRef string `json:"ipmi_secret_ref,omitempty"`
 	// Contact person
@@ -132,6 +136,8 @@ func (*Device) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case device.FieldRebootRequired, device.FieldUnattendedUpgrades:
+			values[i] = new(sql.NullBool)
 		case device.FieldCreateBy, device.FieldUpdateBy, device.FieldTenantID, device.FieldDeviceType, device.FieldRackPosition, device.FieldDeviceHeightU, device.FieldStatus:
 			values[i] = new(sql.NullInt64)
 		case device.FieldID, device.FieldName, device.FieldDescription, device.FieldManufacturer, device.FieldModel, device.FieldSerialNumber, device.FieldAssetTag, device.FieldLocationID, device.FieldRackID, device.FieldPrimaryIP, device.FieldPrimaryIpv6, device.FieldManagementIP, device.FieldOsType, device.FieldOsVersion, device.FieldFirmwareVersion, device.FieldIpmiSecretRef, device.FieldContact, device.FieldTags, device.FieldMetadata, device.FieldNotes:
@@ -311,6 +317,18 @@ func (_m *Device) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.FirmwareVersion = value.String
 			}
+		case device.FieldRebootRequired:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field reboot_required", values[i])
+			} else if value.Valid {
+				_m.RebootRequired = value.Bool
+			}
+		case device.FieldUnattendedUpgrades:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field unattended_upgrades", values[i])
+			} else if value.Valid {
+				_m.UnattendedUpgrades = value.Bool
+			}
 		case device.FieldIpmiSecretRef:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field ipmi_secret_ref", values[i])
@@ -486,6 +504,12 @@ func (_m *Device) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("firmware_version=")
 	builder.WriteString(_m.FirmwareVersion)
+	builder.WriteString(", ")
+	builder.WriteString("reboot_required=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RebootRequired))
+	builder.WriteString(", ")
+	builder.WriteString("unattended_upgrades=")
+	builder.WriteString(fmt.Sprintf("%v", _m.UnattendedUpgrades))
 	builder.WriteString(", ")
 	builder.WriteString("ipmi_secret_ref=")
 	builder.WriteString(_m.IpmiSecretRef)

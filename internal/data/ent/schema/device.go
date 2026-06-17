@@ -106,6 +106,16 @@ func (Device) Fields() []ent.Field {
 			Optional().
 			Comment("Firmware version"),
 
+		field.Bool("reboot_required").
+			Optional().
+			Default(false).
+			Comment("Host needs a reboot (agent: /var/run/reboot-required or needrestart)"),
+
+		field.Bool("unattended_upgrades").
+			Optional().
+			Default(false).
+			Comment("Automatic/unattended OS updates enabled (agent: unattended-upgrades or dnf-automatic)"),
+
 		field.String("ipmi_secret_ref").
 			Optional().
 			Comment("Reference (Warden secret id) to the IPMI/BMC credentials — a pointer only, never the secret value"),

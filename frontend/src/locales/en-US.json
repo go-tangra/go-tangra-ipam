@@ -248,7 +248,10 @@
       "updateStatus": "Update Status",
       "upToDate": "Up to date",
       "updatesAvailable": "{count} updates",
-      "securityUpdates": "{count} security"
+      "securityUpdates": "{count} security",
+      "maintenance": "Maintenance",
+      "rebootRequired": "Reboot required",
+      "autoUpdates": "Auto-updates"
     },
     "system": {
       "title": "Systems"

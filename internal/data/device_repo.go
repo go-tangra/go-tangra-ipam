@@ -11,9 +11,9 @@ import (
 	entCrud "github.com/tx7do/go-crud/entgo"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
+	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
-	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
 type DeviceRepo struct {
@@ -102,17 +102,17 @@ func (r *DeviceRepo) GetByID(ctx context.Context, id string) (*ent.Device, error
 }
 
 var deviceSortFields = map[string]func(opts ...sql.OrderTermOption) device.OrderOption{
-	"name":          device.ByName,
-	"deviceType":    device.ByDeviceType,
-	"status":        device.ByStatus,
-	"primaryIp":     device.ByPrimaryIP,
-	"managementIp":  device.ByManagementIP,
-	"osVersion":     device.ByOsVersion,
-	"manufacturer":  device.ByManufacturer,
-	"model":         device.ByModel,
-	"notes":         device.ByNotes,
-	"create_time":   device.ByCreateTime,
-	"update_time":   device.ByUpdateTime,
+	"name":         device.ByName,
+	"deviceType":   device.ByDeviceType,
+	"status":       device.ByStatus,
+	"primaryIp":    device.ByPrimaryIP,
+	"managementIp": device.ByManagementIP,
+	"osVersion":    device.ByOsVersion,
+	"manufacturer": device.ByManufacturer,
+	"model":        device.ByModel,
+	"notes":        device.ByNotes,
+	"create_time":  device.ByCreateTime,
+	"update_time":  device.ByUpdateTime,
 }
 
 func deviceOrderBy(orderBy []string) []device.OrderOption {
@@ -236,6 +236,12 @@ func (r *DeviceRepo) Update(ctx context.Context, id string, updates map[string]i
 	}
 	if osVersion, ok := updates["os_version"].(string); ok {
 		update = update.SetOsVersion(osVersion)
+	}
+	if rebootRequired, ok := updates["reboot_required"].(bool); ok {
+		update = update.SetRebootRequired(rebootRequired)
+	}
+	if unattended, ok := updates["unattended_upgrades"].(bool); ok {
+		update = update.SetUnattendedUpgrades(unattended)
 	}
 	if firmwareVersion, ok := updates["firmware_version"].(string); ok {
 		update = update.SetFirmwareVersion(firmwareVersion)

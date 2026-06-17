@@ -112,6 +112,14 @@ message Device {
   // Package update counts (populated in list responses)
   optional int32 package_update_count = 40 [json_name = "packageUpdateCount"];
   optional int32 security_update_count = 41 [json_name = "securityUpdateCount"];
+
+  // Whether the host needs a reboot (reported by the agent: presence of
+  // /var/run/reboot-required or needrestart kernel status).
+  optional bool reboot_required = 42 [json_name = "rebootRequired"];
+
+  // Whether automatic/unattended OS updates are enabled on the host (reported by
+  // the agent: apt unattended-upgrades or dnf-automatic).
+  optional bool unattended_upgrades = 43 [json_name = "unattendedUpgrades"];
 }
 
 enum DeviceType {
@@ -220,6 +228,8 @@ message CreateDeviceRequest {
   optional string notes = 20 [json_name = "notes"];
   optional int32 device_height_u = 21 [json_name = "deviceHeightU"];
   optional string ipmi_secret_ref = 22 [json_name = "ipmiSecretRef"];
+  optional bool reboot_required = 23 [json_name = "rebootRequired"];
+  optional bool unattended_upgrades = 24 [json_name = "unattendedUpgrades"];
 }
 
 message CreateDeviceResponse {

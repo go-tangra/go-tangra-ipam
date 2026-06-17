@@ -126,6 +126,14 @@ func init() {
 	deviceDescStatus := deviceFields[12].Descriptor()
 	// device.DefaultStatus holds the default value on creation for the status field.
 	device.DefaultStatus = deviceDescStatus.Default.(int32)
+	// deviceDescRebootRequired is the schema descriptor for reboot_required field.
+	deviceDescRebootRequired := deviceFields[19].Descriptor()
+	// device.DefaultRebootRequired holds the default value on creation for the reboot_required field.
+	device.DefaultRebootRequired = deviceDescRebootRequired.Default.(bool)
+	// deviceDescUnattendedUpgrades is the schema descriptor for unattended_upgrades field.
+	deviceDescUnattendedUpgrades := deviceFields[20].Descriptor()
+	// device.DefaultUnattendedUpgrades holds the default value on creation for the unattended_upgrades field.
+	device.DefaultUnattendedUpgrades = deviceDescUnattendedUpgrades.Default.(bool)
 	// deviceDescID is the schema descriptor for id field.
 	deviceDescID := deviceFields[0].Descriptor()
 	// device.IDValidator is a validator for the "id" field. It is called by the builders before save.

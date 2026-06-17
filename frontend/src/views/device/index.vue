@@ -287,6 +287,12 @@ const gridOptions: VxeGridProps<ipamservicev1_Device> = {
       slots: { default: 'updateStatus' },
     },
     {
+      title: $t('ipam.page.device.maintenance'),
+      field: 'rebootRequired',
+      width: 160,
+      slots: { default: 'maintenance' },
+    },
+    {
       title: $t('ui.table.action'),
       field: 'action',
       fixed: 'right',
@@ -396,6 +402,13 @@ async function handleDelete(row: ipamservicev1_Device) {
             <Tag color="warning">{{ $t('ipam.page.device.updatesAvailable', { count: row.packageUpdateCount }) }}</Tag>
             <Tag v-if="row.securityUpdateCount > 0" color="error">{{ $t('ipam.page.device.securityUpdates', { count: row.securityUpdateCount }) }}</Tag>
           </span>
+        </template>
+      </template>
+      <template #maintenance="{ row }">
+        <template v-if="isServerOrVM(row.deviceType)">
+          <Tag v-if="row.rebootRequired" color="error">{{ $t('ipam.page.device.rebootRequired') }}</Tag>
+          <Tag v-if="row.unattendedUpgrades" color="processing">{{ $t('ipam.page.device.autoUpdates') }}</Tag>
+          <span v-if="!row.rebootRequired && !row.unattendedUpgrades" class="text-gray-400">-</span>
         </template>
       </template>
       <template #action="{ row }">

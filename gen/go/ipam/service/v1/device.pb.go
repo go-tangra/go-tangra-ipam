@@ -246,8 +246,14 @@ type Device struct {
 	// Package update counts (populated in list responses)
 	PackageUpdateCount  *int32 `protobuf:"varint,40,opt,name=package_update_count,json=packageUpdateCount,proto3,oneof" json:"package_update_count,omitempty"`
 	SecurityUpdateCount *int32 `protobuf:"varint,41,opt,name=security_update_count,json=securityUpdateCount,proto3,oneof" json:"security_update_count,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Whether the host needs a reboot (reported by the agent: presence of
+	// /var/run/reboot-required or needrestart kernel status).
+	RebootRequired *bool `protobuf:"varint,42,opt,name=reboot_required,json=rebootRequired,proto3,oneof" json:"reboot_required,omitempty"`
+	// Whether automatic/unattended OS updates are enabled on the host (reported by
+	// the agent: apt unattended-upgrades or dnf-automatic).
+	UnattendedUpgrades *bool `protobuf:"varint,43,opt,name=unattended_upgrades,json=unattendedUpgrades,proto3,oneof" json:"unattended_upgrades,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -516,6 +522,20 @@ func (x *Device) GetSecurityUpdateCount() int32 {
 		return *x.SecurityUpdateCount
 	}
 	return 0
+}
+
+func (x *Device) GetRebootRequired() bool {
+	if x != nil && x.RebootRequired != nil {
+		return *x.RebootRequired
+	}
+	return false
+}
+
+func (x *Device) GetUnattendedUpgrades() bool {
+	if x != nil && x.UnattendedUpgrades != nil {
+		return *x.UnattendedUpgrades
+	}
+	return false
 }
 
 // DeviceInterface represents a network interface on a device
@@ -793,31 +813,33 @@ func (x *DeviceLink) GetLinkLastSeen() *timestamppb.Timestamp {
 
 // CreateDeviceRequest creates a new device
 type CreateDeviceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      *uint32                `protobuf:"varint,1,opt,name=tenant_id,json=tenantId,proto3,oneof" json:"tenant_id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	DeviceType    *DeviceType            `protobuf:"varint,3,opt,name=device_type,json=deviceType,proto3,enum=ipam.service.v1.DeviceType,oneof" json:"device_type,omitempty"`
-	Description   *string                `protobuf:"bytes,4,opt,name=description,proto3,oneof" json:"description,omitempty"`
-	Manufacturer  *string                `protobuf:"bytes,5,opt,name=manufacturer,proto3,oneof" json:"manufacturer,omitempty"`
-	Model         *string                `protobuf:"bytes,6,opt,name=model,proto3,oneof" json:"model,omitempty"`
-	SerialNumber  *string                `protobuf:"bytes,7,opt,name=serial_number,json=serialNumber,proto3,oneof" json:"serial_number,omitempty"`
-	AssetTag      *string                `protobuf:"bytes,8,opt,name=asset_tag,json=assetTag,proto3,oneof" json:"asset_tag,omitempty"`
-	LocationId    *string                `protobuf:"bytes,9,opt,name=location_id,json=locationId,proto3,oneof" json:"location_id,omitempty"`
-	RackId        *string                `protobuf:"bytes,10,opt,name=rack_id,json=rackId,proto3,oneof" json:"rack_id,omitempty"`
-	RackPosition  *int32                 `protobuf:"varint,11,opt,name=rack_position,json=rackPosition,proto3,oneof" json:"rack_position,omitempty"`
-	Status        *DeviceStatus          `protobuf:"varint,12,opt,name=status,proto3,enum=ipam.service.v1.DeviceStatus,oneof" json:"status,omitempty"`
-	PrimaryIp     *string                `protobuf:"bytes,13,opt,name=primary_ip,json=primaryIp,proto3,oneof" json:"primary_ip,omitempty"`
-	ManagementIp  *string                `protobuf:"bytes,14,opt,name=management_ip,json=managementIp,proto3,oneof" json:"management_ip,omitempty"`
-	OsType        *string                `protobuf:"bytes,15,opt,name=os_type,json=osType,proto3,oneof" json:"os_type,omitempty"`
-	OsVersion     *string                `protobuf:"bytes,16,opt,name=os_version,json=osVersion,proto3,oneof" json:"os_version,omitempty"`
-	Contact       *string                `protobuf:"bytes,17,opt,name=contact,proto3,oneof" json:"contact,omitempty"`
-	Tags          *string                `protobuf:"bytes,18,opt,name=tags,proto3,oneof" json:"tags,omitempty"`
-	Metadata      *string                `protobuf:"bytes,19,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
-	Notes         *string                `protobuf:"bytes,20,opt,name=notes,proto3,oneof" json:"notes,omitempty"`
-	DeviceHeightU *int32                 `protobuf:"varint,21,opt,name=device_height_u,json=deviceHeightU,proto3,oneof" json:"device_height_u,omitempty"`
-	IpmiSecretRef *string                `protobuf:"bytes,22,opt,name=ipmi_secret_ref,json=ipmiSecretRef,proto3,oneof" json:"ipmi_secret_ref,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TenantId           *uint32                `protobuf:"varint,1,opt,name=tenant_id,json=tenantId,proto3,oneof" json:"tenant_id,omitempty"`
+	Name               *string                `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	DeviceType         *DeviceType            `protobuf:"varint,3,opt,name=device_type,json=deviceType,proto3,enum=ipam.service.v1.DeviceType,oneof" json:"device_type,omitempty"`
+	Description        *string                `protobuf:"bytes,4,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	Manufacturer       *string                `protobuf:"bytes,5,opt,name=manufacturer,proto3,oneof" json:"manufacturer,omitempty"`
+	Model              *string                `protobuf:"bytes,6,opt,name=model,proto3,oneof" json:"model,omitempty"`
+	SerialNumber       *string                `protobuf:"bytes,7,opt,name=serial_number,json=serialNumber,proto3,oneof" json:"serial_number,omitempty"`
+	AssetTag           *string                `protobuf:"bytes,8,opt,name=asset_tag,json=assetTag,proto3,oneof" json:"asset_tag,omitempty"`
+	LocationId         *string                `protobuf:"bytes,9,opt,name=location_id,json=locationId,proto3,oneof" json:"location_id,omitempty"`
+	RackId             *string                `protobuf:"bytes,10,opt,name=rack_id,json=rackId,proto3,oneof" json:"rack_id,omitempty"`
+	RackPosition       *int32                 `protobuf:"varint,11,opt,name=rack_position,json=rackPosition,proto3,oneof" json:"rack_position,omitempty"`
+	Status             *DeviceStatus          `protobuf:"varint,12,opt,name=status,proto3,enum=ipam.service.v1.DeviceStatus,oneof" json:"status,omitempty"`
+	PrimaryIp          *string                `protobuf:"bytes,13,opt,name=primary_ip,json=primaryIp,proto3,oneof" json:"primary_ip,omitempty"`
+	ManagementIp       *string                `protobuf:"bytes,14,opt,name=management_ip,json=managementIp,proto3,oneof" json:"management_ip,omitempty"`
+	OsType             *string                `protobuf:"bytes,15,opt,name=os_type,json=osType,proto3,oneof" json:"os_type,omitempty"`
+	OsVersion          *string                `protobuf:"bytes,16,opt,name=os_version,json=osVersion,proto3,oneof" json:"os_version,omitempty"`
+	Contact            *string                `protobuf:"bytes,17,opt,name=contact,proto3,oneof" json:"contact,omitempty"`
+	Tags               *string                `protobuf:"bytes,18,opt,name=tags,proto3,oneof" json:"tags,omitempty"`
+	Metadata           *string                `protobuf:"bytes,19,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
+	Notes              *string                `protobuf:"bytes,20,opt,name=notes,proto3,oneof" json:"notes,omitempty"`
+	DeviceHeightU      *int32                 `protobuf:"varint,21,opt,name=device_height_u,json=deviceHeightU,proto3,oneof" json:"device_height_u,omitempty"`
+	IpmiSecretRef      *string                `protobuf:"bytes,22,opt,name=ipmi_secret_ref,json=ipmiSecretRef,proto3,oneof" json:"ipmi_secret_ref,omitempty"`
+	RebootRequired     *bool                  `protobuf:"varint,23,opt,name=reboot_required,json=rebootRequired,proto3,oneof" json:"reboot_required,omitempty"`
+	UnattendedUpgrades *bool                  `protobuf:"varint,24,opt,name=unattended_upgrades,json=unattendedUpgrades,proto3,oneof" json:"unattended_upgrades,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *CreateDeviceRequest) Reset() {
@@ -1002,6 +1024,20 @@ func (x *CreateDeviceRequest) GetIpmiSecretRef() string {
 		return *x.IpmiSecretRef
 	}
 	return ""
+}
+
+func (x *CreateDeviceRequest) GetRebootRequired() bool {
+	if x != nil && x.RebootRequired != nil {
+		return *x.RebootRequired
+	}
+	return false
+}
+
+func (x *CreateDeviceRequest) GetUnattendedUpgrades() bool {
+	if x != nil && x.UnattendedUpgrades != nil {
+		return *x.UnattendedUpgrades
+	}
+	return false
 }
 
 type CreateDeviceResponse struct {
@@ -2219,7 +2255,7 @@ var File_ipam_service_v1_device_proto protoreflect.FileDescriptor
 
 const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\n" +
-	"\x1cipam/service/v1/device.proto\x12\x0fipam.service.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x16redact/v3/redact.proto\"\x93\x0f\n" +
+	"\x1cipam/service/v1/device.proto\x12\x0fipam.service.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x16redact/v3/redact.proto\"\xa3\x10\n" +
 	"\x06Device\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
 	"\ttenant_id\x18\x02 \x01(\rH\x01R\btenantId\x88\x01\x01\x12\x17\n" +
@@ -2264,7 +2300,9 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"updated_by\x18! \x01(\rH\x1eR\tupdatedBy\x88\x01\x01\x12+\n" +
 	"\x0fipmi_secret_ref\x18\" \x01(\tH\x1fR\ripmiSecretRef\x88\x01\x01\x125\n" +
 	"\x14package_update_count\x18( \x01(\x05H R\x12packageUpdateCount\x88\x01\x01\x127\n" +
-	"\x15security_update_count\x18) \x01(\x05H!R\x13securityUpdateCount\x88\x01\x01B\x05\n" +
+	"\x15security_update_count\x18) \x01(\x05H!R\x13securityUpdateCount\x88\x01\x01\x12,\n" +
+	"\x0freboot_required\x18* \x01(\bH\"R\x0erebootRequired\x88\x01\x01\x124\n" +
+	"\x13unattended_upgrades\x18+ \x01(\bH#R\x12unattendedUpgrades\x88\x01\x01B\x05\n" +
 	"\x03_idB\f\n" +
 	"\n" +
 	"_tenant_idB\a\n" +
@@ -2304,7 +2342,9 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\v_updated_byB\x12\n" +
 	"\x10_ipmi_secret_refB\x17\n" +
 	"\x15_package_update_countB\x18\n" +
-	"\x16_security_update_count\"\x9c\b\n" +
+	"\x16_security_update_countB\x12\n" +
+	"\x10_reboot_requiredB\x16\n" +
+	"\x14_unattended_upgrades\"\x9c\b\n" +
 	"\x0fDeviceInterface\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12 \n" +
 	"\tdevice_id\x18\x02 \x01(\tH\x01R\bdeviceId\x88\x01\x01\x12\x17\n" +
@@ -2366,7 +2406,8 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\f_link_sourceB\f\n" +
 	"\n" +
 	"_link_vlanB\x11\n" +
-	"\x0f_link_last_seen\"\xa9\t\n" +
+	"\x0f_link_last_seen\"\xb9\n" +
+	"\n" +
 	"\x13CreateDeviceRequest\x12%\n" +
 	"\ttenant_id\x18\x01 \x01(\rB\x03\xe0A\x02H\x00R\btenantId\x88\x01\x01\x12&\n" +
 	"\x04name\x18\x02 \x01(\tB\r\xe0A\x02\xbaH\ar\x05\x10\x01\x18\xff\x01H\x01R\x04name\x88\x01\x01\x12A\n" +
@@ -2395,7 +2436,9 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\bmetadata\x18\x13 \x01(\tH\x12R\bmetadata\x88\x01\x01\x12\x19\n" +
 	"\x05notes\x18\x14 \x01(\tH\x13R\x05notes\x88\x01\x01\x12+\n" +
 	"\x0fdevice_height_u\x18\x15 \x01(\x05H\x14R\rdeviceHeightU\x88\x01\x01\x12+\n" +
-	"\x0fipmi_secret_ref\x18\x16 \x01(\tH\x15R\ripmiSecretRef\x88\x01\x01B\f\n" +
+	"\x0fipmi_secret_ref\x18\x16 \x01(\tH\x15R\ripmiSecretRef\x88\x01\x01\x12,\n" +
+	"\x0freboot_required\x18\x17 \x01(\bH\x16R\x0erebootRequired\x88\x01\x01\x124\n" +
+	"\x13unattended_upgrades\x18\x18 \x01(\bH\x17R\x12unattendedUpgrades\x88\x01\x01B\f\n" +
 	"\n" +
 	"_tenant_idB\a\n" +
 	"\x05_nameB\x0e\n" +
@@ -2422,7 +2465,9 @@ const file_ipam_service_v1_device_proto_rawDesc = "" +
 	"\t_metadataB\b\n" +
 	"\x06_notesB\x12\n" +
 	"\x10_device_height_uB\x12\n" +
-	"\x10_ipmi_secret_ref\"G\n" +
+	"\x10_ipmi_secret_refB\x12\n" +
+	"\x10_reboot_requiredB\x16\n" +
+	"\x14_unattended_upgrades\"G\n" +
 	"\x14CreateDeviceResponse\x12/\n" +
 	"\x06device\x18\x01 \x01(\v2\x17.ipam.service.v1.DeviceR\x06device\".\n" +
 	"\x10GetDeviceRequest\x12\x1a\n" +

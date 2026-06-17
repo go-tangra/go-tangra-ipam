@@ -1935,57 +1935,59 @@ func (m *AuditLogMutation) ResetEdge(name string) error {
 // DeviceMutation represents an operation that mutates the Device nodes in the graph.
 type DeviceMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *string
-	create_by          *uint32
-	addcreate_by       *int32
-	update_by          *uint32
-	addupdate_by       *int32
-	create_time        *time.Time
-	update_time        *time.Time
-	delete_time        *time.Time
-	tenant_id          *uint32
-	addtenant_id       *int32
-	name               *string
-	device_type        *int32
-	adddevice_type     *int32
-	description        *string
-	manufacturer       *string
-	model              *string
-	serial_number      *string
-	asset_tag          *string
-	rack_id            *string
-	rack_position      *int32
-	addrack_position   *int32
-	device_height_u    *int32
-	adddevice_height_u *int32
-	status             *int32
-	addstatus          *int32
-	primary_ip         *string
-	primary_ipv6       *string
-	management_ip      *string
-	os_type            *string
-	os_version         *string
-	firmware_version   *string
-	ipmi_secret_ref    *string
-	contact            *string
-	tags               *string
-	metadata           *string
-	notes              *string
-	last_seen          *time.Time
-	clearedFields      map[string]struct{}
-	addresses          map[string]struct{}
-	removedaddresses   map[string]struct{}
-	clearedaddresses   bool
-	interfaces         map[string]struct{}
-	removedinterfaces  map[string]struct{}
-	clearedinterfaces  bool
-	location           *string
-	clearedlocation    bool
-	done               bool
-	oldValue           func(context.Context) (*Device, error)
-	predicates         []predicate.Device
+	op                  Op
+	typ                 string
+	id                  *string
+	create_by           *uint32
+	addcreate_by        *int32
+	update_by           *uint32
+	addupdate_by        *int32
+	create_time         *time.Time
+	update_time         *time.Time
+	delete_time         *time.Time
+	tenant_id           *uint32
+	addtenant_id        *int32
+	name                *string
+	device_type         *int32
+	adddevice_type      *int32
+	description         *string
+	manufacturer        *string
+	model               *string
+	serial_number       *string
+	asset_tag           *string
+	rack_id             *string
+	rack_position       *int32
+	addrack_position    *int32
+	device_height_u     *int32
+	adddevice_height_u  *int32
+	status              *int32
+	addstatus           *int32
+	primary_ip          *string
+	primary_ipv6        *string
+	management_ip       *string
+	os_type             *string
+	os_version          *string
+	firmware_version    *string
+	reboot_required     *bool
+	unattended_upgrades *bool
+	ipmi_secret_ref     *string
+	contact             *string
+	tags                *string
+	metadata            *string
+	notes               *string
+	last_seen           *time.Time
+	clearedFields       map[string]struct{}
+	addresses           map[string]struct{}
+	removedaddresses    map[string]struct{}
+	clearedaddresses    bool
+	interfaces          map[string]struct{}
+	removedinterfaces   map[string]struct{}
+	clearedinterfaces   bool
+	location            *string
+	clearedlocation     bool
+	done                bool
+	oldValue            func(context.Context) (*Device, error)
+	predicates          []predicate.Device
 }
 
 var _ ent.Mutation = (*DeviceMutation)(nil)
@@ -3374,6 +3376,104 @@ func (m *DeviceMutation) ResetFirmwareVersion() {
 	delete(m.clearedFields, device.FieldFirmwareVersion)
 }
 
+// SetRebootRequired sets the "reboot_required" field.
+func (m *DeviceMutation) SetRebootRequired(b bool) {
+	m.reboot_required = &b
+}
+
+// RebootRequired returns the value of the "reboot_required" field in the mutation.
+func (m *DeviceMutation) RebootRequired() (r bool, exists bool) {
+	v := m.reboot_required
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRebootRequired returns the old "reboot_required" field's value of the Device entity.
+// If the Device object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceMutation) OldRebootRequired(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRebootRequired is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRebootRequired requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRebootRequired: %w", err)
+	}
+	return oldValue.RebootRequired, nil
+}
+
+// ClearRebootRequired clears the value of the "reboot_required" field.
+func (m *DeviceMutation) ClearRebootRequired() {
+	m.reboot_required = nil
+	m.clearedFields[device.FieldRebootRequired] = struct{}{}
+}
+
+// RebootRequiredCleared returns if the "reboot_required" field was cleared in this mutation.
+func (m *DeviceMutation) RebootRequiredCleared() bool {
+	_, ok := m.clearedFields[device.FieldRebootRequired]
+	return ok
+}
+
+// ResetRebootRequired resets all changes to the "reboot_required" field.
+func (m *DeviceMutation) ResetRebootRequired() {
+	m.reboot_required = nil
+	delete(m.clearedFields, device.FieldRebootRequired)
+}
+
+// SetUnattendedUpgrades sets the "unattended_upgrades" field.
+func (m *DeviceMutation) SetUnattendedUpgrades(b bool) {
+	m.unattended_upgrades = &b
+}
+
+// UnattendedUpgrades returns the value of the "unattended_upgrades" field in the mutation.
+func (m *DeviceMutation) UnattendedUpgrades() (r bool, exists bool) {
+	v := m.unattended_upgrades
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnattendedUpgrades returns the old "unattended_upgrades" field's value of the Device entity.
+// If the Device object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceMutation) OldUnattendedUpgrades(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnattendedUpgrades is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnattendedUpgrades requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnattendedUpgrades: %w", err)
+	}
+	return oldValue.UnattendedUpgrades, nil
+}
+
+// ClearUnattendedUpgrades clears the value of the "unattended_upgrades" field.
+func (m *DeviceMutation) ClearUnattendedUpgrades() {
+	m.unattended_upgrades = nil
+	m.clearedFields[device.FieldUnattendedUpgrades] = struct{}{}
+}
+
+// UnattendedUpgradesCleared returns if the "unattended_upgrades" field was cleared in this mutation.
+func (m *DeviceMutation) UnattendedUpgradesCleared() bool {
+	_, ok := m.clearedFields[device.FieldUnattendedUpgrades]
+	return ok
+}
+
+// ResetUnattendedUpgrades resets all changes to the "unattended_upgrades" field.
+func (m *DeviceMutation) ResetUnattendedUpgrades() {
+	m.unattended_upgrades = nil
+	delete(m.clearedFields, device.FieldUnattendedUpgrades)
+}
+
 // SetIpmiSecretRef sets the "ipmi_secret_ref" field.
 func (m *DeviceMutation) SetIpmiSecretRef(s string) {
 	m.ipmi_secret_ref = &s
@@ -3837,7 +3937,7 @@ func (m *DeviceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DeviceMutation) Fields() []string {
-	fields := make([]string, 0, 30)
+	fields := make([]string, 0, 32)
 	if m.create_by != nil {
 		fields = append(fields, device.FieldCreateBy)
 	}
@@ -3909,6 +4009,12 @@ func (m *DeviceMutation) Fields() []string {
 	}
 	if m.firmware_version != nil {
 		fields = append(fields, device.FieldFirmwareVersion)
+	}
+	if m.reboot_required != nil {
+		fields = append(fields, device.FieldRebootRequired)
+	}
+	if m.unattended_upgrades != nil {
+		fields = append(fields, device.FieldUnattendedUpgrades)
 	}
 	if m.ipmi_secret_ref != nil {
 		fields = append(fields, device.FieldIpmiSecretRef)
@@ -3984,6 +4090,10 @@ func (m *DeviceMutation) Field(name string) (ent.Value, bool) {
 		return m.OsVersion()
 	case device.FieldFirmwareVersion:
 		return m.FirmwareVersion()
+	case device.FieldRebootRequired:
+		return m.RebootRequired()
+	case device.FieldUnattendedUpgrades:
+		return m.UnattendedUpgrades()
 	case device.FieldIpmiSecretRef:
 		return m.IpmiSecretRef()
 	case device.FieldContact:
@@ -4053,6 +4163,10 @@ func (m *DeviceMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldOsVersion(ctx)
 	case device.FieldFirmwareVersion:
 		return m.OldFirmwareVersion(ctx)
+	case device.FieldRebootRequired:
+		return m.OldRebootRequired(ctx)
+	case device.FieldUnattendedUpgrades:
+		return m.OldUnattendedUpgrades(ctx)
 	case device.FieldIpmiSecretRef:
 		return m.OldIpmiSecretRef(ctx)
 	case device.FieldContact:
@@ -4241,6 +4355,20 @@ func (m *DeviceMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetFirmwareVersion(v)
+		return nil
+	case device.FieldRebootRequired:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRebootRequired(v)
+		return nil
+	case device.FieldUnattendedUpgrades:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnattendedUpgrades(v)
 		return nil
 	case device.FieldIpmiSecretRef:
 		v, ok := value.(string)
@@ -4464,6 +4592,12 @@ func (m *DeviceMutation) ClearedFields() []string {
 	if m.FieldCleared(device.FieldFirmwareVersion) {
 		fields = append(fields, device.FieldFirmwareVersion)
 	}
+	if m.FieldCleared(device.FieldRebootRequired) {
+		fields = append(fields, device.FieldRebootRequired)
+	}
+	if m.FieldCleared(device.FieldUnattendedUpgrades) {
+		fields = append(fields, device.FieldUnattendedUpgrades)
+	}
 	if m.FieldCleared(device.FieldIpmiSecretRef) {
 		fields = append(fields, device.FieldIpmiSecretRef)
 	}
@@ -4558,6 +4692,12 @@ func (m *DeviceMutation) ClearField(name string) error {
 		return nil
 	case device.FieldFirmwareVersion:
 		m.ClearFirmwareVersion()
+		return nil
+	case device.FieldRebootRequired:
+		m.ClearRebootRequired()
+		return nil
+	case device.FieldUnattendedUpgrades:
+		m.ClearUnattendedUpgrades()
 		return nil
 	case device.FieldIpmiSecretRef:
 		m.ClearIpmiSecretRef()
@@ -4656,6 +4796,12 @@ func (m *DeviceMutation) ResetField(name string) error {
 		return nil
 	case device.FieldFirmwareVersion:
 		m.ResetFirmwareVersion()
+		return nil
+	case device.FieldRebootRequired:
+		m.ResetRebootRequired()
+		return nil
+	case device.FieldUnattendedUpgrades:
+		m.ResetUnattendedUpgrades()
 		return nil
 	case device.FieldIpmiSecretRef:
 		m.ResetIpmiSecretRef()

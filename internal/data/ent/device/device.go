@@ -61,6 +61,10 @@ const (
 	FieldOsVersion = "os_version"
 	// FieldFirmwareVersion holds the string denoting the firmware_version field in the database.
 	FieldFirmwareVersion = "firmware_version"
+	// FieldRebootRequired holds the string denoting the reboot_required field in the database.
+	FieldRebootRequired = "reboot_required"
+	// FieldUnattendedUpgrades holds the string denoting the unattended_upgrades field in the database.
+	FieldUnattendedUpgrades = "unattended_upgrades"
 	// FieldIpmiSecretRef holds the string denoting the ipmi_secret_ref field in the database.
 	FieldIpmiSecretRef = "ipmi_secret_ref"
 	// FieldContact holds the string denoting the contact field in the database.
@@ -131,6 +135,8 @@ var Columns = []string{
 	FieldOsType,
 	FieldOsVersion,
 	FieldFirmwareVersion,
+	FieldRebootRequired,
+	FieldUnattendedUpgrades,
 	FieldIpmiSecretRef,
 	FieldContact,
 	FieldTags,
@@ -167,6 +173,10 @@ var (
 	DefaultDeviceHeightU int32
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus int32
+	// DefaultRebootRequired holds the default value on creation for the "reboot_required" field.
+	DefaultRebootRequired bool
+	// DefaultUnattendedUpgrades holds the default value on creation for the "unattended_upgrades" field.
+	DefaultUnattendedUpgrades bool
 	// IDValidator is a validator for the "id" field. It is called by the builders before save.
 	IDValidator func(string) error
 )
@@ -297,6 +307,16 @@ func ByOsVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByFirmwareVersion orders the results by the firmware_version field.
 func ByFirmwareVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFirmwareVersion, opts...).ToFunc()
+}
+
+// ByRebootRequired orders the results by the reboot_required field.
+func ByRebootRequired(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRebootRequired, opts...).ToFunc()
+}
+
+// ByUnattendedUpgrades orders the results by the unattended_upgrades field.
+func ByUnattendedUpgrades(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUnattendedUpgrades, opts...).ToFunc()
 }
 
 // ByIpmiSecretRef orders the results by the ipmi_secret_ref field.

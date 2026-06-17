@@ -14,12 +14,12 @@ import (
 	"github.com/go-kratos/kratos/v2/errors"
 
 	"github.com/go-tangra/go-tangra-common/grpcx"
+	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 	"github.com/go-tangra/go-tangra-ipam/internal/client"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/internal/metrics"
-	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
 type DeviceService struct {
@@ -206,6 +206,12 @@ func (s *DeviceService) CreateDevice(ctx context.Context, req *ipamV1.CreateDevi
 	if req.OsVersion != nil {
 		opts = append(opts, func(c *ent.DeviceCreate) { c.SetOsVersion(*req.OsVersion) })
 	}
+	if req.RebootRequired != nil {
+		opts = append(opts, func(c *ent.DeviceCreate) { c.SetRebootRequired(*req.RebootRequired) })
+	}
+	if req.UnattendedUpgrades != nil {
+		opts = append(opts, func(c *ent.DeviceCreate) { c.SetUnattendedUpgrades(*req.UnattendedUpgrades) })
+	}
 	if req.Contact != nil {
 		opts = append(opts, func(c *ent.DeviceCreate) { c.SetContact(*req.Contact) })
 	}
@@ -355,6 +361,12 @@ func (s *DeviceService) UpdateDevice(ctx context.Context, req *ipamV1.UpdateDevi
 		}
 		if req.Data.OsVersion != nil {
 			updates["os_version"] = *req.Data.OsVersion
+		}
+		if req.Data.RebootRequired != nil {
+			updates["reboot_required"] = *req.Data.RebootRequired
+		}
+		if req.Data.UnattendedUpgrades != nil {
+			updates["unattended_upgrades"] = *req.Data.UnattendedUpgrades
 		}
 		if req.Data.FirmwareVersion != nil {
 			updates["firmware_version"] = *req.Data.FirmwareVersion
@@ -559,33 +571,35 @@ func deviceToProto(e *ent.Device) *ipamV1.Device {
 	deviceType := ipamV1.DeviceType(e.DeviceType)
 
 	result := &ipamV1.Device{
-		Id:              &e.ID,
-		TenantId:        e.TenantID,
-		Name:            ptrString(e.Name),
-		DeviceType:      &deviceType,
-		Description:     ptrString(e.Description),
-		Manufacturer:    ptrString(e.Manufacturer),
-		Model:           ptrString(e.Model),
-		SerialNumber:    ptrString(e.SerialNumber),
-		AssetTag:        ptrString(e.AssetTag),
-		LocationId:      ptrString(e.LocationID),
-		RackId:          ptrString(e.RackID),
-		RackPosition:    e.RackPosition,
-		DeviceHeightU:   e.DeviceHeightU,
-		Status:          &status,
-		PrimaryIp:       ptrString(e.PrimaryIP),
-		PrimaryIpv6:     ptrString(e.PrimaryIpv6),
-		ManagementIp:    ptrString(e.ManagementIP),
-		OsType:          ptrString(e.OsType),
-		OsVersion:       ptrString(e.OsVersion),
-		FirmwareVersion: ptrString(e.FirmwareVersion),
-		Contact:         ptrString(e.Contact),
-		Tags:            ptrString(e.Tags),
-		Metadata:        ptrString(e.Metadata),
-		Notes:           ptrString(e.Notes),
-		IpmiSecretRef:   ptrString(e.IpmiSecretRef),
-		CreatedBy:       e.CreateBy,
-		UpdatedBy:       e.UpdateBy,
+		Id:                 &e.ID,
+		TenantId:           e.TenantID,
+		Name:               ptrString(e.Name),
+		DeviceType:         &deviceType,
+		Description:        ptrString(e.Description),
+		Manufacturer:       ptrString(e.Manufacturer),
+		Model:              ptrString(e.Model),
+		SerialNumber:       ptrString(e.SerialNumber),
+		AssetTag:           ptrString(e.AssetTag),
+		LocationId:         ptrString(e.LocationID),
+		RackId:             ptrString(e.RackID),
+		RackPosition:       e.RackPosition,
+		DeviceHeightU:      e.DeviceHeightU,
+		Status:             &status,
+		PrimaryIp:          ptrString(e.PrimaryIP),
+		PrimaryIpv6:        ptrString(e.PrimaryIpv6),
+		ManagementIp:       ptrString(e.ManagementIP),
+		OsType:             ptrString(e.OsType),
+		OsVersion:          ptrString(e.OsVersion),
+		RebootRequired:     ptrBool(e.RebootRequired),
+		UnattendedUpgrades: ptrBool(e.UnattendedUpgrades),
+		FirmwareVersion:    ptrString(e.FirmwareVersion),
+		Contact:            ptrString(e.Contact),
+		Tags:               ptrString(e.Tags),
+		Metadata:           ptrString(e.Metadata),
+		Notes:              ptrString(e.Notes),
+		IpmiSecretRef:      ptrString(e.IpmiSecretRef),
+		CreatedBy:          e.CreateBy,
+		UpdatedBy:          e.UpdateBy,
 	}
 
 	if e.CreateTime != nil {

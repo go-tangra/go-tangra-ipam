@@ -1103,6 +1103,10 @@ export interface components {
              * @description Security update counts (populated in list responses)
              */
             securityUpdateCount?: number;
+            /** @description Host needs a reboot (agent: /var/run/reboot-required or needrestart) */
+            rebootRequired?: boolean;
+            /** @description Automatic/unattended OS updates enabled (agent: unattended-upgrades or dnf-automatic) */
+            unattendedUpgrades?: boolean;
         };
         /** @description DeviceInterface represents a network interface on a device */
         DeviceInterface: {
