@@ -10,12 +10,12 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
+	appViewer "github.com/go-tangra/go-tangra-common/viewer"
 	"github.com/go-tangra/go-tangra-ipam/internal/biz"
 	"github.com/go-tangra/go-tangra-ipam/internal/data"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/ipscanjob"
 	"github.com/go-tangra/go-tangra-ipam/internal/event"
-	appViewer "github.com/go-tangra/go-tangra-common/viewer"
 )
 
 const (
@@ -672,6 +672,18 @@ func (e *ScanExecutor) reaperWorker() {
 			} else if n > 0 {
 				e.log.Warnf("Reaped %d stalled scan job(s) with no progress for over %s", n, staleScanTimeout)
 			}
+
+			// Clear hypervisor "Connected To" links whose host has stopped
+			// reporting entirely (e.g. a decommissioned hypervisor). Hosts that
+			// are still syncing prune their own dropped guests authoritatively
+			// in correlateHostedVMs and refresh link_last_seen each pass, so this
+			// only catches links no live host owns anymore.
+			hvCutoff := time.Now().Add(-hypervisorLinkStaleAfter)
+			if hv, err := e.deviceInterfaceRepo.PruneStaleFlatLinks(e.ctx, linkSourceHypervisor, hvCutoff); err != nil {
+				e.log.Errorf("periodic prune of stale hypervisor links failed: %v", err)
+			} else if hv > 0 {
+				e.log.Warnf("Cleared %d stale hypervisor link(s) not refreshed in over %s", hv, hypervisorLinkStaleAfter)
+			}
 		}
 	}
 }
@@ -832,6 +844,15 @@ const (
 	// any FDB before it is pruned. Generous so partial (single-subnet) scans that
 	// omit a switch don't evict that switch's still-valid link prematurely.
 	linkStaleAfter = 14 * 24 * time.Hour
+
+	// hypervisorLinkStaleAfter is how long a guest's "Connected To" hypervisor
+	// link survives without its host re-reporting it (link_last_seen heartbeat)
+	// before the reaper clears it. A live host refreshes its guests every sync
+	// (~hourly by default), so this is generous enough to tolerate a host being
+	// briefly down while still clearing links owned by hosts that are gone for
+	// good. A guest that merely migrated is re-pointed immediately by its new
+	// host; this only matters when no host claims the guest at all.
+	hypervisorLinkStaleAfter = 3 * 24 * time.Hour
 )
 
 // switchFDB pairs a discovered switch with its bridge forwarding database for

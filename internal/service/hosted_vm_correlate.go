@@ -87,6 +87,10 @@ func correlateHostedVMs(ctx context.Context, repo *data.DeviceInterfaceRepo, log
 	}
 
 	linked := 0
+	// Interfaces this host legitimately hosts right now. Used to prune links to
+	// guests this host no longer reports (migrated away) so their "Connected To"
+	// stops pointing here.
+	var keepInterfaceIDs []string
 	for _, vm := range vms {
 		portName := guestPortLabel(vm)
 		for _, rawMAC := range vm.MACs {
@@ -102,29 +106,40 @@ func correlateHostedVMs(ctx context.Context, repo *data.DeviceInterfaceRepo, log
 			if guestIface == nil || guestIface.DeviceID == hostDeviceID {
 				continue // guest device unknown, or the MAC is the host's own
 			}
-			// Skip if already pointing at this host via the hypervisor source
-			// (avoid a redundant write on every host heartbeat).
-			if guestIface.LinkSource == linkSourceHypervisor &&
-				guestIface.RemoteDeviceID == hostDeviceID &&
-				guestIface.RemotePortName == portName {
-				continue
-			}
+			keepInterfaceIDs = append(keepInterfaceIDs, guestIface.ID)
 
-			updates := map[string]any{
-				"remote_device_id": hostDeviceID,
-				"remote_port_name": portName,
-				"link_source":      linkSourceHypervisor,
-				"link_last_seen":   time.Now(),
+			// When the link already points at this host unchanged, still refresh
+			// link_last_seen so it stays a true heartbeat (the time-based reaper
+			// relies on it). Skip the heavier device/port rewrite in that case.
+			alreadyLinked := guestIface.LinkSource == linkSourceHypervisor &&
+				guestIface.RemoteDeviceID == hostDeviceID &&
+				guestIface.RemotePortName == portName
+			updates := map[string]any{"link_last_seen": time.Now()}
+			if !alreadyLinked {
+				updates["remote_device_id"] = hostDeviceID
+				updates["remote_port_name"] = portName
+				updates["link_source"] = linkSourceHypervisor
 			}
 			if _, err := repo.Update(ctx, guestIface.ID, updates); err != nil {
 				logger.Warnf("hosted-vm correlation: failed to set link on interface %s: %v", guestIface.ID, err)
 				continue
 			}
-			linked++
-			logger.Infof("Hosted-VM link discovered: guest interface %s (MAC %s) -> host %s as %s",
-				guestIface.Name, mac, hostDeviceID, portName)
+			if !alreadyLinked {
+				linked++
+				logger.Infof("Hosted-VM link discovered: guest interface %s (MAC %s) -> host %s as %s",
+					guestIface.Name, mac, hostDeviceID, portName)
+			}
 		}
 	}
+
+	// Authoritative prune: drop any hypervisor link still pointing at this host
+	// for a guest it no longer reports (VM migrated or was removed).
+	if cleared, err := repo.ClearFlatLinksForRemoteExcept(ctx, linkSourceHypervisor, hostDeviceID, keepInterfaceIDs); err != nil {
+		logger.Warnf("hosted-vm correlation: failed to prune stale links for host %s: %v", hostDeviceID, err)
+	} else if cleared > 0 {
+		logger.Infof("Hosted-VM correlation: cleared %d stale guest link(s) no longer hosted on %s", cleared, hostDeviceID)
+	}
+
 	if linked > 0 {
 		logger.Infof("Hosted-VM correlation: linked %d guest interfaces to host %s", linked, hostDeviceID)
 	}

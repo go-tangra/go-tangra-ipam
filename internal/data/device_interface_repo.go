@@ -9,11 +9,11 @@ import (
 	entCrud "github.com/tx7do/go-crud/entgo"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
+	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/device"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterface"
 	"github.com/go-tangra/go-tangra-ipam/internal/data/ent/deviceinterfacelink"
-	ipamV1 "github.com/go-tangra/go-tangra-ipam/gen/go/ipam/service/v1"
 )
 
 // DeviceTypeServer is the device_type value for a physical server. Layer-2 link
@@ -253,6 +253,63 @@ func (r *DeviceInterfaceRepo) PruneStaleLinks(ctx context.Context, source string
 	if err != nil {
 		r.log.Errorf("prune stale interface links failed: %s", err.Error())
 		return 0, ipamV1.ErrorInternalServerError("prune stale interface links failed")
+	}
+	return n, nil
+}
+
+// ClearFlatLinksForRemoteExcept clears the flat interface link columns
+// (remote_device_id / remote_port_name / link_source / link_vlan /
+// link_last_seen) on every interface currently linked to remoteDeviceID via the
+// given source EXCEPT those whose ID is in keepInterfaceIDs. It makes a host
+// authoritative for the set of links it reports on each re-sync: when a guest VM
+// migrates off a hypervisor (the host stops reporting it), its now-stale
+// "Connected To" link to that host is removed. Returns the number of interfaces
+// cleared.
+func (r *DeviceInterfaceRepo) ClearFlatLinksForRemoteExcept(ctx context.Context, source, remoteDeviceID string, keepInterfaceIDs []string) (int, error) {
+	q := r.entClient.Client().DeviceInterface.Update().
+		Where(
+			deviceinterface.LinkSource(source),
+			deviceinterface.RemoteDeviceID(remoteDeviceID),
+		)
+	if len(keepInterfaceIDs) > 0 {
+		q = q.Where(deviceinterface.IDNotIn(keepInterfaceIDs...))
+	}
+	n, err := q.
+		ClearRemoteDeviceID().
+		ClearRemotePortName().
+		ClearLinkSource().
+		ClearLinkVlan().
+		ClearLinkLastSeen().
+		SetUpdateTime(time.Now()).
+		Save(ctx)
+	if err != nil {
+		r.log.Errorf("clear stale flat links for remote %s failed: %s", remoteDeviceID, err.Error())
+		return 0, ipamV1.ErrorInternalServerError("clear stale flat links failed")
+	}
+	return n, nil
+}
+
+// PruneStaleFlatLinks clears the flat interface link columns for links of the
+// given source whose last-seen timestamp predates cutoff. This catches links
+// whose remote host has stopped syncing entirely (e.g. a decommissioned
+// hypervisor), which the per-host authoritative pass never revisits. Returns the
+// number of interfaces cleared.
+func (r *DeviceInterfaceRepo) PruneStaleFlatLinks(ctx context.Context, source string, cutoff time.Time) (int, error) {
+	n, err := r.entClient.Client().DeviceInterface.Update().
+		Where(
+			deviceinterface.LinkSource(source),
+			deviceinterface.LinkLastSeenLT(cutoff),
+		).
+		ClearRemoteDeviceID().
+		ClearRemotePortName().
+		ClearLinkSource().
+		ClearLinkVlan().
+		ClearLinkLastSeen().
+		SetUpdateTime(time.Now()).
+		Save(ctx)
+	if err != nil {
+		r.log.Errorf("prune stale flat links failed: %s", err.Error())
+		return 0, ipamV1.ErrorInternalServerError("prune stale flat links failed")
 	}
 	return n, nil
 }
