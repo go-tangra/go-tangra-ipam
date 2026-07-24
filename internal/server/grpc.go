@@ -21,6 +21,7 @@ import (
 	commonV1 "github.com/go-tangra/go-tangra-common/gen/go/common/service/v1"
 	appViewer "github.com/go-tangra/go-tangra-common/viewer"
 	"github.com/go-tangra/go-tangra-common/middleware/audit"
+	"github.com/go-tangra/go-tangra-common/middleware/claims"
 	"github.com/go-tangra/go-tangra-common/middleware/mtls"
 )
 
@@ -112,10 +113,17 @@ func NewGRPCServer(
 				"/grpc.health.v1.Health/Watch",
 				"/ipam.service.v1.SystemService/HealthCheck",
 			),
+			// mTLS caller allow-list (client cert CN "lcm-<module>"); gateway=lcm-admin, backup=lcm-backup.
+			mtls.WithAllowedIdentities("lcm-admin", "lcm-backup"),
 		))
 	} else {
 		l.Warn("mTLS middleware disabled (TLS not configured)")
 	}
+
+	// Bind x-md-global-* user claims to the gateway's HMAC assertion so a direct
+	// mTLS caller cannot forge platform:admin (CRIT-3.2). No-op for calls that
+	// carry no user claims; strips unverified claims in enforce mode.
+	ms = append(ms, claims.Server(logger))
 
 	// Add audit logging middleware
 	ms = append(ms, audit.Server(
