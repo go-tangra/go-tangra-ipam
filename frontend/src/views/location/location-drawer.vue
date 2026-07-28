@@ -25,6 +25,7 @@ import {
 } from '../../api/proto-types';
 import { $t } from 'shell/locales';
 import { useIpamLocationStore } from '../../stores/ipam-location.state';
+import { formatDateTime as formatDateTimeShared } from '../../datetime';
 
 const locationStore = useIpamLocationStore();
 const userStore = useUserStore();
@@ -91,7 +92,7 @@ function locationTypeToName(type: string | undefined) {
 function formatDateTime(value: string | undefined) {
   if (!value) return '-';
   try {
-    return new Date(value).toLocaleString();
+    return formatDateTimeShared(value);
   } catch {
     return value;
   }

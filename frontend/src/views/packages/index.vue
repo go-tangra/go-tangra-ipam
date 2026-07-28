@@ -13,6 +13,7 @@ import { useVbenVxeGrid } from 'shell/adapter/vxe-table';
 import { type ipamservicev1_DevicePackage } from '../../api/proto-types';
 import { $t } from 'shell/locales';
 import { useIpamDevicePackageStore } from '../../stores/ipam-device-package.state';
+import { formatDateTime } from '../../datetime';
 import { useIpamDeviceStore } from '../../stores/ipam-device.state';
 import type { GetDevicePackageStatsResponse } from '../../api/services';
 
@@ -273,7 +274,7 @@ async function handleDeleteAll() {
 
 function formatLastSync(lastSync: string | undefined) {
   if (!lastSync) return '-';
-  return new Date(lastSync).toLocaleString();
+  return formatDateTime(lastSync);
 }
 </script>
 

@@ -39,6 +39,7 @@ import {
 } from '../../api/proto-types';
 import { $t } from 'shell/locales';
 import { useIpamSubnetStore } from '../../stores/ipam-subnet.state';
+import { formatDateTime as formatDateTimeShared } from '../../datetime';
 import { useIpamVlanStore } from '../../stores/ipam-vlan.state';
 import { useIpamLocationStore } from '../../stores/ipam-location.state';
 import {
@@ -476,7 +477,7 @@ async function loadUtilization(subnetId: string) {
 function formatDateTime(value: string | undefined) {
   if (!value) return '-';
   try {
-    return new Date(value).toLocaleString();
+    return formatDateTimeShared(value);
   } catch {
     return value;
   }

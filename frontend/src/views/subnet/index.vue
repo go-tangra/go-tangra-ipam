@@ -5,6 +5,7 @@ import { h, ref, computed, onMounted } from 'vue';
 
 import { Page, useVbenDrawer, type VbenFormProps } from 'shell/vben/common-ui';
 import { useUserStore } from 'shell/vben/stores';
+import { formatDateTime } from '../../datetime';
 import {
   LucideEye,
   LucideTrash,
@@ -591,7 +592,7 @@ onMounted(() => {
         <Divider v-if="selectedIpAddress.lastSeen">{{ $t('ipam.page.ipAddress.scanInfo') }}</Divider>
         <Descriptions v-if="selectedIpAddress.lastSeen" :column="2" bordered size="small">
           <DescriptionsItem :label="$t('ipam.page.ipAddress.lastSeen')">
-            {{ new Date(selectedIpAddress.lastSeen).toLocaleString() }}
+            {{ formatDateTime(selectedIpAddress.lastSeen) }}
           </DescriptionsItem>
         </Descriptions>
 
