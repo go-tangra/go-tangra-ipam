@@ -1,0 +1,1020 @@
+syntax = "proto3";
+
+// ipam.v1 is the module-to-module API of the IPAM module. It is NOT proxied by
+// the gateway: callers are authenticated platform services on the Freya SPIFFE
+// mTLS channel, acting for the tenant named in each request (tenant_id). The
+// actor identity comes from the verified SPIFFE peer.
+//
+// Redaction: no message ever carries SNMP/BMC/IPMI credentials. Devices and
+// subnets carry only opaque warden secret references (*_secret_ref); the secret
+// material is fetched from warden at use time and never stored, logged or
+// returned. Sealed owner/contact/phone/email fields are excluded from the wire
+// messages. Power and KVM RPCs require the platform-admin role.
+package ipam.v1;
+
+option go_package = "github.com/go-freya/freya/services/ipam/api/proto/ipam/v1;ipamv1";
+
+// ---- Enums (values are prefixed; several share plain names like ACTIVE) ----
+
+// SubnetStatus is the lifecycle status of a subnet.
+enum SubnetStatus {
+  SUBNET_STATUS_UNSPECIFIED = 0;
+  SUBNET_STATUS_ACTIVE = 1;
+  SUBNET_STATUS_RESERVED = 2;
+  SUBNET_STATUS_DEPRECATED = 3;
+  SUBNET_STATUS_DELETED = 4;
+}
+
+// IpStatus is the lifecycle status of an IP address.
+enum IpStatus {
+  IP_STATUS_UNSPECIFIED = 0;
+  IP_STATUS_ACTIVE = 1;
+  IP_STATUS_RESERVED = 2;
+  IP_STATUS_DHCP = 3;
+  IP_STATUS_DEPRECATED = 4;
+  IP_STATUS_OFFLINE = 5;
+}
+
+// AddressType classifies an address within its subnet.
+enum AddressType {
+  ADDRESS_TYPE_UNSPECIFIED = 0;
+  ADDRESS_TYPE_HOST = 1;
+  ADDRESS_TYPE_GATEWAY = 2;
+  ADDRESS_TYPE_BROADCAST = 3;
+  ADDRESS_TYPE_NETWORK = 4;
+  ADDRESS_TYPE_VIRTUAL = 5;
+  ADDRESS_TYPE_ANYCAST = 6;
+}
+
+// DeviceType classifies a managed device.
+enum DeviceType {
+  DEVICE_TYPE_UNSPECIFIED = 0;
+  DEVICE_TYPE_SERVER = 1;
+  DEVICE_TYPE_VM = 2;
+  DEVICE_TYPE_ROUTER = 3;
+  DEVICE_TYPE_SWITCH = 4;
+  DEVICE_TYPE_FIREWALL = 5;
+  DEVICE_TYPE_LOAD_BALANCER = 6;
+  DEVICE_TYPE_ACCESS_POINT = 7;
+  DEVICE_TYPE_STORAGE = 8;
+  DEVICE_TYPE_PRINTER = 9;
+  DEVICE_TYPE_PHONE = 10;
+  DEVICE_TYPE_WORKSTATION = 11;
+  DEVICE_TYPE_CONTAINER = 12;
+  DEVICE_TYPE_OTHER = 13;
+}
+
+// DeviceStatus is the lifecycle status of a device.
+enum DeviceStatus {
+  DEVICE_STATUS_UNSPECIFIED = 0;
+  DEVICE_STATUS_ACTIVE = 1;
+  DEVICE_STATUS_PLANNED = 2;
+  DEVICE_STATUS_STAGED = 3;
+  DEVICE_STATUS_DECOMMISSIONED = 4;
+  DEVICE_STATUS_OFFLINE = 5;
+  DEVICE_STATUS_FAILED = 6;
+  DEVICE_STATUS_AVAILABLE = 7;
+}
+
+// VlanStatus is the lifecycle status of a VLAN.
+enum VlanStatus {
+  VLAN_STATUS_UNSPECIFIED = 0;
+  VLAN_STATUS_ACTIVE = 1;
+  VLAN_STATUS_RESERVED = 2;
+  VLAN_STATUS_DEPRECATED = 3;
+}
+
+// LocationType classifies a node in the physical location tree.
+enum LocationType {
+  LOCATION_TYPE_UNSPECIFIED = 0;
+  LOCATION_TYPE_REGION = 1;
+  LOCATION_TYPE_COUNTRY = 2;
+  LOCATION_TYPE_CITY = 3;
+  LOCATION_TYPE_DATACENTER = 4;
+  LOCATION_TYPE_BUILDING = 5;
+  LOCATION_TYPE_FLOOR = 6;
+  LOCATION_TYPE_ROOM = 7;
+  LOCATION_TYPE_RACK = 8;
+  LOCATION_TYPE_SITE = 9;
+  LOCATION_TYPE_BRANCH = 10;
+}
+
+// LocationStatus is the lifecycle status of a location.
+enum LocationStatus {
+  LOCATION_STATUS_UNSPECIFIED = 0;
+  LOCATION_STATUS_ACTIVE = 1;
+  LOCATION_STATUS_PLANNED = 2;
+  LOCATION_STATUS_DECOMMISSIONED = 3;
+}
+
+// MemberType classifies an IP-group member value.
+enum MemberType {
+  MEMBER_TYPE_UNSPECIFIED = 0;
+  MEMBER_TYPE_ADDRESS = 1;
+  MEMBER_TYPE_RANGE = 2;
+  MEMBER_TYPE_SUBNET = 3;
+}
+
+// GroupStatus is the lifecycle status of an IP or host group.
+enum GroupStatus {
+  GROUP_STATUS_UNSPECIFIED = 0;
+  GROUP_STATUS_ACTIVE = 1;
+  GROUP_STATUS_INACTIVE = 2;
+}
+
+// ScanStatus is the status of an async discovery job.
+enum ScanStatus {
+  SCAN_STATUS_UNSPECIFIED = 0;
+  SCAN_STATUS_PENDING = 1;
+  SCAN_STATUS_SCANNING = 2;
+  SCAN_STATUS_COMPLETED = 3;
+  SCAN_STATUS_FAILED = 4;
+  SCAN_STATUS_CANCELLED = 5;
+}
+
+// ScanTrigger is what triggered a scan job.
+enum ScanTrigger {
+  SCAN_TRIGGER_UNSPECIFIED = 0;
+  SCAN_TRIGGER_AUTO = 1;
+  SCAN_TRIGGER_MANUAL = 2;
+}
+
+// PowerAction is an out-of-band power operation on a device BMC.
+enum PowerAction {
+  POWER_ACTION_UNSPECIFIED = 0;
+  POWER_ACTION_ON = 1;
+  POWER_ACTION_OFF = 2;
+  POWER_ACTION_CYCLE = 3;
+  POWER_ACTION_RESET = 4;
+  POWER_ACTION_SOFT = 5;
+  POWER_ACTION_DIAG = 6;
+}
+
+// ---- Domain messages (mirror internal/store/models.go; no credentials) ----
+
+// Subnet is a CIDR network in a tenant (hierarchical).
+message Subnet {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string cidr = 4;
+  string description = 5;
+  string gateway = 6;
+  string dns_servers = 7;
+  string vlan_id = 8;
+  string parent_id = 9;
+  string location_id = 10;
+  SubnetStatus status = 11;
+  int32 ip_version = 12;
+  string network_address = 13;
+  string broadcast_address = 14;
+  string mask = 15;
+  int32 prefix_length = 16;
+  string snmp_secret_ref = 17; // warden id; never the secret
+  int32 snmp_version = 18;
+  map<string, string> tags = 19;
+  string created_by = 20;
+  int64 created_at = 21; // unix seconds
+  int64 updated_at = 22; // unix seconds
+  // Computed (not stored):
+  int64 total_addresses = 23;
+  int64 used_addresses = 24;
+  int64 available_addresses = 25;
+  double utilization = 26;
+}
+
+// IPAddress is an address within a subnet. Unique (tenant_id,address).
+message IPAddress {
+  string id = 1;
+  string tenant_id = 2;
+  string address = 3;
+  string subnet_id = 4;
+  string hostname = 5;
+  string mac_address = 6;
+  string description = 7;
+  string device_id = 8;
+  string interface_name = 9;
+  IpStatus status = 10;
+  AddressType address_type = 11;
+  bool is_primary = 12;
+  string ptr_record = 13;
+  string dns_name = 14;
+  int64 last_seen = 15;    // unix seconds, 0 = unset
+  int64 lease_expiry = 16; // unix seconds, 0 = unset
+  bool has_reverse_dns = 17;
+  string note = 18;
+  map<string, string> tags = 19;
+  string created_by = 20;
+  int64 created_at = 21; // unix seconds
+  int64 updated_at = 22; // unix seconds
+}
+
+// Device is a managed network device/host. Unique (tenant_id,name). Sealed
+// contact fields are excluded; ipmi_secret_ref is a warden id, never the secret.
+message Device {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  DeviceType device_type = 4;
+  string description = 5;
+  string manufacturer = 6;
+  string model = 7;
+  string serial_number = 8;
+  string asset_tag = 9;
+  string location_id = 10;
+  string rack_id = 11;
+  int32 rack_position = 12;
+  int32 device_height_u = 13;
+  DeviceStatus status = 14;
+  string primary_ip = 15;
+  string primary_ipv6 = 16;
+  string management_ip = 17;
+  string os_type = 18;
+  string os_version = 19;
+  string firmware_version = 20;
+  int64 last_seen = 21;          // unix seconds, 0 = unset
+  string ipmi_secret_ref = 22;   // warden id; never the secret
+  bool reboot_required = 23;
+  bool unattended_upgrades = 24;
+  map<string, string> tags = 25;
+  string created_by = 26;
+  int64 created_at = 27; // unix seconds
+  int64 updated_at = 28; // unix seconds
+  // Computed:
+  int64 interface_count = 29;
+  int64 address_count = 30;
+  int64 package_update_count = 31;
+  int64 security_update_count = 32;
+}
+
+// DeviceInterface is a NIC on a device. Unique (device_id,name).
+message DeviceInterface {
+  string id = 1;
+  string tenant_id = 2;
+  string device_id = 3;
+  string name = 4;
+  string mac_address = 5;
+  string interface_type = 6;
+  bool enabled = 7;
+  int32 speed_mbps = 8;
+  string description = 9;
+  int32 if_index = 10;
+  string remote_device_id = 11;
+  string remote_interface_id = 12;
+  string remote_port_name = 13;
+  string link_source = 14;
+  int32 link_vlan = 15;
+  int64 link_last_seen = 16; // unix seconds, 0 = unset
+  int64 created_at = 17;     // unix seconds
+  int64 updated_at = 18;     // unix seconds
+}
+
+// DevicePackage is an OS package on a device. Unique (tenant_id,device_id,name).
+message DevicePackage {
+  string id = 1;
+  string tenant_id = 2;
+  string device_id = 3;
+  string name = 4;
+  string current_version = 5;
+  string available_version = 6;
+  bool needs_update = 7;
+  bool is_security_update = 8;
+  string package_manager = 9;
+  string description = 10;
+  int64 created_at = 11; // unix seconds
+  int64 updated_at = 12; // unix seconds
+}
+
+// Vlan. Unique (tenant_id,vlan_id) and (tenant_id,name).
+message Vlan {
+  string id = 1;
+  string tenant_id = 2;
+  int32 vlan_id = 3;
+  string name = 4;
+  string description = 5;
+  string domain = 6;
+  string location_id = 7;
+  VlanStatus status = 8;
+  map<string, string> tags = 9;
+  string created_by = 10;
+  int64 created_at = 11; // unix seconds
+  int64 updated_at = 12; // unix seconds
+  int64 subnet_count = 13;
+}
+
+// Location is a node in the physical tree. Sealed contact/phone/email excluded.
+message Location {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string code = 4;
+  LocationType location_type = 5;
+  string description = 6;
+  string parent_id = 7;
+  string path = 8;
+  string address = 9;
+  string city = 10;
+  string state = 11;
+  string country = 12;
+  string postal_code = 13;
+  double latitude = 14;
+  double longitude = 15;
+  LocationStatus status = 16;
+  int32 rack_size_u = 17;
+  map<string, string> tags = 18;
+  string created_by = 19;
+  int64 created_at = 20; // unix seconds
+  int64 updated_at = 21; // unix seconds
+  int64 child_count = 22;
+  int64 device_count = 23;
+  int64 subnet_count = 24;
+  int64 vlan_count = 25;
+}
+
+// IPGroup is a named collection of address/range/subnet members.
+message IPGroup {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string description = 4;
+  GroupStatus status = 5;
+  map<string, string> tags = 6;
+  string created_by = 7;
+  int64 created_at = 8; // unix seconds
+  int64 updated_at = 9; // unix seconds
+  int64 member_count = 10;
+  repeated IPGroupMember members = 11; // present when include_members
+}
+
+// IPGroupMember is one member of an IP group.
+message IPGroupMember {
+  string id = 1;
+  string tenant_id = 2;
+  string ip_group_id = 3;
+  MemberType member_type = 4;
+  string value = 5;
+  string description = 6;
+  int32 sequence = 7;
+}
+
+// HostGroup is a named collection of devices.
+message HostGroup {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string description = 4;
+  GroupStatus status = 5;
+  map<string, string> tags = 6;
+  string created_by = 7;
+  int64 created_at = 8; // unix seconds
+  int64 updated_at = 9; // unix seconds
+  int64 member_count = 10;
+  repeated HostGroupMember members = 11; // present when include_members
+}
+
+// HostGroupMember is one device member of a host group (enriched on read).
+message HostGroupMember {
+  string id = 1;
+  string tenant_id = 2;
+  string host_group_id = 3;
+  string device_id = 4;
+  int32 sequence = 5;
+  string device_name = 6;
+  DeviceType device_type = 7;
+  DeviceStatus device_status = 8;
+  string device_primary_ip = 9;
+}
+
+// IPScanJob is an async discovery job (work queue).
+message IPScanJob {
+  string id = 1;
+  string tenant_id = 2;
+  string subnet_id = 3;
+  ScanStatus status = 4;
+  int32 progress = 5;
+  string status_message = 6;
+  int64 total_addresses = 7;
+  int64 scanned_count = 8;
+  int64 alive_count = 9;
+  int64 new_count = 10;
+  int64 updated_count = 11;
+  int64 snmp_discovered_count = 12;
+  ScanTrigger triggered_by = 13;
+  int32 retry_count = 14;
+  int32 max_retries = 15;
+  int64 next_retry_at = 16; // unix seconds, 0 = unset
+  int32 timeout_ms = 17;
+  int32 concurrency = 18;
+  bool skip_reverse_dns = 19;
+  string tcp_probe_ports = 20;
+  bool enable_snmp = 21;
+  bool enable_dns_update = 22;
+  int64 started_at = 23;   // unix seconds, 0 = unset
+  int64 completed_at = 24; // unix seconds, 0 = unset
+  string created_by = 25;
+  int64 created_at = 26; // unix seconds
+  int64 updated_at = 27; // unix seconds
+}
+
+// DNSConfig is one per tenant.
+message DNSConfig {
+  string id = 1;
+  string tenant_id = 2;
+  repeated string dns_servers = 3;
+  int32 timeout_ms = 4;
+  bool use_system_dns_fallback = 5;
+  bool reverse_dns_enabled = 6;
+  int64 created_at = 7; // unix seconds
+  int64 updated_at = 8; // unix seconds
+}
+
+// Stats are per-tenant IPAM rollups.
+message Stats {
+  int64 subnets_total = 1;
+  int64 addresses_total = 2;
+  int64 addresses_used = 3;
+  int64 addresses_available = 4;
+  double utilization = 5;
+  int64 devices_total = 6;
+  int64 vlans_total = 7;
+  int64 locations_total = 8;
+  int64 ip_groups_total = 9;
+  int64 host_groups_total = 10;
+  int64 scans_running = 11;
+  map<string, int64> devices_by_status = 12;
+  map<string, int64> devices_by_type = 13;
+  map<string, int64> addresses_by_status = 14;
+  map<string, int64> subnets_by_status = 15;
+}
+
+// ---- SubnetService ----
+
+// SubnetService administers subnets and runs synchronous discovery.
+service SubnetService {
+  rpc Create(CreateSubnetRequest) returns (Subnet);
+  rpc Get(GetSubnetRequest) returns (Subnet);
+  rpc List(ListSubnetsRequest) returns (ListSubnetsResponse);
+  rpc Update(UpdateSubnetRequest) returns (Subnet);
+  rpc Delete(DeleteSubnetRequest) returns (DeleteResponse);
+  rpc GetTree(GetSubnetTreeRequest) returns (SubnetTree);
+  rpc GetStats(GetSubnetStatsRequest) returns (Subnet);
+  rpc Scan(ScanSubnetRequest) returns (IPScanJob);
+}
+
+message CreateSubnetRequest {
+  string tenant_id = 1;
+  Subnet subnet = 2;
+}
+message GetSubnetRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message ListSubnetsRequest {
+  string tenant_id = 1;
+  string vlan_id = 2;
+  string parent_id = 3;
+  string location_id = 4;
+  SubnetStatus status = 5;
+  int32 ip_version = 6;
+  string query = 7;
+  int64 limit = 8;
+  string cursor_id = 9;
+}
+message ListSubnetsResponse {
+  repeated Subnet subnets = 1;
+  string next_cursor_id = 2;
+}
+message UpdateSubnetRequest {
+  string tenant_id = 1;
+  string id = 2;
+  Subnet subnet = 3;
+}
+message DeleteSubnetRequest {
+  string tenant_id = 1;
+  string id = 2;
+  bool force = 3;
+}
+message GetSubnetTreeRequest {
+  string tenant_id = 1;
+}
+message SubnetTreeNode {
+  Subnet subnet = 1;
+  repeated SubnetTreeNode children = 2;
+}
+message SubnetTree {
+  repeated SubnetTreeNode roots = 1;
+}
+message GetSubnetStatsRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message ScanSubnetRequest {
+  string tenant_id = 1;
+  string id = 2;
+  bool enable_snmp = 3;
+  bool skip_reverse_dns = 4;
+  string tcp_probe_ports = 5;
+}
+
+// DeleteResponse is the empty result of a delete RPC.
+message DeleteResponse {}
+
+// ---- IpAddressService ----
+
+// IpAddressService administers IP addresses and runs allocation/reachability.
+service IpAddressService {
+  rpc Create(CreateIpAddressRequest) returns (IPAddress);
+  rpc Get(GetIpAddressRequest) returns (IPAddress);
+  rpc List(ListIpAddressesRequest) returns (ListIpAddressesResponse);
+  rpc Update(UpdateIpAddressRequest) returns (IPAddress);
+  rpc Delete(DeleteIpAddressRequest) returns (DeleteResponse);
+  rpc AllocateNext(AllocateNextRequest) returns (IPAddress);
+  rpc BulkAllocate(BulkAllocateRequest) returns (BulkAllocateResponse);
+  rpc Find(FindIpAddressRequest) returns (IPAddress);
+  rpc Suggest(SuggestIpAddressRequest) returns (SuggestIpAddressResponse);
+  rpc Ping(PingIpAddressRequest) returns (PingResponse);
+}
+
+message CreateIpAddressRequest {
+  string tenant_id = 1;
+  IPAddress address = 2;
+}
+message GetIpAddressRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message ListIpAddressesRequest {
+  string tenant_id = 1;
+  string subnet_id = 2;
+  string device_id = 3;
+  IpStatus status = 4;
+  AddressType address_type = 5;
+  string address_prefix = 6;
+  string hostname_pattern = 7;
+  int64 limit = 8;
+  string cursor_id = 9;
+}
+message ListIpAddressesResponse {
+  repeated IPAddress addresses = 1;
+  string next_cursor_id = 2;
+}
+message UpdateIpAddressRequest {
+  string tenant_id = 1;
+  string id = 2;
+  IPAddress address = 3;
+}
+message DeleteIpAddressRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message AllocateNextRequest {
+  string tenant_id = 1;
+  string subnet_id = 2;
+  string hostname = 3;
+  string device_id = 4;
+  string description = 5;
+}
+message BulkAllocateRequest {
+  string tenant_id = 1;
+  string subnet_id = 2;
+  int32 count = 3;
+  string hostname_prefix = 4;
+}
+message BulkAllocateResponse {
+  repeated IPAddress addresses = 1;
+}
+message FindIpAddressRequest {
+  string tenant_id = 1;
+  string address = 2;
+}
+message SuggestIpAddressRequest {
+  string tenant_id = 1;
+  string subnet_id = 2;
+  int32 count = 3;
+}
+message SuggestIpAddressResponse {
+  repeated string addresses = 1; // verified free (ICMP+TCP)
+}
+message PingIpAddressRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message PingResponse {
+  bool alive = 1;
+  int32 rtt_ms = 2;
+}
+
+// ---- DeviceService ----
+
+// DeviceService administers devices, interfaces, packages and out-of-band ops.
+service DeviceService {
+  rpc Create(CreateDeviceRequest) returns (Device);
+  rpc Get(GetDeviceRequest) returns (Device);
+  rpc List(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc Update(UpdateDeviceRequest) returns (Device);
+  rpc Delete(DeleteDeviceRequest) returns (DeleteResponse);
+  rpc GetAddresses(GetDeviceAddressesRequest) returns (ListIpAddressesResponse);
+  rpc GetInterfaces(GetDeviceInterfacesRequest) returns (ListInterfacesResponse);
+  rpc CreateInterface(CreateInterfaceRequest) returns (DeviceInterface);
+  rpc DeleteInterface(DeleteInterfaceRequest) returns (DeleteResponse);
+  rpc SyncPackages(SyncPackagesRequest) returns (ListPackagesResponse);
+  rpc ListPackages(ListPackagesRequest) returns (ListPackagesResponse);
+  rpc PowerStatus(PowerStatusRequest) returns (PowerStatusResponse);   // platform-admin
+  rpc Power(PowerRequest) returns (PowerStatusResponse);               // platform-admin
+  rpc StartKvmSession(StartKvmSessionRequest) returns (KvmSession);    // platform-admin
+}
+
+message CreateDeviceRequest {
+  string tenant_id = 1;
+  Device device = 2;
+}
+message GetDeviceRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message ListDevicesRequest {
+  string tenant_id = 1;
+  DeviceType device_type = 2;
+  DeviceStatus status = 3;
+  string location_id = 4;
+  string manufacturer = 5;
+  string rack_id = 6;
+  string query = 7;
+  int64 limit = 8;
+  string cursor_id = 9;
+}
+message ListDevicesResponse {
+  repeated Device devices = 1;
+  string next_cursor_id = 2;
+}
+message UpdateDeviceRequest {
+  string tenant_id = 1;
+  string id = 2;
+  Device device = 3;
+}
+message DeleteDeviceRequest {
+  string tenant_id = 1;
+  string id = 2;
+  bool force = 3;
+}
+message GetDeviceAddressesRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message GetDeviceInterfacesRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message ListInterfacesResponse {
+  repeated DeviceInterface interfaces = 1;
+}
+message CreateInterfaceRequest {
+  string tenant_id = 1;
+  string device_id = 2;
+  DeviceInterface iface = 3;
+}
+message DeleteInterfaceRequest {
+  string tenant_id = 1;
+  string device_id = 2;
+  string interface_id = 3;
+}
+message SyncPackagesRequest {
+  string tenant_id = 1;
+  string device_id = 2;
+}
+message ListPackagesRequest {
+  string tenant_id = 1;
+  string device_id = 2;
+}
+message ListPackagesResponse {
+  repeated DevicePackage packages = 1;
+}
+message PowerStatusRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message PowerStatusResponse {
+  string state = 1; // on|off|unknown
+}
+message PowerRequest {
+  string tenant_id = 1;
+  string id = 2;
+  PowerAction action = 3;
+}
+message StartKvmSessionRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message KvmSession {
+  string token = 1;
+  string console_url = 2;
+  int64 expires_at = 3; // unix seconds
+}
+
+// ---- VlanService ----
+
+// VlanService administers VLANs.
+service VlanService {
+  rpc Create(CreateVlanRequest) returns (Vlan);
+  rpc Get(GetVlanRequest) returns (Vlan);
+  rpc List(ListVlansRequest) returns (ListVlansResponse);
+  rpc Update(UpdateVlanRequest) returns (Vlan);
+  rpc Delete(DeleteVlanRequest) returns (DeleteResponse);
+  rpc GetSubnets(GetVlanSubnetsRequest) returns (ListSubnetsResponse);
+}
+
+message CreateVlanRequest {
+  string tenant_id = 1;
+  Vlan vlan = 2;
+}
+message GetVlanRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message ListVlansRequest {
+  string tenant_id = 1;
+  string location_id = 2;
+  string domain = 3;
+  VlanStatus status = 4;
+  int32 vlan_id_min = 5;
+  int32 vlan_id_max = 6;
+  int64 limit = 7;
+  string cursor_id = 8;
+}
+message ListVlansResponse {
+  repeated Vlan vlans = 1;
+  string next_cursor_id = 2;
+}
+message UpdateVlanRequest {
+  string tenant_id = 1;
+  string id = 2;
+  Vlan vlan = 3;
+}
+message DeleteVlanRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message GetVlanSubnetsRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+
+// ---- LocationService ----
+
+// LocationService administers the physical location tree.
+service LocationService {
+  rpc Create(CreateLocationRequest) returns (Location);
+  rpc Get(GetLocationRequest) returns (Location);
+  rpc List(ListLocationsRequest) returns (ListLocationsResponse);
+  rpc Update(UpdateLocationRequest) returns (Location);
+  rpc Delete(DeleteLocationRequest) returns (DeleteResponse);
+  rpc GetTree(GetLocationTreeRequest) returns (LocationTree);
+}
+
+message CreateLocationRequest {
+  string tenant_id = 1;
+  Location location = 2;
+}
+message GetLocationRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message ListLocationsRequest {
+  string tenant_id = 1;
+  string parent_id = 2;
+  LocationType location_type = 3;
+  string country = 4;
+  LocationStatus status = 5;
+  int64 limit = 6;
+  string cursor_id = 7;
+}
+message ListLocationsResponse {
+  repeated Location locations = 1;
+  string next_cursor_id = 2;
+}
+message UpdateLocationRequest {
+  string tenant_id = 1;
+  string id = 2;
+  Location location = 3;
+}
+message DeleteLocationRequest {
+  string tenant_id = 1;
+  string id = 2;
+  bool force = 3;
+}
+message GetLocationTreeRequest {
+  string tenant_id = 1;
+}
+message LocationTreeNode {
+  Location location = 1;
+  repeated LocationTreeNode children = 2;
+}
+message LocationTree {
+  repeated LocationTreeNode roots = 1;
+}
+
+// ---- IpGroupService ----
+
+// IpGroupService administers IP groups and their members.
+service IpGroupService {
+  rpc Create(CreateIpGroupRequest) returns (IPGroup);
+  rpc Get(GetIpGroupRequest) returns (IPGroup);
+  rpc List(ListIpGroupsRequest) returns (ListIpGroupsResponse);
+  rpc Update(UpdateIpGroupRequest) returns (IPGroup);
+  rpc Delete(DeleteIpGroupRequest) returns (DeleteResponse);
+  rpc AddMember(AddIpGroupMemberRequest) returns (IPGroupMember);
+  rpc UpdateMember(UpdateIpGroupMemberRequest) returns (IPGroupMember);
+  rpc RemoveMember(RemoveIpGroupMemberRequest) returns (DeleteResponse);
+  rpc ListMembers(ListIpGroupMembersRequest) returns (ListIpGroupMembersResponse);
+  rpc CheckIpInGroup(CheckIpInGroupRequest) returns (CheckIpInGroupResponse);
+}
+
+message CreateIpGroupRequest {
+  string tenant_id = 1;
+  IPGroup group = 2;
+}
+message GetIpGroupRequest {
+  string tenant_id = 1;
+  string id = 2;
+  bool include_members = 3;
+}
+message ListIpGroupsRequest {
+  string tenant_id = 1;
+  bool include_members = 2;
+  int64 limit = 3;
+  string cursor_id = 4;
+}
+message ListIpGroupsResponse {
+  repeated IPGroup groups = 1;
+  string next_cursor_id = 2;
+}
+message UpdateIpGroupRequest {
+  string tenant_id = 1;
+  string id = 2;
+  IPGroup group = 3;
+}
+message DeleteIpGroupRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message AddIpGroupMemberRequest {
+  string tenant_id = 1;
+  string ip_group_id = 2;
+  IPGroupMember member = 3;
+}
+message UpdateIpGroupMemberRequest {
+  string tenant_id = 1;
+  string ip_group_id = 2;
+  string member_id = 3;
+  IPGroupMember member = 4;
+}
+message RemoveIpGroupMemberRequest {
+  string tenant_id = 1;
+  string ip_group_id = 2;
+  string member_id = 3;
+}
+message ListIpGroupMembersRequest {
+  string tenant_id = 1;
+  string ip_group_id = 2;
+}
+message ListIpGroupMembersResponse {
+  repeated IPGroupMember members = 1;
+}
+message CheckIpInGroupRequest {
+  string tenant_id = 1;
+  string ip = 2;
+}
+message CheckIpInGroupResponse {
+  repeated IPGroup groups = 1; // groups the ip belongs to
+}
+
+// ---- HostGroupService ----
+
+// HostGroupService administers host groups and their device members.
+service HostGroupService {
+  rpc Create(CreateHostGroupRequest) returns (HostGroup);
+  rpc Get(GetHostGroupRequest) returns (HostGroup);
+  rpc List(ListHostGroupsRequest) returns (ListHostGroupsResponse);
+  rpc Update(UpdateHostGroupRequest) returns (HostGroup);
+  rpc Delete(DeleteHostGroupRequest) returns (DeleteResponse);
+  rpc AddMember(AddHostGroupMemberRequest) returns (HostGroupMember);
+  rpc RemoveMember(RemoveHostGroupMemberRequest) returns (DeleteResponse);
+  rpc ListMembers(ListHostGroupMembersRequest) returns (ListHostGroupMembersResponse);
+  rpc ListDeviceHostGroups(ListDeviceHostGroupsRequest) returns (ListHostGroupsResponse);
+}
+
+message CreateHostGroupRequest {
+  string tenant_id = 1;
+  HostGroup group = 2;
+}
+message GetHostGroupRequest {
+  string tenant_id = 1;
+  string id = 2;
+  bool include_members = 3;
+}
+message ListHostGroupsRequest {
+  string tenant_id = 1;
+  bool include_members = 2;
+  int64 limit = 3;
+  string cursor_id = 4;
+}
+message ListHostGroupsResponse {
+  repeated HostGroup groups = 1;
+  string next_cursor_id = 2;
+}
+message UpdateHostGroupRequest {
+  string tenant_id = 1;
+  string id = 2;
+  HostGroup group = 3;
+}
+message DeleteHostGroupRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message AddHostGroupMemberRequest {
+  string tenant_id = 1;
+  string host_group_id = 2;
+  string device_id = 3;
+  int32 sequence = 4;
+}
+message RemoveHostGroupMemberRequest {
+  string tenant_id = 1;
+  string host_group_id = 2;
+  string device_id = 3;
+}
+message ListHostGroupMembersRequest {
+  string tenant_id = 1;
+  string host_group_id = 2;
+}
+message ListHostGroupMembersResponse {
+  repeated HostGroupMember members = 1;
+}
+message ListDeviceHostGroupsRequest {
+  string tenant_id = 1;
+  string device_id = 2;
+}
+
+// ---- IpScanService ----
+
+// IpScanService starts and tracks async discovery jobs.
+service IpScanService {
+  rpc Start(StartScanRequest) returns (IPScanJob);
+  rpc Get(GetScanRequest) returns (IPScanJob);
+  rpc List(ListScansRequest) returns (ListScansResponse);
+  rpc Cancel(CancelScanRequest) returns (IPScanJob);
+}
+
+message StartScanRequest {
+  string tenant_id = 1;
+  string subnet_id = 2;
+  bool enable_snmp = 3;
+  bool enable_dns_update = 4;
+  bool skip_reverse_dns = 5;
+  string tcp_probe_ports = 6;
+  int32 concurrency = 7;
+  int32 timeout_ms = 8;
+}
+message GetScanRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+message ListScansRequest {
+  string tenant_id = 1;
+  string subnet_id = 2;
+  ScanStatus status = 3;
+  int64 limit = 4;
+  string cursor_id = 5;
+}
+message ListScansResponse {
+  repeated IPScanJob jobs = 1;
+  string next_cursor_id = 2;
+}
+message CancelScanRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+
+// ---- SystemService ----
+
+// SystemService reports health, rollups and per-tenant DNS configuration.
+service SystemService {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc GetStats(GetStatsRequest) returns (Stats);
+  rpc GetDnsConfig(GetDnsConfigRequest) returns (DNSConfig);
+  rpc UpdateDnsConfig(UpdateDnsConfigRequest) returns (DNSConfig);
+}
+
+message HealthRequest {}
+message HealthResponse {
+  string status = 1; // ok|degraded
+}
+message GetStatsRequest {
+  string tenant_id = 1;
+}
+message GetDnsConfigRequest {
+  string tenant_id = 1;
+}
+message UpdateDnsConfigRequest {
+  string tenant_id = 1;
+  DNSConfig config = 2;
+}
