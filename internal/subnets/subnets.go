@@ -85,7 +85,7 @@ func (s *Service) Create(ctx context.Context, subj authz.Subjects, in store.Subn
 		return store.Subnet{}, err
 	}
 	if !allowOverlap {
-		if err := s.checkOverlap(ctx, subj.TenantID, in.CIDR, ""); err != nil {
+		if err := s.checkOverlap(ctx, subj.TenantID, in.CIDR, "", in.ParentID); err != nil {
 			return store.Subnet{}, err
 		}
 	}
@@ -105,6 +105,90 @@ func (s *Service) Create(ctx context.Context, subj authz.Subjects, in store.Subn
 		return store.Subnet{}, mapErr(err)
 	}
 	return s.Get(ctx, subj, in.ID)
+}
+
+// SplitResult reports the outcome of Split: the blocks that were created and
+// the ones skipped because they already exist (or overlap something).
+type SplitResult struct {
+	Parent  store.Subnet   `json:"parent"`
+	Created []store.Subnet `json:"created"`
+	Skipped []SkippedBlock `json:"skipped"`
+}
+
+// SkippedBlock is one child block Split did not create, with the reason.
+type SkippedBlock struct {
+	CIDR   string `json:"cidr"`
+	Reason string `json:"reason"`
+}
+
+// Split subdivides a subnet into the child blocks of prefixLen it contains and
+// creates them under it, inheriting its VLAN and location. A block that
+// overlaps an existing subnet is skipped rather than failing the whole
+// operation, so an already partially split parent can be split further. With
+// dryRun nothing is written and the result only reports what would be created.
+func (s *Service) Split(ctx context.Context, subj authz.Subjects, id string, prefixLen int, dryRun bool) (SplitResult, error) {
+	parent, err := s.Get(ctx, subj, id)
+	if err != nil {
+		return SplitResult{}, err
+	}
+	blocks, err := ipnet.Subdivide(parent.CIDR, prefixLen)
+	if err != nil {
+		return SplitResult{}, ValidationError{Msg: fmt.Sprintf("cannot split %q into /%d: %v", parent.CIDR, prefixLen, err)}
+	}
+	existing, err := s.st.AllSubnetCIDRs(ctx, subj.TenantID)
+	if err != nil {
+		return SplitResult{}, err
+	}
+	res := SplitResult{Parent: parent}
+	for i, block := range blocks {
+		if taken, by := overlapsAny(block, parent.ID, existing); taken {
+			res.Skipped = append(res.Skipped, SkippedBlock{CIDR: block, Reason: fmt.Sprintf("overlaps %s", by)})
+			continue
+		}
+		child := store.Subnet{
+			Name:        fmt.Sprintf("%s — %s", parent.Name, block),
+			CIDR:        block,
+			Description: fmt.Sprintf("split %d of %d from %s", i+1, len(blocks), parent.CIDR),
+			ParentID:    parent.ID,
+			VlanID:      parent.VlanID,
+			LocationID:  parent.LocationID,
+			Status:      store.SubnetActive,
+		}
+		if dryRun {
+			if derr := deriveCIDR(&child); derr != nil {
+				return SplitResult{}, derr
+			}
+			res.Created = append(res.Created, child)
+			continue
+		}
+		// allowOverlap: the parent contains every block by construction and
+		// sibling collisions were ruled out above.
+		created, cerr := s.Create(ctx, subj, child, true)
+		if cerr != nil {
+			return SplitResult{}, cerr
+		}
+		res.Created = append(res.Created, created)
+		existing = append(existing, store.Subnet{ID: created.ID, CIDR: created.CIDR})
+	}
+	if len(res.Created) == 0 {
+		return res, ValidationError{Msg: fmt.Sprintf("no free /%d block inside %s", prefixLen, parent.CIDR)}
+	}
+	return res, nil
+}
+
+// overlapsAny reports whether block collides with a stored subnet other than
+// the parent being split, and returns that subnet's CIDR.
+func overlapsAny(block, parentID string, existing []store.Subnet) (bool, string) {
+	for _, ex := range existing {
+		if ex.ID == parentID || ex.CIDR == "" {
+			continue
+		}
+		ov, err := ipnet.Overlaps(block, ex.CIDR)
+		if err == nil && ov {
+			return true, ex.CIDR
+		}
+	}
+	return false, ""
 }
 
 // Get returns one subnet with its used/available/utilization fields computed.
@@ -159,7 +243,7 @@ func (s *Service) Update(ctx context.Context, subj authz.Subjects, in store.Subn
 		return store.Subnet{}, err
 	}
 	if !allowOverlap {
-		if err := s.checkOverlap(ctx, subj.TenantID, in.CIDR, in.ID); err != nil {
+		if err := s.checkOverlap(ctx, subj.TenantID, in.CIDR, in.ID, in.ParentID); err != nil {
 			return store.Subnet{}, err
 		}
 	}
@@ -310,13 +394,21 @@ func checkGateway(cidr, gateway string) error {
 
 // checkOverlap rejects a block that overlaps any existing subnet in the tenant,
 // skipping selfID (the row being updated) and any malformed stored CIDR.
-func (s *Service) checkOverlap(ctx context.Context, tenantID, cidr, selfID string) error {
+func (s *Service) checkOverlap(ctx context.Context, tenantID, cidr, selfID, parentID string) error {
 	existing, err := s.st.AllSubnetCIDRs(ctx, tenantID)
 	if err != nil {
 		return err
 	}
+	byID := make(map[string]store.Subnet, len(existing))
 	for _, ex := range existing {
-		if ex.ID == selfID || ex.CIDR == "" {
+		byID[ex.ID] = ex
+	}
+	nested, err := nestedWith(byID, cidr, selfID, parentID)
+	if err != nil {
+		return err
+	}
+	for _, ex := range existing {
+		if ex.ID == selfID || ex.CIDR == "" || nested[ex.ID] {
 			continue
 		}
 		ov, oerr := ipnet.Overlaps(cidr, ex.CIDR)
@@ -328,6 +420,40 @@ func (s *Service) checkOverlap(ctx context.Context, tenantID, cidr, selfID strin
 		}
 	}
 	return nil
+}
+
+// nestedWith returns the IDs a block legitimately overlaps in the hierarchy:
+// parentID and every subnet above it, plus every subnet below selfID (its own
+// children, when it is being updated). The block must lie strictly inside its
+// declared parent.
+func nestedWith(byID map[string]store.Subnet, cidr, selfID, parentID string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if parentID != "" {
+		parent, ok := byID[parentID]
+		if !ok {
+			return nil, ValidationError{Msg: fmt.Sprintf("parent subnet %s not found", parentID)}
+		}
+		if !ipnet.Within(cidr, parent.CIDR) {
+			return nil, ValidationError{Msg: fmt.Sprintf("cidr %q is not inside parent %s", cidr, parent.CIDR)}
+		}
+		for id := parentID; id != "" && !out[id]; id = byID[id].ParentID {
+			out[id] = true
+		}
+	}
+	if selfID == "" {
+		return out, nil
+	}
+	for id, sub := range byID {
+		seen := map[string]bool{}
+		for p := sub.ParentID; p != "" && !seen[p]; p = byID[p].ParentID {
+			if p == selfID {
+				out[id] = true
+				break
+			}
+			seen[p] = true
+		}
+	}
+	return out, nil
 }
 
 func sortNodes(ns []*TreeNode) {

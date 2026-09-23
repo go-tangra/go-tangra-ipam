@@ -323,6 +323,70 @@ func TestIntToIPTruncate(t *testing.T) {
 	}
 }
 
+func TestWithin(t *testing.T) {
+	cases := []struct {
+		child, parent string
+		want          bool
+	}{
+		{"10.0.0.64/26", "10.0.0.0/24", true},
+		{"10.0.0.0/24", "10.0.0.0/24", false},
+		{"10.0.0.0/16", "10.0.0.0/24", false},
+		{"10.0.1.0/26", "10.0.0.0/24", false},
+		{"2001:db8::/64", "2001:db8::/48", true},
+		{"2001:db8::/64", "10.0.0.0/8", false},
+		{"bogus", "10.0.0.0/8", false},
+		{"10.0.0.0/26", "bogus", false},
+	}
+	for _, c := range cases {
+		if got := Within(c.child, c.parent); got != c.want {
+			t.Errorf("Within(%q, %q) = %v, want %v", c.child, c.parent, got, c.want)
+		}
+	}
+}
+
+func TestSubdivide(t *testing.T) {
+	got, err := Subdivide("10.0.0.0/24", 26)
+	if err != nil {
+		t.Fatalf("Subdivide: %v", err)
+	}
+	want := []string{"10.0.0.0/26", "10.0.0.64/26", "10.0.0.128/26", "10.0.0.192/26"}
+	if len(got) != len(want) {
+		t.Fatalf("blocks = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("block %d = %s, want %s", i, got[i], want[i])
+		}
+	}
+	// Host bits in the input are masked to the network first.
+	if b, err := Subdivide("192.168.5.37/24", 25); err != nil || b[0] != "192.168.5.0/25" || b[1] != "192.168.5.128/25" {
+		t.Errorf("Subdivide(host bits) = %v, %v", b, err)
+	}
+	// One step only, and IPv6 works the same way.
+	if b, _ := Subdivide("10.0.0.0/23", 24); len(b) != 2 || b[1] != "10.0.1.0/24" {
+		t.Errorf("Subdivide(/23 to /24) = %v", b)
+	}
+	if b, err := Subdivide("2001:db8::/32", 34); err != nil || len(b) != 4 || b[1] != "2001:db8:4000::/34" {
+		t.Errorf("Subdivide(v6) = %v, %v", b, err)
+	}
+	// Refusals: not longer than the parent, past the address family, beyond the
+	// cap, and an unparsable block.
+	for _, tc := range []struct {
+		cidr   string
+		prefix int
+	}{
+		{"10.0.0.0/24", 24}, {"10.0.0.0/24", 23}, {"10.0.0.0/24", 33}, {"10.0.0.0/8", 24}, {"nonsense", 26},
+	} {
+		if _, err := Subdivide(tc.cidr, tc.prefix); err == nil {
+			t.Errorf("Subdivide(%q, %d) = nil error, want refusal", tc.cidr, tc.prefix)
+		}
+	}
+	// The cap is a boundary, not an off-by-one: /22 into /32 is exactly 1024.
+	if b, err := Subdivide("10.0.0.0/22", 32); err != nil || len(b) != MaxSubdivide {
+		t.Errorf("Subdivide at cap = %d blocks, %v", len(b), err)
+	}
+}
+
 // lessIP compares two IP strings numerically (test helper for monotonicity).
 func lessIP(a, b string) bool {
 	return ipToInt(net.ParseIP(a)).Cmp(ipToInt(net.ParseIP(b))) < 0

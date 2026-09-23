@@ -83,3 +83,11 @@ preserved unique constraints; subnet overlap and gateway-in-range are validated.
 devices, VLANs, locations and groups, versioned by schema; secret references'
 values are never included. `POST /api/ipam/v1/backup/import` recreates them
 (mode `skip` or `overwrite`), preserving ids.
+
+## UI
+
+The remote under `services/ipam/ui` is built on the shared kit `@freya/ui` (FlyonUI + Zod,
+see `docs/frontend.md`): forms validate through Zod schemas in `src/schemas/`, the
+shell provides the theme and shared singletons, and `npm run lint` runs
+`check-no-legacy`. Rebuild the image after UI changes; the Dockerfile builds `ui/kit`
+first.

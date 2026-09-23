@@ -57,6 +57,80 @@ func TestCreateDerivesFields(t *testing.T) {
 	}
 }
 
+func TestSplitCreatesChildren(t *testing.T) {
+	svc, _ := newSvc(t)
+	ctx := context.Background()
+	parent, err := svc.Create(ctx, subj(), store.Subnet{Name: "core", CIDR: "10.0.0.0/24", VlanID: "v1", LocationID: "l1"}, false)
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+	// Dry run writes nothing.
+	preview, err := svc.Split(ctx, subj(), parent.ID, 26, true)
+	if err != nil {
+		t.Fatalf("split dry-run: %v", err)
+	}
+	if len(preview.Created) != 4 || len(preview.Skipped) != 0 {
+		t.Fatalf("preview = %d created, %d skipped", len(preview.Created), len(preview.Skipped))
+	}
+	if all, _ := svc.List(ctx, subj(), store.SubnetFilter{}); len(all) != 1 {
+		t.Fatalf("dry run persisted %d subnets", len(all))
+	}
+	res, err := svc.Split(ctx, subj(), parent.ID, 26, false)
+	if err != nil {
+		t.Fatalf("split: %v", err)
+	}
+	if len(res.Created) != 4 {
+		t.Fatalf("created = %d, want 4", len(res.Created))
+	}
+	for _, c := range res.Created {
+		if c.ParentID != parent.ID {
+			t.Errorf("child %s parent = %q, want %q", c.CIDR, c.ParentID, parent.ID)
+		}
+		if c.VlanID != "v1" || c.LocationID != "l1" {
+			t.Errorf("child %s did not inherit vlan/location: %q/%q", c.CIDR, c.VlanID, c.LocationID)
+		}
+		if c.PrefixLength != 26 || c.TotalAddresses != 64 {
+			t.Errorf("child %s derived fields: prefix %d, total %d", c.CIDR, c.PrefixLength, c.TotalAddresses)
+		}
+	}
+	// Splitting again skips every block that now exists instead of failing.
+	again, err := svc.Split(ctx, subj(), parent.ID, 26, false)
+	if err == nil {
+		t.Fatalf("second split created %d children, want refusal", len(again.Created))
+	}
+	if len(again.Skipped) != 4 {
+		t.Errorf("skipped = %d, want 4", len(again.Skipped))
+	}
+}
+
+func TestSplitPartialAndValidation(t *testing.T) {
+	svc, _ := newSvc(t)
+	ctx := context.Background()
+	parent, err := svc.Create(ctx, subj(), store.Subnet{Name: "core", CIDR: "10.0.0.0/24"}, false)
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+	// One half already carved out: the other three blocks are still created.
+	if _, err := svc.Create(ctx, subj(), store.Subnet{Name: "taken", CIDR: "10.0.0.0/26", ParentID: parent.ID}, true); err != nil {
+		t.Fatalf("create sibling: %v", err)
+	}
+	res, err := svc.Split(ctx, subj(), parent.ID, 26, false)
+	if err != nil {
+		t.Fatalf("split: %v", err)
+	}
+	if len(res.Created) != 3 || len(res.Skipped) != 1 || res.Skipped[0].CIDR != "10.0.0.0/26" {
+		t.Fatalf("created %d, skipped %+v", len(res.Created), res.Skipped)
+	}
+	// A prefix no longer than the parent is a validation error, and an unknown
+	// subnet is not found.
+	if _, err := svc.Split(ctx, subj(), parent.ID, 24, false); err == nil {
+		t.Errorf("split into /24 = nil error, want validation")
+	}
+	if _, err := svc.Split(ctx, subj(), "missing", 26, false); err == nil {
+		t.Errorf("split of unknown subnet = nil error")
+	}
+}
+
 func TestCreateValidation(t *testing.T) {
 	svc, _ := newSvc(t)
 	ctx := context.Background()
@@ -91,6 +165,40 @@ func TestCreateOverlapRejected(t *testing.T) {
 	// With allowOverlap the same block is accepted.
 	if _, err := svc.Create(ctx, subj(), store.Subnet{Name: "c", CIDR: "10.0.0.0/25"}, true); err != nil {
 		t.Fatalf("allow-overlap: %v", err)
+	}
+}
+
+func TestCreateNestedChild(t *testing.T) {
+	svc, _ := newSvc(t)
+	ctx := context.Background()
+	root, err := svc.Create(ctx, subj(), store.Subnet{Name: "root", CIDR: "10.0.0.0/16"}, false)
+	if err != nil {
+		t.Fatalf("root: %v", err)
+	}
+	mid, err := svc.Create(ctx, subj(), store.Subnet{Name: "mid", CIDR: "10.0.1.0/24", ParentID: root.ID}, false)
+	if err != nil {
+		t.Fatalf("child inside parent must be accepted: %v", err)
+	}
+	// A grandchild overlaps both ancestors, which is allowed.
+	if _, err := svc.Create(ctx, subj(), store.Subnet{Name: "leaf", CIDR: "10.0.1.0/26", ParentID: mid.ID}, false); err != nil {
+		t.Fatalf("grandchild: %v", err)
+	}
+	var ve ValidationError
+	// A sibling colliding with an existing child is still rejected.
+	if _, err := svc.Create(ctx, subj(), store.Subnet{Name: "dup", CIDR: "10.0.1.128/25", ParentID: root.ID}, false); !errors.As(err, &ve) {
+		t.Errorf("sibling overlap: want ValidationError, got %v", err)
+	}
+	// A block outside its declared parent is rejected.
+	if _, err := svc.Create(ctx, subj(), store.Subnet{Name: "out", CIDR: "10.1.0.0/24", ParentID: mid.ID}, false); !errors.As(err, &ve) {
+		t.Errorf("outside parent: want ValidationError, got %v", err)
+	}
+	// An unknown parent is rejected.
+	if _, err := svc.Create(ctx, subj(), store.Subnet{Name: "orphan", CIDR: "10.0.9.0/24", ParentID: "nope"}, false); !errors.As(err, &ve) {
+		t.Errorf("unknown parent: want ValidationError, got %v", err)
+	}
+	// Moving a child under a new parent re-checks containment on update.
+	if _, err := svc.Update(ctx, subj(), store.Subnet{ID: mid.ID, Name: "mid", CIDR: "10.0.1.0/24", ParentID: root.ID}, false); err != nil {
+		t.Errorf("update in place: %v", err)
 	}
 }
 

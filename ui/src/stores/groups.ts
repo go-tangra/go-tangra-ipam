@@ -61,8 +61,8 @@ export const useGroups = defineStore('ipam-ip-groups', () => {
 
   // checkIp returns the groups whose membership contains an address.
   async function checkIp(ip: string): Promise<GroupMatch[]> {
-    const res = await api<{ items: GroupMatch[] }>('GET', 'ip-groups/check', undefined, { query: { ip } })
-    return res.items ?? []
+    const res = await api<{ matching_groups: IPGroup[] | null }>('GET', 'ip-groups/check', undefined, { query: { ip } })
+    return (res.matching_groups ?? []).map((g) => ({ group_id: g.id, name: g.name }))
   }
 
   return { items, loading, error, list, get, create, update, remove, members, addMember, updateMember, removeMember, checkIp }

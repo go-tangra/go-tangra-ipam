@@ -69,6 +69,30 @@ func (s *Server) Register(d Deps) {
 		}
 		WriteJSON(w, http.StatusCreated, v)
 	})
+	// Split a subnet into the /prefix_length children it contains (they inherit
+	// its VLAN and location); blocks colliding with an existing subnet come back
+	// as skipped. dry_run previews the result without writing anything.
+	s.MustHandle("POST", p+"/subnets/{id}/split", func(w http.ResponseWriter, r *http.Request) {
+		subj, err := subjects(r)
+		if err != nil {
+			failSvc(w, err)
+			return
+		}
+		var in struct {
+			PrefixLength int  `json:"prefix_length"`
+			DryRun       bool `json:"dry_run"`
+		}
+		if err := DecodeJSON(r, &in, 0); err != nil {
+			Fail(w, r, nil, err)
+			return
+		}
+		v, err := d.Subnets.Split(r.Context(), subj, r.PathValue("id"), in.PrefixLength, in.DryRun)
+		if err != nil {
+			failSvc(w, err)
+			return
+		}
+		WriteJSON(w, http.StatusOK, v)
+	})
 	s.MustHandle("GET", p+"/subnets/tree", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
 		if err != nil {
@@ -1042,6 +1066,26 @@ func (s *Server) registerGroups(d Deps, p string) {
 			return
 		}
 		WriteJSON(w, http.StatusCreated, v)
+	})
+	s.MustHandle("PUT", p+"/host-groups/{id}/members/{mid}", func(w http.ResponseWriter, r *http.Request) {
+		subj, err := subjects(r)
+		if err != nil {
+			failSvc(w, err)
+			return
+		}
+		var in store.HostGroupMember
+		if err := DecodeJSON(r, &in, 0); err != nil {
+			Fail(w, r, nil, err)
+			return
+		}
+		in.ID = r.PathValue("mid")
+		in.HostGroupID = r.PathValue("id")
+		v, err := d.Groups.UpdateHostGroupMember(r.Context(), subj, in)
+		if err != nil {
+			failSvc(w, err)
+			return
+		}
+		WriteJSON(w, http.StatusOK, v)
 	})
 	s.MustHandle("DELETE", p+"/host-groups/{id}/members/{mid}", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)

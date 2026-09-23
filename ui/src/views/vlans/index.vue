@@ -1,59 +1,41 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted } from 'vue'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiDataTable, UiStatusChip, type Column, type SelectOption } from '@freya/ui'
+import { useZodForm } from '@freya/ui/forms'
 import { useVlans } from '@/stores/vlans'
-import type { VlanFilter } from '@/stores/vlans'
+import { vlanFilterSchema, VLAN_STATUSES } from '@/schemas'
+import type { Vlan } from '@/api/types'
 
 const store = useVlans()
-
-const domain = ref('')
-const status = ref<string | null>(null)
-const STATUSES = ['active', 'reserved', 'deprecated']
-const statusColor: Record<string, string> = { active: 'success', reserved: 'info', deprecated: 'warning' }
-
+const statusOptions: SelectOption[] = VLAN_STATUSES.map((s) => ({ title: s, value: s }))
 onMounted(() => void store.list())
-
-function reload(): void {
-  const filter: VlanFilter = {
-    domain: domain.value.trim() || undefined,
-    status: status.value ?? undefined,
-  }
-  void store.list(filter)
-}
+const filter = useZodForm(vlanFilterSchema, { initial: { domain: '' }, onSubmit: (f) => store.list({ domain: f.domain || undefined, status: f.status }) })
+const reload = () => void filter.submit()
+const columns: Column<Vlan>[] = [
+  { key: 'vlan_id', label: 'VLAN ID', width: 'sm', sortable: true },
+  { key: 'name', label: 'Name', sortable: true },
+  { key: 'domain', label: 'Domain', hideOnStack: true },
+  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'subnet_count', label: 'Subnets', align: 'end', format: (v) => String(v.subnet_count ?? 0) },
+]
 </script>
 
 <template>
-  <div>
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">VLANs</h1>
-      <v-spacer />
-      <v-btn variant="text" icon="mdi-refresh" @click="reload" />
-    </div>
-
-    <v-card variant="tonal" class="mb-4">
-      <v-card-text>
-        <v-row dense>
-          <v-col cols="12" sm="6"><v-text-field v-model="domain" label="Domain" density="compact" clearable hide-details @keyup.enter="reload" @click:clear="reload" /></v-col>
-          <v-col cols="12" sm="6"><v-select v-model="status" :items="STATUSES" label="Status" density="compact" clearable hide-details @update:model-value="reload" /></v-col>
-        </v-row>
-      </v-card-text>
-    </v-card>
-
-    <v-alert v-if="store.error" type="error" variant="tonal" density="compact" class="mb-3">{{ store.error }}</v-alert>
-
-    <v-table data-test="vlans-table">
-      <thead>
-        <tr><th>VLAN ID</th><th>Name</th><th>Domain</th><th>Status</th><th>Subnets</th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="v in store.items" :key="v.id" :data-test="'vlan-row-' + v.id">
-          <td>{{ v.vlan_id }}</td>
-          <td>{{ v.name }}</td>
-          <td class="text-medium-emphasis">{{ v.domain || '—' }}</td>
-          <td><v-chip size="x-small" :color="statusColor[v.status]" variant="flat">{{ v.status }}</v-chip></td>
-          <td class="text-medium-emphasis">{{ v.subnet_count ?? 0 }}</td>
-        </tr>
-        <tr v-if="!store.items.length && !store.loading"><td colspan="5" class="text-medium-emphasis">No VLANs match.</td></tr>
-      </tbody>
-    </v-table>
-  </div>
+  <UiPage title="VLANs">
+    <template #actions><UiButton variant="text" icon="mdi-refresh" icon-only label="Refresh" @click="reload" /></template>
+    <template #filters>
+      <UiForm :form="filter" class="w-full">
+        <div class="grid grid-cols-1 gap-2 md:grid-cols-12 md:items-end">
+          <div class="md:col-span-6"><UiInput v-bind="filter.field('domain')" label="Domain" size="sm" @enter="reload" /></div>
+          <div class="md:col-span-6"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
+        </div>
+      </UiForm>
+    </template>
+    <UiAlert v-if="store.error" kind="error" class="mb-3">{{ store.error }}</UiAlert>
+    <UiCard :padded="false">
+      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="VLANs" empty-title="No VLANs match" :row-attrs="(v) => ({ 'data-test': 'vlan-row-' + v.id })" data-test="vlans-table">
+        <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', deprecated: 'warning' }" /></template>
+      </UiDataTable>
+    </UiCard>
+  </UiPage>
 </template>

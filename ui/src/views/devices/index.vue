@@ -1,80 +1,60 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiDataTable, UiStatusChip, UiBadge, UiRecordDrawer, type Column, type SelectOption } from '@freya/ui'
+import { useZodForm } from '@freya/ui/forms'
 import { useDevices } from '@/stores/devices'
-import type { DeviceFilter } from '@/stores/devices'
+import { deviceFilterSchema, deviceSchema, DEVICE_TYPES, DEVICE_STATUSES } from '@/schemas'
+import type { Device } from '@/api/types'
+import { statusColors } from './colors'
+import { useDeviceFields } from './fields'
 
 const router = useRouter()
 const store = useDevices()
-
-const q = ref('')
-const deviceType = ref<string | null>(null)
-const status = ref<string | null>(null)
-
-const TYPES = ['server', 'vm', 'router', 'switch', 'firewall', 'load_balancer', 'access_point', 'storage', 'printer', 'phone', 'workstation', 'container', 'other']
-const STATUSES = ['active', 'planned', 'staged', 'decommissioned', 'offline', 'failed', 'available']
-const statusColor: Record<string, string> = { active: 'success', planned: 'info', staged: 'teal', decommissioned: 'grey', offline: 'grey', failed: 'error', available: 'blue-grey' }
-
+const typeOptions: SelectOption[] = DEVICE_TYPES.map((s) => ({ title: s, value: s }))
+const statusOptions: SelectOption[] = DEVICE_STATUSES.map((s) => ({ title: s, value: s }))
 onMounted(() => void store.list())
-
-function reload(): void {
-  const filter: DeviceFilter = {
-    q: q.value.trim() || undefined,
-    device_type: deviceType.value ?? undefined,
-    status: status.value ?? undefined,
-  }
-  void store.list(filter)
-}
-
-function open(id: string): void {
-  void router.push({ name: 'ipam-device', params: { id } })
-}
+const filter = useZodForm(deviceFilterSchema, { initial: { q: '' }, onSubmit: (f) => store.list({ query: f.q || undefined, device_type: f.device_type, status: f.status }) })
+const reload = () => void filter.submit()
+const creating = ref(false)
+const fields = useDeviceFields()
+const createDevice = (v: Record<string, unknown>) => store.create(v)
+const columns: Column<Device>[] = [
+  { key: 'name', label: 'Name', sortable: true },
+  { key: 'device_type', label: 'Type', width: 'sm' },
+  { key: 'model', label: 'Model', format: (d) => [d.manufacturer, d.model].filter(Boolean).join(' '), hideOnStack: true },
+  { key: 'management_ip', label: 'Management IP', format: (d) => d.management_ip || d.primary_ip || '' },
+  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'updates', label: 'Updates', width: 'sm', format: (d) => [d.security_update_count ? d.security_update_count + ' sec' : '', d.package_update_count ? d.package_update_count + ' pkg' : ''].filter(Boolean).join(' ') },
+  { key: 'interface_count', label: 'NICs', align: 'end', format: (d) => String(d.interface_count ?? 0), hideOnStack: true },
+]
 </script>
 
 <template>
-  <div>
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Devices</h1>
-      <v-spacer />
-      <v-btn variant="text" icon="mdi-refresh" @click="reload" />
-    </div>
-
-    <v-card variant="tonal" class="mb-4">
-      <v-card-text>
-        <v-row dense>
-          <v-col cols="12" sm="6"><v-text-field v-model="q" label="Search (name)" density="compact" clearable hide-details @keyup.enter="reload" @click:clear="reload" /></v-col>
-          <v-col cols="6" sm="3"><v-select v-model="deviceType" :items="TYPES" label="Type" density="compact" clearable hide-details @update:model-value="reload" /></v-col>
-          <v-col cols="6" sm="3"><v-select v-model="status" :items="STATUSES" label="Status" density="compact" clearable hide-details @update:model-value="reload" /></v-col>
-        </v-row>
-      </v-card-text>
-    </v-card>
-
-    <v-alert v-if="store.error" type="error" variant="tonal" density="compact" class="mb-3">{{ store.error }}</v-alert>
-
-    <v-table data-test="devices-table">
-      <thead>
-        <tr><th>Name</th><th>Type</th><th>Model</th><th>Management IP</th><th>Status</th><th>Updates</th><th>NICs</th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="d in store.items" :key="d.id" class="cursor-pointer" :data-test="'device-row-' + d.id" @click="open(d.id)">
-          <td>{{ d.name }}</td>
-          <td class="text-medium-emphasis">{{ d.device_type }}</td>
-          <td class="text-medium-emphasis">{{ d.manufacturer }} {{ d.model }}</td>
-          <td class="text-medium-emphasis">{{ d.management_ip || d.primary_ip || '—' }}</td>
-          <td><v-chip size="x-small" :color="statusColor[d.status]" variant="flat">{{ d.status }}</v-chip></td>
-          <td>
-            <v-chip v-if="(d.security_update_count ?? 0) > 0" size="x-small" color="error" variant="tonal" class="me-1">{{ d.security_update_count }} sec</v-chip>
-            <v-chip v-if="(d.package_update_count ?? 0) > 0" size="x-small" color="warning" variant="tonal">{{ d.package_update_count }} pkg</v-chip>
-            <span v-if="!(d.package_update_count ?? 0) && !(d.security_update_count ?? 0)" class="text-medium-emphasis">—</span>
-          </td>
-          <td class="text-medium-emphasis">{{ d.interface_count ?? 0 }}</td>
-        </tr>
-        <tr v-if="!store.items.length && !store.loading"><td colspan="7" class="text-medium-emphasis">No devices match.</td></tr>
-      </tbody>
-    </v-table>
-  </div>
+  <UiPage title="Devices">
+    <template #actions>
+      <UiButton icon="mdi-plus" data-test="device-new" @click="creating = true">New device</UiButton>
+      <UiButton variant="text" icon="mdi-refresh" icon-only label="Refresh" @click="reload" />
+    </template>
+    <template #filters>
+      <UiForm :form="filter" class="w-full">
+        <div class="grid grid-cols-2 gap-2 md:grid-cols-12 md:items-end">
+          <div class="col-span-2 md:col-span-6"><UiInput v-bind="filter.field('q')" label="Search (name)" type="search" size="sm" @enter="reload" /></div>
+          <div class="md:col-span-3"><UiSelect v-bind="filter.field('device_type')" label="Type" :options="typeOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="md:col-span-3"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
+        </div>
+      </UiForm>
+    </template>
+    <UiAlert v-if="store.error" kind="error" class="mb-3">{{ store.error }}</UiAlert>
+    <UiCard :padded="false">
+      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="Devices" empty-title="No devices match" clickable :row-attrs="(d) => ({ 'data-test': 'device-row-' + d.id })" data-test="devices-table" @row-click="router.push({ name: 'ipam-device', params: { id: $event.id } })">
+        <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="statusColors" /></template>
+        <template #cell-updates="{ row }">
+          <UiBadge v-if="(row.security_update_count ?? 0) > 0" color="error" size="xs">{{ row.security_update_count }} sec</UiBadge>
+          <UiBadge v-if="(row.package_update_count ?? 0) > 0" color="warning" size="xs">{{ row.package_update_count }} pkg</UiBadge>
+        </template>
+      </UiDataTable>
+    </UiCard>
+    <UiRecordDrawer v-model="creating" close-on-save title="New device" :schema="deviceSchema" :fields="fields" :initial="{ device_type: 'server', status: 'active', device_height_u: 1 }" :submit="createDevice" size="lg" @saved="router.push({ name: 'ipam-device', params: { id: ($event as Device).id } })" />
+  </UiPage>
 </template>
-
-<style scoped>
-.cursor-pointer { cursor: pointer; }
-</style>

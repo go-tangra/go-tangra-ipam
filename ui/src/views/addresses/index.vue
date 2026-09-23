@@ -1,27 +1,23 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiNumberInput, UiButton, UiDataTable, UiStatusChip, UiBadge, UiLiveIndicator, UiDrawer, useConfirm, type Column, type SelectOption } from '@freya/ui'
+import { useZodForm } from '@freya/ui/forms'
 import { useAddresses } from '@/stores/addresses'
 import { useSubnets } from '@/stores/subnets'
 import { useLive } from '@/stores/live'
-import type { AddressFilter } from '@/stores/addresses'
+import { addressFilterSchema, allocateSchema, bulkAllocateSchema, suggestSchema, ADDRESS_STATUSES, ADDRESS_TYPES } from '@/schemas'
 import type { IPAddress, PingResult } from '@/api/types'
 import { describe } from '@/api/client'
 
 const store = useAddresses()
 const subnets = useSubnets()
 const live = useLive()
-
-const subnetId = ref<string | null>(null)
-const status = ref<string | null>(null)
-const addressType = ref<string | null>(null)
-const hostname = ref('')
-
-const STATUSES = ['active', 'reserved', 'dhcp', 'deprecated', 'offline']
-const TYPES = ['host', 'gateway', 'broadcast', 'network', 'virtual', 'anycast']
-const statusColor: Record<string, string> = { active: 'success', reserved: 'info', dhcp: 'teal', deprecated: 'warning', offline: 'grey' }
+const confirm = useConfirm()
+const statusOptions: SelectOption[] = ADDRESS_STATUSES.map((s) => ({ title: s, value: s }))
+const typeOptions: SelectOption[] = ADDRESS_TYPES.map((s) => ({ title: s, value: s }))
+const subnetOptions = computed<SelectOption[]>(() => subnets.items.map((s) => ({ title: s.name + ' (' + s.cidr + ')', value: s.id })))
 
 let release: (() => void) | null = null
-
 onMounted(() => {
   void store.list()
   void subnets.list()
@@ -29,74 +25,53 @@ onMounted(() => {
 })
 onUnmounted(() => release?.())
 
-const subnetItems = () => subnets.items.map((s) => ({ title: s.name + ' (' + s.cidr + ')', value: s.id }))
+const filter = useZodForm(addressFilterSchema, {
+  initial: { hostname: '' },
+  onSubmit: (f) => store.list({ subnet_id: f.subnet_id || undefined, status: f.status, address_type: f.address_type, hostname: f.hostname || undefined }),
+})
+const reload = () => void filter.submit()
 
-function reload(): void {
-  const filter: AddressFilter = {
-    subnet_id: subnetId.value ?? undefined,
-    status: status.value ?? undefined,
-    address_type: addressType.value ?? undefined,
-    hostname: hostname.value.trim() || undefined,
-  }
-  void store.list(filter)
-}
-
-const actionError = ref('')
-
-// --- allocate dialog ---
-const allocOpen = ref(false)
-const allocMode = ref<'single' | 'bulk' | 'suggest'>('single')
-const allocSubnet = ref<string | null>(null)
-const allocHostname = ref('')
-const allocCount = ref(1)
-const allocPrefix = ref('')
+// --- allocate / bulk / suggest dialogs: one schema each ---
+type Mode = 'single' | 'bulk' | 'suggest'
+const mode = ref<Mode | null>(null)
 const suggested = ref<string[]>([])
-const busy = ref(false)
-
-function openAlloc(mode: 'single' | 'bulk' | 'suggest'): void {
-  allocMode.value = mode
-  allocSubnet.value = subnetId.value ?? (subnets.items[0]?.id ?? null)
-  allocHostname.value = ''
-  allocCount.value = 1
-  allocPrefix.value = ''
+const actionError = ref('')
+const single = useZodForm(allocateSchema, { onSubmit: (v) => store.allocate({ subnet_id: v.subnet_id, hostname: v.hostname }), onSuccess: () => (mode.value = null) })
+const bulk = useZodForm(bulkAllocateSchema, { onSubmit: (v) => store.bulkAllocate({ subnet_id: v.subnet_id, count: v.count, hostname_prefix: v.hostname_prefix }), onSuccess: () => (mode.value = null) })
+const suggest = useZodForm(suggestSchema, { onSubmit: async (v) => { suggested.value = await store.suggest(v.subnet_id, v.count) } })
+const forms = { single, bulk, suggest }
+const current = computed(() => (mode.value ? forms[mode.value] : null))
+function open(m: Mode): void {
+  const subnet_id = (filter.values.subnet_id as string | undefined) || subnets.items[0]?.id || ''
+  single.reset({ subnet_id, hostname: '' })
+  bulk.reset({ subnet_id, count: 1, hostname_prefix: '' })
+  suggest.reset({ subnet_id, count: 5 })
   suggested.value = []
-  actionError.value = ''
-  allocOpen.value = true
+  mode.value = m
 }
-
-async function runAlloc(): Promise<void> {
-  if (!allocSubnet.value) return
-  busy.value = true
-  actionError.value = ''
-  try {
-    if (allocMode.value === 'single') {
-      await store.allocate({ subnet_id: allocSubnet.value, hostname: allocHostname.value.trim() || undefined })
-      allocOpen.value = false
-    } else if (allocMode.value === 'bulk') {
-      await store.bulkAllocate({ subnet_id: allocSubnet.value, count: allocCount.value, hostname_prefix: allocPrefix.value.trim() || undefined })
-      allocOpen.value = false
-    } else {
-      suggested.value = await store.suggest(allocSubnet.value, allocCount.value)
-    }
-  } catch (e) {
-    actionError.value = describe(e)
-  } finally {
-    busy.value = false
-  }
-}
+const titles: Record<Mode, string> = { single: 'Allocate next-free', bulk: 'Bulk allocate', suggest: 'Suggest free addresses' }
 
 // --- ping ---
 const pingResult = ref<Record<string, PingResult>>({})
+const pinging = ref<Record<string, boolean>>({})
 async function ping(a: IPAddress): Promise<void> {
   actionError.value = ''
+  pinging.value = { ...pinging.value, [a.id]: true }
   try {
     pingResult.value = { ...pingResult.value, [a.id]: await store.ping(a.id) }
   } catch (e) {
-    actionError.value = describe(e)
+    actionError.value = `Ping ${a.address}: ${describe(e)}`
+  } finally {
+    pinging.value = { ...pinging.value, [a.id]: false }
   }
 }
-
+// The button itself reports the last result, so feedback lands where the click was.
+function pingLabel(id: string): string {
+  const p = pingResult.value[id]
+  return !p ? 'Ping' : p.available === false ? 'Unavailable' : p.alive ? `${p.rtt_ms ?? 0} ms` : 'No reply'
+}
 async function removeAddr(a: IPAddress): Promise<void> {
+  if (!(await confirm.ask({ title: `Release ${a.address}?`, danger: true, confirmLabel: 'Release' }))) return
   actionError.value = ''
   try {
     await store.remove(a.id)
@@ -104,87 +79,67 @@ async function removeAddr(a: IPAddress): Promise<void> {
     actionError.value = describe(e)
   }
 }
+const columns: Column<IPAddress>[] = [
+  { key: 'address', label: 'Address', sortable: true },
+  { key: 'hostname', label: 'Hostname' },
+  { key: 'mac_address', label: 'MAC', hideOnStack: true },
+  { key: 'address_type', label: 'Type', hideOnStack: true },
+  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'ping', label: 'Ping', width: 'sm', format: (a) => { const p = pingResult.value[a.id]; return p ? (p.alive ? (p.rtt_ms ?? 0) + ' ms' : 'down') : '' } },
+]
 </script>
 
 <template>
-  <div>
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">IP Addresses</h1>
-      <v-chip v-if="live.connected" size="x-small" color="success" variant="tonal" class="ms-3">live</v-chip>
-      <v-spacer />
-      <v-btn size="small" variant="tonal" prepend-icon="mdi-plus" class="me-2" @click="openAlloc('single')">Allocate</v-btn>
-      <v-btn size="small" variant="tonal" prepend-icon="mdi-plus-box-multiple" class="me-2" @click="openAlloc('bulk')">Bulk</v-btn>
-      <v-btn size="small" variant="tonal" prepend-icon="mdi-lightbulb-on-outline" @click="openAlloc('suggest')">Suggest</v-btn>
-    </div>
+  <UiPage title="IP Addresses">
+    <template #badges><UiLiveIndicator :connected="live.connected" /></template>
+    <template #actions>
+      <UiButton size="sm" variant="soft" icon="mdi-plus" @click="open('single')">Allocate</UiButton>
+      <UiButton size="sm" variant="soft" icon="mdi-plus-box-multiple" @click="open('bulk')">Bulk</UiButton>
+      <UiButton size="sm" variant="soft" icon="mdi-lightbulb-on-outline" @click="open('suggest')">Suggest</UiButton>
+    </template>
+    <template #filters>
+      <UiForm :form="filter" class="w-full">
+        <div class="grid grid-cols-2 gap-2 md:grid-cols-12 md:items-end">
+          <div class="col-span-2 md:col-span-4"><UiSelect v-bind="filter.field('subnet_id')" label="Subnet" :options="subnetOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="md:col-span-3"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="md:col-span-3"><UiSelect v-bind="filter.field('address_type')" label="Type" :options="typeOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="col-span-2 md:col-span-2"><UiInput v-bind="filter.field('hostname')" label="Hostname" size="sm" @enter="reload" /></div>
+        </div>
+      </UiForm>
+    </template>
+    <UiAlert v-if="store.error" kind="error" class="mb-3">{{ store.error }}</UiAlert>
+    <UiAlert v-if="actionError" kind="error" class="mb-3">{{ actionError }}</UiAlert>
+    <UiCard :padded="false">
+      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="IP addresses" empty-title="No addresses match" :row-attrs="(a) => ({ 'data-test': 'address-row-' + a.id })" data-test="addresses-table">
+        <template #cell-address="{ row }">{{ row.address }} <UiBadge v-if="row.is_primary" color="primary" size="xs">primary</UiBadge></template>
+        <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', dhcp: 'accent', deprecated: 'warning', offline: 'neutral' }" /></template>
+        <template #cell-ping="{ row }"><UiStatusChip v-if="pingResult[row.id]" :status="pingResult[row.id]!.alive ? 'alive' : 'down'" :label="pingResult[row.id]!.alive ? (pingResult[row.id]!.rtt_ms ?? 0) + ' ms' : 'down'" :colors="{ alive: 'success', down: 'neutral' }" /><span v-else class="text-base-content/70">—</span></template>
+        <template #actions="{ row }">
+          <UiButton size="xs" variant="text" :color="pingResult[row.id] ? (pingResult[row.id]!.alive ? 'success' : 'error') : 'primary'" icon="mdi-lan-pending" :loading="pinging[row.id] ?? false" :data-test="'address-ping-' + row.id" @click="ping(row)">{{ pingLabel(row.id) }}</UiButton>
+          <UiButton size="xs" variant="text" color="error" icon="mdi-delete-outline" icon-only label="Release" @click="removeAddr(row)" />
+        </template>
+      </UiDataTable>
+    </UiCard>
 
-    <v-card variant="tonal" class="mb-4">
-      <v-card-text>
-        <v-row dense>
-          <v-col cols="12" sm="4"><v-select v-model="subnetId" :items="subnetItems()" label="Subnet" density="compact" clearable hide-details @update:model-value="reload" /></v-col>
-          <v-col cols="6" sm="3"><v-select v-model="status" :items="STATUSES" label="Status" density="compact" clearable hide-details @update:model-value="reload" /></v-col>
-          <v-col cols="6" sm="3"><v-select v-model="addressType" :items="TYPES" label="Type" density="compact" clearable hide-details @update:model-value="reload" /></v-col>
-          <v-col cols="12" sm="2"><v-text-field v-model="hostname" label="Hostname" density="compact" clearable hide-details @keyup.enter="reload" @click:clear="reload" /></v-col>
-        </v-row>
-      </v-card-text>
-    </v-card>
-
-    <v-alert v-if="store.error" type="error" variant="tonal" density="compact" class="mb-3">{{ store.error }}</v-alert>
-    <v-alert v-if="actionError" type="error" variant="tonal" density="compact" class="mb-3">{{ actionError }}</v-alert>
-
-    <v-table data-test="addresses-table">
-      <thead>
-        <tr><th>Address</th><th>Hostname</th><th>MAC</th><th>Type</th><th>Status</th><th>Ping</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="a in store.items" :key="a.id" :data-test="'address-row-' + a.id">
-          <td>{{ a.address }}<v-chip v-if="a.is_primary" size="x-small" color="primary" variant="tonal" class="ms-2">primary</v-chip></td>
-          <td class="text-medium-emphasis">{{ a.hostname || '—' }}</td>
-          <td class="text-medium-emphasis">{{ a.mac_address || '—' }}</td>
-          <td class="text-medium-emphasis">{{ a.address_type }}</td>
-          <td><v-chip size="x-small" :color="statusColor[a.status]" variant="flat">{{ a.status }}</v-chip></td>
-          <td>
-            <v-chip v-if="pingResult[a.id]" size="x-small" :color="pingResult[a.id]!.alive ? 'success' : 'grey'" variant="tonal">
-              {{ pingResult[a.id]!.alive ? (pingResult[a.id]!.rtt_ms ?? 0) + ' ms' : 'down' }}
-            </v-chip>
-            <span v-else class="text-medium-emphasis">—</span>
-          </td>
-          <td>
-            <v-btn size="x-small" variant="text" prepend-icon="mdi-lan-pending" @click="ping(a)">Ping</v-btn>
-            <v-btn size="x-small" variant="text" color="error" icon="mdi-delete-outline" @click="removeAddr(a)" />
-          </td>
-        </tr>
-        <tr v-if="!store.items.length && !store.loading"><td colspan="7" class="text-medium-emphasis">No addresses match.</td></tr>
-      </tbody>
-    </v-table>
-
-    <v-dialog v-model="allocOpen" max-width="480">
-      <v-card>
-        <v-card-title class="text-subtitle-1">
-          {{ allocMode === 'single' ? 'Allocate next-free' : allocMode === 'bulk' ? 'Bulk allocate' : 'Suggest free addresses' }}
-        </v-card-title>
-        <v-card-text>
-          <v-select v-model="allocSubnet" :items="subnetItems()" label="Subnet" density="compact" class="mb-3" hide-details />
-          <v-text-field v-if="allocMode === 'single'" v-model="allocHostname" label="Hostname (optional)" density="compact" hide-details />
-          <template v-if="allocMode === 'bulk'">
-            <v-text-field v-model.number="allocCount" type="number" label="Count" density="compact" class="mb-3" hide-details />
-            <v-text-field v-model="allocPrefix" label="Hostname prefix (optional)" density="compact" hide-details />
+    <UiDrawer :model-value="mode !== null" :title="mode ? titles[mode] : ''" size="md" @update:model-value="mode = null">
+      <UiForm v-if="current && mode" :form="current">
+        <div class="flex flex-col gap-3">
+          <UiSelect v-bind="current.field('subnet_id')" label="Subnet" :options="subnetOptions" :clearable="false" required />
+          <UiInput v-if="mode === 'single'" v-bind="single.field('hostname')" label="Hostname (optional)" />
+          <template v-if="mode === 'bulk'">
+            <UiNumberInput v-bind="bulk.field('count')" label="Count" :min="1" :max="1024" required />
+            <UiInput v-bind="bulk.field('hostname_prefix')" label="Hostname prefix (optional)" />
           </template>
-          <template v-if="allocMode === 'suggest'">
-            <v-text-field v-model.number="allocCount" type="number" label="Count" density="compact" hide-details />
-            <div v-if="suggested.length" class="mt-3">
-              <v-chip v-for="ip in suggested" :key="ip" size="small" variant="tonal" class="me-2 mb-2">{{ ip }}</v-chip>
-            </div>
+          <template v-if="mode === 'suggest'">
+            <UiNumberInput v-bind="suggest.field('count')" label="Count" :min="1" :max="1024" required />
+            <div v-if="suggested.length" class="flex flex-wrap gap-1"><UiBadge v-for="ip in suggested" :key="ip" size="md">{{ ip }}</UiBadge></div>
           </template>
-          <v-alert v-if="actionError" type="error" variant="tonal" density="compact" class="mt-3">{{ actionError }}</v-alert>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="allocOpen = false">Close</v-btn>
-          <v-btn color="primary" variant="tonal" :loading="busy" @click="runAlloc">
-            {{ allocMode === 'suggest' ? 'Suggest' : 'Allocate' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  </div>
+        </div>
+      </UiForm>
+      <template #actions>
+        <UiButton variant="text" @click="mode = null">Close</UiButton>
+        <UiButton :loading="current?.submitting.value ?? false" @click="current?.submit()">{{ mode === 'suggest' ? 'Suggest' : 'Allocate' }}</UiButton>
+      </template>
+    </UiDrawer>
+  </UiPage>
 </template>

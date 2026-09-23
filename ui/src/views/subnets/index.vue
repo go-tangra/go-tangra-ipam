@@ -1,38 +1,35 @@
 <script setup lang="ts">
+// Subnet list + tree. Everything done *to* a subnet lives in the right-hand
+// drawer (view → scan / split / add child / edit / delete), as in go-tangra.
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiBadge, UiDataTable, UiStatusChip, UiTree, type Column, type SelectOption, type TreeNode } from '@freya/ui'
+import { useZodForm } from '@freya/ui/forms'
 import { useSubnets } from '@/stores/subnets'
-import type { SubnetFilter } from '@/stores/subnets'
-import type { ScanResult, Subnet, SubnetTreeNode } from '@/api/types'
-import { describe } from '@/api/client'
+import { useVlans } from '@/stores/vlans'
+import { useLocations } from '@/stores/locations'
+import { subnetFilterSchema, SUBNET_STATUSES } from '@/schemas'
+import type { Subnet, SubnetTreeNode } from '@/api/types'
+import SubnetDrawer, { type SubnetDrawerMode } from './drawer.vue'
 
-const router = useRouter()
 const store = useSubnets()
-
-const q = ref('')
-const status = ref<string | null>(null)
-const ipVersion = ref<string | null>(null)
-
-const STATUSES = ['active', 'reserved', 'deprecated', 'deleted']
-const VERSIONS = [
-  { title: 'IPv4', value: '4' },
-  { title: 'IPv6', value: '6' },
-]
-
-const statusColor: Record<string, string> = { active: 'success', reserved: 'info', deprecated: 'warning', deleted: 'grey' }
+const vlans = useVlans()
+const locations = useLocations()
+const statusOptions: SelectOption[] = SUBNET_STATUSES.map((s) => ({ title: s, value: s }))
+const versionOptions: SelectOption[] = [{ title: 'IPv4', value: '4' }, { title: 'IPv6', value: '6' }]
 
 onMounted(() => {
   void store.list()
   void store.loadTree()
+  void vlans.list()
+  void locations.list()
 })
-
-function reload(): void {
-  const filter: SubnetFilter = {
-    q: q.value.trim() || undefined,
-    status: status.value ?? undefined,
-    ip_version: ipVersion.value ? Number(ipVersion.value) : undefined,
-  }
-  void store.list(filter)
+const filter = useZodForm(subnetFilterSchema, {
+  initial: { q: '' },
+  onSubmit: (f) => store.list({ query: f.q || undefined, status: f.status, ip_version: f.ip_version ? Number(f.ip_version) : undefined }),
+})
+const reload = () => void filter.submit()
+async function refreshAll(): Promise<void> {
+  await Promise.all([filter.submit(), store.loadTree()])
 }
 
 function utilPct(s: Subnet): number {
@@ -40,128 +37,66 @@ function utilPct(s: Subnet): number {
   const total = s.total_addresses ?? 0
   return total > 0 ? Math.round(((s.used_addresses ?? 0) / total) * 100) : 0
 }
+const utilClass = (pct: number) => (pct >= 90 ? 'progress-error' : pct >= 75 ? 'progress-warning' : 'progress-success')
+const parentCidr = (id?: string) => store.items.find((s) => s.id === id)?.cidr ?? ''
 
-function utilColor(pct: number): string {
-  return pct >= 90 ? 'error' : pct >= 75 ? 'warning' : 'success'
-}
+const toNode = (n: SubnetTreeNode): TreeNode => ({ id: n.id, label: n.cidr, icon: 'mdi-ip-network-outline', badge: n.name, children: (n.children ?? []).map(toNode) })
+const tree = computed<TreeNode[]>(() => store.tree.map(toNode))
 
-function filterByTree(node: SubnetTreeNode): void {
-  q.value = node.cidr
-  reload()
-}
+// --- drawer state ---
+const drawer = ref<{ id: string | null; mode: SubnetDrawerMode; parentId?: string | undefined }>({ id: null, mode: 'view' })
+const selectedTree = computed({ get: () => drawer.value.id ?? '', set: () => {} })
+const openSubnet = (id: string) => (drawer.value = { id, mode: 'view' })
+const navigate = (id: string, mode: SubnetDrawerMode, parentId?: string) => (drawer.value = { id: id || null, mode, parentId })
+const closeDrawer = () => (drawer.value = { id: null, mode: 'view' })
 
-// Flatten the tree for an indented navigator.
-interface FlatNode { subnet: SubnetTreeNode; depth: number }
-const flatTree = computed<FlatNode[]>(() => {
-  const out: FlatNode[] = []
-  const walk = (nodes: SubnetTreeNode[], depth: number): void => {
-    for (const n of nodes) {
-      out.push({ subnet: n, depth })
-      if (n.children?.length) walk(n.children, depth + 1)
-    }
-  }
-  walk(store.tree, 0)
-  return out
-})
-
-const scanning = ref<string | null>(null)
-const scanResult = ref<ScanResult | null>(null)
-const actionError = ref('')
-
-async function scan(s: Subnet): Promise<void> {
-  scanning.value = s.id
-  actionError.value = ''
-  scanResult.value = null
-  try {
-    scanResult.value = await store.scan(s.id)
-    await store.list()
-  } catch (e) {
-    actionError.value = describe(e)
-  } finally {
-    scanning.value = null
-  }
-}
-
-async function removeSubnet(s: Subnet): Promise<void> {
-  actionError.value = ''
-  try {
-    await store.remove(s.id)
-    await store.loadTree()
-  } catch (e) {
-    actionError.value = describe(e)
-  }
-}
+const columns: Column<Subnet>[] = [
+  { key: 'name', label: 'Name', sortable: true },
+  { key: 'cidr', label: 'CIDR', sortable: true },
+  { key: 'parent_id', label: 'Parent', hideOnStack: true, format: (s) => parentCidr(s.parent_id) },
+  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'utilization', label: 'Utilization', width: 'lg', format: (s) => `${utilPct(s)}% (${s.used_addresses ?? 0}/${s.total_addresses ?? 0})` },
+]
 </script>
 
 <template>
-  <div>
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Subnets</h1>
-      <v-spacer />
-      <v-btn variant="text" icon="mdi-refresh" @click="reload" />
+  <UiPage title="Subnets">
+    <template #actions>
+      <UiButton icon="mdi-plus" data-test="subnet-new" @click="navigate('', 'create')">New subnet</UiButton>
+      <UiButton variant="text" icon="mdi-refresh" icon-only label="Refresh" @click="refreshAll" />
+    </template>
+    <!-- The tree sits beside the table only when there is room for both; below
+         that it stacks on top with a capped, scrollable height. -->
+    <div class="grid grid-cols-1 gap-4 2xl:grid-cols-12">
+      <UiCard title="Tree" class="2xl:col-span-3">
+        <div class="max-h-72 overflow-y-auto 2xl:max-h-[70vh]"><UiTree v-model:selected="selectedTree" :items="tree" @select="openSubnet($event.id)" /></div>
+      </UiCard>
+      <div class="flex min-w-0 flex-col gap-3 2xl:col-span-9">
+        <UiCard>
+          <UiForm :form="filter">
+            <div class="grid grid-cols-2 gap-2 md:grid-cols-12 md:items-end">
+              <div class="col-span-2 md:col-span-6"><UiInput v-bind="filter.field('q')" label="Search (name / CIDR)" type="search" size="sm" @enter="reload" /></div>
+              <div class="md:col-span-3"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
+              <div class="md:col-span-3"><UiSelect v-bind="filter.field('ip_version')" label="Version" :options="versionOptions" size="sm" @update:model-value="reload" /></div>
+            </div>
+          </UiForm>
+        </UiCard>
+        <UiAlert v-if="store.error" kind="error">{{ store.error }}</UiAlert>
+        <UiCard :padded="false">
+          <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="Subnets — select one to view and act on it" empty-title="No subnets match" clickable :row-attrs="(s) => ({ 'data-test': 'subnet-row-' + s.id })" data-test="subnets-table" @row-click="openSubnet($event.id)">
+            <template #cell-cidr="{ row }">{{ row.cidr }} <UiBadge v-if="row.ip_version === 6" size="xs">v6</UiBadge></template>
+            <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', deprecated: 'warning', deleted: 'neutral' }" /></template>
+            <template #cell-utilization="{ row }">
+              <div class="flex items-center gap-2">
+                <progress class="progress h-2 w-24" :class="utilClass(utilPct(row))" :value="utilPct(row)" max="100" :aria-label="'Utilization ' + utilPct(row) + '%'" />
+                <span class="text-xs whitespace-nowrap">{{ utilPct(row) }}% ({{ row.used_addresses ?? 0 }}/{{ row.total_addresses ?? 0 }})</span>
+              </div>
+            </template>
+          </UiDataTable>
+        </UiCard>
+      </div>
     </div>
 
-    <v-row>
-      <v-col cols="12" md="4">
-        <v-card variant="tonal">
-          <v-card-title class="text-subtitle-1">Tree</v-card-title>
-          <v-card-text class="pt-0">
-            <div v-for="n in flatTree" :key="n.subnet.id" class="d-flex align-center py-1 cursor-pointer" :style="{ paddingLeft: n.depth * 16 + 'px' }" @click="filterByTree(n.subnet)">
-              <v-icon size="small" icon="mdi-ip-network-outline" class="me-2" />
-              <span class="text-body-2">{{ n.subnet.cidr }}</span>
-              <span class="text-caption text-medium-emphasis ms-2">{{ n.subnet.name }}</span>
-            </div>
-            <div v-if="!flatTree.length" class="text-medium-emphasis">No subnets yet.</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" md="8">
-        <v-card variant="tonal" class="mb-4">
-          <v-card-text>
-            <v-row dense>
-              <v-col cols="12" sm="6"><v-text-field v-model="q" label="Search (name / CIDR)" density="compact" clearable hide-details @keyup.enter="reload" @click:clear="reload" /></v-col>
-              <v-col cols="6" sm="3"><v-select v-model="status" :items="STATUSES" label="Status" density="compact" clearable hide-details @update:model-value="reload" /></v-col>
-              <v-col cols="6" sm="3"><v-select v-model="ipVersion" :items="VERSIONS" label="Version" density="compact" clearable hide-details @update:model-value="reload" /></v-col>
-            </v-row>
-          </v-card-text>
-        </v-card>
-
-        <v-alert v-if="store.error" type="error" variant="tonal" density="compact" class="mb-3">{{ store.error }}</v-alert>
-        <v-alert v-if="actionError" type="error" variant="tonal" density="compact" class="mb-3">{{ actionError }}</v-alert>
-        <v-alert v-if="scanResult" type="success" variant="tonal" density="compact" class="mb-3">
-          Scan complete: {{ scanResult.alive_count ?? 0 }} alive, {{ scanResult.new_count ?? 0 }} new.
-        </v-alert>
-
-        <v-table data-test="subnets-table">
-          <thead>
-            <tr><th>Name</th><th>CIDR</th><th>Ver</th><th>Status</th><th style="width: 220px">Utilization</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in store.items" :key="s.id" :data-test="'subnet-row-' + s.id">
-              <td>{{ s.name }}</td>
-              <td class="text-medium-emphasis">{{ s.cidr }}</td>
-              <td class="text-medium-emphasis">v{{ s.ip_version }}</td>
-              <td><v-chip size="x-small" :color="statusColor[s.status]" variant="flat">{{ s.status }}</v-chip></td>
-              <td>
-                <div class="d-flex align-center">
-                  <v-progress-linear :model-value="utilPct(s)" height="8" rounded :color="utilColor(utilPct(s))" />
-                  <span class="ms-3 text-caption" style="min-width: 84px">{{ utilPct(s) }}% ({{ s.used_addresses ?? 0 }}/{{ s.total_addresses ?? 0 }})</span>
-                </div>
-              </td>
-              <td>
-                <v-btn size="x-small" variant="text" :loading="scanning === s.id" prepend-icon="mdi-radar" @click="scan(s)">Scan</v-btn>
-                <v-btn size="x-small" variant="text" color="error" icon="mdi-delete-outline" @click="removeSubnet(s)" />
-              </td>
-            </tr>
-            <tr v-if="!store.items.length && !store.loading"><td colspan="6" class="text-medium-emphasis">No subnets match.</td></tr>
-          </tbody>
-        </v-table>
-      </v-col>
-    </v-row>
-  </div>
+    <SubnetDrawer :subnet-id="drawer.id" :mode="drawer.mode" :parent-id="drawer.parentId" @close="closeDrawer" @changed="refreshAll" @navigate="navigate" />
+  </UiPage>
 </template>
-
-<style scoped>
-.cursor-pointer { cursor: pointer; }
-</style>

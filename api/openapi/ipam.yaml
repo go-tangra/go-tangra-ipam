@@ -74,6 +74,8 @@ paths:
     delete: { operationId: deleteSubnet, x-freya-permission: 'subnets:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/force' }], responses: { '204': { description: deleted } } }
   /api/ipam/v1/subnets/{id}/stats:
     get: { operationId: getSubnetStats, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: stats } } }
+  /api/ipam/v1/subnets/{id}/split:
+    post: { operationId: splitSubnet, x-freya-permission: 'subnets:manage', x-freya-max-body-bytes: 4096, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'created children and skipped blocks' }, '400': { description: validation_failed } } }
   /api/ipam/v1/subnets/{id}/scan:
     post: { operationId: scanSubnet, x-freya-permission: 'scan:run', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'synchronous discovery result' } } }
 
@@ -200,6 +202,7 @@ paths:
     get: { operationId: listHostGroupMembers, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: members } } }
     post: { operationId: addHostGroupMember, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: added } } }
   /api/ipam/v1/host-groups/{id}/members/{mid}:
+    put: { operationId: updateHostGroupMember, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/mid' }], responses: { '200': { description: updated } } }
     delete: { operationId: removeHostGroupMember, x-freya-permission: 'groups:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/mid' }], responses: { '204': { description: removed } } }
 
   # ---- Scans ----

@@ -89,8 +89,8 @@ export const useAddresses = defineStore('ipam-addresses', () => {
 
   // suggest returns ICMP+TCP verified free addresses in a subnet.
   async function suggest(subnetId: string, count = 5): Promise<string[]> {
-    const res = await api<{ addresses: string[] }>('GET', 'ip-addresses/suggest', undefined, { query: { subnet_id: subnetId, count } })
-    return res.addresses ?? []
+    const res = await api<{ suggestions: string[] | null }>('GET', 'ip-addresses/suggest', undefined, { query: { subnet_id: subnetId, count } })
+    return res.suggestions ?? []
   }
 
   // ping probes reachability of an address (scan:run).

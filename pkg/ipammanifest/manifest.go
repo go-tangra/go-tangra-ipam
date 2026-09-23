@@ -84,6 +84,9 @@ var Abilities = []gatewayclient.Ability{
 	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"IpGroup"}, Requires: "ipam:read"},
 	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"HostGroup"}, Requires: "ipam:read"},
 	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"IpScan"}, Requires: "ipam:read"},
+	// Out-of-band controls: the UI hides them unless the caller holds the platform-admin permissions.
+	{Action: []string{"control"}, Subject: []string{"Power"}, Requires: "power:control"},
+	{Action: []string{"access"}, Subject: []string{"Kvm"}, Requires: "kvm:access"},
 }
 
 // Nav lists the navigation contributions.

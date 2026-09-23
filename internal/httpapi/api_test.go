@@ -289,6 +289,54 @@ func TestVlanLocationGroupCheck(t *testing.T) {
 	}
 }
 
+func TestSubnetSplitAndHostMemberUpdate(t *testing.T) {
+	f := newAPI(t)
+	sid := f.createSubnet(t, "office", "10.60.0.0/24")
+
+	// Manual child inside its parent is accepted; outside it is refused.
+	if w := f.req(t, "POST", p+"/subnets", "admin", `{"name":"printers","cidr":"10.60.0.192/26","parent_id":"`+sid+`"}`); w.Code != 201 {
+		t.Fatalf("create child: %d %s", w.Code, w.Body)
+	}
+	if w := f.req(t, "POST", p+"/subnets", "admin", `{"name":"stray","cidr":"10.61.0.0/26","parent_id":"`+sid+`"}`); w.Code != 422 {
+		t.Fatalf("child outside parent: want 422, got %d %s", w.Code, w.Body)
+	}
+
+	// Dry run previews three free /26 blocks (the fourth is taken) and writes nothing.
+	w := f.req(t, "POST", p+"/subnets/"+sid+"/split", "admin", `{"prefix_length":26,"dry_run":true}`)
+	body := decodeBody(t, w)
+	created, _ := body["created"].([]any)
+	skipped, _ := body["skipped"].([]any)
+	if w.Code != 200 || len(created) != 3 || len(skipped) != 1 {
+		t.Fatalf("dry-run split: %d created=%d skipped=%d %s", w.Code, len(created), len(skipped), w.Body)
+	}
+	if w := f.req(t, "GET", p+"/subnets?parent_id="+sid, "admin", ""); len(decodeBody(t, w)["items"].([]any)) != 1 {
+		t.Fatalf("dry run must not write: %s", w.Body)
+	}
+	if w := f.req(t, "POST", p+"/subnets/"+sid+"/split", "admin", `{"prefix_length":26}`); w.Code != 200 {
+		t.Fatalf("split: %d %s", w.Code, w.Body)
+	}
+	if w := f.req(t, "GET", p+"/subnets?parent_id="+sid, "admin", ""); len(decodeBody(t, w)["items"].([]any)) != 4 {
+		t.Fatalf("after split want 4 children: %s", w.Body)
+	}
+	// Nothing left to carve at /26; an impossible prefix is refused too.
+	for _, in := range []string{`{"prefix_length":26}`, `{"prefix_length":20}`} {
+		if w := f.req(t, "POST", p+"/subnets/"+sid+"/split", "admin", in); w.Code != 422 {
+			t.Fatalf("split %s: want 422, got %d %s", in, w.Code, w.Body)
+		}
+	}
+
+	// Host-group member order can be edited in place.
+	w = f.req(t, "POST", p+"/devices", "admin", `{"name":"web-1","device_type":"server"}`)
+	did, _ := decodeBody(t, w)["id"].(string)
+	w = f.req(t, "POST", p+"/host-groups", "admin", `{"name":"web"}`)
+	hid, _ := decodeBody(t, w)["id"].(string)
+	w = f.req(t, "POST", p+"/host-groups/"+hid+"/members", "admin", `{"device_id":"`+did+`","sequence":1}`)
+	mid, _ := decodeBody(t, w)["id"].(string)
+	if w := f.req(t, "PUT", p+"/host-groups/"+hid+"/members/"+mid, "admin", `{"device_id":"`+did+`","sequence":5}`); w.Code != 200 || decodeBody(t, w)["sequence"] != float64(5) {
+		t.Fatalf("update host member: %d %s", w.Code, w.Body)
+	}
+}
+
 func TestScanStartAndList(t *testing.T) {
 	f := newAPI(t)
 	sid := f.createSubnet(t, "scan-net", "10.60.0.0/24")

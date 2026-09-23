@@ -47,13 +47,17 @@ export const useHostGroups = defineStore('ipam-host-groups', () => {
     return res.items ?? []
   }
 
-  async function addMember(id: string, deviceId: string): Promise<HostGroupMember> {
-    return api<HostGroupMember>('POST', 'host-groups/' + id + '/members', { device_id: deviceId })
+  async function addMember(id: string, body: Partial<HostGroupMember>): Promise<HostGroupMember> {
+    return api<HostGroupMember>('POST', 'host-groups/' + id + '/members', body)
+  }
+
+  async function updateMember(id: string, mid: string, body: Partial<HostGroupMember>): Promise<HostGroupMember> {
+    return api<HostGroupMember>('PUT', 'host-groups/' + id + '/members/' + mid, body)
   }
 
   async function removeMember(id: string, mid: string): Promise<void> {
     await api('DELETE', 'host-groups/' + id + '/members/' + mid)
   }
 
-  return { items, loading, error, list, get, create, update, remove, members, addMember, removeMember }
+  return { items, loading, error, list, get, create, update, remove, members, addMember, updateMember, removeMember }
 })

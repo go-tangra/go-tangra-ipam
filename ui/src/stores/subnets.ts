@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
-import type { ScanResult, Subnet, SubnetStats, SubnetTreeNode } from '@/api/types'
+import type { IPScanJob, SplitResult, Subnet, SubnetStats, SubnetTreeNode } from '@/api/types'
 
 export interface SubnetFilter {
   vlan_id?: string | undefined
@@ -9,7 +9,7 @@ export interface SubnetFilter {
   location_id?: string | undefined
   status?: string | undefined
   ip_version?: number | undefined
-  q?: string | undefined
+  query?: string | undefined
   cursor?: string | undefined
   limit?: number | undefined
 }
@@ -35,8 +35,8 @@ export const useSubnets = defineStore('ipam-subnets', () => {
 
   async function loadTree(): Promise<void> {
     try {
-      const res = await api<{ items: SubnetTreeNode[] }>('GET', 'subnets/tree')
-      tree.value = res.items ?? []
+      const res = await api<{ tree: SubnetTreeNode[] | null }>('GET', 'subnets/tree')
+      tree.value = res.tree ?? []
     } catch (e) {
       error.value = (e as Error).message
     }
@@ -67,10 +67,17 @@ export const useSubnets = defineStore('ipam-subnets', () => {
     items.value = items.value.filter((x) => x.id !== id)
   }
 
-  // scan runs synchronous discovery on a subnet (scan:run).
-  async function scan(id: string): Promise<ScanResult> {
-    return api<ScanResult>('POST', 'subnets/' + id + '/scan', {})
+  // scan queues a discovery job for a subnet (scan:run) and returns it at once;
+  // follow it through the scans store until it reaches a terminal status.
+  async function scan(id: string): Promise<IPScanJob> {
+    return api<IPScanJob>('POST', 'subnets/' + id + '/scan', {})
   }
 
-  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan }
+  // split carves a subnet into its /prefixLength children in one call; with
+  // dryRun it only previews which blocks would be created or skipped.
+  async function split(id: string, prefixLength: number, dryRun = false): Promise<SplitResult> {
+    return api<SplitResult>('POST', 'subnets/' + id + '/split', { prefix_length: prefixLength, dry_run: dryRun })
+  }
+
+  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan, split }
 })

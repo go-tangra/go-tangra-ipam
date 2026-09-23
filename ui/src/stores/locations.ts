@@ -33,8 +33,8 @@ export const useLocations = defineStore('ipam-locations', () => {
 
   async function loadTree(): Promise<void> {
     try {
-      const res = await api<{ items: LocationTreeNode[] }>('GET', 'locations/tree')
-      tree.value = res.items ?? []
+      const res = await api<{ tree: LocationTreeNode[] | null }>('GET', 'locations/tree')
+      tree.value = res.tree ?? []
     } catch (e) {
       error.value = (e as Error).message
     }

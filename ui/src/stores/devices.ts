@@ -10,7 +10,7 @@ import type {
   PowerAction,
   PowerStatus,
   SelEntry,
-  Sensors,
+  Sensor,
 } from '@/api/types'
 
 export interface DeviceFilter {
@@ -19,7 +19,7 @@ export interface DeviceFilter {
   location_id?: string | undefined
   manufacturer?: string | undefined
   rack_id?: string | undefined
-  q?: string | undefined
+  query?: string | undefined
   cursor?: string | undefined
   limit?: number | undefined
 }
@@ -40,6 +40,13 @@ export const useDevices = defineStore('ipam-devices', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  // inRack lists the devices mounted in a rack without replacing `items`, so a
+  // rack elevation can load alongside the device list.
+  async function inRack(rackId: string): Promise<Device[]> {
+    const res = await api<{ items: Device[] }>('GET', 'devices', undefined, { query: { rack_id: rackId, limit: 500 } })
+    return res.items ?? []
   }
 
   async function get(id: string): Promise<Device> {
@@ -83,11 +90,6 @@ export const useDevices = defineStore('ipam-devices', () => {
     return res.items ?? []
   }
 
-  async function syncPackages(id: string): Promise<DevicePackage[]> {
-    const res = await api<{ items: DevicePackage[] }>('POST', 'devices/' + id + '/packages/sync', {})
-    return res.items ?? []
-  }
-
   async function addresses(id: string): Promise<IPAddress[]> {
     const res = await api<{ items: IPAddress[] }>('GET', 'devices/' + id + '/addresses')
     return res.items ?? []
@@ -99,12 +101,15 @@ export const useDevices = defineStore('ipam-devices', () => {
     return api<PowerStatus>('GET', 'devices/' + id + '/power')
   }
 
-  async function setPower(id: string, action: PowerAction): Promise<PowerStatus> {
-    return api<PowerStatus>('POST', 'devices/' + id + '/power', { action })
+  // setPower sends a chassis action; the BMC only acknowledges it, so callers
+  // re-read power() for the resulting state.
+  async function setPower(id: string, action: PowerAction): Promise<void> {
+    await api<{ accepted: boolean }>('POST', 'devices/' + id + '/power', { action })
   }
 
-  async function sensors(id: string): Promise<Sensors> {
-    return api<Sensors>('GET', 'devices/' + id + '/sensors')
+  async function sensors(id: string): Promise<Sensor[]> {
+    const res = await api<{ items: Sensor[] | null }>('GET', 'devices/' + id + '/sensors')
+    return res.items ?? []
   }
 
   async function sel(id: string): Promise<SelEntry[]> {
@@ -118,9 +123,9 @@ export const useDevices = defineStore('ipam-devices', () => {
 
   return {
     items, loading, error,
-    list, get, create, update, remove,
+    list, inRack, get, create, update, remove,
     interfaces, addInterface, removeInterface,
-    packages, syncPackages, addresses,
+    packages, addresses,
     power, setPower, sensors, sel, kvmSession,
   }
 })

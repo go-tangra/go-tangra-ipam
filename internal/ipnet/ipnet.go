@@ -7,6 +7,7 @@ package ipnet
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"net"
@@ -201,6 +202,60 @@ func Overlaps(a, b string) (bool, error) {
 		return false, ErrParse
 	}
 	return na.Contains(nb.IP) || nb.Contains(na.IP), nil
+}
+
+// Within reports whether child is a strictly smaller block inside parent (same
+// address family, longer prefix). Unparsable input is never within.
+func Within(child, parent string) bool {
+	_, nc, err := net.ParseCIDR(strings.TrimSpace(child))
+	if err != nil {
+		return false
+	}
+	_, np, err := net.ParseCIDR(strings.TrimSpace(parent))
+	if err != nil {
+		return false
+	}
+	cOnes, cBits := nc.Mask.Size()
+	pOnes, pBits := np.Mask.Size()
+	return cBits == pBits && cOnes > pOnes && np.Contains(nc.IP)
+}
+
+// MaxSubdivide caps how many child blocks Subdivide will enumerate, so a wide
+// parent and a long prefix cannot allocate an unbounded slice.
+const MaxSubdivide = 1024
+
+// Subdivide splits cidr into the consecutive blocks of prefixLen it contains
+// ("10.0.0.0/24" at 26 → the four /26s). prefixLen must be longer than the
+// parent prefix and within the address family; at most MaxSubdivide blocks are
+// produced.
+func Subdivide(cidr string, prefixLen int) ([]string, error) {
+	info, err := Parse(cidr)
+	if err != nil {
+		return nil, err
+	}
+	bits := 32
+	if info.Version == 6 {
+		bits = 128
+	}
+	if prefixLen <= info.PrefixLen || prefixLen > bits {
+		return nil, fmt.Errorf("%w: prefix /%d is not inside /%d", ErrParse, prefixLen, info.PrefixLen)
+	}
+	countBits := prefixLen - info.PrefixLen
+	if countBits > 20 { // 2^20 is already far beyond the cap; avoid a huge shift
+		return nil, ErrTooLarge
+	}
+	count := 1 << uint(countBits) // #nosec G115 -- countBits in [1,20]
+	if count > MaxSubdivide {
+		return nil, ErrTooLarge
+	}
+	step := new(big.Int).Lsh(big.NewInt(1), uint(bits-prefixLen)) // #nosec G115 -- prefixLen <= bits
+	base := ipToInt(info.Network)
+	out := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		ip := intToIP(new(big.Int).Add(base, new(big.Int).Mul(step, big.NewInt(int64(i)))), info.Version)
+		out = append(out, fmt.Sprintf("%s/%d", ip.String(), prefixLen))
+	}
+	return out, nil
 }
 
 // Contains reports whether ip falls within cidr.

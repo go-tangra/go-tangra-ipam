@@ -57,6 +57,13 @@ export interface SubnetTreeNode extends Subnet {
   children?: SubnetTreeNode[]
 }
 
+// SplitResult is the /subnets/{id}/split response.
+export interface SplitResult {
+  parent: Subnet
+  created: Subnet[]
+  skipped: { cidr: string; reason: string }[] | null
+}
+
 // SubnetStats is the /subnets/{id}/stats response.
 export interface SubnetStats {
   subnet_id?: string
@@ -101,6 +108,8 @@ export interface PingResult {
   address?: string
   alive: boolean
   rtt_ms?: number
+  // false when the server has no ICMP prober (alive is then meaningless).
+  available?: boolean
 }
 
 // --- devices ---
@@ -178,32 +187,38 @@ export interface DevicePackage {
 
 // --- out-of-band (IPMI / BMC / KVM) ---
 
-// PowerStatus is the GET /devices/{id}/power response.
+// PowerStatus is the GET /devices/{id}/power response (BMC chassis status).
 export interface PowerStatus {
-  power_state?: string
-  chassis_on?: boolean
-  last_power_event?: string
+  on: boolean
+  power_restore_policy?: string
+  power_fault?: boolean
+  power_overload?: boolean
+  intrusion?: boolean
+  cooling_fault?: boolean
+  drive_fault?: boolean
+  identify_active?: boolean
 }
 
+// Sensor is one entry of the GET /devices/{id}/sensors items.
 export interface Sensor {
+  number?: number
   name: string
-  reading?: number
+  type?: string
+  reading?: string
+  value?: number
   unit?: string
   status?: string
-  lower_critical?: number
-  upper_critical?: number
+  valid?: boolean
 }
 
-// Sensors is the GET /devices/{id}/sensors response.
-export interface Sensors {
-  sensors?: Sensor[]
-}
-
+// SelEntry is one entry of the GET /devices/{id}/sel items.
 export interface SelEntry {
-  id?: string
+  record_id: number
+  record_type?: string
   timestamp?: string
-  sensor?: string
-  event?: string
+  sensor_type?: string
+  sensor_name?: string
+  description: string
   severity?: string
 }
 
@@ -359,34 +374,19 @@ export interface IPScanJob {
   updated_at?: string
 }
 
-// ScanResult is the synchronous POST /subnets/{id}/scan response.
-export interface ScanResult {
-  subnet_id?: string
-  total_addresses?: number
-  alive_count?: number
-  new_count?: number
-  updated_count?: number
-}
-
 // --- statistics ---
 
 // Stats mirrors the GET /stats tenant rollup.
 export interface Stats {
-  subnets_total?: number
-  addresses_total?: number
-  addresses_used?: number
-  addresses_available?: number
-  utilization?: number
-  devices_total?: number
-  devices_by_type?: Record<string, number>
-  devices_by_status?: Record<string, number>
-  vlans_total?: number
-  locations_total?: number
-  ip_groups_total?: number
-  host_groups_total?: number
-  scans_active?: number
-  scans_completed?: number
-  security_updates?: number
+  total_subnets: number
+  total_addresses: number
+  used_addresses: number
+  available_addresses: number
+  total_vlans: number
+  total_devices: number
+  total_locations: number
+  overall_utilization: number
+  devices_by_type?: Record<string, number> | null
 }
 
 // --- DNS config ---
