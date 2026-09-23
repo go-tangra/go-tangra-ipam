@@ -107,6 +107,17 @@ func (c *Client) AllocateNextAddress(ctx context.Context, tenantID string, req A
 	return toAddress(resp), nil
 }
 
+// GetAddress returns one address by id. An unknown id (or one of another
+// tenant) is a gRPC NotFound status, which callers may test with
+// status.Code(err) == codes.NotFound.
+func (c *Client) GetAddress(ctx context.Context, tenantID, id string) (IPAddress, error) {
+	resp, err := c.addresses.Get(ctx, &ipamv1.GetIpAddressRequest{TenantId: tenantID, Id: id})
+	if err != nil {
+		return IPAddress{}, err
+	}
+	return toAddress(resp), nil
+}
+
 // FindAddress returns the address with the given dotted/colon string.
 func (c *Client) FindAddress(ctx context.Context, tenantID, address string) (IPAddress, error) {
 	resp, err := c.addresses.Find(ctx, &ipamv1.FindIpAddressRequest{TenantId: tenantID, Address: address})

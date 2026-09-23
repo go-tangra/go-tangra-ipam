@@ -259,7 +259,8 @@ func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
 	host, scheme := e.host, m.scheme
 	proxy := &httputil.ReverseProxy{
 		Transport: m.httpClient.Transport,
-		Director: func(req *http.Request) {
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			req := pr.Out
 			req.URL.Scheme = scheme
 			req.URL.Host = host
 			req.URL.Path = upstreamPath

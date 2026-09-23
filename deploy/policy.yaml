@@ -10,3 +10,10 @@ rules:
     to: ["ipam"]
     operations: ["*"]
     effect: allow
+  - id: dns-ipam-sync
+    # The dns module re-reads addresses (and their subnet prefix) named by
+    # ipam.ip_address.* events before writing A/AAAA/PTR records (dns research D8).
+    from: ["spiffe://example.org/svc/dns"]
+    to: ["ipam"]
+    operations: ["/ipam.v1.IpAddressService/Get", "/ipam.v1.IpAddressService/Find", "/ipam.v1.SubnetService/Get"]
+    effect: allow
