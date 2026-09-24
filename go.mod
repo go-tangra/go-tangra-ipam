@@ -109,3 +109,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260831171406-18b4a7587f8a // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
+
+replace github.com/go-tangra/go-tangra-ipam/sdk/v4 => ./sdk
