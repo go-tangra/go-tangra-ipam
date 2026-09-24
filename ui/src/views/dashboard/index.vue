@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { UiPage, UiCard, UiStatGrid, UiStatTile, UiBarList, type BarItem } from '@freya/ui'
+import { UiPage, UiCard, UiStatGrid, UiStatTile, UiBarList, type BarItem } from '@go-tangra/ui'
 import { useStats } from '@/stores/stats'
 import { useSubnets } from '@/stores/subnets'
 import { useDevices } from '@/stores/devices'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useAbility } from '@casl/vue'
-import { UiAlert, UiCard, UiButton, UiStatusChip, UiDataTable, useConfirm, type Column } from '@freya/ui'
+import { UiAlert, UiCard, UiButton, UiStatusChip, UiDataTable, useConfirm, type Column } from '@go-tangra/ui'
 import { useDevices } from '@/stores/devices'
 import type { KvmSession, PowerAction, PowerStatus, Sensor } from '@/api/types'
 import { describe } from '@/api/client'

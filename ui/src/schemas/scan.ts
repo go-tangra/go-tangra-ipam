@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { nonEmpty } from '@freya/ui/forms'
+import { nonEmpty } from '@go-tangra/ui/forms'
 
 /** POST /ip-scans payload. */
 export const startScanSchema = z.object({

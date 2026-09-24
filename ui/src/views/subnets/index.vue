@@ -2,8 +2,8 @@
 // Subnet list + tree. Everything done *to* a subnet lives in the right-hand
 // drawer (view → scan / split / add child / edit / delete), as in go-tangra.
 import { computed, onMounted, ref } from 'vue'
-import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiBadge, UiDataTable, UiStatusChip, UiTree, type Column, type SelectOption, type TreeNode } from '@freya/ui'
-import { useZodForm } from '@freya/ui/forms'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiBadge, UiDataTable, UiStatusChip, UiTree, type Column, type SelectOption, type TreeNode } from '@go-tangra/ui'
+import { useZodForm } from '@go-tangra/ui/forms'
 import { useSubnets } from '@/stores/subnets'
 import { useVlans } from '@/stores/vlans'
 import { useLocations } from '@/stores/locations'

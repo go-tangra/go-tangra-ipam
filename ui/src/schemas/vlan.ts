@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { nonEmpty, optionalString } from '@freya/ui/forms'
+import { nonEmpty, optionalString } from '@go-tangra/ui/forms'
 
 export const VLAN_STATUSES = ['active', 'reserved', 'deprecated'] as const
 

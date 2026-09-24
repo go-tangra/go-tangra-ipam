@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { cidr, nonEmpty, optionalString } from '@freya/ui/forms'
+import { cidr, nonEmpty, optionalString } from '@go-tangra/ui/forms'
 
 export const SUBNET_STATUSES = ['active', 'reserved', 'deprecated', 'deleted'] as const
 

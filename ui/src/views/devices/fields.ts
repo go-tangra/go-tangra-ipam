@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { zodToFields } from '@freya/ui/forms'
+import { zodToFields } from '@go-tangra/ui/forms'
 import { deviceSchema } from '@/schemas'
 import { useLocations } from '@/stores/locations'
 

@@ -5,8 +5,8 @@
 // same drawer into edit, add-child or split mode, and back.
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { z } from 'zod'
-import { UiDrawer, UiButton, UiAlert, UiKeyValueTable, UiStatusChip, UiRecordForm, UiNumberInput, UiForm, UiToolbar, useConfirm, type KeyValue } from '@freya/ui'
-import { useZodForm, zodToFields, type ZodForm } from '@freya/ui/forms'
+import { UiDrawer, UiButton, UiAlert, UiKeyValueTable, UiStatusChip, UiRecordForm, UiNumberInput, UiForm, UiToolbar, useConfirm, type KeyValue } from '@go-tangra/ui'
+import { useZodForm, zodToFields, type ZodForm } from '@go-tangra/ui/forms'
 import { useSubnets } from '@/stores/subnets'
 import { useVlans } from '@/stores/vlans'
 import { useLocations } from '@/stores/locations'

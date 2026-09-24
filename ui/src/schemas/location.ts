@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { nonEmpty, optionalString, positiveInt } from '@freya/ui/forms'
+import { nonEmpty, optionalString, positiveInt } from '@go-tangra/ui/forms'
 
 export const LOCATION_TYPES = ['region', 'country', 'city', 'datacenter', 'building', 'floor', 'room', 'rack', 'site', 'branch'] as const
 export const LOCATION_STATUSES = ['active', 'planned', 'decommissioned'] as const

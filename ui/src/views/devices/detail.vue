@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAbility } from '@casl/vue'
-import { UiPage, UiAlert, UiCard, UiButton, UiStatusChip, UiKeyValueTable, UiDataTable, UiTabs, UiBadge, UiRecordDrawer, type Column, type KeyValue, type TabItem } from '@freya/ui'
+import { UiPage, UiAlert, UiCard, UiButton, UiStatusChip, UiKeyValueTable, UiDataTable, UiTabs, UiBadge, UiRecordDrawer, type Column, type KeyValue, type TabItem } from '@go-tangra/ui'
 import { useDevices } from '@/stores/devices'
 import type { Device, DeviceInterface, DevicePackage, IPAddress } from '@/api/types'
 import { describe } from '@/api/client'

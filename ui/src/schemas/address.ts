@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { nonEmpty, optionalString, positiveInt } from '@freya/ui/forms'
+import { nonEmpty, optionalString, positiveInt } from '@go-tangra/ui/forms'
 
 export const ADDRESS_STATUSES = ['active', 'reserved', 'dhcp', 'deprecated', 'offline'] as const
 export const ADDRESS_TYPES = ['host', 'gateway', 'broadcast', 'network', 'virtual', 'anycast'] as const

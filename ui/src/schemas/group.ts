@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { cidr, ipv4, nonEmpty, optionalString, positiveInt } from '@freya/ui/forms'
+import { cidr, ipv4, nonEmpty, optionalString, positiveInt } from '@go-tangra/ui/forms'
 
 /** "Check IP membership" lookup. */
 export const checkIpSchema = z.object({ ip: ipv4 })

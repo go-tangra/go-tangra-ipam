@@ -4,7 +4,7 @@
 // units are buttons that ask the parent to place a device there; overlapping
 // or out-of-range devices are flagged instead of silently hidden.
 import { computed } from 'vue'
-import { UiBadge, UiButton, UiStatTile } from '@freya/ui'
+import { UiBadge, UiButton, UiStatTile } from '@go-tangra/ui'
 import type { Device } from '@/api/types'
 
 const props = defineProps<{ sizeU: number; devices: Device[] }>()

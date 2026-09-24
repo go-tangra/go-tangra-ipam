@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ipv4, nonEmpty, optionalString, positiveInt } from '@freya/ui/forms'
+import { ipv4, nonEmpty, optionalString, positiveInt } from '@go-tangra/ui/forms'
 
 export const DEVICE_TYPES = ['server', 'vm', 'router', 'switch', 'firewall', 'load_balancer', 'access_point', 'storage', 'printer', 'phone', 'workstation', 'container', 'other'] as const
 export const DEVICE_STATUSES = ['active', 'planned', 'staged', 'decommissioned', 'offline', 'failed', 'available'] as const
