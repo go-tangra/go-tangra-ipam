@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	ipamv1 "github.com/go-freya/freya/services/ipam/api/proto/ipam/v1"
-	"github.com/go-freya/freya/services/ipam/internal/repo"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // TestTimeHelpers exercises unix/unixPtr/unixTime including the zero/nil branches.

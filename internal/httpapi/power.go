@@ -3,10 +3,10 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/go-freya/freya/services/ipam/internal/authz"
-	"github.com/go-freya/freya/services/ipam/internal/ipmi"
-	"github.com/go-freya/freya/services/ipam/internal/kvm"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // registerPower mounts the privileged out-of-band routes: chassis power

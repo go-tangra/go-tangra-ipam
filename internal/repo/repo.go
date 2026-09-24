@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 var (

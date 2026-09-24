@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/go-freya/freya/services/ipam/pkg/ipammanifest"
+	"github.com/go-tangra/go-tangra-ipam/v4/pkg/ipammanifest"
 )
 
 // SeedPermissions registers the module's permissions + built-in role grants with

@@ -12,10 +12,10 @@ import (
 	"net"
 	"strings"
 
-	"github.com/go-freya/freya/services/ipam/internal/authz"
-	"github.com/go-freya/freya/services/ipam/internal/ipnet"
-	"github.com/go-freya/freya/services/ipam/internal/repo"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // ValidationError is returned when a caller-supplied field fails validation.

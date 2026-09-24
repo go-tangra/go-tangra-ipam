@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // TestErrorType exercises the Error value's Error() method.

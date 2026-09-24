@@ -5,10 +5,10 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/go-freya/freya/services/ipam/internal/backup"
-	"github.com/go-freya/freya/services/ipam/internal/scan"
-	"github.com/go-freya/freya/services/ipam/internal/store"
-	"github.com/go-freya/freya/services/ipam/internal/warden"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 // ipamBase is the gateway-proxied prefix every route shares.

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-freya/freya/services/ipam/internal/repo"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 func bg() context.Context { return context.Background() }

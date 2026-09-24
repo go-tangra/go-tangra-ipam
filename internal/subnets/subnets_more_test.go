@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-freya/freya/services/ipam/internal/authz"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 func TestValidationErrorString(t *testing.T) {

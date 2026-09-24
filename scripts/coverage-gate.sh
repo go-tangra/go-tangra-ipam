@@ -5,7 +5,7 @@
 # math that constrains scans and allocation).
 set -euo pipefail
 PROFILE="${1:-coverage.out}"
-MODULE="github.com/go-freya/freya/services/ipam"
+MODULE="github.com/go-tangra/go-tangra-ipam/v4"
 SECURITY_PKGS=("internal/authz" "internal/sealed" "internal/ipnet")
 total=$(go tool cover -func="$PROFILE" | awk '/^total:/ {gsub("%","",$3); print $3}')
 echo "coverage: total ${total}%"

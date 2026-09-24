@@ -3,7 +3,7 @@ package scan
 import (
 	"testing"
 
-	"github.com/go-freya/freya/services/ipam/internal/ipnet"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
 )
 
 // FuzzScanTargets asserts the target-enumeration invariants for arbitrary CIDR

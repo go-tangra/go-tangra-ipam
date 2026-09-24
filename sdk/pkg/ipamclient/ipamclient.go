@@ -14,7 +14,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	ipamv1 "github.com/go-freya/freya/services/ipam/api/proto/ipam/v1"
+	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
 )
 
 // Client calls the ipam.v1 API over a caller-provided gRPC connection.

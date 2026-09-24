@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-freya/freya/services/ipam/internal/events"
-	"github.com/go-freya/freya/services/ipam/internal/ipnet"
-	"github.com/go-freya/freya/services/ipam/internal/scan/snmp"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // pollInterval is how often Run polls the work queue for due jobs.

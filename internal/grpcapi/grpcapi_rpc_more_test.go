@@ -8,17 +8,17 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	ipamv1 "github.com/go-freya/freya/services/ipam/api/proto/ipam/v1"
-	"github.com/go-freya/freya/services/ipam/internal/addresses"
-	"github.com/go-freya/freya/services/ipam/internal/devices"
-	"github.com/go-freya/freya/services/ipam/internal/dnscfg"
-	"github.com/go-freya/freya/services/ipam/internal/events"
-	"github.com/go-freya/freya/services/ipam/internal/groups"
-	"github.com/go-freya/freya/services/ipam/internal/locations"
-	"github.com/go-freya/freya/services/ipam/internal/memstore"
-	"github.com/go-freya/freya/services/ipam/internal/stats"
-	"github.com/go-freya/freya/services/ipam/internal/subnets"
-	"github.com/go-freya/freya/services/ipam/internal/vlans"
+	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
 )
 
 func svcCaller(t *testing.T) {

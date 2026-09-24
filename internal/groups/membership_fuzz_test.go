@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-freya/freya/services/ipam/internal/groups"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // ipToInt is an independent reference conversion (v4 uses 4 bytes, v6 16) used to

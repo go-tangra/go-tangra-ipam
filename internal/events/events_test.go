@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-freya/freya/services/ipam/internal/stream"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
 )
 
 func TestNilHubPublisherIsNoOp(t *testing.T) {

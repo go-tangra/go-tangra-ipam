@@ -3,7 +3,7 @@ package ipamclient
 import (
 	"time"
 
-	ipamv1 "github.com/go-freya/freya/services/ipam/api/proto/ipam/v1"
+	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
 )
 
 // ---- plain Go value types (no internal/* imports) ----

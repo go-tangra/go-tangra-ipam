@@ -9521,7 +9521,7 @@ const file_ipam_v1_ipam_proto_rawDesc = "" +
 	"\x06Health\x12\x16.ipam.v1.HealthRequest\x1a\x17.ipam.v1.HealthResponse\x124\n" +
 	"\bGetStats\x12\x18.ipam.v1.GetStatsRequest\x1a\x0e.ipam.v1.Stats\x12@\n" +
 	"\fGetDnsConfig\x12\x1c.ipam.v1.GetDnsConfigRequest\x1a\x12.ipam.v1.DNSConfig\x12F\n" +
-	"\x0fUpdateDnsConfig\x12\x1f.ipam.v1.UpdateDnsConfigRequest\x1a\x12.ipam.v1.DNSConfigBBZ@github.com/go-freya/freya/services/ipam/api/proto/ipam/v1;ipamv1b\x06proto3"
+	"\x0fUpdateDnsConfig\x12\x1f.ipam.v1.UpdateDnsConfigRequest\x1a\x12.ipam.v1.DNSConfigBEZCgithub.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1;ipamv1b\x06proto3"
 
 var (
 	file_ipam_v1_ipam_proto_rawDescOnce sync.Once

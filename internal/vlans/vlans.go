@@ -11,9 +11,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-freya/freya/services/ipam/internal/authz"
-	"github.com/go-freya/freya/services/ipam/internal/repo"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // MinVlanID and MaxVlanID bound the usable 802.1Q VLAN id space (0 and 4095 are

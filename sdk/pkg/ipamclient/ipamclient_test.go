@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
-	ipamv1 "github.com/go-freya/freya/services/ipam/api/proto/ipam/v1"
-	"github.com/go-freya/freya/services/ipam/pkg/ipamclient"
+	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
+	"github.com/go-tangra/go-tangra-ipam/sdk/v4/pkg/ipamclient"
 )
 
 // ---- stub servers ----

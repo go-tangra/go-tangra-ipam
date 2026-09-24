@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-freya/freya/services/ipam/internal/events"
-	"github.com/go-freya/freya/services/ipam/internal/memstore"
-	"github.com/go-freya/freya/services/ipam/internal/scan/icmp"
-	"github.com/go-freya/freya/services/ipam/internal/scan/snmp"
-	"github.com/go-freya/freya/services/ipam/internal/store"
-	"github.com/go-freya/freya/services/ipam/internal/warden"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 func TestRunOnceSweepsAndCompletes(t *testing.T) {

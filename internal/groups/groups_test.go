@@ -6,11 +6,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/go-freya/freya/services/ipam/internal/authz"
-	"github.com/go-freya/freya/services/ipam/internal/groups"
-	"github.com/go-freya/freya/services/ipam/internal/memstore"
-	"github.com/go-freya/freya/services/ipam/internal/repo"
-	"github.com/go-freya/freya/services/ipam/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 func subj(tenant string) authz.Subjects {

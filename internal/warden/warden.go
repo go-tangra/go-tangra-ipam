@@ -72,10 +72,10 @@ type grpcClient struct {
 // TODO(ipam): wire the concrete calls once the warden proto is a dependency of
 // this module. That requires adding to go.mod (owned elsewhere):
 //
-//	require  github.com/go-freya/freya/services/warden v0.0.0-...
-//	replace  github.com/go-freya/freya/services/warden => ../warden
+//	require  github.com/go-tangra/go-tangra-warden/v4 v0.0.0-...
+//	replace  github.com/go-tangra/go-tangra-warden/v4 => ../warden
 //
-// and then, with wardenv1 "github.com/go-freya/freya/services/warden/api/proto/warden/v1":
+// and then, with wardenv1 "github.com/go-tangra/go-tangra-warden/sdk/v4/api/proto/warden/v1":
 //
 //	sc := wardenv1.NewSecretsClient(c.cc)
 //	meta, err := sc.Get(ctx, &wardenv1.GetRequest{Id: ref})

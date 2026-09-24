@@ -1,4 +1,4 @@
-module github.com/go-freya/freya/services/ipam
+module github.com/go-tangra/go-tangra-ipam/v4
 
 go 1.26.3
 
@@ -7,10 +7,11 @@ toolchain go1.26.8
 require (
 	github.com/bougou/go-ipmi v0.8.1
 	github.com/getkin/kin-openapi v0.149.0
-	github.com/go-freya/freya v0.0.0-00010101000000-000000000000
-	github.com/go-freya/freya/services/auth v0.0.0-00010101000000-000000000000
-	github.com/go-freya/freya/services/gateway v0.0.0-00010101000000-000000000000
-	github.com/go-freya/freya/services/lcm v0.0.0-00010101000000-000000000000
+	github.com/go-tangra/go-tangra-auth/sdk/v4 v4.0.0
+	github.com/go-tangra/go-tangra-ipam/sdk/v4 v4.0.0
+	github.com/go-tangra/go-tangra-lcm/sdk/v4 v4.0.0
+	github.com/go-tangra/go-tangra-portal/sdk/v4 v4.0.0
+	github.com/go-tangra/go-tangra/v4 v4.0.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/gosnmp/gosnmp v1.43.2
 	github.com/jackc/pgx/v5 v5.11.0
@@ -19,7 +20,6 @@ require (
 	github.com/valkey-io/valkey-go v1.0.78
 	golang.org/x/net v0.59.0
 	google.golang.org/grpc v1.83.2
-	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -107,12 +107,5 @@ require (
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260831171406-18b4a7587f8a // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 )
-
-replace github.com/go-freya/freya => ../..
-
-replace github.com/go-freya/freya/services/auth => ../auth
-
-replace github.com/go-freya/freya/services/gateway => ../gateway
-
-replace github.com/go-freya/freya/services/lcm => ../lcm
