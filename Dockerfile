@@ -1,101 +1,50 @@
-##################################
-# Stage 0: Build frontend module
-##################################
+# syntax=docker/dockerfile:1
+# IPAM service image: builds the Vue remote, embeds it (-tags ui), and produces
+# a slim runtime carrying ipamsvc. Build context is the repo root so the
+# module's replace directives (../.. and sibling services) resolve. The runtime
+# grants ipamsvc CAP_NET_RAW so it can open the raw ICMP socket used by subnet
+# scans without running as root.
 
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS ui
+# The front-ends form one npm workspace (root package-lock.json) with the shared
+# kit at ui/kit; install the workspace, build the kit, then this front-end.
+WORKDIR /w
+COPY package.json package-lock.json .npmrc ./
+COPY ui/kit/package.json ui/kit/
+COPY services/gateway/shell/package.json services/gateway/shell/
+COPY services/auth/console/package.json services/auth/console/
+COPY services/asset/ui/package.json services/asset/ui/
+COPY services/inventory/ui/package.json services/inventory/ui/
+COPY services/ipam/ui/package.json services/ipam/ui/
+COPY services/paperless/ui/package.json services/paperless/ui/
+COPY services/deployer/ui/package.json services/deployer/ui/
+COPY services/lcm/ui/package.json services/lcm/ui/
+COPY services/notification/ui/package.json services/notification/ui/
+COPY services/warden/ui/package.json services/warden/ui/
+COPY services/ticket/ui/package.json services/ticket/ui/
+COPY services/dns/ui/package.json services/dns/ui/
+RUN npm ci --no-audit --no-fund
+COPY ui/ ./ui/
+RUN npm run -w ui/kit build
+COPY services/ipam/ui/ ./services/ipam/ui/
+RUN npm run -w services/ipam/ui build
 
-RUN npm install -g pnpm@9
-
-WORKDIR /frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile || pnpm install
-COPY frontend/ .
-RUN pnpm build
-
-##################################
-# Stage 1: Build Go executable
-##################################
-
-FROM golang:1.23-alpine AS builder
-
-ARG APP_VERSION=1.0.0
-
-# Enable toolchain auto-download for newer Go versions
-ENV GOTOOLCHAIN=auto
-
-# Install build dependencies
-RUN apk add --no-cache git make curl
-
-# Install buf for proto descriptor generation
-RUN curl -sSL "https://github.com/bufbuild/buf/releases/latest/download/buf-$(uname -s)-$(uname -m)" -o /usr/local/bin/buf && \
-    chmod +x /usr/local/bin/buf
-
-# Set working directory
+FROM golang:1.26-alpine AS build
+RUN apk add --no-cache git ca-certificates
 WORKDIR /src
-
-# Copy go mod files first for better caching
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy the entire source code
 COPY . .
-
-# Regenerate proto descriptor (ensures embedded descriptor.bin is always up to date)
-RUN buf build -o cmd/server/assets/descriptor.bin
-
-# Copy frontend dist into assets for go:embed
-COPY --from=frontend-builder /frontend/dist cmd/server/assets/frontend-dist/
-
-# Build the server
-RUN CGO_ENABLED=0 \
-    GOOS=linux \
-    GOARCH=amd64 \
-    go build -ldflags "-X main.version=${APP_VERSION} -s -w" \
-    -o /src/bin/ipam-server \
-    ./cmd/server
-
-##################################
-# Stage 2: Create runtime image
-##################################
+COPY --from=ui /w/services/ipam/ui/dist ./services/ipam/ui/dist
+WORKDIR /src/services/ipam
+ENV CGO_ENABLED=0 GOFLAGS=-buildvcs=false
+RUN go build -tags "ui" -o /out/ipamsvc ./cmd/ipamsvc
 
 FROM alpine:3.20
-
-ARG APP_VERSION=1.0.0
-
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata libcap
-
-# Set timezone
-ENV TZ=UTC
-
-# Set working directory
+RUN apk add --no-cache ca-certificates postgresql-client libcap && adduser -D -u 10001 app
+COPY --from=build /out/ipamsvc /usr/local/bin/
+# CAP_NET_RAW lets the unprivileged app user send ICMP echo for discovery scans.
+RUN setcap cap_net_raw+ep /usr/local/bin/ipamsvc
+COPY services/ipam/deploy /app/deploy
 WORKDIR /app
-
-# Copy executable from builder
-COPY --from=builder /src/bin/ipam-server /app/bin/ipam-server
-
-# Copy configuration files
-COPY --from=builder /src/configs/ /app/configs/
-
-# Create non-root user
-RUN addgroup -g 1000 ipam && \
-    adduser -D -u 1000 -G ipam ipam && \
-    mkdir -p /app/certs && chown -R ipam:ipam /app
-
-# Grant NET_RAW capability for ICMP ping scanning
-# NOTE: must run AFTER chown, as chown strips file capabilities
-RUN setcap cap_net_raw+ep /app/bin/ipam-server
-
-# Switch to non-root user
-USER ipam:ipam
-
-# Expose gRPC and HTTP ports
-EXPOSE 9400 9401
-
-# Set default command
-CMD ["/app/bin/ipam-server", "-c", "/app/configs"]
-
-# Labels
-LABEL org.opencontainers.image.title="IPAM Service" \
-      org.opencontainers.image.description="IP Address Management Service" \
-      org.opencontainers.image.version="${APP_VERSION}"
+USER app
+ENTRYPOINT ["ipamsvc"]
+CMD ["-config", "deploy/container.yaml"]

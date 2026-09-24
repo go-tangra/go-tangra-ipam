@@ -1,0 +1,237 @@
+openapi: 3.1.0
+info:
+  title: IPAM API
+  version: 0.1.0
+  description: >
+    IP address management: subnets, IP addresses, managed devices (with
+    interfaces, packages and out-of-band power/KVM), VLANs, locations, IP and
+    host groups, active/async discovery scans, per-tenant DNS configuration,
+    statistics, tenant backup and a realtime event stream. Gateway-proxied under
+    /api/ipam. Every route declares an x-freya-permission (health is public).
+    SNMP/BMC/IPMI credentials and sealed owner/contact fields are never returned
+    in any response; devices and subnets expose only opaque warden secret refs.
+servers:
+  - url: /
+components:
+  parameters:
+    csrf:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string, maxLength: 128 }
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, maxLength: 64 }
+      example: '018f3a2b-0000-7000-8000-000000000001'
+    ifid:
+      name: ifid
+      in: path
+      required: true
+      schema: { type: string, maxLength: 64 }
+      example: '018f3a2b-0000-7000-8000-0000000000bb'
+    mid:
+      name: mid
+      in: path
+      required: true
+      schema: { type: string, maxLength: 64 }
+      example: '018f3a2b-0000-7000-8000-0000000000cc'
+    cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string, maxLength: 64 }
+    limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 500 }
+    force:
+      name: force
+      in: query
+      required: false
+      schema: { type: boolean }
+  schemas:
+    Error:
+      type: object
+      properties:
+        reason: { type: string }
+        detail: { type: object }
+      example:
+        reason: not_found
+        detail: {}
+paths:
+  # ---- Subnets ----
+  /api/ipam/v1/subnets:
+    get: { operationId: listSubnets, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    post: { operationId: createSubnet, x-freya-permission: 'subnets:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
+  /api/ipam/v1/subnets/tree:
+    get: { operationId: getSubnetTree, x-freya-permission: 'ipam:read', responses: { '200': { description: tree } } }
+  /api/ipam/v1/subnets/{id}:
+    get: { operationId: getSubnet, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: subnet }, '404': { description: not_found } } }
+    put: { operationId: updateSubnet, x-freya-permission: 'subnets:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
+    delete: { operationId: deleteSubnet, x-freya-permission: 'subnets:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/force' }], responses: { '204': { description: deleted } } }
+  /api/ipam/v1/subnets/{id}/stats:
+    get: { operationId: getSubnetStats, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: stats } } }
+  /api/ipam/v1/subnets/{id}/split:
+    post: { operationId: splitSubnet, x-freya-permission: 'subnets:manage', x-freya-max-body-bytes: 4096, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'created children and skipped blocks' }, '400': { description: validation_failed } } }
+  /api/ipam/v1/subnets/{id}/scan:
+    post: { operationId: scanSubnet, x-freya-permission: 'scan:run', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'synchronous discovery result' } } }
+
+  # ---- IP addresses ----
+  /api/ipam/v1/ip-addresses:
+    get: { operationId: listIpAddresses, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    post: { operationId: createIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
+  /api/ipam/v1/ip-addresses/allocate:
+    post: { operationId: allocateIpAddress, x-freya-permission: 'addresses:allocate', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: 'next-free allocated' } } }
+  /api/ipam/v1/ip-addresses/bulk-allocate:
+    post: { operationId: bulkAllocateIpAddresses, x-freya-permission: 'addresses:allocate', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: 'bulk allocated' } } }
+  /api/ipam/v1/ip-addresses/find:
+    get:
+      operationId: findIpAddress
+      x-freya-permission: 'ipam:read'
+      parameters:
+        - { name: address, in: query, required: true, schema: { type: string, maxLength: 64 } }
+      responses: { '200': { description: found }, '404': { description: not_found } }
+  /api/ipam/v1/ip-addresses/suggest:
+    get:
+      operationId: suggestIpAddresses
+      x-freya-permission: 'ipam:read'
+      parameters:
+        - { name: subnet_id, in: query, required: true, schema: { type: string, maxLength: 64 } }
+        - { name: count, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 256 } }
+      responses: { '200': { description: 'ICMP+TCP verified free addresses' } }
+  /api/ipam/v1/ip-addresses/{id}:
+    get: { operationId: getIpAddress, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: address }, '404': { description: not_found } } }
+    put: { operationId: updateIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
+    delete: { operationId: deleteIpAddress, x-freya-permission: 'addresses:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '204': { description: deleted } } }
+  /api/ipam/v1/ip-addresses/{id}/ping:
+    post: { operationId: pingIpAddress, x-freya-permission: 'scan:run', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'reachability result' } } }
+
+  # ---- Devices ----
+  /api/ipam/v1/devices:
+    get: { operationId: listDevices, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    post: { operationId: createDevice, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
+  /api/ipam/v1/devices/{id}:
+    get: { operationId: getDevice, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: device }, '404': { description: not_found } } }
+    put: { operationId: updateDevice, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
+    delete: { operationId: deleteDevice, x-freya-permission: 'devices:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/force' }], responses: { '204': { description: deleted } } }
+  /api/ipam/v1/devices/{id}/addresses:
+    get: { operationId: getDeviceAddresses, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: addresses } } }
+  /api/ipam/v1/devices/{id}/interfaces:
+    get: { operationId: getDeviceInterfaces, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: interfaces } } }
+    post: { operationId: createDeviceInterface, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: created } } }
+  /api/ipam/v1/devices/{id}/interfaces/{ifid}:
+    delete: { operationId: deleteDeviceInterface, x-freya-permission: 'devices:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/ifid' }], responses: { '204': { description: deleted } } }
+  /api/ipam/v1/devices/{id}/packages:
+    get: { operationId: listDevicePackages, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: packages } } }
+  /api/ipam/v1/devices/{id}/packages/sync:
+    post: { operationId: syncDevicePackages, x-freya-permission: 'devices:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: synced } } }
+  /api/ipam/v1/devices/{id}/host-groups:
+    get: { operationId: getDeviceHostGroups, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'host groups for device' } } }
+  /api/ipam/v1/devices/{id}/power:
+    get: { operationId: getDevicePower, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'power status' } } }
+    post: { operationId: setDevicePower, x-freya-permission: 'power:control', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'power action accepted' } } }
+  /api/ipam/v1/devices/{id}/sensors:
+    get: { operationId: getDeviceSensors, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: sensors } } }
+  /api/ipam/v1/devices/{id}/sel:
+    get: { operationId: getDeviceSel, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'system event log' } } }
+  /api/ipam/v1/devices/{id}/kvm-session:
+    post: { operationId: startDeviceKvmSession, x-freya-permission: 'kvm:access', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: 'kvm session token + console url' } } }
+
+  # ---- Warden secret references (metadata only) ----
+  /api/ipam/v1/warden-secrets:
+    get: { operationId: listWardenSecrets, x-freya-permission: 'ipam:read', responses: { '200': { description: 'secret metadata (no values)' } } }
+  /api/ipam/v1/warden-secrets/{id}:
+    get: { operationId: getWardenSecret, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'secret metadata (no values)' }, '404': { description: not_found } } }
+
+  # ---- VLANs ----
+  /api/ipam/v1/vlans:
+    get: { operationId: listVlans, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    post: { operationId: createVlan, x-freya-permission: 'vlans:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
+  /api/ipam/v1/vlans/{id}:
+    get: { operationId: getVlan, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: vlan }, '404': { description: not_found } } }
+    put: { operationId: updateVlan, x-freya-permission: 'vlans:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
+    delete: { operationId: deleteVlan, x-freya-permission: 'vlans:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '204': { description: deleted } } }
+  /api/ipam/v1/vlans/{id}/subnets:
+    get: { operationId: getVlanSubnets, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: subnets } } }
+
+  # ---- Locations ----
+  /api/ipam/v1/locations:
+    get: { operationId: listLocations, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    post: { operationId: createLocation, x-freya-permission: 'locations:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
+  /api/ipam/v1/locations/tree:
+    get: { operationId: getLocationTree, x-freya-permission: 'ipam:read', responses: { '200': { description: tree } } }
+  /api/ipam/v1/locations/{id}:
+    get: { operationId: getLocation, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: location }, '404': { description: not_found } } }
+    put: { operationId: updateLocation, x-freya-permission: 'locations:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
+    delete: { operationId: deleteLocation, x-freya-permission: 'locations:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/force' }], responses: { '204': { description: deleted } } }
+
+  # ---- IP groups ----
+  /api/ipam/v1/ip-groups:
+    get: { operationId: listIpGroups, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    post: { operationId: createIpGroup, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
+  /api/ipam/v1/ip-groups/check:
+    get:
+      operationId: checkIpInGroup
+      x-freya-permission: 'ipam:read'
+      parameters:
+        - { name: ip, in: query, required: true, schema: { type: string, maxLength: 64 } }
+      responses: { '200': { description: 'groups containing ip' } }
+  /api/ipam/v1/ip-groups/{id}:
+    get: { operationId: getIpGroup, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: group }, '404': { description: not_found } } }
+    put: { operationId: updateIpGroup, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
+    delete: { operationId: deleteIpGroup, x-freya-permission: 'groups:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '204': { description: deleted } } }
+  /api/ipam/v1/ip-groups/{id}/members:
+    get: { operationId: listIpGroupMembers, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: members } } }
+    post: { operationId: addIpGroupMember, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: added } } }
+  /api/ipam/v1/ip-groups/{id}/members/{mid}:
+    put: { operationId: updateIpGroupMember, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/mid' }], responses: { '200': { description: updated } } }
+    delete: { operationId: removeIpGroupMember, x-freya-permission: 'groups:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/mid' }], responses: { '204': { description: removed } } }
+
+  # ---- Host groups ----
+  /api/ipam/v1/host-groups:
+    get: { operationId: listHostGroups, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    post: { operationId: createHostGroup, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
+  /api/ipam/v1/host-groups/{id}:
+    get: { operationId: getHostGroup, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: group }, '404': { description: not_found } } }
+    put: { operationId: updateHostGroup, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
+    delete: { operationId: deleteHostGroup, x-freya-permission: 'groups:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '204': { description: deleted } } }
+  /api/ipam/v1/host-groups/{id}/members:
+    get: { operationId: listHostGroupMembers, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: members } } }
+    post: { operationId: addHostGroupMember, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: added } } }
+  /api/ipam/v1/host-groups/{id}/members/{mid}:
+    put: { operationId: updateHostGroupMember, x-freya-permission: 'groups:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/mid' }], responses: { '200': { description: updated } } }
+    delete: { operationId: removeHostGroupMember, x-freya-permission: 'groups:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/mid' }], responses: { '204': { description: removed } } }
+
+  # ---- Scans ----
+  /api/ipam/v1/ip-scans:
+    get: { operationId: listIpScans, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    post: { operationId: startIpScan, x-freya-permission: 'scan:run', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '202': { description: 'scan started' } } }
+  /api/ipam/v1/ip-scans/{id}:
+    get: { operationId: getIpScan, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: job }, '404': { description: not_found } } }
+  /api/ipam/v1/ip-scans/{id}/cancel:
+    post: { operationId: cancelIpScan, x-freya-permission: 'scan:run', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: cancelled } } }
+
+  # ---- System ----
+  /api/ipam/v1/health:
+    get: { operationId: health, x-freya-public: true, responses: { '200': { description: 'health (public)' } } }
+  /api/ipam/v1/stats:
+    get: { operationId: getStats, x-freya-permission: 'ipam:read', responses: { '200': { description: 'tenant statistics' } } }
+  /api/ipam/v1/dns-config:
+    get: { operationId: getDnsConfig, x-freya-permission: 'ipam:read', responses: { '200': { description: 'dns config' } } }
+    put: { operationId: updateDnsConfig, x-freya-permission: 'dns:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '200': { description: updated } } }
+  /api/ipam/v1/dns-config/test:
+    post: { operationId: testDnsConfig, x-freya-permission: 'dns:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '200': { description: 'dns test result' } } }
+
+  # ---- Backup ----
+  /api/ipam/v1/backup/export:
+    post: { operationId: exportBackup, x-freya-permission: 'backup:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '200': { description: export } } }
+  /api/ipam/v1/backup/import:
+    post: { operationId: importBackup, x-freya-permission: 'backup:manage', x-freya-max-body-bytes: 268435456, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '200': { description: imported } } }
+
+  # ---- Realtime (SSE; no x-freya-timeout-seconds so it stays within the
+  #      gateway's 5m MaxDurationRoute) ----
+  /api/ipam/v1/stream:
+    get: { operationId: streamEvents, x-freya-permission: 'ipam:read', responses: { '200': { description: 'SSE event stream (address/scan events)' } } }
