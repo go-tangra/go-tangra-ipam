@@ -114,7 +114,7 @@ func subnetTotal(cidr string) int64 {
 const subnetCols = `id, tenant_id, name, cidr, description, gateway, dns_servers,
 	coalesce(vlan_id::text,''), coalesce(parent_id::text,''), coalesce(location_id::text,''),
 	status, ip_version, network_address, broadcast_address, mask, prefix_length,
-	snmp_secret_ref, snmp_version, tags, created_by, created_at, updated_at`
+	snmp_secret_ref, snmp_version, tags, created_by, created_at, updated_at, origin`
 
 func scanSubnet(sc scanner) (store.Subnet, error) {
 	var s store.Subnet
@@ -122,7 +122,7 @@ func scanSubnet(sc scanner) (store.Subnet, error) {
 	if err := sc.Scan(&s.ID, &s.TenantID, &s.Name, &s.CIDR, &s.Description, &s.Gateway, &s.DNSServers,
 		&s.VlanID, &s.ParentID, &s.LocationID, &s.Status, &s.IPVersion, &s.NetworkAddress,
 		&s.BroadcastAddr, &s.Mask, &s.PrefixLength, &s.SNMPSecretRef, &s.SNMPVersion, &tags,
-		&s.CreatedBy, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		&s.CreatedBy, &s.CreatedAt, &s.UpdatedAt, &s.Origin); err != nil {
 		return store.Subnet{}, err
 	}
 	s.Tags = unmarshalTags(tags)
@@ -364,7 +364,8 @@ func (d *DB) AllSubnetCIDRs(ctx context.Context, tenantID string) (out []store.S
 
 const addrCols = `id, tenant_id, address, subnet_id, hostname, mac_address, description,
 	coalesce(device_id::text,''), interface_name, status, address_type, is_primary, ptr_record,
-	dns_name, owner, last_seen, lease_expiry, has_reverse_dns, note, tags, created_by, created_at, updated_at`
+	dns_name, owner, last_seen, lease_expiry, has_reverse_dns, note, tags, created_by, created_at, updated_at,
+	report_state, coalesce(previous_device_id::text,''), moved_at, move_count, move_window_start, conflict`
 
 func scanAddress(sc scanner) (store.IPAddress, error) {
 	var a store.IPAddress
@@ -372,7 +373,8 @@ func scanAddress(sc scanner) (store.IPAddress, error) {
 	if err := sc.Scan(&a.ID, &a.TenantID, &a.Address, &a.SubnetID, &a.Hostname, &a.MACAddress, &a.Description,
 		&a.DeviceID, &a.InterfaceName, &a.Status, &a.AddressType, &a.IsPrimary, &a.PTRRecord, &a.DNSName,
 		&a.Owner, &a.LastSeen, &a.LeaseExpiry, &a.HasReverseDNS, &a.Note, &tags, &a.CreatedBy,
-		&a.CreatedAt, &a.UpdatedAt); err != nil {
+		&a.CreatedAt, &a.UpdatedAt, &a.ReportState, &a.PreviousDeviceID, &a.MovedAt, &a.MoveCount,
+		&a.MoveWindowStart, &a.Conflict); err != nil {
 		return store.IPAddress{}, err
 	}
 	a.Tags = unmarshalTags(tags)
@@ -447,6 +449,12 @@ func (d *DB) ListAddresses(ctx context.Context, tenantID string, f store.Address
 		}
 		if f.HostnamePattern != "" {
 			add(" AND hostname ILIKE $%d", "%"+f.HostnamePattern+"%")
+		}
+		if f.ReportState != "" {
+			add(" AND report_state = $%d", f.ReportState)
+		}
+		if f.Conflict != nil {
+			add(" AND conflict = $%d", *f.Conflict)
 		}
 		if f.CursorID != "" {
 			add(" AND id < $%d", f.CursorID)
@@ -525,9 +533,14 @@ func (d *DB) UpsertAddressByAddress(ctx context.Context, a store.IPAddress) (cre
 			 has_reverse_dns, note, tags, created_by, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$22)
 			ON CONFLICT (tenant_id, address) DO UPDATE SET
-				subnet_id=EXCLUDED.subnet_id, hostname=EXCLUDED.hostname, mac_address=EXCLUDED.mac_address,
-				description=EXCLUDED.description, device_id=EXCLUDED.device_id, interface_name=EXCLUDED.interface_name,
-				status=EXCLUDED.status, address_type=EXCLUDED.address_type, is_primary=EXCLUDED.is_primary,
+				subnet_id=EXCLUDED.subnet_id,
+				hostname=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.hostname ELSE EXCLUDED.hostname END,
+				mac_address=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.mac_address ELSE EXCLUDED.mac_address END,
+				description=EXCLUDED.description,
+				device_id=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.device_id ELSE EXCLUDED.device_id END,
+				interface_name=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.interface_name ELSE EXCLUDED.interface_name END,
+				status=EXCLUDED.status, address_type=EXCLUDED.address_type,
+				is_primary=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.is_primary ELSE EXCLUDED.is_primary END,
 				ptr_record=EXCLUDED.ptr_record, dns_name=EXCLUDED.dns_name, owner=EXCLUDED.owner,
 				last_seen=EXCLUDED.last_seen, lease_expiry=EXCLUDED.lease_expiry, has_reverse_dns=EXCLUDED.has_reverse_dns,
 				note=EXCLUDED.note, tags=EXCLUDED.tags, updated_at=EXCLUDED.updated_at
@@ -563,7 +576,9 @@ func (d *DB) AddressesForDevice(ctx context.Context, tenantID, deviceID string) 
 const deviceCols = `id, tenant_id, name, device_type, description, manufacturer, model, serial_number,
 	asset_tag, coalesce(location_id::text,''), rack_id, rack_position, device_height_u, status, primary_ip,
 	primary_ipv6, management_ip, os_type, os_version, firmware_version, contact, last_seen, ipmi_secret_ref,
-	reboot_required, unattended_upgrades, tags, created_by, created_at, updated_at`
+	reboot_required, unattended_upgrades, tags, created_by, created_at, updated_at, source,
+	coalesce(inventory_host_id::text,''), virtualization_kind, coalesce(hypervisor_device_id::text,''),
+	update_status, report_state, last_report_at, report_digest`
 
 func scanDevice(sc scanner) (store.Device, error) {
 	var d store.Device
@@ -572,7 +587,8 @@ func scanDevice(sc scanner) (store.Device, error) {
 		&d.SerialNumber, &d.AssetTag, &d.LocationID, &d.RackID, &d.RackPosition, &d.DeviceHeightU, &d.Status,
 		&d.PrimaryIP, &d.PrimaryIPv6, &d.ManagementIP, &d.OSType, &d.OSVersion, &d.FirmwareVersion, &d.Contact,
 		&d.LastSeen, &d.IPMISecretRef, &d.RebootRequired, &d.UnattendedUpgrades, &tags, &d.CreatedBy,
-		&d.CreatedAt, &d.UpdatedAt); err != nil {
+		&d.CreatedAt, &d.UpdatedAt, &d.Source, &d.InventoryHostID, &d.VirtualizationKind, &d.HypervisorDeviceID,
+		&d.UpdateStatus, &d.ReportState, &d.LastReportAt, &d.ReportDigest); err != nil {
 		return store.Device{}, err
 	}
 	d.Tags = unmarshalTags(tags)
@@ -584,23 +600,24 @@ func computeDevice(ctx context.Context, tx pgx.Tx, d *store.Device) error {
 		(SELECT count(*) FROM ipam_device_interfaces WHERE tenant_id=$1 AND device_id=$2),
 		(SELECT count(*) FROM ipam_ip_addresses WHERE tenant_id=$1 AND device_id=$2),
 		(SELECT count(*) FROM ipam_device_packages WHERE tenant_id=$1 AND device_id=$2 AND needs_update),
-		(SELECT count(*) FROM ipam_device_packages WHERE tenant_id=$1 AND device_id=$2 AND is_security_update)`,
-		d.TenantID, d.ID).Scan(&d.InterfaceCount, &d.AddressCount, &d.PackageUpdateCount, &d.SecurityUpdateCount)
+		(SELECT count(*) FROM ipam_device_packages WHERE tenant_id=$1 AND device_id=$2 AND is_security_update),
+		(SELECT count(*) FROM ipam_hypervisor_guests WHERE tenant_id=$1 AND host_device_id=$2)`,
+		d.TenantID, d.ID).Scan(&d.InterfaceCount, &d.AddressCount, &d.PackageUpdateCount, &d.SecurityUpdateCount, &d.GuestCount)
 }
 
 func deviceInsertArgs(d store.Device, now time.Time) []any {
 	return []any{d.ID, d.TenantID, d.Name, d.DeviceType, d.Description, d.Manufacturer, d.Model, d.SerialNumber,
 		d.AssetTag, np(d.LocationID), d.RackID, d.RackPosition, d.DeviceHeightU, d.Status, d.PrimaryIP,
 		d.PrimaryIPv6, d.ManagementIP, d.OSType, d.OSVersion, d.FirmwareVersion, d.Contact, d.LastSeen,
-		d.IPMISecretRef, d.RebootRequired, d.UnattendedUpgrades, mustJSON(nzTags(d.Tags)), d.CreatedBy, now}
+		d.IPMISecretRef, d.RebootRequired, d.UnattendedUpgrades, mustJSON(nzTags(d.Tags)), d.CreatedBy, now, d.Source}
 }
 
 const deviceInsertSQL = `INSERT INTO ipam_devices
 	(id, tenant_id, name, device_type, description, manufacturer, model, serial_number, asset_tag, location_id,
 	 rack_id, rack_position, device_height_u, status, primary_ip, primary_ipv6, management_ip, os_type,
 	 os_version, firmware_version, contact, last_seen, ipmi_secret_ref, reboot_required, unattended_upgrades,
-	 tags, created_by, created_at, updated_at)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,$27,$28,$28)`
+	 tags, created_by, created_at, updated_at, source)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,$27,$28,$28,$29)`
 
 func (d *DB) CreateDevice(ctx context.Context, dev store.Device) error {
 	if dev.ID == "" {
@@ -612,6 +629,7 @@ func (d *DB) CreateDevice(ctx context.Context, dev store.Device) error {
 	if dev.DeviceType == "" {
 		dev.DeviceType = store.DevOther
 	}
+	dev.Source = store.SrcManual // server-owned: API-created devices are manual
 	now := time.Now().UTC()
 	return d.tenant(ctx, dev.TenantID, func(tx pgx.Tx) error {
 		_, e := tx.Exec(ctx, deviceInsertSQL, deviceInsertArgs(dev, now)...)
@@ -657,6 +675,12 @@ func (d *DB) ListDevices(ctx context.Context, tenantID string, f store.DeviceFil
 		}
 		if f.RackID != "" {
 			add(" AND rack_id = $%d", f.RackID)
+		}
+		if f.Source != "" {
+			add(" AND source = $%d", f.Source)
+		}
+		if f.ReportState != "" {
+			add(" AND report_state = $%d", f.ReportState)
 		}
 		if f.Query != "" {
 			args = append(args, "%"+f.Query+"%")
@@ -808,6 +832,7 @@ func (d *DB) UpsertDeviceByName(ctx context.Context, dev store.Device) (out stor
 			if nd.DeviceType == "" {
 				nd.DeviceType = store.DevOther
 			}
+			nd.Source = store.SrcScan
 			if _, e := tx.Exec(ctx, deviceInsertSQL, deviceInsertArgs(nd, now)...); e != nil {
 				return mapErr(e)
 			}
@@ -815,6 +840,9 @@ func (d *DB) UpsertDeviceByName(ctx context.Context, dev store.Device) (out stor
 			return computeDevice(ctx, tx, &out)
 		}
 		m := mergeDevice(existing, dev)
+		if existing.Source == store.SrcHostReport {
+			m = store.FillEmptyDevice(existing, dev) // D9: reported fields win
+		}
 		if _, e := tx.Exec(ctx, `UPDATE ipam_devices SET
 			device_type=$3, description=$4, manufacturer=$5, model=$6, serial_number=$7, asset_tag=$8,
 			location_id=$9, rack_id=$10, rack_position=$11, device_height_u=$12, status=$13, primary_ip=$14,
@@ -839,13 +867,13 @@ func (d *DB) UpsertDeviceByName(ctx context.Context, dev store.Device) (out stor
 
 const ifaceCols = `id, tenant_id, device_id, name, mac_address, interface_type, enabled, speed_mbps,
 	description, if_index, remote_device_id, remote_interface_id, remote_port_name, link_source, link_vlan,
-	link_last_seen, created_at, updated_at`
+	link_last_seen, created_at, updated_at, report_state`
 
 func scanIface(sc scanner) (store.DeviceInterface, error) {
 	var i store.DeviceInterface
 	if err := sc.Scan(&i.ID, &i.TenantID, &i.DeviceID, &i.Name, &i.MACAddress, &i.InterfaceType, &i.Enabled,
 		&i.SpeedMbps, &i.Description, &i.IfIndex, &i.RemoteDeviceID, &i.RemoteInterfaceID, &i.RemotePortName,
-		&i.LinkSource, &i.LinkVlan, &i.LinkLastSeen, &i.CreatedAt, &i.UpdatedAt); err != nil {
+		&i.LinkSource, &i.LinkVlan, &i.LinkLastSeen, &i.CreatedAt, &i.UpdatedAt, &i.ReportState); err != nil {
 		return store.DeviceInterface{}, err
 	}
 	return i, nil
@@ -883,21 +911,37 @@ func (d *DB) GetInterface(ctx context.Context, tenantID, id string) (out store.D
 	return
 }
 
+// ListInterfaces returns a device's interfaces with the computed name of the
+// linked remote device and, for a switch port, the host device linked to it
+// ("device behind", US5).
 func (d *DB) ListInterfaces(ctx context.Context, tenantID, deviceID string) (out []store.DeviceInterface, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
-		rows, e := tx.Query(ctx, "SELECT "+ifaceCols+" FROM ipam_device_interfaces WHERE tenant_id=$1 AND device_id=$2 ORDER BY if_index, name", tenantID, deviceID)
+		rows, e := tx.Query(ctx, "SELECT "+ifaceCols+` FROM ipam_device_interfaces WHERE tenant_id=$1 AND device_id=$2 ORDER BY if_index, name`, tenantID, deviceID)
 		if e != nil {
 			return e
 		}
-		defer rows.Close()
 		for rows.Next() {
 			i, e := scanIface(rows)
 			if e != nil {
+				rows.Close()
 				return e
 			}
 			out = append(out, i)
 		}
-		return rows.Err()
+		rows.Close()
+		if e := rows.Err(); e != nil {
+			return e
+		}
+		for k := range out {
+			i := &out[k]
+			if i.RemoteDeviceID != "" {
+				_ = tx.QueryRow(ctx, "SELECT name FROM ipam_devices WHERE tenant_id=$1 AND id::text=$2", tenantID, i.RemoteDeviceID).Scan(&i.RemoteDeviceName)
+			}
+			_ = tx.QueryRow(ctx, `SELECT d.id::text, d.name FROM ipam_device_interfaces h JOIN ipam_devices d ON d.id = h.device_id
+				WHERE h.tenant_id=$1 AND h.remote_interface_id=$2 ORDER BY h.link_last_seen DESC NULLS LAST LIMIT 1`,
+				tenantID, i.ID).Scan(&i.BehindDeviceID, &i.BehindDeviceName)
+		}
+		return nil
 	})
 	return
 }

@@ -19,6 +19,8 @@ export interface DeviceFilter {
   location_id?: string | undefined
   manufacturer?: string | undefined
   rack_id?: string | undefined
+  source?: string | undefined
+  report_state?: string | undefined
   query?: string | undefined
   cursor?: string | undefined
   limit?: number | undefined

@@ -18,6 +18,11 @@ time and never logged, audited or exported. The gRPC binding to warden's
 resolution fails closed and SNMP/IPMI/KVM operations that need a credential are
 refused.
 
+**Host sync**: hosts running the inventory agent keep their devices,
+interfaces, addresses (in auto-created subnets when needed), BMC management
+addresses, hypervisor guests, pending updates and switch ports current in IPAM
+(see [Host sync](#host-sync)).
+
 Operations: [`deploy/README.md`](deploy/README.md).
 Design history: `specs/011-ipam-service` (walkthrough in `quickstart.md`).
 
@@ -29,6 +34,7 @@ go-tangra/go-tangra          platform module + @go-tangra/ui kit
 go-tangra-auth  <---->  go-tangra-portal (gateway)  <---->  go-tangra-ipam
                               |                              |       ^
                          go-tangra-lcm (SVIDs)        go-tangra-warden   dns (ipam sdk)
+                                                             go-tangra-inventory (host reports)
 ```
 
 - Built on `github.com/go-tangra/go-tangra/v4` (mTLS transports, identity,
@@ -39,6 +45,8 @@ go-tangra-auth  <---->  go-tangra-portal (gateway)  <---->  go-tangra-ipam
   (`github.com/go-tangra/go-tangra-portal/sdk/v4`), which fronts the browser API
   (`/api/ipam`), the KVM proxy (`/bmc/`) and the federated UI remote.
 - Enrolls for its workload identity with lcm (`github.com/go-tangra/go-tangra-lcm/sdk/v4`).
+- Reads host reports from inventory (`github.com/go-tangra/go-tangra-inventory/sdk/v4`,
+  `inventory.v1.HostReportService`, inventory >= 4.3.0).
 
 ## Modules in this repository
 
@@ -62,6 +70,8 @@ SDK's published `sdk/vX.Y.Z` tag.
 | `internal/scan` | scan executor and ICMP/SNMP/TCP probes |
 | `internal/ipmi`, `internal/kvm` | BMC power/inventory and the KVM console proxy |
 | `internal/warden` | secret-reference client (plus an in-memory fake) |
+| `internal/{invclient,hostreport,hostplan,hostsync}` | host sync: inventory client, report validation, pure planner, poller/reconcile/apply and admin service |
+| `internal/portlink` | links reported host interfaces to switch ports from SNMP FDB/LLDP data |
 | `internal/{authz,sealed,audit,stream,backup,stats,dnscfg}` | authorization, sealed owner data, audit vocabulary, event stream, tenant backup, statistics, DNS settings |
 | `internal/{repo,store,memstore}` | repository, SQL bindings (RLS, goose migrations), in-memory store |
 | `pkg/ipammanifest` | gateway manifest built from the OpenAPI document |
@@ -87,7 +97,8 @@ npm ci && npm run lint && npm run test:unit && npm run build
 ```
 
 The unit coverage gate requires at least 80 % overall and 100 % for
-`internal/{authz,sealed,ipnet}`. Generated code, SQL bindings, wiring and the
+`internal/{authz,sealed,ipnet,hostreport,hostplan}`. `make fuzz` runs every fuzz
+target (`FUZZTIME`, default 10 s each). Generated code, SQL bindings, wiring and the
 raw network probes are covered by the integration suite instead. The Playwright
 specs in `ui/tests/e2e` need a running platform and operator credentials; they
 skip otherwise.
@@ -124,13 +135,74 @@ key-encryption key. `ipamsvc` carries the file capability `cap_net_raw+ep` so
 ICMP discovery scans work without root; the container must keep `NET_RAW` in its
 capability set (Docker's default; the platform stack adds it explicitly).
 
+## Host sync
+
+The inventory agent reports each host's interfaces (kind, speed, addresses with
+prefix and flags, gateway), primary addresses, virtualization, BMC LAN
+settings (no credentials), Proxmox guests and Linux update state to the
+inventory module. IPAM pulls a projection of each host's latest report from
+inventory over the mesh (`inventory.v1.HostReportService`, SPIFFE mTLS):
+
+- a **poll** every `host_sync.poll_interval_seconds` (60) fetches the reports
+  that changed since the tenant's watermark; a per-tenant **reconcile** (tenant
+  setting, default hourly) compares digests of every host and marks devices of
+  retired or deleted hosts as *no longer reported* (nothing is deleted);
+- each host is applied in **one tenant transaction** holding a per-tenant
+  advisory lock and `FOR SHARE` on the tenant settings, so disabling the sync
+  stops every later change; every change is written as an audit row in the
+  same transaction (actor `system`/`hostsync`);
+- the device is matched by inventory host id, else a unique real serial, else a
+  non-generic hostname; reported data wins for the reported fields only —
+  description, tags, location, rack, asset tag, status, contact, BMC secret
+  reference, firmware and groups are never changed; addresses are placed in the
+  most specific subnet (a subnet named after the reported network is created
+  with origin `host_sync` when none contains it), moved from other devices with
+  the previous device audited, flagged as a conflict after repeated moves, and
+  released (not deleted) when the host stops reporting them; loopback,
+  link-local, temporary IPv6 and container/virtual bridge interfaces (tenant
+  exclusion patterns) are not recorded;
+- after SNMP scans and host-sync runs, host interface MACs are correlated with
+  the switches' forwarding tables and LLDP neighbours to show the switch port
+  (and VLAN) each host is connected to.
+
+Configuration (`host_sync` section, all optional):
+
+```yaml
+host_sync:
+  enabled: true                 # global kill switch (false: nothing is applied)
+  inventory_service: inventory
+  poll_interval_seconds: 60     # 10-3600
+  workers: 2                    # tenants in parallel, 1-8
+  page_size: 100                # 1-200
+  pace_ms: 10                   # pause between hosts
+  request_timeout_seconds: 30
+  conflict_moves: 3             # moves within the window that flag a conflict, 2-100
+  conflict_window_hours: 24     # 1-168
+  max_macs_per_port: 16         # switch ports with more MACs are never inferred, 1-256
+  link_stale_days: 14           # switch-port links not re-confirmed are cleared
+```
+
+Per tenant, administrators enable or disable the sync, set the reconcile
+interval and edit the interface exclusions (`/ipam/host-sync`, permission
+`hostsync:manage`); anyone with `devices:manage` can re-sync one host or all.
+Until inventory >= 4.3.0 is deployed and its policy has the `ipam-hostsync` rule
+(see `deploy/README.md`), the sync reports `degraded` and writes nothing.
+
+Audit vocabulary of the sync: `device_created`, `device_updated`,
+`device_not_reported`, `interface_created`, `interface_updated`,
+`interface_not_reported`, `subnet_created`, `address_created`,
+`address_updated`, `address_moved`, `address_released`, `address_conflict`,
+`address_conflict_cleared`, `packages_updated`, `hypervisor_linked`,
+`hypervisor_unlinked`, `port_linked`, `port_unlinked`, `hostsync_run`,
+`hostsync_settings_updated`, `hostsync_resync_requested`.
+
 ## API permissions
 
 `ipam:read`, `subnets:manage`, `addresses:manage`, `addresses:allocate`,
 `devices:manage`, `vlans:manage`, `locations:manage`, `groups:manage`,
-`scan:run`, `dns:manage`, `backup:manage`, `power:control`, `kvm:access`. The
-gateway enforces the per-route permission from the manifest; power, IPMI and
-KVM additionally require the platform-admin role.
+`scan:run`, `dns:manage`, `backup:manage`, `power:control`, `kvm:access`,
+`hostsync:manage`. The gateway enforces the per-route permission from the
+manifest; power, IPMI and KVM additionally require the platform-admin role.
 
 ## Roles
 
@@ -140,13 +212,13 @@ tenant (locked; administrators assign them or clone them into custom roles):
 
 | Role | Display name | Permissions |
 |---|---|---|
-| `administrator` | IPAM administrator | all 13, including `power:control` and `kvm:access` (the handlers still require platform-admin for those) |
+| `administrator` | IPAM administrator | all 14, including `power:control`, `kvm:access` (the handlers still require platform-admin for those) and `hostsync:manage` |
 | `operator` | IPAM operator | `ipam:read`, `addresses:allocate`, `scan:run` |
 | `viewer` | IPAM viewer | `ipam:read` |
 
 Built-in role grants (scoped to IPAM by auth): `owner` and `admin` hold every
-permission; `operator` holds everything except `power:control` and
-`kvm:access`; `member` and `auditor` hold `ipam:read`.
+permission; `operator` holds everything except `power:control`, `kvm:access`
+and `hostsync:manage`; `member` and `auditor` hold `ipam:read`.
 
 ## Versioning
 

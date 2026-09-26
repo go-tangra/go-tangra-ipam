@@ -10,6 +10,8 @@ export interface AddressFilter {
   address_type?: string | undefined
   prefix?: string | undefined
   hostname?: string | undefined
+  report_state?: string | undefined
+  conflict?: boolean | undefined
   cursor?: string | undefined
   limit?: number | undefined
 }

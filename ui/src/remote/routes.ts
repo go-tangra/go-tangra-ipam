@@ -11,6 +11,7 @@ export const routes: RouteRecordRaw[] = [
   { path: '/ipam/locations', name: 'ipam-locations', component: () => import('@/views/locations/index.vue'), meta: { module: 'ipam' } },
   { path: '/ipam/groups', name: 'ipam-groups', component: () => import('@/views/groups/index.vue'), meta: { module: 'ipam' } },
   { path: '/ipam/scans', name: 'ipam-scans', component: () => import('@/views/scans/index.vue'), meta: { module: 'ipam' } },
+  { path: '/ipam/host-sync', name: 'ipam-host-sync', component: () => import('@/views/hostsync/index.vue'), meta: { module: 'ipam' } },
   { path: '/ipam/dashboard', name: 'ipam-dashboard', component: () => import('@/views/dashboard/index.vue'), meta: { module: 'ipam' } },
 ]
 export default routes

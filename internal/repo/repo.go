@@ -13,6 +13,9 @@ var (
 	ErrNotFound = errors.New("not found")
 	ErrConflict = errors.New("conflict") // unique-constraint violation (duplicate)
 	ErrNotEmpty = errors.New("not empty")
+	// ErrSyncDisabled aborts a host-sync apply whose tenant disabled the sync
+	// (SR-006): nothing of the transaction is committed.
+	ErrSyncDisabled = errors.New("host sync disabled")
 )
 
 // Stats is a per-tenant statistics rollup.
@@ -130,4 +133,98 @@ type Store interface {
 
 	// Audit
 	AppendAudit(ctx context.Context, row store.AuditRow) error
+
+	HostSyncStore
+	PortLinkStore
+}
+
+// PortLinkData is what switch-port correlation reads for one tenant.
+type PortLinkData struct {
+	Switches     []store.Device              // devices typed switch
+	SwitchIfaces []store.DeviceInterface     // their interfaces
+	Links        []store.DeviceInterfaceLink // snmp_fdb / lldp rows on switch interfaces
+	Hosts        []store.Device              // host-reported devices
+	HostIfaces   []store.DeviceInterface     // their reported interfaces (with the flat link columns)
+}
+
+// PortLinkStore is the switch-port correlation persistence (US5).
+type PortLinkStore interface {
+	PortLinkData(ctx context.Context, tenantID string) (PortLinkData, error)
+	// SetInterfaceLinks writes the flat link columns of host interfaces and
+	// their audit rows in one tenant transaction.
+	SetInterfaceLinks(ctx context.Context, tenantID string, ifaces []store.DeviceInterface, audit []store.AuditRow) error
+}
+
+// MACOwner is a device interface carrying a MAC (hypervisor guest matching).
+type MACOwner struct {
+	MAC                string
+	DeviceID           string
+	HypervisorDeviceID string
+}
+
+// HostSyncStore is the host-sync persistence (feature 020). Settings and
+// reads are tenant-scoped (ListHostSyncSettings is system scope); every write a
+// host report causes goes through ApplyHostReport.
+type HostSyncStore interface {
+	// EnsureHostSyncSettings inserts the tenant's default settings if absent
+	// and returns the row.
+	EnsureHostSyncSettings(ctx context.Context, tenantID string) (store.HostSyncSettings, error)
+	GetHostSyncSettings(ctx context.Context, tenantID string) (store.HostSyncSettings, error)
+	// UpdateHostSyncSettings writes enabled/interval/exclusions and the audit
+	// row in one transaction; re-enabling requests a reconcile.
+	UpdateHostSyncSettings(ctx context.Context, s store.HostSyncSettings, audit store.AuditRow) error
+	// RequestReconcile flags the tenant for a full reconcile (resync-all).
+	RequestReconcile(ctx context.Context, tenantID string, audit store.AuditRow) error
+	ListHostSyncSettings(ctx context.Context) ([]store.HostSyncSettings, error) // system scope
+	SaveHostSyncState(ctx context.Context, tenantID string, st store.HostSyncStatus) error
+
+	// ApplyHostReport runs fn in one tenant transaction that holds the
+	// tenant's host-sync advisory lock and a FOR SHARE lock on its settings;
+	// it returns ErrSyncDisabled (committing nothing) when the sync is off.
+	ApplyHostReport(ctx context.Context, tenantID string, fn func(tx HostTx) error) error
+
+	// HostDevices lists the tenant's devices linked to an inventory host.
+	HostDevices(ctx context.Context, tenantID string) ([]store.Device, error)
+	GetHostSyncDeviceState(ctx context.Context, tenantID, deviceID string) (store.HostSyncDeviceState, error)
+	// HostSyncCounts returns devices no longer reported and addresses in conflict.
+	HostSyncCounts(ctx context.Context, tenantID string) (notReported, conflicts int64, err error)
+	// ListGuests lists the guests a hypervisor device reports, with the names
+	// of the matched guest devices.
+	ListGuests(ctx context.Context, tenantID, hostDeviceID string) ([]store.HypervisorGuest, error)
+	// ClearAddressConflict resets an address's conflict flag with its audit row.
+	ClearAddressConflict(ctx context.Context, tenantID, addressID string, audit store.AuditRow) (store.IPAddress, error)
+}
+
+// HostTx is the tenant- and transaction-bound view one host apply uses. Reads
+// load the state the planner needs; writes change only the columns the host
+// sync owns (research D8).
+type HostTx interface {
+	DeviceByInventoryHost(hostID string) (store.Device, bool, error)
+	DevicesBySerial(serial string) ([]store.Device, error) // case-insensitive, trimmed
+	DevicesByNames(names []string) ([]store.Device, error) // case-insensitive
+	Interfaces(deviceID string) ([]store.DeviceInterface, error)
+	AddressesByValue(addrs []string) ([]store.IPAddress, error)
+	AddressesOfDevice(deviceID string) ([]store.IPAddress, error)
+	Subnets() ([]store.Subnet, error)
+	Packages(deviceID string) ([]store.DevicePackage, error)
+	Guests(hostDeviceID string) ([]store.HypervisorGuest, error)
+	DevicesByMAC(macs []string) ([]MACOwner, error)
+	GuestRowsByMAC(macs []string) ([]store.HypervisorGuest, error)
+	GuestDevicesOf(hostDeviceID string) ([]store.Device, error)
+
+	InsertDevice(d store.Device) error
+	UpdateDeviceReported(d store.Device) error
+	UpsertInterfaceReported(i store.DeviceInterface, create bool) error
+	CreateSubnetAuto(s store.Subnet) error
+	InsertAddressReported(a store.IPAddress) error
+	UpdateAddressReported(a store.IPAddress) error
+	ReplacePendingPackages(deviceID string, pkgs []store.DevicePackage) error
+	ReplaceGuests(hostDeviceID string, guests []store.HypervisorGuest) error
+	SetHypervisor(deviceID, hypervisorID string) error
+	SetGuestDevice(guestRowID, deviceID string) error
+	// MarkDeviceNotReported flags a device, its reported interfaces and its
+	// reported addresses as no longer reported (links kept).
+	MarkDeviceNotReported(deviceID string) error
+	SaveDeviceState(st store.HostSyncDeviceState) error
+	AppendAudit(row store.AuditRow) error
 }

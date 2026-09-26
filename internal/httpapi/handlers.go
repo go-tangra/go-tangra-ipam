@@ -27,6 +27,7 @@ const MaxImportBytes = 256 << 20
 // realtime SSE stream is mounted only when Deps.Hub is set.
 func (s *Server) Register(d Deps) {
 	p := ipamBase
+	s.registerHostSync(d)
 
 	// ---------------------------------------------------------------- Subnets
 	s.MustHandle("GET", p+"/subnets", func(w http.ResponseWriter, r *http.Request) {
@@ -202,6 +203,8 @@ func (s *Server) Register(d Deps) {
 			DeviceID:    q.Get("device_id"),
 			Status:      q.Get("status"),
 			AddressType: q.Get("address_type"),
+			ReportState: q.Get("report_state"),
+			Conflict:    optBool(q, "conflict"),
 			Limit:       atoiDefault(q.Get("limit"), 0),
 			CursorID:    q.Get("cursor"),
 		})
@@ -375,6 +378,8 @@ func (s *Server) Register(d Deps) {
 			LocationID:   q.Get("location_id"),
 			Manufacturer: q.Get("manufacturer"),
 			RackID:       q.Get("rack_id"),
+			Source:       q.Get("source"),
+			ReportState:  q.Get("report_state"),
 			Query:        q.Get("query"),
 			Limit:        atoiDefault(q.Get("limit"), 0),
 			CursorID:     q.Get("cursor"),

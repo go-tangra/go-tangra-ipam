@@ -2,7 +2,7 @@ GO        ?= go
 PKGS      := $(shell $(GO) list ./... | grep -v /ui/)
 COVER_OUT := coverage.out
 
-.PHONY: lint vuln test test-integration cover generate ui-build build build-ui image
+.PHONY: lint vuln test test-integration cover fuzz generate ui-build build build-ui image
 
 lint:
 	$(GO) vet ./...
@@ -29,6 +29,26 @@ COVERPKG := $(shell $(GO) list ./... | grep -v -E '/api/|/internal/store$$|db$$|
 cover:
 	$(GO) test -count=1 -coverprofile=$(COVER_OUT) -coverpkg=$(COVERPKG) $(PKGS)
 	./scripts/coverage-gate.sh $(COVER_OUT)
+
+# Every fuzz target runs for FUZZTIME (package:target pairs). internal/hostsync,
+# internal/invclient and internal/portlink stay inside COVERPKG above.
+FUZZTIME ?= 10s
+FUZZ_TARGETS := \
+	./internal/ipnet:FuzzParseAllocate \
+	./internal/ipnet:FuzzMostSpecific \
+	./internal/scan:FuzzScanTargets \
+	./internal/groups:FuzzMembership \
+	./internal/hostreport:FuzzNormalizeReport \
+	./internal/hostreport:FuzzExclusionPattern \
+	./internal/hostplan:FuzzPlan \
+	./internal/portlink:FuzzRank
+
+fuzz:
+	@set -e; for t in $(FUZZ_TARGETS); do \
+		pkg=$${t%%:*}; name=$${t##*:}; \
+		echo "fuzz $$pkg $$name"; \
+		$(GO) test -run '^$$' -fuzz "^$$name$$" -fuzztime $(FUZZTIME) $$pkg; \
+	done
 
 generate:
 	cd sdk && buf generate

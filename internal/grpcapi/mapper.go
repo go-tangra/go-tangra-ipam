@@ -454,7 +454,7 @@ func subnetToPB(v store.Subnet) *ipamv1.Subnet {
 		PrefixLength: int32(v.PrefixLength), SnmpSecretRef: v.SNMPSecretRef, SnmpVersion: int32(v.SNMPVersion),
 		Tags: v.Tags, CreatedBy: v.CreatedBy, CreatedAt: unix(v.CreatedAt), UpdatedAt: unix(v.UpdatedAt),
 		TotalAddresses: v.TotalAddresses, UsedAddresses: v.UsedAddresses,
-		AvailableAddresses: v.AvailableAddresses, Utilization: v.Utilization,
+		AvailableAddresses: v.AvailableAddresses, Utilization: v.Utilization, Origin: v.Origin,
 	}
 }
 
@@ -492,6 +492,7 @@ func addressToPB(v store.IPAddress) *ipamv1.IPAddress {
 		IsPrimary: v.IsPrimary, PtrRecord: v.PTRRecord, DnsName: v.DNSName, LastSeen: unixPtr(v.LastSeen),
 		LeaseExpiry: unixPtr(v.LeaseExpiry), HasReverseDns: v.HasReverseDNS, Note: v.Note, Tags: v.Tags,
 		CreatedBy: v.CreatedBy, CreatedAt: unix(v.CreatedAt), UpdatedAt: unix(v.UpdatedAt),
+		ReportState: v.ReportState, PreviousDeviceId: v.PreviousDeviceID, MovedAt: unixPtr(v.MovedAt), Conflict: v.Conflict,
 	}
 }
 
@@ -532,9 +533,16 @@ func deviceToPB(v store.Device) *ipamv1.Device {
 		CreatedBy: v.CreatedBy, CreatedAt: unix(v.CreatedAt), UpdatedAt: unix(v.UpdatedAt),
 		InterfaceCount: v.InterfaceCount, AddressCount: v.AddressCount,
 		PackageUpdateCount: v.PackageUpdateCount, SecurityUpdateCount: v.SecurityUpdateCount,
+		Source: v.Source, InventoryHostId: v.InventoryHostID, VirtualizationKind: v.VirtualizationKind,
+		HypervisorDeviceId: v.HypervisorDeviceID, UpdateStatus: v.UpdateStatus, ReportState: v.ReportState,
+		LastReportAt: unixPtr(v.LastReportAt), GuestCount: v.GuestCount,
 	}
 }
 
+// deviceFromPB maps a caller's device. The host-sync fields (source,
+// inventory_host_id, virtualization_kind, hypervisor_device_id,
+// update_status, report_state, last_report_at) are server-owned and are
+// never read from a caller.
 func deviceFromPB(p *ipamv1.Device) store.Device {
 	if p == nil {
 		return store.Device{}
@@ -558,7 +566,7 @@ func deviceInterfaceToPB(v store.DeviceInterface) *ipamv1.DeviceInterface {
 		Description: v.Description, IfIndex: int32(v.IfIndex), RemoteDeviceId: v.RemoteDeviceID,
 		RemoteInterfaceId: v.RemoteInterfaceID, RemotePortName: v.RemotePortName, LinkSource: v.LinkSource,
 		LinkVlan: int32(v.LinkVlan), LinkLastSeen: unixPtr(v.LinkLastSeen),
-		CreatedAt: unix(v.CreatedAt), UpdatedAt: unix(v.UpdatedAt),
+		CreatedAt: unix(v.CreatedAt), UpdatedAt: unix(v.UpdatedAt), ReportState: v.ReportState,
 	}
 }
 

@@ -181,6 +181,7 @@ message Subnet {
   int64 used_addresses = 24;
   int64 available_addresses = 25;
   double utilization = 26;
+  string origin = 27;        // "manual" | "host_sync" (server-owned)
 }
 
 // IPAddress is an address within a subnet. Unique (tenant_id,address).
@@ -207,6 +208,11 @@ message IPAddress {
   string created_by = 20;
   int64 created_at = 21; // unix seconds
   int64 updated_at = 22; // unix seconds
+  // Host sync (feature 020). Server-owned: ignored by Create/Update RPCs.
+  string report_state = 23;
+  string previous_device_id = 24;
+  int64 moved_at = 25;       // unix seconds, 0 = never moved
+  bool conflict = 26;
 }
 
 // Device is a managed network device/host. Unique (tenant_id,name). Sealed
@@ -245,6 +251,15 @@ message Device {
   int64 address_count = 30;
   int64 package_update_count = 31;
   int64 security_update_count = 32;
+  // Host sync (feature 020). Server-owned: ignored by Create/Update RPCs.
+  string source = 33;                // "manual" | "scan" | "host_report"
+  string inventory_host_id = 34;
+  string virtualization_kind = 35;
+  string hypervisor_device_id = 36;
+  string update_status = 37;         // unknown|up_to_date|updates_available|unsupported|error
+  string report_state = 38;          // "" | "reported" | "not_reported"
+  int64 last_report_at = 39;         // unix seconds, 0 = never
+  int64 guest_count = 40;            // computed
 }
 
 // DeviceInterface is a NIC on a device. Unique (device_id,name).
@@ -267,6 +282,7 @@ message DeviceInterface {
   int64 link_last_seen = 16; // unix seconds, 0 = unset
   int64 created_at = 17;     // unix seconds
   int64 updated_at = 18;     // unix seconds
+  string report_state = 19;  // host sync, server-owned
 }
 
 // DevicePackage is an OS package on a device. Unique (tenant_id,device_id,name).

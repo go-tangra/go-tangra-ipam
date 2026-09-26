@@ -88,3 +88,69 @@ func TestStreamHasNoTimeout(t *testing.T) {
 		}
 	}
 }
+
+// TestHostSyncContract (T068): the host-sync paths, schemas and bounds of
+// contracts/ipam-http.md.
+func TestHostSyncContract(t *testing.T) {
+	doc := loadDoc(t)
+	settings := doc.Components.Schemas["HostSyncSettings"].Value
+	if settings == nil || settings.AdditionalProperties.Has == nil || *settings.AdditionalProperties.Has {
+		t.Fatal("HostSyncSettings must forbid additional properties")
+	}
+	fim := settings.Properties["full_interval_minutes"].Value
+	if *fim.Min != 15 || *fim.Max != 1440 {
+		t.Fatal("interval bounds")
+	}
+	ex := settings.Properties["excluded_interfaces"].Value
+	if *ex.MaxItems != 64 || ex.Items.Value.Pattern != `^[A-Za-z0-9*?._:-]{1,64}$` {
+		t.Fatal("exclusion bounds")
+	}
+	for _, name := range []string{"HostSyncStatus", "DeviceHostSync", "ResyncResult", "HypervisorGuest", "HostSyncIssue"} {
+		if doc.Components.Schemas[name] == nil {
+			t.Errorf("schema %s missing", name)
+		}
+	}
+	for path, methods := range map[string][]string{
+		"/api/ipam/v1/host-sync/settings":               {"GET", "PUT"},
+		"/api/ipam/v1/host-sync/status":                 {"GET"},
+		"/api/ipam/v1/host-sync/resync":                 {"POST"},
+		"/api/ipam/v1/devices/{id}/host-sync":           {"GET", "POST"},
+		"/api/ipam/v1/devices/{id}/guests":              {"GET"},
+		"/api/ipam/v1/ip-addresses/{id}/clear-conflict": {"POST"},
+	} {
+		item := doc.Paths.Find(path)
+		if item == nil {
+			t.Fatalf("%s missing", path)
+		}
+		for _, m := range methods {
+			op := item.GetOperation(m)
+			if op == nil {
+				t.Fatalf("%s %s missing", m, path)
+			}
+			if m != "GET" {
+				csrf := false
+				for _, p := range op.Parameters {
+					csrf = csrf || (p.Value != nil && p.Value.Name == "X-CSRF-Token" && p.Value.Required)
+				}
+				if !csrf {
+					t.Errorf("%s %s must require the CSRF parameter", m, path)
+				}
+				if _, ok := op.Extensions["x-freya-max-body-bytes"]; !ok {
+					t.Errorf("%s %s must bound its body", m, path)
+				}
+			}
+		}
+	}
+	for path, params := range map[string][]string{"/api/ipam/v1/devices": {"source", "report_state"}, "/api/ipam/v1/ip-addresses": {"conflict", "report_state"}} {
+		op := doc.Paths.Find(path).Get
+		for _, want := range params {
+			found := false
+			for _, p := range op.Parameters {
+				found = found || (p.Value != nil && p.Value.Name == want)
+			}
+			if !found {
+				t.Errorf("%s filter %s", path, want)
+			}
+		}
+	}
+}

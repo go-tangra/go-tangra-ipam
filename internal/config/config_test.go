@@ -276,3 +276,63 @@ func TestLoadErrors(t *testing.T) {
 		t.Error("Load with unknown field must error")
 	}
 }
+
+func TestHostSyncDefaultsAndBounds(t *testing.T) {
+	d := Default().HostSync
+	if !d.Enabled || d.InventoryService != "inventory" || d.PollIntervalSeconds != 60 || d.Workers != 2 || d.PageSize != 100 ||
+		d.PaceMs != 10 || d.RequestTimeoutSeconds != 30 || d.ConflictMoves != 3 || d.ConflictWindowHours != 24 ||
+		d.MaxMACsPerPort != 16 || d.LinkStaleDays != 14 {
+		t.Fatalf("host_sync defaults: %+v", d)
+	}
+	cases := []struct {
+		name string
+		mut  func(*HostSync)
+		want string
+	}{
+		{"service", func(h *HostSync) { h.InventoryService = "" }, "inventory_service"},
+		{"poll low", func(h *HostSync) { h.PollIntervalSeconds = 9 }, "poll_interval_seconds"},
+		{"poll high", func(h *HostSync) { h.PollIntervalSeconds = 3601 }, "poll_interval_seconds"},
+		{"workers", func(h *HostSync) { h.Workers = 9 }, "workers"},
+		{"workers low", func(h *HostSync) { h.Workers = 0 }, "workers"},
+		{"page", func(h *HostSync) { h.PageSize = 201 }, "page_size"},
+		{"pace", func(h *HostSync) { h.PaceMs = -1 }, "pace_ms"},
+		{"timeout", func(h *HostSync) { h.RequestTimeoutSeconds = 0 }, "request_timeout_seconds"},
+		{"moves", func(h *HostSync) { h.ConflictMoves = 1 }, "conflict_moves"},
+		{"moves high", func(h *HostSync) { h.ConflictMoves = 101 }, "conflict_moves"},
+		{"window", func(h *HostSync) { h.ConflictWindowHours = 169 }, "conflict_window_hours"},
+		{"macs", func(h *HostSync) { h.MaxMACsPerPort = 257 }, "max_macs_per_port"},
+		{"stale", func(h *HostSync) { h.LinkStaleDays = 0 }, "link_stale_days"},
+	}
+	for _, c := range cases {
+		cfg := valid()
+		c.mut(&cfg.HostSync)
+		err := cfg.Validate()
+		if err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: err = %v, want %q", c.name, err, c.want)
+		}
+	}
+	// A disabled sync skips the bounds (the kill switch is always usable).
+	cfg := valid()
+	cfg.HostSync = HostSync{Enabled: false}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("disabled host_sync rejected: %v", err)
+	}
+}
+
+func TestHostSyncUnknownKeyRejected(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "c.yaml")
+	if err := os.WriteFile(p, []byte("host_sync:\n  enabled: false\n  surprise: 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(p); err == nil {
+		t.Fatal("unknown host_sync key must be rejected")
+	}
+	if err := os.WriteFile(p, []byte("host_sync:\n  enabled: false\n  workers: 4\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(p)
+	if err != nil || c.HostSync.Enabled || c.HostSync.Workers != 4 || c.HostSync.PageSize != 100 {
+		t.Fatalf("load: %+v %v", c.HostSync, err)
+	}
+}

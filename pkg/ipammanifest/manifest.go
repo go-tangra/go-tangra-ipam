@@ -35,7 +35,7 @@ const (
 	TimeoutExtension    = "x-freya-timeout-seconds"
 )
 
-// Permissions the module registers (the 13 IPAM permissions).
+// Permissions the module registers (the 14 IPAM permissions).
 var Permissions = []gatewayclient.Permission{
 	{Resource: "ipam", Action: "read", Description: "List and read subnets, addresses, devices, groups, scans and the live stream"},
 	{Resource: "subnets", Action: "manage", Description: "Create, update and delete subnets"},
@@ -50,12 +50,14 @@ var Permissions = []gatewayclient.Permission{
 	{Resource: "backup", Action: "manage", Description: "Export and import tenant IPAM data"},
 	{Resource: "power", Action: "control", Description: "Out-of-band power status and actions via device BMC (platform-admin)"},
 	{Resource: "kvm", Action: "access", Description: "Start token-gated KVM console sessions (platform-admin)"},
+	{Resource: "hostsync", Action: "manage", Description: "Enable or disable the host sync and edit its interface exclusions"},
 }
 
 // Grants maps built-in role slugs to the permissions they hold. Owner and admin
 // hold everything (including power:control and kvm:access); operator holds the
 // manage set plus scan:run and allocate but NOT power/kvm; member and auditor
-// read only.
+// read only. hostsync:manage (turning the audited automatic writes off or
+// changing which interfaces are recorded) is an owner/admin decision.
 var Grants = map[string][]string{
 	"owner": PermissionRefs(),
 	"admin": PermissionRefs(),
@@ -85,6 +87,12 @@ var Abilities = []gatewayclient.Ability{
 	// Out-of-band controls: the UI hides them unless the caller holds the platform-admin permissions.
 	{Action: []string{"control"}, Subject: []string{"Power"}, Requires: "power:control"},
 	{Action: []string{"access"}, Subject: []string{"Kvm"}, Requires: "kvm:access"},
+	// Host sync settings: owners, admins and the IPAM administrator role only.
+	{Action: []string{"manage"}, Subject: []string{"HostSync"}, Requires: "hostsync:manage"},
+	// Re-sync (one host or all) and clearing an address conflict follow the
+	// device/address manage permissions.
+	{Action: []string{"resync"}, Subject: []string{"HostSync"}, Requires: "devices:manage"},
+	{Action: []string{"clear"}, Subject: []string{"AddressConflict"}, Requires: "addresses:manage"},
 }
 
 // Nav lists the navigation contributions.
@@ -96,6 +104,7 @@ var Nav = []gatewayclient.NavEntry{
 	{Title: "Locations", Path: "/ipam/locations", Icon: "mdi-map-marker-outline", Order: 740, Requires: "ipam:read"},
 	{Title: "Groups", Path: "/ipam/groups", Icon: "mdi-group", Order: 750, Requires: "ipam:read"},
 	{Title: "Scans", Path: "/ipam/scans", Icon: "mdi-radar", Order: 760, Requires: "ipam:read"},
+	{Title: "Host sync", Path: "/ipam/host-sync", Icon: "mdi-sync", Order: 765, Requires: "ipam:read"},
 	{Title: "Dashboard", Path: "/ipam/dashboard", Icon: "mdi-view-dashboard-outline", Order: 770, Requires: "ipam:read"},
 }
 

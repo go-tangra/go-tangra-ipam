@@ -67,7 +67,17 @@ type Service struct {
 
 	now       func() time.Time
 	revLookup func(ctx context.Context, ip string) string
+	linker    LinkCorrelator
 }
+
+// LinkCorrelator links host interfaces to switch ports from the SNMP data a
+// completed scan stored (feature 020, US5).
+type LinkCorrelator interface {
+	Correlate(ctx context.Context, tenantID string) error
+}
+
+// SetLinker installs the switch-port correlation run after SNMP scans.
+func (s *Service) SetLinker(l LinkCorrelator) { s.linker = l }
 
 // New builds a scan Service. A nil now uses time.Now (UTC); a nil publisher
 // must not be passed (use events.HubPublisher{} for a no-op).

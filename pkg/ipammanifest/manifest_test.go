@@ -23,8 +23,8 @@ func TestManifestBuilds(t *testing.T) {
 }
 
 func TestPermissionCount(t *testing.T) {
-	if len(Permissions) != 13 {
-		t.Fatalf("want 13 permissions, got %d", len(Permissions))
+	if len(Permissions) != 14 {
+		t.Fatalf("want 14 permissions, got %d", len(Permissions))
 	}
 	// PermissionRefs must be unique.
 	seen := map[string]bool{}
@@ -37,7 +37,7 @@ func TestPermissionCount(t *testing.T) {
 	for _, want := range []string{
 		"ipam:read", "subnets:manage", "addresses:manage", "addresses:allocate",
 		"devices:manage", "vlans:manage", "locations:manage", "groups:manage",
-		"scan:run", "dns:manage", "backup:manage", "power:control", "kvm:access",
+		"scan:run", "dns:manage", "backup:manage", "power:control", "kvm:access", "hostsync:manage",
 	} {
 		if !seen[want] {
 			t.Errorf("missing permission %q", want)
@@ -97,13 +97,13 @@ func TestOperatorExcludesPowerAndKvm(t *testing.T) {
 }
 
 func TestNavEntries(t *testing.T) {
-	if len(Nav) != 8 {
-		t.Fatalf("want 8 nav entries, got %d", len(Nav))
+	if len(Nav) != 9 {
+		t.Fatalf("want 9 nav entries, got %d", len(Nav))
 	}
 	wantPaths := map[string]bool{
 		"/ipam": false, "/ipam/addresses": false, "/ipam/devices": false,
 		"/ipam/vlans": false, "/ipam/locations": false, "/ipam/groups": false,
-		"/ipam/scans": false, "/ipam/dashboard": false,
+		"/ipam/scans": false, "/ipam/dashboard": false, "/ipam/host-sync": false,
 	}
 	for _, n := range Nav {
 		if _, ok := wantPaths[n.Path]; !ok {
@@ -160,12 +160,13 @@ func TestRoles(t *testing.T) {
 }
 
 // TestBuiltinGrantsUnchanged: the built-in grants are those registered before
-// module roles existed (auth now scopes them to the module).
+// module roles existed (auth now scopes them to the module), plus
+// hostsync:manage for owner/admin (feature 020).
 func TestBuiltinGrantsUnchanged(t *testing.T) {
 	all := []string{
 		"ipam:read", "subnets:manage", "addresses:manage", "addresses:allocate",
 		"devices:manage", "vlans:manage", "locations:manage", "groups:manage",
-		"scan:run", "dns:manage", "backup:manage", "power:control", "kvm:access",
+		"scan:run", "dns:manage", "backup:manage", "power:control", "kvm:access", "hostsync:manage",
 	}
 	want := map[string][]string{
 		"owner": all,
@@ -213,4 +214,87 @@ func contains(s []string, v string) bool {
 		}
 	}
 	return false
+}
+
+// TestHostSyncPermission (T066): hostsync:manage is held by owner, admin and
+// the IPAM administrator module role only; the new routes use the permissions
+// of contracts/ipam-http.md.
+func TestHostSyncPermission(t *testing.T) {
+	for _, role := range []string{"owner", "admin"} {
+		if !contains(Grants[role], "hostsync:manage") {
+			t.Errorf("%s must hold hostsync:manage", role)
+		}
+	}
+	for _, role := range []string{"operator", "member", "auditor"} {
+		if contains(Grants[role], "hostsync:manage") {
+			t.Errorf("%s must not hold hostsync:manage", role)
+		}
+	}
+	for _, r := range Roles {
+		has := contains(r.Permissions, "hostsync:manage")
+		if (r.Slug == "administrator") != has {
+			t.Errorf("module role %s hostsync:manage = %v", r.Slug, has)
+		}
+	}
+	reg := Registration()
+	found := false
+	for _, p := range reg.Permissions {
+		found = found || (p.Resource == "hostsync" && p.Action == "manage")
+	}
+	if !found {
+		t.Fatal("hostsync:manage registered with auth")
+	}
+	ability := false
+	for _, a := range Abilities {
+		ability = ability || (reflect.DeepEqual(a.Subject, []string{"HostSync"}) && reflect.DeepEqual(a.Action, []string{"manage"}) && a.Requires == "hostsync:manage")
+	}
+	if !ability {
+		t.Fatal("CASL {manage, HostSync}")
+	}
+	for _, want := range [][3]string{{"resync", "HostSync", "devices:manage"}, {"clear", "AddressConflict", "addresses:manage"}} {
+		ok := false
+		for _, a := range Abilities {
+			ok = ok || (reflect.DeepEqual(a.Action, []string{want[0]}) && reflect.DeepEqual(a.Subject, []string{want[1]}) && a.Requires == want[2])
+		}
+		if !ok {
+			t.Errorf("CASL %v", want)
+		}
+	}
+	nav := false
+	for _, n := range Nav {
+		nav = nav || (n.Path == "/ipam/host-sync" && n.Requires == "ipam:read" && n.Order == 765 && n.Icon == "mdi-sync")
+	}
+	if !nav {
+		t.Fatal("host sync nav entry")
+	}
+	doc, _ := Load()
+	routes, _ := Routes(doc)
+	want := map[string]string{
+		"GET /api/ipam/v1/host-sync/settings":                "ipam:read",
+		"PUT /api/ipam/v1/host-sync/settings":                "hostsync:manage",
+		"GET /api/ipam/v1/host-sync/status":                  "ipam:read",
+		"POST /api/ipam/v1/host-sync/resync":                 "devices:manage",
+		"GET /api/ipam/v1/devices/{id}/host-sync":            "ipam:read",
+		"POST /api/ipam/v1/devices/{id}/host-sync":           "devices:manage",
+		"GET /api/ipam/v1/devices/{id}/guests":               "ipam:read",
+		"POST /api/ipam/v1/ip-addresses/{id}/clear-conflict": "addresses:manage",
+	}
+	limits := map[string]uint64{"PUT /api/ipam/v1/host-sync/settings": 16384, "POST /api/ipam/v1/host-sync/resync": 1024,
+		"POST /api/ipam/v1/devices/{id}/host-sync": 1024, "POST /api/ipam/v1/ip-addresses/{id}/clear-conflict": 1024}
+	got := map[string]bool{}
+	for _, r := range routes {
+		k := r.Method + " " + r.Path
+		if p, ok := want[k]; ok {
+			got[k] = true
+			if r.Permission != p {
+				t.Errorf("%s permission %s want %s", k, r.Permission, p)
+			}
+			if l, ok := limits[k]; ok && r.MaxBodyBytes != l {
+				t.Errorf("%s body limit %d want %d", k, r.MaxBodyBytes, l)
+			}
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("routes %v", got)
+	}
 }

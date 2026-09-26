@@ -57,7 +57,29 @@ const (
 	BackupImported EventType = "backup_imported"
 
 	AccessRefused EventType = "access_refused"
+
+	// Host sync (feature 020, contracts/audit-events.md). Written in the
+	// apply transaction with actor system/hostsync.
+	InterfaceCreated        EventType = "interface_created"
+	InterfaceUpdated        EventType = "interface_updated"
+	InterfaceNotReported    EventType = "interface_not_reported"
+	AddressMoved            EventType = "address_moved"
+	AddressReleased         EventType = "address_released"
+	AddressConflict         EventType = "address_conflict"
+	AddressConflictCleared  EventType = "address_conflict_cleared"
+	PackagesUpdated         EventType = "packages_updated"
+	HypervisorLinked        EventType = "hypervisor_linked"
+	HypervisorUnlinked      EventType = "hypervisor_unlinked"
+	PortLinked              EventType = "port_linked"
+	PortUnlinked            EventType = "port_unlinked"
+	DeviceNotReported       EventType = "device_not_reported"
+	HostSyncSettingsUpdated EventType = "hostsync_settings_updated"
+	HostSyncResyncRequested EventType = "hostsync_resync_requested"
+	HostSyncRun             EventType = "hostsync_run"
 )
+
+// HostSyncActor is the actor id of every change the host sync makes.
+const HostSyncActor = "hostsync"
 
 // Subject kinds (closed set).
 const (
@@ -74,6 +96,8 @@ const (
 	SubjectDNS       = "dns"
 	SubjectBackup    = "backup"
 	SubjectSystem    = "system"
+	SubjectPackage   = "package"
+	SubjectHostSync  = "hostsync"
 )
 
 // Outcomes (closed set).
@@ -104,6 +128,10 @@ func init() {
 		PowerAction, KVMSessionStarted, DNSConfigUpdated,
 		BackupExported, BackupImported,
 		AccessRefused,
+		InterfaceCreated, InterfaceUpdated, InterfaceNotReported,
+		AddressMoved, AddressReleased, AddressConflict, AddressConflictCleared,
+		PackagesUpdated, HypervisorLinked, HypervisorUnlinked, PortLinked, PortUnlinked,
+		DeviceNotReported, HostSyncSettingsUpdated, HostSyncResyncRequested, HostSyncRun,
 	} {
 		known[t] = struct{}{}
 	}
@@ -148,7 +176,8 @@ func Validate(e Event) error {
 	switch e.SubjectKind {
 	case SubjectSubnet, SubjectAddress, SubjectDevice, SubjectInterface,
 		SubjectVlan, SubjectLocation, SubjectGroup, SubjectScan,
-		SubjectPower, SubjectKVM, SubjectDNS, SubjectBackup, SubjectSystem:
+		SubjectPower, SubjectKVM, SubjectDNS, SubjectBackup, SubjectSystem,
+		SubjectPackage, SubjectHostSync:
 	default:
 		return fmt.Errorf("audit: subject_kind %q", e.SubjectKind)
 	}
@@ -206,6 +235,29 @@ func guardMap(m map[string]any) map[string]any {
 		out[k] = guardValue(v)
 	}
 	return out
+}
+
+// Row validates e and turns it into a guarded audit row for a caller that
+// writes it itself (the host sync writes its rows inside the apply
+// transaction so that no change is ever committed without its audit row).
+func Row(e Event, at time.Time) (store.AuditRow, error) {
+	if err := Validate(e); err != nil {
+		return store.AuditRow{}, err
+	}
+	return store.AuditRow{
+		ID:          store.NewID(),
+		TenantID:    e.TenantID,
+		At:          at,
+		ActorKind:   e.ActorKind,
+		ActorID:     e.ActorID,
+		Action:      string(e.EventType),
+		SubjectKind: e.SubjectKind,
+		SubjectID:   e.SubjectID,
+		Target:      e.Target,
+		Outcome:     e.Outcome,
+		Reason:      e.Reason,
+		Detail:      guardMap(e.Details),
+	}, nil
 }
 
 // Writer buffers events and writes them one row at a time; Record never blocks.

@@ -176,6 +176,11 @@ func (s *Service) processJob(ctx context.Context, log *slog.Logger, job store.IP
 	}
 	s.pub.Publish(ctx, job.TenantID, events.ScanCompleted,
 		events.ScanPayload(job.ID, job.SubnetID, job.AliveCount, job.NewCount))
+	if s.linker != nil && job.EnableSNMP {
+		if err := s.linker.Correlate(ctx, job.TenantID); err != nil {
+			log.Warn("port correlation", "job", job.ID, "err", err)
+		}
+	}
 }
 
 // discoverSNMP runs SNMP discovery against the alive hosts using the subnet's
