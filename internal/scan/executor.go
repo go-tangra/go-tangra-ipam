@@ -12,7 +12,9 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/snmpcred"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 )
 
 // pollInterval is how often Run polls the work queue for due jobs.
@@ -76,6 +78,9 @@ func (s *Service) RunOnce(ctx context.Context, log *slog.Logger) (int, error) {
 // optionally run SNMP discovery, then mark completed. Failures are retried with
 // backoff up to max_retries; a cancel is honored cooperatively.
 func (s *Service) processJob(ctx context.Context, log *slog.Logger, job store.IPScanJob) {
+	if log == nil {
+		log = slog.Default()
+	}
 	// A cancel may have landed between the claim and now; never write progress
 	// (which would clobber the cancelled status) once it has.
 	if s.observeCancel(ctx, log, &job) {
@@ -85,6 +90,15 @@ func (s *Service) processJob(ctx context.Context, log *slog.Logger, job store.IP
 	if err != nil {
 		s.retryOrFail(ctx, log, job, fmt.Errorf("load subnet: %w", err))
 		return
+	}
+	// Credentials are resolved and opened once, when the job starts: the scan
+	// keeps them even if they change meanwhile (FR-013, FR-018).
+	var cred effective
+	if job.EnableSNMP {
+		if cred, err = s.effectiveCreds(ctx, job.TenantID, job.SubnetID); err != nil {
+			s.retryOrFail(ctx, log, job, fmt.Errorf("resolve snmp credentials: %w", err))
+			return
+		}
 	}
 
 	targets, err := enumerateTargets(subnet.CIDR, s.cfg.MaxHosts)
@@ -157,9 +171,7 @@ func (s *Service) processJob(ctx context.Context, log *slog.Logger, job store.IP
 	job.NewCount = newC
 	job.UpdatedCount = updC
 
-	if job.EnableSNMP && len(aliveList) > 0 {
-		job.SNMPDiscoveredCount = s.discoverSNMP(ctx, log, job, subnet, aliveList)
-	}
+	s.snmpPhase(ctx, log, &job, cred, aliveList)
 
 	if s.observeCancel(ctx, log, &job) {
 		return
@@ -183,55 +195,80 @@ func (s *Service) processJob(ctx context.Context, log *slog.Logger, job store.IP
 	}
 }
 
-// discoverSNMP runs SNMP discovery against the alive hosts using the subnet's
-// warden-referenced credentials, persisting each discovered device with its
-// interfaces and L2 links. It returns the number of devices discovered. SNMP is
-// best-effort: a missing credential ref or a silent host is skipped, not fatal.
-func (s *Service) discoverSNMP(ctx context.Context, log *slog.Logger, job store.IPScanJob, subnet store.Subnet, aliveList []string) int64 {
-	creds, ok := s.snmpCreds(ctx, subnet)
-	if !ok {
-		return 0
+// effective is the outcome of resolving a subnet's SNMP credentials at job
+// start: a status other than "ran" means SNMP cannot run.
+type effective struct {
+	status string // SNMPRan (usable) | SNMPNoCredentials | SNMPUnreadable
+	source string // subnet whose credentials apply
+	creds  snmp.Creds
+	secret snmpcred.Secret // for scrubbing error text only
+}
+
+// effectiveCreds resolves the nearest subnet with own credentials (own or an
+// ancestor, same tenant) and opens its sealed blob.
+func (s *Service) effectiveCreds(ctx context.Context, tenantID, subnetID string) (effective, error) {
+	idx, err := subnets.SNMPIndex(ctx, s.st, tenantID)
+	if err != nil {
+		return effective{}, err
 	}
-	var count int64
-	for _, ip := range aliveList {
-		dev, err := s.snmp.Discover(ctx, ip, creds)
+	_, src, ok := idx.Effective(subnetID)
+	if !ok {
+		return effective{status: store.SNMPNoCredentials}, nil
+	}
+	row, err := s.st.GetSubnetSNMP(ctx, tenantID, src.SubnetID)
+	if err != nil {
+		return effective{status: store.SNMPUnreadable, source: src.SubnetID}, nil
+	}
+	sec, err := snmpcred.Open(s.env, tenantID, row.SubnetID, row.Sealed)
+	if err != nil {
+		return effective{status: store.SNMPUnreadable, source: src.SubnetID}, nil
+	}
+	return effective{status: store.SNMPRan, source: src.SubnetID, secret: sec,
+		creds: snmpcred.ToCreds(snmpcred.MetaOf(row), sec, s.cfg.TimeoutMs, 0)}, nil
+}
+
+// snmpPhase records why SNMP ran or not (FR-016, SC-005) and, when it can,
+// probes every live host.
+func (s *Service) snmpPhase(ctx context.Context, log *slog.Logger, job *store.IPScanJob, cred effective, alive []string) {
+	job.SNMPSourceSubnetID = cred.source
+	switch {
+	case !job.EnableSNMP:
+		job.SNMPStatus = store.SNMPNotRequested
+	case cred.status != store.SNMPRan:
+		job.SNMPStatus = cred.status
+	case len(alive) == 0:
+		job.SNMPStatus = store.SNMPNoLiveHosts
+	default:
+		job.SNMPStatus = store.SNMPRan
+		s.discoverSNMP(ctx, log, job, cred, alive)
+	}
+}
+
+// discoverSNMP probes the live hosts with the opened credentials, persisting
+// each discovered device with its interfaces and L2 links and counting the
+// hosts that did not answer or rejected the credentials. SNMP is
+// best-effort: a silent host is counted, not fatal.
+func (s *Service) discoverSNMP(ctx context.Context, log *slog.Logger, job *store.IPScanJob, cred effective, alive []string) {
+	for _, ip := range alive {
+		job.SNMPProbed++
+		dev, err := s.snmp.Discover(ctx, ip, cred.creds)
 		if err != nil {
-			continue // silent / non-SNMP host
+			switch o := snmp.Classify(err); {
+			case o == snmp.OutcomeNoResponse:
+				job.SNMPNoAnswer++
+			case o.Rejected():
+				job.SNMPRejected++
+			default:
+				log.Debug("scan snmp host", "job", job.ID, "ip", ip, "err", snmpcred.Scrub(err.Error(), cred.secret))
+			}
+			continue
 		}
 		if err := s.persistDevice(ctx, job.TenantID, ip, dev); err != nil {
 			log.Warn("scan persist device", "job", job.ID, "ip", ip, "err", err)
 			continue
 		}
-		count++
+		job.SNMPDiscoveredCount++
 	}
-	return count
-}
-
-// snmpCreds fetches and maps the subnet's SNMP credentials from warden at use
-// time. The secret map is never stored or logged. It returns ok=false when the
-// subnet has no credential reference or the fetch fails.
-func (s *Service) snmpCreds(ctx context.Context, subnet store.Subnet) (snmp.Creds, bool) {
-	if subnet.SNMPSecretRef == "" {
-		return snmp.Creds{}, false
-	}
-	secret, err := s.warden.GetSecret(ctx, subnet.SNMPSecretRef)
-	if err != nil {
-		return snmp.Creds{}, false
-	}
-	version := subnet.SNMPVersion
-	if version == 0 {
-		version = 2
-	}
-	return snmp.Creds{
-		Version:      version,
-		Community:    secret["community"],
-		User:         secret["username"],
-		AuthPassword: secret["auth_password"],
-		PrivPassword: secret["priv_password"],
-		AuthProtocol: secret["auth_protocol"],
-		PrivProtocol: secret["priv_protocol"],
-		TimeoutMs:    s.cfg.TimeoutMs,
-	}, true
 }
 
 // persistDevice upserts a discovered device, its interfaces and their links.

@@ -2,9 +2,10 @@
 // subnet-scan work queue: StartScan validates and enqueues a job (tenant-scoped,
 // refusing IPv6, oversized and already-active subnets), and the executor worker
 // pool (Run/RunOnce) claims due jobs, sweeps the subnet's own hosts for ICMP
-// liveness, upserts the alive addresses, optionally runs SNMP device discovery,
-// and publishes realtime progress — all through the Sweeper/Pinger/Discoverer,
-// warden and Publisher interfaces so the orchestration and its authorization are
+// liveness, upserts the alive addresses, optionally runs SNMP device discovery
+// with the subnet's effective (own or inherited) sealed credentials, and
+// publishes realtime progress — all through the Sweeper/Pinger/Discoverer and
+// Publisher interfaces so the orchestration and its authorization are
 // unit-tested with fakes, without touching the network.
 package scan
 
@@ -21,8 +22,8 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/snmpcred"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 // Sentinel errors surfaced to callers.
@@ -61,7 +62,7 @@ type Service struct {
 	sweeper icmp.Sweeper
 	pinger  icmp.Pinger
 	snmp    snmp.Discoverer
-	warden  warden.Client
+	env     snmpcred.Sealer // opens subnet SNMP credentials (SetEnvelope)
 	pub     events.Publisher
 	cfg     Config
 
@@ -79,6 +80,9 @@ type LinkCorrelator interface {
 // SetLinker installs the switch-port correlation run after SNMP scans.
 func (s *Service) SetLinker(l LinkCorrelator) { s.linker = l }
 
+// SetEnvelope installs the module envelope that opens SNMP credentials.
+func (s *Service) SetEnvelope(env snmpcred.Sealer) { s.env = env }
+
 // New builds a scan Service. A nil now uses time.Now (UTC); a nil publisher
 // must not be passed (use events.HubPublisher{} for a no-op).
 func New(
@@ -86,7 +90,6 @@ func New(
 	sweeper icmp.Sweeper,
 	pinger icmp.Pinger,
 	disc snmp.Discoverer,
-	w warden.Client,
 	pub events.Publisher,
 	cfg Config,
 	now func() time.Time,
@@ -99,7 +102,6 @@ func New(
 		sweeper:   sweeper,
 		pinger:    pinger,
 		snmp:      disc,
-		warden:    w,
 		pub:       pub,
 		cfg:       cfg,
 		now:       now,

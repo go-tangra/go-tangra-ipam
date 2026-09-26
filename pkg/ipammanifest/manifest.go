@@ -93,6 +93,11 @@ var Abilities = []gatewayclient.Ability{
 	// device/address manage permissions.
 	{Action: []string{"resync"}, Subject: []string{"HostSync"}, Requires: "devices:manage"},
 	{Action: []string{"clear"}, Subject: []string{"AddressConflict"}, Requires: "addresses:manage"},
+	// Subnet SNMP credentials (feature 021): set/replace/clear follow
+	// subnets:manage, the credentials test follows scan:run; everyone with
+	// ipam:read sees only the status.
+	{Action: []string{"manage"}, Subject: []string{"SubnetSnmp"}, Requires: "subnets:manage"},
+	{Action: []string{"test"}, Subject: []string{"SubnetSnmp"}, Requires: "scan:run"},
 }
 
 // Nav lists the navigation contributions.

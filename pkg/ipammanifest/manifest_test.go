@@ -298,3 +298,24 @@ func TestHostSyncPermission(t *testing.T) {
 		t.Fatalf("routes %v", got)
 	}
 }
+
+// TestSNMPCredentialPermissions (021): read-only roles see SNMP status but
+// cannot set, clear or test credentials; operators can.
+func TestSNMPCredentialPermissions(t *testing.T) {
+	has := func(role, perm string) bool {
+		for _, p := range Grants[role] {
+			if p == perm {
+				return true
+			}
+		}
+		return false
+	}
+	for _, role := range []string{"member", "auditor"} {
+		if !has(role, "ipam:read") || has(role, "subnets:manage") || has(role, "scan:run") {
+			t.Errorf("%s must read SNMP status only", role)
+		}
+	}
+	if !has("operator", "subnets:manage") || !has("operator", "scan:run") {
+		t.Error("operator manages and tests SNMP credentials")
+	}
+}

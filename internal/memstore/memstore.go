@@ -345,6 +345,9 @@ func (m *Mem) SubnetsForVlan(_ context.Context, tenantID, vlanID string) ([]stor
 func (m *Mem) AllSubnetCIDRs(_ context.Context, tenantID string) ([]store.Subnet, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.fail("AllSubnetCIDRs"); err != nil {
+		return nil, err
+	}
 	var out []store.Subnet
 	for _, s := range m.subnets {
 		if s.TenantID == tenantID {

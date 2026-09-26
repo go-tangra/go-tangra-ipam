@@ -40,8 +40,11 @@ export interface Subnet {
   broadcast_address?: string
   mask?: string
   prefix_length?: number
-  snmp_secret_ref?: string
+  // Effective SNMP version (0/absent when none); the legacy warden ref is
+  // never returned.
   snmp_version?: number
+  // Effective SNMP credential state (feature 021); never a credential value.
+  snmp?: SNMPSummary
   tags?: Record<string, string>
   created_by?: string
   created_at?: string
@@ -52,6 +55,51 @@ export interface Subnet {
   utilization?: number
   // "host_sync" when the host sync created it for a reported network.
   origin?: 'manual' | 'host_sync'
+}
+
+// --- subnet SNMP credentials (feature 021): write-only ---
+
+export type SNMPVersion = 2 | 3
+export type SNMPSecurityLevel = 'authNoPriv' | 'authPriv'
+export type SNMPState = 'none' | 'own' | 'inherited'
+
+// SNMPSummary is a subnet's effective SNMP state.
+export interface SNMPSummary {
+  state: SNMPState
+  version?: SNMPVersion
+  security_level?: SNMPSecurityLevel
+  weak?: boolean
+  source_subnet_id?: string
+  source_name?: string
+  source_cidr?: string
+}
+
+export interface SubnetSNMPOwn {
+  version: SNMPVersion
+  security_level?: SNMPSecurityLevel
+  auth_protocol?: string
+  priv_protocol?: string
+  weak: boolean
+  updated_by?: string
+  updated_at?: string
+}
+
+// SubnetSNMPStatus is GET/PUT /subnets/{id}/snmp: status only, never values.
+export interface SubnetSNMPStatus {
+  own: SubnetSNMPOwn | null
+  effective: SNMPSummary
+}
+
+// SubnetSNMPInput is the set/replace body; every field of the kind is sent.
+export interface SubnetSNMPInput {
+  version: SNMPVersion
+  community?: string
+  user?: string
+  security_level?: SNMPSecurityLevel
+  auth_protocol?: string
+  auth_password?: string
+  priv_protocol?: string
+  priv_password?: string
 }
 
 // SubnetTreeNode is a subnet enriched with nested children for /subnets/tree.

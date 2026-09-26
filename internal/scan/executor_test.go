@@ -11,8 +11,8 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/snmpcred"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 func TestRunOnceSweepsAndCompletes(t *testing.T) {
@@ -24,7 +24,7 @@ func TestRunOnceSweepsAndCompletes(t *testing.T) {
 
 	sweeper := icmp.NewFake("10.0.0.1", "10.0.0.3")
 	pub := &recPub{}
-	svc := newService(m, sweeper, snmp.NewFake(), warden.NewFake(), pub, testConfig(), clk)
+	svc := newService(m, sweeper, snmp.NewFake(), pub, testConfig(), clk)
 
 	job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true})
 	if err != nil {
@@ -76,15 +76,8 @@ func TestRunOnceSNMPDiscovery(t *testing.T) {
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
 
-	// Attach an SNMP credential reference to the subnet.
-	sub, _ := m.GetSubnet(ctx, "t1", "s1")
-	sub.SNMPSecretRef = "snmp-ref"
-	sub.SNMPVersion = 2
-	if err := m.UpdateSubnet(ctx, sub); err != nil {
-		t.Fatalf("update subnet: %v", err)
-	}
-	w := warden.NewFake()
-	w.Put("snmp-ref", map[string]string{"community": "public"}, warden.SecretMeta{Name: "snmp"})
+	// Own v2c credentials on the subnet (sealed, feature 021).
+	setCreds(t, m, "t1", "s1", snmpcred.Input{Version: 2, Community: "lab-community"})
 
 	disc := snmp.NewFake()
 	disc.Set("10.0.0.1", snmp.DiscoveredDevice{
@@ -95,9 +88,10 @@ func TestRunOnceSNMPDiscovery(t *testing.T) {
 	})
 
 	sweeper := icmp.NewFake("10.0.0.1")
-	svc := newService(m, sweeper, disc, w, &recPub{}, testConfig(), clk)
+	svc := newService(m, sweeper, disc, &recPub{}, testConfig(), clk)
 
-	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true, SkipReverseDNS: true}); err != nil {
+	job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true, SkipReverseDNS: true})
+	if err != nil {
 		t.Fatalf("StartScan: %v", err)
 	}
 	if _, err := svc.RunOnce(ctx, nil); err != nil {
@@ -125,6 +119,17 @@ func TestRunOnceSNMPDiscovery(t *testing.T) {
 	if len(links) != 1 || links[0].LinkSource != snmp.SourceSNMPFDB || links[0].LinkVlan != 10 {
 		t.Fatalf("links = %+v, want one snmp_fdb vlan10", links)
 	}
+	// T021: the subnet's own credentials reached the client and the SNMP
+	// phase is recorded.
+	seen := disc.Seen()
+	if len(seen) != 1 || seen[0].Version != 2 || seen[0].Community != "lab-community" || seen[0].TimeoutMs != testConfig().TimeoutMs {
+		t.Fatalf("creds reaching the client: %d calls", len(seen))
+	}
+	got, _ := m.GetScanJob(ctx, "t1", job.ID)
+	if got.SNMPStatus != store.SNMPRan || got.SNMPSourceSubnetID != "s1" || got.SNMPProbed != 1 || got.SNMPDiscoveredCount != 1 ||
+		got.SNMPNoAnswer != 0 || got.SNMPRejected != 0 {
+		t.Fatalf("snmp phase %+v", got)
+	}
 }
 
 func TestProcessJobHonorsCancel(t *testing.T) {
@@ -135,7 +140,7 @@ func TestProcessJobHonorsCancel(t *testing.T) {
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
 
 	sweeper := icmp.NewFake("10.0.0.1")
-	svc := newService(m, sweeper, snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, sweeper, snmp.NewFake(), &recPub{}, testConfig(), clk)
 
 	job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true})
 	if err != nil {
@@ -168,7 +173,7 @@ func TestRunOnceRetriesWithBackoffThenFails(t *testing.T) {
 	sweeper := &icmp.Fake{Err: errors.New("boom")} // every sweep fails
 	cfg := testConfig()
 	cfg.MaxRetries = 2
-	svc := newService(m, sweeper, snmp.NewFake(), warden.NewFake(), &recPub{}, cfg, clk)
+	svc := newService(m, sweeper, snmp.NewFake(), &recPub{}, cfg, clk)
 
 	job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true})
 	if err != nil {
@@ -225,11 +230,7 @@ func TestSNMPScanGuardsHostReportedDevice(t *testing.T) {
 	clk := &clock{t: time.Now().UTC()}
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
-	sub, _ := m.GetSubnet(ctx, "t1", "s1")
-	sub.SNMPSecretRef = "snmp-ref"
-	_ = m.UpdateSubnet(ctx, sub)
-	w := warden.NewFake()
-	w.Put("snmp-ref", map[string]string{"community": "public"}, warden.SecretMeta{Name: "snmp"})
+	setCreds(t, m, "t1", "s1", snmpcred.Input{Version: 2, Community: "lab-community"})
 	_ = m.ApplyHostReport(ctx, "t1", func(tx repo.HostTx) error {
 		return tx.InsertDevice(store.Device{ID: "web", Name: "web-01", DeviceType: store.DevServer, ManagementIP: "10.9.0.5",
 			OSVersion: "Ubuntu 24.04", Source: store.SrcHostReport, InventoryHostID: "h1", Status: store.DevStActive})
@@ -237,7 +238,7 @@ func TestSNMPScanGuardsHostReportedDevice(t *testing.T) {
 	disc := snmp.NewFake()
 	disc.Set("10.0.0.1", snmp.DiscoveredDevice{SysName: "web-01", DeviceType: store.DevOther, OSVersion: "Linux 6.8", Model: "net-snmp"})
 	disc.Set("10.0.0.2", snmp.DiscoveredDevice{SysName: "switch-9", DeviceType: store.DevSwitch})
-	svc := newService(m, icmp.NewFake("10.0.0.1", "10.0.0.2"), disc, w, &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake("10.0.0.1", "10.0.0.2"), disc, &recPub{}, testConfig(), clk)
 	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true, SkipReverseDNS: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +272,7 @@ func TestPortCorrelationAfterSNMPScan(t *testing.T) {
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
 	l := &countLinker{}
-	svc := newService(m, icmp.NewFake("10.0.0.1"), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake("10.0.0.1"), snmp.NewFake(), &recPub{}, testConfig(), clk)
 	svc.SetLinker(l)
 	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true}); err != nil {
 		t.Fatal(err)
@@ -288,7 +289,7 @@ func TestPortCorrelationAfterSNMPScan(t *testing.T) {
 		t.Fatalf("correlation after an SNMP scan: %v", l.tenants)
 	}
 	// A failing job (subnet gone) never correlates.
-	failing := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	failing := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 	l2 := &countLinker{}
 	failing.SetLinker(l2)
 	job, _ := failing.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true})

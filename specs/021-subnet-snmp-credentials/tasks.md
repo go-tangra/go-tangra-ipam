@@ -70,21 +70,21 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T019 [P] [US1] Service tests in `internal/subnets/snmp_test.go`: `SetSNMP` stores sealed blob + metadata and returns status without values; `GetSNMP` status; `Update` of the subnet with `snmp_version`/`snmp_secret_ref`/`snmp` in the body leaves credentials untouched (FR-005) and never writes legacy columns
-- [ ] T020 [P] [US1] HTTP tests in `internal/httpapi/snmp_test.go`: GET/PUT routes, 400 with `detail.field`, 404, body limit; **negative**: response bodies of GET/PUT/list/get/tree never contain the community string (SC-003); read-only subject gets 403 on PUT
-- [ ] T021 [P] [US1] Executor tests in `internal/scan/executor_test.go`: job with EnableSNMP on a subnet with own v2c creds uses them (Fake records creds), persists the device, sets `snmp_status=ran`, `snmp_source_subnet_id`, probed/discovered counts
-- [ ] T022 [P] [US1] OpenAPI contract test update (existing contract test in `internal/httpapi`): new routes present with permissions `ipam:read`/`subnets:manage`, CSRF on PUT, body limit 4096
+- [x] T019 [P] [US1] Service tests in `internal/subnets/snmp_test.go`: `SetSNMP` stores sealed blob + metadata and returns status without values; `GetSNMP` status; `Update` of the subnet with `snmp_version`/`snmp_secret_ref`/`snmp` in the body leaves credentials untouched (FR-005) and never writes legacy columns
+- [x] T020 [P] [US1] HTTP tests in `internal/httpapi/snmp_test.go`: GET/PUT routes, 400 with `detail.field`, 404, body limit; **negative**: response bodies of GET/PUT/list/get/tree never contain the community string (SC-003); read-only subject gets 403 on PUT
+- [x] T021 [P] [US1] Executor tests in `internal/scan/executor_test.go`: job with EnableSNMP on a subnet with own v2c creds uses them (Fake records creds), persists the device, sets `snmp_status=ran`, `snmp_source_subnet_id`, probed/discovered counts
+- [x] T022 [P] [US1] OpenAPI contract test update (existing contract test in `internal/httpapi`): new routes present with permissions `ipam:read`/`subnets:manage`, CSRF on PUT, body limit 4096
 
 ### Implementation
 
-- [ ] T023 [US1] Implement `internal/subnets/snmp.go`: `GetSNMP`, `SetSNMP` (validate → seal with `ADSNMP` → put → audit set/replaced), summary fill for Get/List/Tree via `ListSubnetSNMP` + `snmpcred.Resolve`; zero legacy fields in `Create`/`Update` in `internal/subnets/subnets.go`; the service gets the envelope via a setter
-- [ ] T024 [US1] Replace `snmpCreds` in `internal/scan/executor.go`: resolve effective creds at job start (subnet + ancestors + metadata), open the source blob with the envelope, map via `snmpcred.ToCreds`; record phase result fields; drop the warden dependency for SNMP
-- [ ] T025 [US1] Add routes in `internal/httpapi/snmp.go` (GET/PUT `/api/ipam/v1/subnets/{id}/snmp`) and register them in `internal/httpapi/handlers.go`
-- [ ] T026 [US1] Add schemas `SubnetSNMPInput`, `SubnetSNMPStatus` and the routes to `api/openapi/ipam.yaml`
-- [ ] T027 [US1] Wire the envelope into subnets and scan services in `internal/app/app.go`
-- [ ] T028 [P] [US1] UI: types in `ui/src/api/types.ts`, zod schema `ui/src/schemas/snmp.ts`, store actions in `ui/src/stores/subnets.ts` (`snmpStatus`, `setSnmp`)
-- [ ] T029 [US1] UI: `ui/src/components/SubnetSnmpCard.vue` (status line, Set/Replace form for v2c, never pre-filled, cleared after submit) mounted in edit mode of `ui/src/views/subnets/drawer.vue`
-- [ ] T030 [P] [US1] UI tests `ui/tests/unit/snmp.spec.ts`: card shows status, submits v2c, clears the field after save, hides the form without `subnets:manage`
+- [x] T023 [US1] Implement `internal/subnets/snmp.go`: `GetSNMP`, `SetSNMP` (validate → seal with `ADSNMP` → put → audit set/replaced), summary fill for Get/List/Tree via `ListSubnetSNMP` + `snmpcred.Resolve`; zero legacy fields in `Create`/`Update` in `internal/subnets/subnets.go`; the service gets the envelope via a setter
+- [x] T024 [US1] Replace `snmpCreds` in `internal/scan/executor.go`: resolve effective creds at job start (subnet + ancestors + metadata), open the source blob with the envelope, map via `snmpcred.ToCreds`; record phase result fields; drop the warden dependency for SNMP
+- [x] T025 [US1] Add routes in `internal/httpapi/snmp.go` (GET/PUT `/api/ipam/v1/subnets/{id}/snmp`) and register them in `internal/httpapi/handlers.go`
+- [x] T026 [US1] Add schemas `SubnetSNMPInput`, `SubnetSNMPStatus` and the routes to `api/openapi/ipam.yaml`
+- [x] T027 [US1] Wire the envelope into subnets and scan services in `internal/app/app.go`
+- [x] T028 [P] [US1] UI: types in `ui/src/api/types.ts`, zod schema `ui/src/schemas/snmp.ts`, store actions in `ui/src/stores/subnets.ts` (`snmpStatus`, `setSnmp`)
+- [x] T029 [US1] UI: `ui/src/components/SubnetSnmpCard.vue` (status line, Set/Replace form for v2c, never pre-filled, cleared after submit) mounted in edit mode of `ui/src/views/subnets/drawer.vue`
+- [x] T030 [P] [US1] UI tests `ui/tests/unit/snmp.spec.ts`: card shows status, submits v2c, clears the field after save, hides the form without `subnets:manage`
 
 **Checkpoint**: v3 parity for v2c — MVP.
 

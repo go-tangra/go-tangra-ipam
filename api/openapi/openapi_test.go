@@ -154,3 +154,73 @@ func TestHostSyncContract(t *testing.T) {
 		}
 	}
 }
+
+// TestSubnetSNMPContract (021 T022/T042/T049): the SNMP credential routes,
+// their permissions, CSRF, body bounds and the write-only schemas.
+func TestSubnetSNMPContract(t *testing.T) {
+	doc := loadDoc(t)
+	type want struct {
+		perm  string
+		limit float64
+	}
+	for path, ops := range map[string]map[string]want{
+		"/api/ipam/v1/subnets/{id}/snmp": {
+			"GET": {"ipam:read", 0}, "PUT": {"subnets:manage", 4096},
+		},
+	} {
+		item := doc.Paths.Find(path)
+		if item == nil {
+			t.Fatalf("%s missing", path)
+		}
+		for m, w := range ops {
+			op := item.GetOperation(m)
+			if op == nil {
+				t.Fatalf("%s %s missing", m, path)
+			}
+			if perm, _ := op.Extensions["x-freya-permission"].(string); perm != w.perm {
+				t.Errorf("%s %s permission %q want %q", m, path, perm, w.perm)
+			}
+			if w.limit > 0 {
+				if n, _ := op.Extensions["x-freya-max-body-bytes"].(float64); n != w.limit {
+					t.Errorf("%s %s body limit %v want %v", m, path, n, w.limit)
+				}
+			}
+			if m != "GET" {
+				csrf := false
+				for _, p := range op.Parameters {
+					csrf = csrf || (p.Value != nil && p.Value.Name == "X-CSRF-Token" && p.Value.Required)
+				}
+				if !csrf {
+					t.Errorf("%s %s must require the CSRF parameter", m, path)
+				}
+			}
+		}
+	}
+	in := doc.Components.Schemas["SubnetSNMPInput"].Value
+	if in == nil || in.AdditionalProperties.Has == nil || *in.AdditionalProperties.Has {
+		t.Fatal("SubnetSNMPInput must forbid additional properties")
+	}
+	for _, f := range []string{"community", "user", "auth_password", "priv_password"} {
+		if p := in.Properties[f]; p == nil || p.Value.MaxLength == nil || *p.Value.MaxLength != 256 || !p.Value.WriteOnly {
+			t.Errorf("input %s must be write-only with maxLength 256", f)
+		}
+	}
+	if got := in.Properties["auth_protocol"].Value.Enum; len(got) != 6 {
+		t.Errorf("auth protocols %v", got)
+	}
+	if got := in.Properties["priv_protocol"].Value.Enum; len(got) != 4 {
+		t.Errorf("priv protocols %v", got)
+	}
+	for _, name := range []string{"SubnetSNMPStatus", "SNMPSummary"} {
+		s := doc.Components.Schemas[name]
+		if s == nil {
+			t.Fatalf("schema %s missing", name)
+		}
+		for f := range s.Value.Properties {
+			switch f {
+			case "community", "user", "auth_password", "priv_password":
+				t.Errorf("response schema %s exposes %s", name, f)
+			}
+		}
+	}
+}

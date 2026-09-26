@@ -152,12 +152,13 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 			authclient.GRPCRevocations{Client: authv1.NewSessionsClient(conn)})
 	}
 
-	// Warden secret-reference client (BMC/SNMP creds fetched at use time).
+	// Warden secret-reference client (BMC creds fetched at use time; SNMP
+	// credentials are sealed by IPAM itself since feature 021).
 	var wclient warden.Client = warden.NewFake()
 	if wconn, werr := a.Freya.Client(ctx, cfg.Warden.Service); werr == nil {
 		wclient = warden.New(wconn)
 	} else {
-		a.Log.Warn("warden client unavailable; power/KVM/SNMP credential fetch will fail", "err", werr)
+		a.Log.Warn("warden client unavailable; power/KVM credential fetch will fail", "err", werr)
 	}
 
 	// Event bus.
@@ -185,6 +186,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 
 	// Domain services.
 	subnetsSvc := subnets.New(a.Repo)
+	subnetsSvc.SetEnvelope(a.Env) // SNMP credentials are sealed with the module KEK (021)
 	addressesSvc := addresses.New(a.Repo, pub, cfg.Allocation.SkipFirst, cfg.Allocation.SkipLast)
 	addressesSvc.SetProbers(pinger, portScanner)
 	devicesSvc := devices.New(a.Repo)
@@ -194,10 +196,11 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	statsSvc := stats.New(a.Repo)
 	backupSvc := backup.New(a.Repo)
 	dnsSvc := dnscfg.New(a.Repo)
-	scanSvc := scan.New(a.Repo, pinger, pinger, snmpDisc, wclient, pub, scan.Config{
+	scanSvc := scan.New(a.Repo, pinger, pinger, snmpDisc, pub, scan.Config{
 		MaxHosts: cfg.Scan.MaxHosts, Concurrency: cfg.Scan.Concurrency, TimeoutMs: cfg.Scan.TimeoutMs,
 		Workers: cfg.Scan.Workers, MaxRetries: cfg.Scan.MaxRetries,
 	}, nil)
+	scanSvc.SetEnvelope(a.Env)
 
 	// Host sync (feature 020): IPAM pulls host reports from inventory over the
 	// mesh; the connection is dialled lazily through the Freya pool.

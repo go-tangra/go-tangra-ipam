@@ -84,6 +84,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ipam/v1/subnets/{id}/snmp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSubnetSnmp"];
+        put: operations["setSubnetSnmp"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ipam/v1/subnets/{id}/scan": {
         parameters: {
             query?: never;
@@ -1000,6 +1016,56 @@ export interface components {
             /** Format: date-time */
             last_reported_at?: string;
         };
+        /** @description Set or replace a subnet's own SNMP credentials. Every field of the chosen kind is required (v2c: community; v3: user, security_level, auth_protocol, auth_password and, for authPriv, priv_protocol and priv_password). Values are sealed at rest and never returned. */
+        SubnetSNMPInput: {
+            /** @enum {integer} */
+            version: 2 | 3;
+            community?: string;
+            user?: string;
+            /** @enum {string} */
+            security_level?: "authNoPriv" | "authPriv";
+            /**
+             * @description MD5 and SHA (SHA-1) are weak
+             * @enum {string}
+             */
+            auth_protocol?: "MD5" | "SHA" | "SHA224" | "SHA256" | "SHA384" | "SHA512";
+            auth_password?: string;
+            /**
+             * @description DES is weak; AES is AES-128
+             * @enum {string}
+             */
+            priv_protocol?: "DES" | "AES" | "AES192" | "AES256";
+            priv_password?: string;
+        };
+        /** @description Effective SNMP state of a subnet (own, inherited from the nearest ancestor, or none). Never a credential value. */
+        SNMPSummary: {
+            /** @enum {string} */
+            state?: "none" | "own" | "inherited";
+            /** @enum {integer} */
+            version?: 2 | 3;
+            /** @enum {string} */
+            security_level?: "authNoPriv" | "authPriv";
+            weak?: boolean;
+            source_subnet_id?: string;
+            source_name?: string;
+            source_cidr?: string;
+        };
+        SubnetSNMPOwn: {
+            /** @enum {integer} */
+            version?: 2 | 3;
+            /** @enum {string} */
+            security_level?: "authNoPriv" | "authPriv";
+            auth_protocol?: string;
+            priv_protocol?: string;
+            weak?: boolean;
+            updated_by?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        SubnetSNMPStatus: {
+            own?: components["schemas"]["SubnetSNMPOwn"] | null;
+            effective?: components["schemas"]["SNMPSummary"];
+        };
         /**
          * @example {
          *       "reason": "not_found",
@@ -1210,6 +1276,79 @@ export interface operations {
             };
             /** @description validation_failed */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getSubnetSnmp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description own and effective SNMP credential status (never values) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubnetSNMPStatus"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    setSubnetSnmp: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubnetSNMPInput"];
+            };
+        };
+        responses: {
+            /** @description credentials set or replaced (status, never values) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubnetSNMPStatus"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation_failed (detail.field names the field) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

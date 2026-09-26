@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http/httptest"
@@ -25,6 +26,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
@@ -98,8 +100,13 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 	bmc := ipmi.NewFake()
 	inv := invclient.NewFake()
 	runner := hostsync.New(mem, inv, pub, hostsync.Config{Workers: 1, ConflictMoves: 3, ConflictWindow: 24 * time.Hour}, nil, nil)
+	env, _ := sealed.NewEnvelope(bytes.Repeat([]byte{6}, 32))
+	subnetsSvc := subnets.New(mem)
+	subnetsSvc.SetEnvelope(env)
+	scanSvc := scan.New(mem, nil, nil, nil, pub, scan.Config{MaxHosts: 65536}, nil)
+	scanSvc.SetEnvelope(env)
 	deps := Deps{
-		Subnets:   subnets.New(mem),
+		Subnets:   subnetsSvc,
 		Addresses: addresses.New(mem, pub, 0, 0),
 		Devices:   devices.New(mem),
 		Vlans:     vlans.New(mem),
@@ -108,7 +115,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		Stats:     stats.New(mem),
 		Backup:    backup.New(mem),
 		DNS:       dns,
-		Scan:      scan.New(mem, nil, nil, nil, wf, pub, scan.Config{MaxHosts: 65536}, nil),
+		Scan:      scanSvc,
 		BMC:       bmc,
 		KVM:       kvm.NewManager(nil, 0),
 		Warden:    wf,
