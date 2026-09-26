@@ -114,10 +114,10 @@ confirmation before they are executed.
 - [X] T047 [P] [US1] Planner address tests `internal/hostplan/address_test.go`: new address in the most specific subnet; nested subnets; no containing subnet → subnet op (`origin=host_sync`, name = CIDR, ` (auto)` on collision, parent = most specific container) then address; IPv6 /128 → /64 subnet; IPv4 /32 → /32; link-local/loopback/temporary/deprecated skipped; primary flag from `primary_ipv4/6`; address of another device → move with `previous_device_id`, `move_count` +1; unowned address → claim; `conflict_moves` moves in the window → conflict op; absent address → release (device NULL, `previous_device_id`, `not_reported`); **negative**: address description/note/tags/dns_name/ptr/status of existing rows never changed
 - [X] T048 [P] [US1] Planner property tests `internal/hostplan/plan_test.go` + `FuzzPlan` in `internal/hostplan/plan_fuzz_test.go`: applying a plan then re-planning the same report yields zero ops (idempotence); every op carries an audit entry with before/after; admin-field invariant holds for random reports and random existing state; op count bounded by report bounds
 - [X] T049 [P] [US1] Runner tests `internal/hostsync/runner_test.go` (memstore + `invclient.Fake`): poll picks up tenants from `ListReportTenants`, creates default settings for a new tenant, applies FULL reports, advances the tenant watermark only after success, failed host keeps the watermark and records `hosts_failed`; digest equal → skipped; reconcile fetches DIGEST view, applies mismatches, marks devices of deleted/retired hosts `not_reported` (addresses keep device link); inventory `Down` → status degraded, nothing written, back-off grows to 10 min and resets on success; `Unimplemented` → `inventory_outdated`; global `host_sync.enabled=false` → nothing runs; tenants processed in parallel ≤ workers, hosts of one tenant sequential
-- [ ] T050 [P] [US1] Apply/store integration `internal/repo/repodb/hostsync_integration_test.go`: a planned report applied in one transaction (device, interfaces, subnets, addresses, device state, audit rows); forced failure mid-apply rolls back everything incl. audit; concurrent apply of two hosts of one tenant serialised by the advisory lock; unique-violation race on subnet creation retried once; **negative (cross-tenant)**: an apply for tenant A cannot read or write tenant B rows (RLS), and a report whose tenant ≠ A is refused before the transaction
+- [X] T050 [P] [US1] Apply/store integration `internal/repo/repodb/hostsync_integration_test.go`: a planned report applied in one transaction (device, interfaces, subnets, addresses, device state, audit rows); forced failure mid-apply rolls back everything incl. audit; concurrent apply of two hosts of one tenant serialised by the advisory lock; unique-violation race on subnet creation retried once; **negative (cross-tenant)**: an apply for tenant A cannot read or write tenant B rows (RLS), and a report whose tenant ≠ A is refused before the transaction
 - [X] T051 [P] [US1] Scan guard test `internal/scan/executor_test.go`: SNMP discovery of a device named like a host-reported device only fills empty fields and bumps `last_seen` (management IP, type, OS kept); new SNMP devices get `source=scan`
 - [X] T052 [P] [US1] Events test `internal/hostsync/events_test.go`: after commit, created/moved/released addresses publish `ipam.ip_address.created|updated` with `action`; nothing published on rollback
-- [ ] T053 [US1] End-to-end integration `internal/hostsync/e2e_integration_test.go` (`//go:build integration`): PostgreSQL (testcontainers) + inventory `HostReportService` from `go-tangra-inventory-v4` (SDK server wiring with memstore) over the framework test mesh with SPIFFE test identities; submit a snapshot for a host in tenant A → IPAM device, interfaces, addresses, auto subnet, audit rows; change an address → moved/released; tenant B sees nothing; IPAM identity not allowed by policy → degraded, nothing written
+- [X] T053 [US1] End-to-end integration `internal/hostsync/e2e_integration_test.go` (`//go:build integration`): PostgreSQL (testcontainers) + inventory `HostReportService` from `go-tangra-inventory-v4` (SDK server wiring with memstore) over the framework test mesh with SPIFFE test identities; submit a snapshot for a host in tenant A → IPAM device, interfaces, addresses, auto subnet, audit rows; change an address → moved/released; tenant B sees nothing; IPAM identity not allowed by policy → degraded, nothing written
 
 ### Implementation for User Story 1
 
@@ -131,8 +131,8 @@ confirmation before they are executed.
 - [X] T061 [P] [US1] Metrics (`Freya.Metrics().Meter("ipam.hostsync")`) and structured logs in `internal/hostsync/metrics.go`
 - [X] T062 [US1] D9 guard in `UpsertDeviceByName` (`internal/repo/repodb/db.go`, `internal/memstore/memstore.go`) and `source=scan` in `internal/scan/executor.go` `persistDevice`
 - [X] T063 [US1] Wiring in `internal/app/app.go`: `invclient.Mesh`, `hostsync.New(...)`, worker appended to `a.workers`, disabled when `host_sync.enabled=false` (startup log line)
-- [ ] T064 [P] [US1] Device/address JSON and list filters (`source`, `report_state`, `conflict`) in `internal/httpapi/handlers.go`, `internal/devices/devices.go`, `internal/addresses/addresses.go`; OpenAPI query parameters in `api/openapi/ipam.yaml`; `npm run gen:api` → `ui/src/api/schema.d.ts`
-- [ ] T065 [P] [US1] UI: interface kind and "not reported" badges, address "not reported"/"moved from" in `ui/src/views/devices/detail.vue`; conflict and report-state columns/filters in `ui/src/views/addresses/index.vue`; types in `ui/src/api/types.ts`; vitest in `ui/tests/unit/views.spec.ts`
+- [X] T064 [P] [US1] Device/address JSON and list filters (`source`, `report_state`, `conflict`) in `internal/httpapi/handlers.go`, `internal/devices/devices.go`, `internal/addresses/addresses.go`; OpenAPI query parameters in `api/openapi/ipam.yaml`; `npm run gen:api` → `ui/src/api/schema.d.ts`
+- [X] T065 [P] [US1] UI: interface kind and "not reported" badges, address "not reported"/"moved from" in `ui/src/views/devices/detail.vue`; conflict and report-state columns/filters in `ui/src/views/addresses/index.vue`; types in `ui/src/api/types.ts`; vitest in `ui/tests/unit/views.spec.ts`
 
 **Checkpoint**: US1 works end to end (quickstart 1–4); the sync can already be switched off with `host_sync.enabled=false`. MVP.
 
@@ -151,7 +151,7 @@ confirmation before they are executed.
 - [X] T068 [P] [US6] OpenAPI contract test `api/openapi/openapi_test.go`: new paths, schemas (`additionalProperties: false`, patterns, bounds), body limits and permissions as in contracts/ipam-http.md
 - [X] T069 [P] [US6] Disable race test `internal/repo/repodb/hostsync_integration_test.go` (SR-006): an apply holding `FOR SHARE` blocks the disabling update; after the update commits, every subsequent apply returns `ErrSyncDisabled` and writes no rows; re-enable sets `reconcile_requested` and the next runner cycle applies the latest reports (US6 scenario 2)
 - [X] T070 [P] [US6] Runner tests `internal/hostsync/resync_test.go`: re-sync one host ignores the digest shortcut and records `trigger=resync:<user>`; resync-all forces a reconcile with full apply; audit `hostsync_resync_requested`; tenant disabled → runner skips it and status `disabled`
-- [ ] T071 [P] [US6] UI tests `ui/tests/unit/hostsync.spec.ts`: settings form read-only without `manage HostSync` ability, pattern validation, status rendering (ok/degraded/disabled); device view shows source, inventory host, last report, re-sync button only with `devices:manage` ability; issues list rendered as text (no HTML injection from reported names)
+- [X] T071 [P] [US6] UI tests `ui/tests/unit/hostsync.spec.ts`: settings form read-only without `manage HostSync` ability, pattern validation, status rendering (ok/degraded/disabled); device view shows source, inventory host, last report, re-sync button only with `devices:manage` ability; issues list rendered as text (no HTML injection from reported names)
 
 ### Implementation for User Story 6
 
@@ -159,7 +159,7 @@ confirmation before they are executed.
 - [X] T073 [US6] Service layer `internal/hostsync/admin.go` (settings get/update with audit, status, resync one/all, clear-conflict; `authz.RequireTenant`)
 - [X] T074 [US6] HTTP handlers `internal/httpapi/hostsync.go` registered from `internal/httpapi/handlers.go`; `Deps.HostSync` in `internal/httpapi/deps.go`; error mapping (`not_host_reported`, `host_sync_disabled`, `temporarily_unavailable`)
 - [X] T075 [P] [US6] Store support for status aggregates (`devices_not_reported`, `addresses_in_conflict`) and device host-sync info in `internal/repo/repodb/hostsync.go` and `internal/memstore/hostsync.go`
-- [ ] T076 [P] [US6] UI page `ui/src/views/hostsync/index.vue`, store `ui/src/stores/hostsync.ts`, route in `ui/src/remote/routes.ts`, nav in `ui/src/remote/nav.ts`; device summary (source, inventory host, last report, issues) and re-sync action in `ui/src/views/devices/detail.vue`; source column/filter in `ui/src/views/devices/index.vue`; conflict clear action in `ui/src/views/addresses/index.vue`
+- [X] T076 [P] [US6] UI page `ui/src/views/hostsync/index.vue`, store `ui/src/stores/hostsync.ts`, route in `ui/src/remote/routes.ts`, nav in `ui/src/remote/nav.ts`; device summary (source, inventory host, last report, issues) and re-sync action in `ui/src/views/devices/detail.vue`; source column/filter in `ui/src/views/devices/index.vue`; conflict clear action in `ui/src/views/addresses/index.vue`
 
 **Checkpoint**: US1 + US6 — automatic writes are observable and controllable per tenant.
 
@@ -184,7 +184,7 @@ confirmation before they are executed.
 - [ ] T082 [US2] `go-tangra-inventory-v4/internal/collector/bmc_linux.go` (go-ipmi `NewOpenClient`, `GetChannelInfo`, `GetLanConfigParamFor` per allowed parameter, 10 s budget) and `bmc_other.go`; `AgentConfig.CollectBMC` in `go-tangra-inventory-v4/internal/config/config.go`; `go get github.com/bougou/go-ipmi@v0.8.1` in `go-tangra-inventory-v4/go.mod`
 - [ ] T083 [P] [US2] BMC diff category in `go-tangra-inventory-v4/internal/diff/diff.go`; BMC section in `go-tangra-inventory-v4/ui/src/views/hosts/detail.vue`
 - [X] T084 [US2] BMC ops in `internal/hostplan/bmc.go` and their store execution in `internal/repo/repodb/hostsync.go` / `internal/memstore/hostsync.go`
-- [ ] T085 [P] [US2] UI: management interface badge and BMC address in `ui/src/views/devices/detail.vue`
+- [X] T085 [P] [US2] UI: management interface badge and BMC address in `ui/src/views/devices/detail.vue`
 
 **Checkpoint**: US2 demonstrable independently of US3/US4.
 
@@ -210,7 +210,7 @@ confirmation before they are executed.
 - [ ] T092 [P] [US3] Diff categories `virtualization`, `guest` in `go-tangra-inventory-v4/internal/diff/diff.go`; virtualization and guests in `go-tangra-inventory-v4/ui/src/views/hosts/detail.vue`
 - [X] T093 [US3] Planner `internal/hostplan/virt.go`; guest store ops (`ReplaceGuests`, `FindGuestsByMAC`, `SetHypervisor`) in `internal/repo/repodb/hostsync.go` and `internal/memstore/hostsync.go`; `guest_count` computed in device reads
 - [X] T094 [US3] `GET /devices/{id}/guests` in `internal/httpapi/hostsync.go` + `api/openapi/ipam.yaml`
-- [ ] T095 [P] [US3] UI: Guests tab (matched → link, unmatched → name/VMID/MACs), "runs on" hypervisor link and virtualization kind in `ui/src/views/devices/detail.vue`; vitest in `ui/tests/unit/views.spec.ts`
+- [X] T095 [P] [US3] UI: Guests tab (matched → link, unmatched → name/VMID/MACs), "runs on" hypervisor link and virtualization kind in `ui/src/views/devices/detail.vue`; vitest in `ui/tests/unit/views.spec.ts`
 
 **Checkpoint**: US3 demonstrable independently.
 
@@ -235,7 +235,7 @@ confirmation before they are executed.
 - [ ] T101 [US4] `go-tangra-inventory-v4/internal/collector/updates_linux.go` (manager detection, command runner interface, deadlines, optional refresh with timestamp in the agent state file) and `updates_other.go`; `AgentConfig` `collect_updates`, `refresh_package_lists`, `update_timeout_seconds` in `go-tangra-inventory-v4/internal/config/config.go`; `Program.available_version/security_update` merge in `go-tangra-inventory-v4/internal/collector/collector.go`
 - [ ] T102 [P] [US4] Diff category `update` and software available-version comparison in `go-tangra-inventory-v4/internal/diff/diff.go`; update state in `go-tangra-inventory-v4/ui/src/views/hosts/detail.vue`
 - [X] T103 [US4] Planner `internal/hostplan/updates.go`; batched `ReplacePendingPackages` in `internal/repo/repodb/hostsync.go` and `internal/memstore/hostsync.go`
-- [ ] T104 [P] [US4] UI: update status chip (unknown ≠ up to date), reboot required, automatic updates, security highlighting and "security only" filter in `ui/src/views/devices/detail.vue`; device list column in `ui/src/views/devices/index.vue`; vitest in `ui/tests/unit/views.spec.ts`
+- [X] T104 [P] [US4] UI: update status chip (unknown ≠ up to date), reboot required, automatic updates, security highlighting and "security only" filter in `ui/src/views/devices/detail.vue`; device list column in `ui/src/views/devices/index.vue`; vitest in `ui/tests/unit/views.spec.ts`
 
 **Checkpoint**: US4 demonstrable independently.
 
@@ -259,7 +259,7 @@ confirmation before they are executed.
 - [X] T109 [US5] Migration `internal/store/migrations/0005_interface_links_unique.sql` per data-model §2.2; memstore uniqueness aligned in `internal/memstore/memstore.go`
 - [X] T110 [US5] `internal/portlink/rank.go` and `internal/portlink/portlink.go` (load FDB/LLDP links and host interfaces in tenant scope, rank, apply with audit)
 - [X] T111 [US5] Hooks: after `ScanCompleted` in `internal/scan/executor.go` (via a `LinkCorrelator` interface on `scan.Service`) and after each tenant run in `internal/hostsync/runner.go`; wiring in `internal/app/app.go`
-- [ ] T112 [P] [US5] Device interface reads include `remote_device_name` and switch-port "device behind" in `internal/repo/repodb/db.go` / `internal/memstore/memstore.go`; UI "Connected to" column (switch, port, VLAN, source) and switch-port "device behind" in `ui/src/views/devices/detail.vue`; vitest in `ui/tests/unit/views.spec.ts`
+- [X] T112 [P] [US5] Device interface reads include `remote_device_name` and switch-port "device behind" in `internal/repo/repodb/db.go` / `internal/memstore/memstore.go`; UI "Connected to" column (switch, port, VLAN, source) and switch-port "device behind" in `ui/src/views/devices/detail.vue`; vitest in `ui/tests/unit/views.spec.ts`
 
 **Checkpoint**: all stories functional.
 
