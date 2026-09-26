@@ -1,6 +1,7 @@
 package hostplan
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +12,17 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
+
+var dnsNameRe = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$`)
+
+// DNSHostname returns the reported hostname when it is a DNS-safe name (the
+// address hostname feeds the dns module); otherwise "".
+func DNSHostname(h string) string {
+	if dnsNameRe.MatchString(h) {
+		return h
+	}
+	return ""
+}
 
 // reportedIface is an interface the report makes the device have.
 type reportedIface struct {
@@ -136,7 +148,7 @@ func (pl *planner) addresses() {
 			}
 			reported[key] = true
 			primary := !ri.bmc && (a.Addr == pl.r.PrimaryIPv4 || a.Addr == pl.r.PrimaryIPv6)
-			hostname := pl.r.Hostname
+			hostname := DNSHostname(pl.r.Hostname)
 			if ri.bmc {
 				hostname = ""
 			}

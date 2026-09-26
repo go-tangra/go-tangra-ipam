@@ -215,6 +215,9 @@ func (a *Admin) ResyncDevice(ctx context.Context, subj authz.Subjects, deviceID 
 		return ResyncResult{}, err
 	}
 	trigger := "resync:" + subj.ActorID()
+	if len(trigger) > 80 { // ipam_hostsync_device_state.trigger bound
+		trigger = trigger[:80]
+	}
 	if err := a.st.AppendAudit(ctx, userRow(subj, audit.HostSyncResyncRequested, audit.SubjectHostSync, deviceID,
 		map[string]any{"trigger": trigger, "inventory_host_id": d.InventoryHostID}, a.now())); err != nil {
 		return ResyncResult{}, err

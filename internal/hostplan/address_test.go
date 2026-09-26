@@ -222,3 +222,18 @@ func TestOwnAddressRefresh(t *testing.T) {
 		t.Fatalf("%+v", p.Ops)
 	}
 }
+
+func TestAddressHostnameIsDNSSafe(t *testing.T) {
+	for in, want := range map[string]string{"web-01": "web-01", "web-01.example.org": "web-01.example.org", "Web 01": "", "-x": "", "": "", "a_b": ""} {
+		if got := DNSHostname(in); got != want {
+			t.Errorf("DNSHostname(%q) = %q", in, got)
+		}
+	}
+	_, st := linked()
+	r := report()
+	r.Hostname = "Kevin's Laptop"
+	a := createdAddrs(Build(st, r, params()))["10.0.0.5"]
+	if a.Hostname != "" {
+		t.Fatalf("address hostname %q", a.Hostname)
+	}
+}

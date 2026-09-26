@@ -3,6 +3,7 @@ package hostsync
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -221,5 +222,20 @@ func TestAdminGuestsAndConflicts(t *testing.T) {
 	_ = f.st.CreateDevice(ctx, store.Device{ID: "m", TenantID: tA, Name: "manual"})
 	if info, err := ad.DeviceHostSync(ctx, userA, "m"); err != nil || info.Source != store.SrcManual || info.Issues == nil {
 		t.Fatalf("manual %+v %v", info, err)
+	}
+}
+
+func TestResyncTriggerBounded(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.inv.Put(rep(tA, host1, "web-01", "10.0.0.5", t0, 1))
+	_ = f.r.Cycle(ctx)
+	d := f.device(t, tA, "web-01")
+	long := authz.Subjects{TenantID: tA, UserID: strings.Repeat("u", 200), ActorKind: authz.ActorUser}
+	if _, err := admin(f, true).ResyncDevice(ctx, long, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := f.st.GetHostSyncDeviceState(ctx, tA, d.ID); len(st.Trigger) != 80 {
+		t.Fatalf("trigger %d", len(st.Trigger))
 	}
 }
