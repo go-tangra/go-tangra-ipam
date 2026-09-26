@@ -3,6 +3,8 @@ package snmp
 import (
 	"context"
 	"testing"
+
+	"github.com/gosnmp/gosnmp"
 )
 
 func TestFakeDiscover(t *testing.T) {
@@ -87,5 +89,64 @@ func TestMacFromOctets(t *testing.T) {
 	}
 	if macFromOctets([]int{1, 2, 3}) != "" {
 		t.Fatal("short octets should yield empty mac")
+	}
+}
+
+// TestNewClientProtocols (T008): every supported protocol maps to its gosnmp
+// constant and the security level decides the message flags.
+func TestNewClientProtocols(t *testing.T) {
+	auth := map[string]gosnmp.SnmpV3AuthProtocol{"MD5": gosnmp.MD5, "SHA": gosnmp.SHA, "SHA224": gosnmp.SHA224,
+		"SHA256": gosnmp.SHA256, "SHA384": gosnmp.SHA384, "SHA512": gosnmp.SHA512}
+	priv := map[string]gosnmp.SnmpV3PrivProtocol{"DES": gosnmp.DES, "AES": gosnmp.AES, "AES192": gosnmp.AES192, "AES256": gosnmp.AES256}
+	for name, want := range auth {
+		c, err := newClient("10.0.0.1", Creds{Version: 3, SecurityLevel: "authNoPriv", User: "u", AuthProtocol: name, AuthPassword: "authpass1"})
+		if err != nil {
+			t.Fatalf("auth %s: %v", name, err)
+		}
+		usm := c.SecurityParameters.(*gosnmp.UsmSecurityParameters)
+		if usm.AuthenticationProtocol != want || c.MsgFlags != gosnmp.AuthNoPriv || usm.PrivacyProtocol != gosnmp.NoPriv || usm.PrivacyPassphrase != "" {
+			t.Fatalf("auth %s: proto %v flags %v priv %v", name, usm.AuthenticationProtocol, c.MsgFlags, usm.PrivacyProtocol)
+		}
+		if c.Version != gosnmp.Version3 || c.SecurityModel != gosnmp.UserSecurityModel || usm.UserName != "u" {
+			t.Fatalf("v3 client fields %+v", c)
+		}
+	}
+	for name, want := range priv {
+		c, err := newClient("10.0.0.1", Creds{Version: 3, SecurityLevel: "authPriv", User: "u", AuthProtocol: "SHA256",
+			AuthPassword: "authpass1", PrivProtocol: name, PrivPassword: "privpass1"})
+		if err != nil {
+			t.Fatalf("priv %s: %v", name, err)
+		}
+		usm := c.SecurityParameters.(*gosnmp.UsmSecurityParameters)
+		if usm.PrivacyProtocol != want || c.MsgFlags != gosnmp.AuthPriv || usm.PrivacyPassphrase != "privpass1" {
+			t.Fatalf("priv %s: proto %v flags %v", name, usm.PrivacyProtocol, c.MsgFlags)
+		}
+	}
+	for name, creds := range map[string]Creds{
+		"unknown auth":  {Version: 3, SecurityLevel: "authNoPriv", User: "u", AuthProtocol: "SHA1", AuthPassword: "authpass1"},
+		"unknown priv":  {Version: 3, SecurityLevel: "authPriv", User: "u", AuthProtocol: "SHA", AuthPassword: "authpass1", PrivProtocol: "3DES", PrivPassword: "privpass1"},
+		"unknown level": {Version: 3, SecurityLevel: "noAuthNoPriv", User: "u", AuthProtocol: "SHA", AuthPassword: "authpass1"},
+		"empty v2c":     {Version: 2},
+		"version 1":     {Version: 1, Community: "c"},
+	} {
+		if _, err := newClient("10.0.0.1", creds); err == nil {
+			t.Errorf("%s: want error", name)
+		}
+	}
+}
+
+// TestNewClientV2cAndTargets: no "public" default, IPv6 targets accepted,
+// timeout and retries applied.
+func TestNewClientV2cAndTargets(t *testing.T) {
+	c, err := newClient("[2001:db8::5]:161", Creds{Version: 2, Community: "lab", TimeoutMs: 250, Retries: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Target != "2001:db8::5" || c.Community != "lab" || c.Version != gosnmp.Version2c || c.Retries != 3 || c.Timeout.Milliseconds() != 250 || c.Port != defaultPort {
+		t.Fatalf("client %+v", c)
+	}
+	c, err = newClient("fe80::1", Creds{Version: 2, Community: "lab"})
+	if err != nil || c.Target != "fe80::1" || c.Timeout != defaultTimeout || c.Retries != defaultRetries {
+		t.Fatalf("ipv6 target: %+v %v", c, err)
 	}
 }

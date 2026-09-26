@@ -38,25 +38,25 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T003 [P] Table tests for `snmpcred.Input.Validate` in `internal/snmpcred/validate_test.go`: v2c ok/empty/too long/v3 fields present; v3 authNoPriv ok, authPriv ok, missing user, password < 8, > 256, unknown protocol, priv fields with authNoPriv, version 1/4 rejected; errors name the field (FR-003); `Weak()` true for MD5/SHA/DES
-- [ ] T004 [P] Tests for `snmpcred.Seal`/`Open` in `internal/snmpcred/seal_test.go`: round trip per kind; blob opened with another subnet or tenant AD fails; tampered blob fails; `Open` of v2c yields only community; secret JSON never contains metadata fields
-- [ ] T005 [P] Tests for `snmpcred.Resolve` in `internal/snmpcred/resolve_test.go`: own wins; nearest ancestor; grandchild under child with own; none; parent missing from map; cycle guard; depth limit 64; returns source id (FR-011)
-- [ ] T006 [P] Tests for `snmpcred.ToCreds` and `snmpcred.Scrub` in `internal/snmpcred/creds_test.go`: mapping per kind incl. security level and protocols; Scrub removes community/user/passwords from error text (SR-004)
-- [ ] T007 [P] Fuzz target `FuzzDecodeValidate` in `internal/snmpcred/fuzz_test.go` (JSON decode with DisallowUnknownFields + Validate never panics, accepted inputs round-trip through Seal/Open)
-- [ ] T008 [P] Tests for the SNMP client builder in `internal/scan/snmp/snmp_test.go`: every auth protocol (MD5, SHA, SHA224, SHA256, SHA384, SHA512) and priv protocol (DES, AES, AES192, AES256) maps to the gosnmp constant; authNoPriv/authPriv flags follow `SecurityLevel`; empty v2c community is an error (no `public`); IPv6 target accepted
-- [ ] T009 [P] Tests for `snmp.Classify` in `internal/scan/snmp/classify_test.go`: timeout → no_response; unknown user → unknown_user; wrong digest/not authentic → auth_failed; decryption → privacy_failed; nil → ok; other → error
-- [ ] T010 [P] Repo tests for `SubnetSNMP` CRUD in `internal/memstore/snmp_test.go` (get/put/delete/list metadata per tenant; tenant isolation; delete of subnet removes row)
+- [x] T003 [P] Table tests for `snmpcred.Input.Validate` in `internal/snmpcred/validate_test.go`: v2c ok/empty/too long/v3 fields present; v3 authNoPriv ok, authPriv ok, missing user, password < 8, > 256, unknown protocol, priv fields with authNoPriv, version 1/4 rejected; errors name the field (FR-003); `Weak()` true for MD5/SHA/DES
+- [x] T004 [P] Tests for `snmpcred.Seal`/`Open` in `internal/snmpcred/seal_test.go`: round trip per kind; blob opened with another subnet or tenant AD fails; tampered blob fails; `Open` of v2c yields only community; secret JSON never contains metadata fields
+- [x] T005 [P] Tests for `snmpcred.Resolve` in `internal/snmpcred/resolve_test.go`: own wins; nearest ancestor; grandchild under child with own; none; parent missing from map; cycle guard; depth limit 64; returns source id (FR-011)
+- [x] T006 [P] Tests for `snmpcred.ToCreds` and `snmpcred.Scrub` in `internal/snmpcred/creds_test.go`: mapping per kind incl. security level and protocols; Scrub removes community/user/passwords from error text (SR-004)
+- [x] T007 [P] Fuzz target `FuzzDecodeValidate` in `internal/snmpcred/fuzz_test.go` (JSON decode with DisallowUnknownFields + Validate never panics, accepted inputs round-trip through Seal/Open)
+- [x] T008 [P] Tests for the SNMP client builder in `internal/scan/snmp/snmp_test.go`: every auth protocol (MD5, SHA, SHA224, SHA256, SHA384, SHA512) and priv protocol (DES, AES, AES192, AES256) maps to the gosnmp constant; authNoPriv/authPriv flags follow `SecurityLevel`; empty v2c community is an error (no `public`); IPv6 target accepted
+- [x] T009 [P] Tests for `snmp.Classify` in `internal/scan/snmp/classify_test.go`: timeout → no_response; unknown user → unknown_user; wrong digest/not authentic → auth_failed; decryption → privacy_failed; nil → ok; other → error
+- [x] T010 [P] Repo tests for `SubnetSNMP` CRUD in `internal/memstore/snmp_test.go` (get/put/delete/list metadata per tenant; tenant isolation; delete of subnet removes row)
 
 ### Implementation
 
-- [ ] T011 Write migration `internal/store/migrations/0006_subnet_snmp.sql`: table `ipam_subnet_snmp` (data-model §1) with CHECK constraints, FK ON DELETE CASCADE, RLS enable + tenant policy like 0003, grants to the app role; `ipam_scan_jobs` columns `snmp_status`, `snmp_source_subnet_id`, `snmp_probed`, `snmp_no_answer`, `snmp_rejected`; Down section
-- [ ] T012 Add `store.SubnetSNMP`, `store.SNMPSummary` (`Subnet.SNMP *SNMPSummary json:"snmp,omitempty"`) and the five `IPScanJob` fields to `internal/store/models.go`
-- [ ] T013 Add `GetSubnetSNMP`, `PutSubnetSNMP`, `DeleteSubnetSNMP`, `ListSubnetSNMP(tenant)` (metadata only, no blob) and `LegacySNMPRefCount` to the store interface in `internal/repo/repo.go`
-- [ ] T014 [P] Implement them in `internal/repo/repodb/snmp.go` (tenant tx + RLS) and add the scan job columns to the scan job SQL in `internal/repo/repodb/db.go`
-- [ ] T015 [P] Implement them in `internal/memstore/snmp.go` and cascade on `DeleteSubnet` in `internal/memstore/memstore.go`
-- [ ] T016 Implement `internal/snmpcred/{snmpcred.go,validate.go,seal.go,resolve.go,creds.go}` to pass T003–T007
-- [ ] T017 Extend `internal/scan/snmp/snmp.go`: `Creds.SecurityLevel`, protocol maps, no default community, `client.Connect()`, `Classify`, `Probe(ctx, ip, creds) (sysName, sysDescr string, err error)`; extend `Fake` with per-IP outcomes (T008, T009)
-- [ ] T018 Add event types `snmp_credentials_set|replaced|cleared|tested` to `internal/audit/audit.go` with a test in `internal/audit/audit_test.go` that details with neutral keys survive and `community`/`password` keys are dropped
+- [x] T011 Write migration `internal/store/migrations/0006_subnet_snmp.sql`: table `ipam_subnet_snmp` (data-model §1) with CHECK constraints, FK ON DELETE CASCADE, RLS enable + tenant policy like 0003, grants to the app role; `ipam_scan_jobs` columns `snmp_status`, `snmp_source_subnet_id`, `snmp_probed`, `snmp_no_answer`, `snmp_rejected`; Down section
+- [x] T012 Add `store.SubnetSNMP`, `store.SNMPSummary` (`Subnet.SNMP *SNMPSummary json:"snmp,omitempty"`) and the five `IPScanJob` fields to `internal/store/models.go`
+- [x] T013 Add `GetSubnetSNMP`, `PutSubnetSNMP`, `DeleteSubnetSNMP`, `ListSubnetSNMP(tenant)` (metadata only, no blob) and `LegacySNMPRefCount` to the store interface in `internal/repo/repo.go`
+- [x] T014 [P] Implement them in `internal/repo/repodb/snmp.go` (tenant tx + RLS) and add the scan job columns to the scan job SQL in `internal/repo/repodb/db.go`
+- [x] T015 [P] Implement them in `internal/memstore/snmp.go` and cascade on `DeleteSubnet` in `internal/memstore/memstore.go`
+- [x] T016 Implement `internal/snmpcred/{snmpcred.go,validate.go,seal.go,resolve.go,creds.go}` to pass T003–T007
+- [x] T017 Extend `internal/scan/snmp/snmp.go`: `Creds.SecurityLevel`, protocol maps, no default community, `client.Connect()`, `Classify`, `Probe(ctx, ip, creds) (sysName, sysDescr string, err error)`; extend `Fake` with per-IP outcomes (T008, T009)
+- [x] T018 Add event types `snmp_credentials_set|replaced|cleared|tested` to `internal/audit/audit.go` with a test in `internal/audit/audit_test.go` that details with neutral keys survive and `community`/`password` keys are dropped
 
 **Checkpoint**: storage, crypto binding, inheritance and SNMP client ready.
 

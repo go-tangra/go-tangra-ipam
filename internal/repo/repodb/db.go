@@ -1847,7 +1847,8 @@ func (d *DB) ListDeviceHostGroups(ctx context.Context, tenantID, deviceID string
 const scanJobCols = `id, tenant_id, subnet_id, status, progress, status_message, total_addresses,
 	scanned_count, alive_count, new_count, updated_count, snmp_discovered_count, triggered_by, retry_count,
 	max_retries, next_retry_at, timeout_ms, concurrency, skip_reverse_dns, tcp_probe_ports, enable_snmp,
-	enable_dns_update, started_at, completed_at, created_by, created_at, updated_at`
+	enable_dns_update, started_at, completed_at, created_by, created_at, updated_at,
+	snmp_status, snmp_source_subnet_id, snmp_probed, snmp_no_answer, snmp_rejected`
 
 func scanScanJob(sc scanner) (store.IPScanJob, error) {
 	var j store.IPScanJob
@@ -1855,7 +1856,8 @@ func scanScanJob(sc scanner) (store.IPScanJob, error) {
 		&j.TotalAddresses, &j.ScannedCount, &j.AliveCount, &j.NewCount, &j.UpdatedCount, &j.SNMPDiscoveredCount,
 		&j.TriggeredBy, &j.RetryCount, &j.MaxRetries, &j.NextRetryAt, &j.TimeoutMs, &j.Concurrency,
 		&j.SkipReverseDNS, &j.TCPProbePorts, &j.EnableSNMP, &j.EnableDNSUpdate, &j.StartedAt, &j.CompletedAt,
-		&j.CreatedBy, &j.CreatedAt, &j.UpdatedAt); err != nil {
+		&j.CreatedBy, &j.CreatedAt, &j.UpdatedAt,
+		&j.SNMPStatus, &j.SNMPSourceSubnetID, &j.SNMPProbed, &j.SNMPNoAnswer, &j.SNMPRejected); err != nil {
 		return store.IPScanJob{}, err
 	}
 	return j, nil
@@ -1886,12 +1888,15 @@ func (d *DB) CreateScanJob(ctx context.Context, j store.IPScanJob) error {
 			(id, tenant_id, subnet_id, status, progress, status_message, total_addresses, scanned_count,
 			 alive_count, new_count, updated_count, snmp_discovered_count, triggered_by, retry_count, max_retries,
 			 next_retry_at, timeout_ms, concurrency, skip_reverse_dns, tcp_probe_ports, enable_snmp,
-			 enable_dns_update, started_at, completed_at, created_by, created_at, updated_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$26)`,
+			 enable_dns_update, started_at, completed_at, created_by, created_at, updated_at,
+			 snmp_status, snmp_source_subnet_id, snmp_probed, snmp_no_answer, snmp_rejected)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$26,
+			 $27,$28,$29,$30,$31)`,
 			j.ID, j.TenantID, j.SubnetID, j.Status, j.Progress, j.StatusMessage, j.TotalAddresses, j.ScannedCount,
 			j.AliveCount, j.NewCount, j.UpdatedCount, j.SNMPDiscoveredCount, j.TriggeredBy, j.RetryCount, j.MaxRetries,
 			j.NextRetryAt, j.TimeoutMs, j.Concurrency, j.SkipReverseDNS, j.TCPProbePorts, j.EnableSNMP,
-			j.EnableDNSUpdate, j.StartedAt, j.CompletedAt, j.CreatedBy, now)
+			j.EnableDNSUpdate, j.StartedAt, j.CompletedAt, j.CreatedBy, now,
+			j.SNMPStatus, j.SNMPSourceSubnetID, j.SNMPProbed, j.SNMPNoAnswer, j.SNMPRejected)
 		return mapErr(e)
 	})
 }
@@ -1952,12 +1957,14 @@ func (d *DB) UpdateScanJob(ctx context.Context, j store.IPScanJob) error {
 			alive_count=$9, new_count=$10, updated_count=$11, snmp_discovered_count=$12, triggered_by=$13,
 			retry_count=$14, max_retries=$15, next_retry_at=$16, timeout_ms=$17, concurrency=$18,
 			skip_reverse_dns=$19, tcp_probe_ports=$20, enable_snmp=$21, enable_dns_update=$22, started_at=$23,
-			completed_at=$24, created_by=$25, updated_at=$26
+			completed_at=$24, created_by=$25, updated_at=$26, snmp_status=$27, snmp_source_subnet_id=$28,
+			snmp_probed=$29, snmp_no_answer=$30, snmp_rejected=$31
 			WHERE tenant_id=$1 AND id=$2`,
 			j.TenantID, j.ID, j.SubnetID, j.Status, j.Progress, j.StatusMessage, j.TotalAddresses, j.ScannedCount,
 			j.AliveCount, j.NewCount, j.UpdatedCount, j.SNMPDiscoveredCount, j.TriggeredBy, j.RetryCount, j.MaxRetries,
 			j.NextRetryAt, j.TimeoutMs, j.Concurrency, j.SkipReverseDNS, j.TCPProbePorts, j.EnableSNMP,
-			j.EnableDNSUpdate, j.StartedAt, j.CompletedAt, j.CreatedBy, now)
+			j.EnableDNSUpdate, j.StartedAt, j.CompletedAt, j.CreatedBy, now,
+			j.SNMPStatus, j.SNMPSourceSubnetID, j.SNMPProbed, j.SNMPNoAnswer, j.SNMPRejected)
 		if e != nil {
 			return mapErr(e)
 		}
@@ -1984,7 +1991,7 @@ func (d *DB) ClaimDueScanJobs(ctx context.Context, at time.Time, limit int) (out
 			)
 			UPDATE ipam_ip_scan_jobs j SET status='scanning', started_at=$3, updated_at=$3
 			FROM due WHERE j.id = due.id
-			RETURNING j.*`, at, limit, now)
+			RETURNING `+prefixed(scanJobCols, "j."), at, limit, now)
 		if e != nil {
 			return e
 		}
@@ -1999,6 +2006,15 @@ func (d *DB) ClaimDueScanJobs(ctx context.Context, at time.Time, limit int) (out
 		return rows.Err()
 	})
 	return
+}
+
+// prefixed qualifies every column of a comma-separated list with prefix.
+func prefixed(cols, prefix string) string {
+	parts := strings.Split(cols, ",")
+	for i, c := range parts {
+		parts[i] = prefix + strings.TrimSpace(c)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (d *DB) ActiveScanForSubnet(ctx context.Context, tenantID, subnetID string) (active bool, err error) {

@@ -60,8 +60,8 @@ type Subnet struct {
 	BroadcastAddr  string            `json:"broadcast_address,omitempty"`
 	Mask           string            `json:"mask,omitempty"`
 	PrefixLength   int               `json:"prefix_length,omitempty"`
-	SNMPSecretRef  string            `json:"snmp_secret_ref,omitempty"` // warden id; never the secret
-	SNMPVersion    int               `json:"snmp_version,omitempty"`
+	SNMPSecretRef  string            `json:"snmp_secret_ref,omitempty"` // legacy warden id (FR-023): never written, never returned
+	SNMPVersion    int               `json:"snmp_version,omitempty"`    // effective SNMP version in responses (0 = none)
 	Tags           map[string]string `json:"tags,omitempty"`
 	CreatedBy      string            `json:"created_by,omitempty"`
 	CreatedAt      time.Time         `json:"created_at"`
@@ -73,6 +73,42 @@ type Subnet struct {
 	UsedAddresses      int64   `json:"used_addresses"`
 	AvailableAddresses int64   `json:"available_addresses"`
 	Utilization        float64 `json:"utilization"`
+	// SNMP is the effective SNMP credential state (computed, read-only; never
+	// a credential value).
+	SNMP *SNMPSummary `json:"snmp,omitempty"`
+}
+
+// SNMP credential states and scan SNMP phase statuses (feature 021).
+const (
+	SNMPStateNone, SNMPStateOwn, SNMPStateInherited = "none", "own", "inherited"
+
+	SNMPNotRequested, SNMPNoLiveHosts, SNMPNoCredentials, SNMPUnreadable, SNMPRan = "not_requested", "no_live_hosts", "no_credentials", "credentials_unreadable", "ran"
+)
+
+// SubnetSNMP is a subnet's own SNMP credentials: clear metadata plus the
+// sealed secret values (never serialised).
+type SubnetSNMP struct {
+	TenantID      string    `json:"tenant_id"`
+	SubnetID      string    `json:"subnet_id"`
+	Version       int       `json:"version"`
+	SecurityLevel string    `json:"security_level,omitempty"`
+	AuthProtocol  string    `json:"auth_protocol,omitempty"`
+	PrivProtocol  string    `json:"priv_protocol,omitempty"`
+	Sealed        []byte    `json:"-"`
+	UpdatedBy     string    `json:"updated_by,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// SNMPSummary is the effective SNMP state of a subnet: none, its own
+// credentials, or those inherited from the nearest ancestor that has them.
+type SNMPSummary struct {
+	State          string `json:"state"`
+	Version        int    `json:"version,omitempty"`
+	SecurityLevel  string `json:"security_level,omitempty"`
+	Weak           bool   `json:"weak,omitempty"`
+	SourceSubnetID string `json:"source_subnet_id,omitempty"`
+	SourceName     string `json:"source_name,omitempty"`
+	SourceCIDR     string `json:"source_cidr,omitempty"`
 }
 
 // IPAddress is an address within a subnet. Unique (tenant_id,address).
@@ -393,6 +429,11 @@ type IPScanJob struct {
 	NewCount            int64      `json:"new_count"`
 	UpdatedCount        int64      `json:"updated_count"`
 	SNMPDiscoveredCount int64      `json:"snmp_discovered_count"`
+	SNMPStatus          string     `json:"snmp_status,omitempty"`
+	SNMPSourceSubnetID  string     `json:"snmp_source_subnet_id,omitempty"`
+	SNMPProbed          int64      `json:"snmp_probed"`
+	SNMPNoAnswer        int64      `json:"snmp_no_answer"`
+	SNMPRejected        int64      `json:"snmp_rejected"`
 	TriggeredBy         string     `json:"triggered_by"`
 	RetryCount          int        `json:"retry_count"`
 	MaxRetries          int        `json:"max_retries"`
