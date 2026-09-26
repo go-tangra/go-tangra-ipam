@@ -273,3 +273,49 @@ func TestRunHooksAndLoop(t *testing.T) {
 		t.Fatal("port correlation after a run with changes")
 	}
 }
+
+// A host missing from the digest listing whose report still exists (inventory
+// omits hosts without a snapshot in listings) is re-applied, not marked gone.
+func TestReconcileConfirmsAbsentHosts(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.inv.Put(rep(tA, host1, "web-01", "10.0.0.5", t0.Add(-time.Minute), 1))
+	_ = f.r.Cycle(ctx)
+	f.r.inv = &hideListing{Fake: f.inv}
+	_ = f.st.RequestReconcile(ctx, tA, store.AuditRow{})
+	f.now = t0.Add(time.Minute)
+	if err := f.r.Cycle(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if d := f.device(t, tA, "web-01"); d.ReportState != store.RepReported {
+		t.Fatal("a host with a report is never marked gone")
+	}
+	f.inv.Err = &invclient.Error{Code: invclient.CodeUnavailable}
+	_ = f.st.RequestReconcile(ctx, tA, store.AuditRow{})
+	f.inv.Err = nil
+	f.r.inv = &hideListing{Fake: f.inv, getErr: &invclient.Error{Code: invclient.CodeUnavailable}}
+	f.now = t0.Add(20 * time.Minute)
+	if err := f.r.Cycle(ctx); err == nil {
+		t.Fatal("confirmation failure surfaces")
+	}
+}
+
+// hideListing lists no host reports (digest view) but still serves GetHostReport.
+type hideListing struct {
+	*invclient.Fake
+	getErr error
+}
+
+func (h *hideListing) ListHostReports(ctx context.Context, tid string, f invclient.Filter, fn func([]invclient.Report) error) error {
+	if f.Digest {
+		return nil
+	}
+	return h.Fake.ListHostReports(ctx, tid, f, fn)
+}
+
+func (h *hideListing) GetHostReport(ctx context.Context, tid, hid string) (invclient.Report, error) {
+	if h.getErr != nil {
+		return invclient.Report{}, h.getErr
+	}
+	return h.Fake.GetHostReport(ctx, tid, hid)
+}

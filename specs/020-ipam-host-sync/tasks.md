@@ -249,16 +249,16 @@ confirmation before they are executed.
 
 ### Tests for User Story 5 (MANDATORY) ⚠️
 
-- [ ] T105 [P] [US5] Regression test for the link uniqueness defect `internal/repo/repodb/links_integration_test.go` (`//go:build integration`): before 0005 a switch port with two FDB MACs fails `ReplaceInterfaceLinks` (documents the bug); after 0005 it stores both and `persistDevice` continues with the next interfaces; exactly one unique constraint existed before the migration
-- [ ] T106 [P] [US5] Ranking tests `internal/portlink/rank_test.go`: per switch the fewest-MAC port; port over `max_macs_per_port` ignored; port that learned another switch's MAC or has a switch LLDP neighbour = uplink, ignored; daisy chain → globally fewest wins; tie → no link; LLDP naming the host (sysName or port id = MAC/name) overrides FDB; VLAN carried; `FuzzRank` in `internal/portlink/rank_fuzz_test.go`
-- [ ] T107 [P] [US5] Apply tests `internal/portlink/portlink_test.go` (memstore): host interface flat link columns set, `port_linked` audit, re-confirmation refreshes `link_last_seen`, links older than `link_stale_days` cleared with `port_unlinked`; switch-port reverse lookup returns the host; only host-reported devices are linked; tenant-scoped (**negative**: FDB data of tenant B never links tenant A hosts)
-- [ ] T108 [P] [US5] Hook tests `internal/scan/executor_test.go`: correlation runs after a completed scan with SNMP for that tenant and not after a cancelled/failed one; `internal/hostsync/runner_test.go`: correlation runs after a host-sync run for tenants with switches
+- [X] T105 [P] [US5] Regression test for the link uniqueness defect `internal/repo/repodb/links_integration_test.go` (`//go:build integration`): before 0005 a switch port with two FDB MACs fails `ReplaceInterfaceLinks` (documents the bug); after 0005 it stores both and `persistDevice` continues with the next interfaces; exactly one unique constraint existed before the migration
+- [X] T106 [P] [US5] Ranking tests `internal/portlink/rank_test.go`: per switch the fewest-MAC port; port over `max_macs_per_port` ignored; port that learned another switch's MAC or has a switch LLDP neighbour = uplink, ignored; daisy chain → globally fewest wins; tie → no link; LLDP naming the host (sysName or port id = MAC/name) overrides FDB; VLAN carried; `FuzzRank` in `internal/portlink/rank_fuzz_test.go`
+- [X] T107 [P] [US5] Apply tests `internal/portlink/portlink_test.go` (memstore): host interface flat link columns set, `port_linked` audit, re-confirmation refreshes `link_last_seen`, links older than `link_stale_days` cleared with `port_unlinked`; switch-port reverse lookup returns the host; only host-reported devices are linked; tenant-scoped (**negative**: FDB data of tenant B never links tenant A hosts)
+- [X] T108 [P] [US5] Hook tests `internal/scan/executor_test.go`: correlation runs after a completed scan with SNMP for that tenant and not after a cancelled/failed one; `internal/hostsync/runner_test.go`: correlation runs after a host-sync run for tenants with switches
 
 ### Implementation for User Story 5
 
-- [ ] T109 [US5] Migration `internal/store/migrations/0005_interface_links_unique.sql` per data-model §2.2; memstore uniqueness aligned in `internal/memstore/memstore.go`
-- [ ] T110 [US5] `internal/portlink/rank.go` and `internal/portlink/portlink.go` (load FDB/LLDP links and host interfaces in tenant scope, rank, apply with audit)
-- [ ] T111 [US5] Hooks: after `ScanCompleted` in `internal/scan/executor.go` (via a `LinkCorrelator` interface on `scan.Service`) and after each tenant run in `internal/hostsync/runner.go`; wiring in `internal/app/app.go`
+- [X] T109 [US5] Migration `internal/store/migrations/0005_interface_links_unique.sql` per data-model §2.2; memstore uniqueness aligned in `internal/memstore/memstore.go`
+- [X] T110 [US5] `internal/portlink/rank.go` and `internal/portlink/portlink.go` (load FDB/LLDP links and host interfaces in tenant scope, rank, apply with audit)
+- [X] T111 [US5] Hooks: after `ScanCompleted` in `internal/scan/executor.go` (via a `LinkCorrelator` interface on `scan.Service`) and after each tenant run in `internal/hostsync/runner.go`; wiring in `internal/app/app.go`
 - [ ] T112 [P] [US5] Device interface reads include `remote_device_name` and switch-port "device behind" in `internal/repo/repodb/db.go` / `internal/memstore/memstore.go`; UI "Connected to" column (switch, port, VLAN, source) and switch-port "device behind" in `ui/src/views/devices/detail.vue`; vitest in `ui/tests/unit/views.spec.ts`
 
 **Checkpoint**: all stories functional.

@@ -58,12 +58,26 @@ func (r *Runner) reconcile(ctx context.Context, s store.HostSyncSettings, ru *ru
 		}
 		r.sleep(ctx, r.cfg.Pace)
 	}
+	// A device whose host is absent from the listing: inventory omits hosts
+	// without any snapshot, so confirm with GetHostReport before marking it.
 	for hid, d := range digests {
-		if !seen[hid] && d.state != store.RepNotReported {
+		if seen[hid] || d.state == store.RepNotReported {
+			continue
+		}
+		full, err := r.inv.GetHostReport(ctx, s.TenantID, hid)
+		switch {
+		case errors.Is(err, invclient.ErrNotFound):
 			if _, err := r.markGone(ctx, s.TenantID, hid, "deleted", TriggerReconcile, ru.id); err != nil {
 				return err
 			}
 			ru.changes++
+		case err != nil:
+			return err
+		default:
+			ru.fetched++
+			if _, err := r.handle(ctx, s, full, TriggerReconcile, ru, digests, true); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
