@@ -43,6 +43,9 @@ type Mem struct {
 	scans       map[string]store.IPScanJob
 	dns         map[string]store.DNSConfig // keyed by tenant id
 	audit       []store.AuditRow
+	guests      map[string]store.HypervisorGuest     // keyed by id
+	hsSettings  map[string]store.HostSyncSettings    // keyed by tenant id
+	devState    map[string]store.HostSyncDeviceState // keyed by device id
 
 	failNext map[string]bool
 	Now      func() time.Time
@@ -65,6 +68,9 @@ func New() *Mem {
 		hostMembers: map[string]store.HostGroupMember{},
 		scans:       map[string]store.IPScanJob{},
 		dns:         map[string]store.DNSConfig{},
+		guests:      map[string]store.HypervisorGuest{},
+		hsSettings:  map[string]store.HostSyncSettings{},
+		devState:    map[string]store.HostSyncDeviceState{},
 		failNext:    map[string]bool{},
 		Now:         func() time.Time { return time.Now().UTC() },
 	}
@@ -176,6 +182,7 @@ func (m *Mem) CreateSubnet(_ context.Context, s store.Subnet) error {
 	if s.IPVersion == 0 {
 		s.IPVersion = 4
 	}
+	s.Origin = store.OriginManual // server-owned (mirrors the column default)
 	t := now(m)
 	if s.CreatedAt.IsZero() {
 		s.CreatedAt = t
@@ -250,6 +257,7 @@ func (m *Mem) UpdateSubnet(_ context.Context, s store.Subnet) error {
 		}
 	}
 	s.CreatedAt = ex.CreatedAt
+	s.Origin = ex.Origin
 	s.UpdatedAt = now(m)
 	m.subnets[s.ID] = s
 	return nil
@@ -373,6 +381,7 @@ func (m *Mem) CreateAddress(_ context.Context, a store.IPAddress) error {
 	if a.AddressType == "" {
 		a.AddressType = store.AddrHost
 	}
+	clearAddrServerFields(&a)
 	t := now(m)
 	if a.CreatedAt.IsZero() {
 		a.CreatedAt = t
@@ -380,6 +389,19 @@ func (m *Mem) CreateAddress(_ context.Context, a store.IPAddress) error {
 	a.UpdatedAt = t
 	m.addrs[a.ID] = a
 	return nil
+}
+
+// clearAddrServerFields resets the host-sync-owned address columns, which the
+// SQL insert never writes through the API path.
+func clearAddrServerFields(a *store.IPAddress) {
+	a.ReportState, a.PreviousDeviceID, a.MovedAt, a.MoveCount, a.MoveWindowStart, a.Conflict = "", "", nil, 0, nil, false
+}
+
+// keepAddrServerFields copies the host-sync-owned columns of ex onto a (the SQL
+// update never writes them through the API path).
+func keepAddrServerFields(a *store.IPAddress, ex store.IPAddress) {
+	a.ReportState, a.PreviousDeviceID, a.MovedAt = ex.ReportState, ex.PreviousDeviceID, ex.MovedAt
+	a.MoveCount, a.MoveWindowStart, a.Conflict = ex.MoveCount, ex.MoveWindowStart, ex.Conflict
 }
 
 func (m *Mem) GetAddress(_ context.Context, tenantID, id string) (store.IPAddress, error) {
@@ -428,6 +450,12 @@ func (m *Mem) ListAddresses(_ context.Context, tenantID string, f store.AddressF
 		if f.HostnamePattern != "" && !strings.Contains(strings.ToLower(a.Hostname), strings.ToLower(f.HostnamePattern)) {
 			continue
 		}
+		if f.ReportState != "" && a.ReportState != f.ReportState {
+			continue
+		}
+		if f.Conflict != nil && a.Conflict != *f.Conflict {
+			continue
+		}
 		out = append(out, a)
 	}
 	out = paginate(out, func(a store.IPAddress) string { return a.ID }, f.CursorID, f.Limit)
@@ -450,6 +478,7 @@ func (m *Mem) UpdateAddress(_ context.Context, a store.IPAddress) error {
 		}
 	}
 	a.CreatedAt = ex.CreatedAt
+	keepAddrServerFields(&a, ex)
 	a.UpdatedAt = now(m)
 	m.addrs[a.ID] = a
 	return nil
@@ -479,6 +508,11 @@ func (m *Mem) UpsertAddressByAddress(_ context.Context, a store.IPAddress) (bool
 	if ex, id, ok := m.findAddrLocked(a.TenantID, a.Address); ok {
 		a.ID = id
 		a.CreatedAt = ex.CreatedAt
+		keepAddrServerFields(&a, ex)
+		if ex.ReportState == store.RepReported {
+			// D9: a scan never unlinks a host-reported address.
+			a.DeviceID, a.InterfaceName, a.MACAddress, a.Hostname, a.IsPrimary = ex.DeviceID, ex.InterfaceName, ex.MACAddress, ex.Hostname, ex.IsPrimary
+		}
 		if a.Status == "" {
 			a.Status = ex.Status
 		}
@@ -498,6 +532,7 @@ func (m *Mem) UpsertAddressByAddress(_ context.Context, a store.IPAddress) (bool
 	if a.AddressType == "" {
 		a.AddressType = store.AddrHost
 	}
+	clearAddrServerFields(&a)
 	a.CreatedAt = t
 	a.UpdatedAt = t
 	m.addrs[a.ID] = a
@@ -543,6 +578,13 @@ func (m *Mem) fillDevice(d *store.Device) {
 			su++
 		}
 	}
+	var gc int64
+	for _, g := range m.guests {
+		if g.TenantID == d.TenantID && g.HostDeviceID == d.ID {
+			gc++
+		}
+	}
+	d.GuestCount = gc
 	d.InterfaceCount = ifc
 	d.AddressCount = ac
 	d.PackageUpdateCount = pu
@@ -612,6 +654,7 @@ func (m *Mem) CreateDevice(_ context.Context, d store.Device) error {
 	if d.DeviceType == "" {
 		d.DeviceType = store.DevOther
 	}
+	keepDeviceServerFields(&d, store.Device{Source: store.SrcManual, UpdateStatus: store.UpdUnknown})
 	t := now(m)
 	if d.CreatedAt.IsZero() {
 		d.CreatedAt = t
@@ -619,6 +662,14 @@ func (m *Mem) CreateDevice(_ context.Context, d store.Device) error {
 	d.UpdatedAt = t
 	m.devices[d.ID] = d
 	return nil
+}
+
+// keepDeviceServerFields copies the host-sync-owned columns of ex onto d: the
+// SQL insert/update of the API path never writes them.
+func keepDeviceServerFields(d *store.Device, ex store.Device) {
+	d.Source, d.InventoryHostID, d.VirtualizationKind = ex.Source, ex.InventoryHostID, ex.VirtualizationKind
+	d.HypervisorDeviceID, d.UpdateStatus, d.ReportState = ex.HypervisorDeviceID, ex.UpdateStatus, ex.ReportState
+	d.LastReportAt, d.ReportDigest = ex.LastReportAt, ex.ReportDigest
 }
 
 func (m *Mem) GetDevice(_ context.Context, tenantID, id string) (store.Device, error) {
@@ -655,6 +706,12 @@ func (m *Mem) ListDevices(_ context.Context, tenantID string, f store.DeviceFilt
 		if f.RackID != "" && d.RackID != f.RackID {
 			continue
 		}
+		if f.Source != "" && d.Source != f.Source {
+			continue
+		}
+		if f.ReportState != "" && d.ReportState != f.ReportState {
+			continue
+		}
 		if f.Query != "" {
 			q := strings.ToLower(f.Query)
 			if !strings.Contains(strings.ToLower(d.Name), q) && !strings.Contains(strings.ToLower(d.PrimaryIP), q) {
@@ -686,6 +743,7 @@ func (m *Mem) UpdateDevice(_ context.Context, d store.Device) error {
 		}
 	}
 	d.CreatedAt = ex.CreatedAt
+	keepDeviceServerFields(&d, ex)
 	d.UpdatedAt = now(m)
 	m.devices[d.ID] = d
 	return nil
@@ -721,6 +779,7 @@ func (m *Mem) DeleteDevice(_ context.Context, tenantID, id string, force bool) e
 		delete(m.links, iid)
 	}
 	delete(m.pkgs, id)
+	m.deleteDeviceHostSyncLocked(id)
 	for aid, a := range m.addrs {
 		if a.TenantID == tenantID && a.DeviceID == id {
 			a.DeviceID = ""
@@ -746,8 +805,12 @@ func (m *Mem) UpsertDeviceByName(_ context.Context, d store.Device) (store.Devic
 	for id, ex := range m.devices {
 		if ex.TenantID == d.TenantID && ex.Name == d.Name {
 			merged := mergeDevice(ex, d)
+			if ex.Source == store.SrcHostReport {
+				merged = store.FillEmptyDevice(ex, d) // D9: reported fields win
+			}
 			merged.ID = id
 			merged.TenantID = ex.TenantID
+			keepDeviceServerFields(&merged, ex)
 			merged.CreatedAt = ex.CreatedAt
 			merged.UpdatedAt = t
 			m.devices[id] = merged
@@ -765,6 +828,7 @@ func (m *Mem) UpsertDeviceByName(_ context.Context, d store.Device) (store.Devic
 	if d.DeviceType == "" {
 		d.DeviceType = store.DevOther
 	}
+	keepDeviceServerFields(&d, store.Device{Source: store.SrcScan, UpdateStatus: store.UpdUnknown})
 	d.CreatedAt = t
 	d.UpdatedAt = t
 	m.devices[d.ID] = d
@@ -789,6 +853,7 @@ func (m *Mem) CreateInterface(_ context.Context, i store.DeviceInterface) error 
 	if i.ID == "" {
 		i.ID = store.NewID()
 	}
+	i.ReportState = "" // server-owned
 	t := now(m)
 	if i.CreatedAt.IsZero() {
 		i.CreatedAt = t
@@ -832,6 +897,7 @@ func (m *Mem) UpsertInterfaceByName(_ context.Context, i store.DeviceInterface) 
 		if ex.DeviceID == i.DeviceID && ex.Name == i.Name {
 			i.ID = id
 			i.CreatedAt = ex.CreatedAt
+			i.ReportState = ex.ReportState
 			i.UpdatedAt = t
 			m.ifaces[id] = i
 			return i, nil

@@ -30,6 +30,16 @@ const (
 	LinkSNMPFDB, LinkLLDP, LinkManual = "snmp_fdb", "lldp", "manual"
 
 	PowerOn, PowerOff, PowerCycle, PowerReset, PowerSoft, PowerDiag = "on", "off", "cycle", "reset", "soft", "diag"
+
+	// Host sync (feature 020): device provenance, report state, update state
+	// and subnet origin.
+	SrcManual, SrcScan, SrcHostReport                               = "manual", "scan", "host_report"
+	RepReported, RepNotReported                                     = "reported", "not_reported"
+	UpdUnknown, UpdUpToDate, UpdAvailable, UpdUnsupported, UpdError = "unknown", "up_to_date", "updates_available", "unsupported", "error"
+	OriginManual, OriginHostSync                                    = "manual", "host_sync"
+	DevInterfaceKindManagement                                      = "management"
+	HostSyncOK, HostSyncDegraded, HostSyncDisabled                  = "ok", "degraded", "disabled"
+	GuestVM, GuestContainer                                         = "vm", "container"
 )
 
 // Subnet is a CIDR network in a tenant (hierarchical).
@@ -56,6 +66,8 @@ type Subnet struct {
 	CreatedBy      string            `json:"created_by,omitempty"`
 	CreatedAt      time.Time         `json:"created_at"`
 	UpdatedAt      time.Time         `json:"updated_at"`
+	// Origin is "manual" or "host_sync" (created by the host sync); server-owned.
+	Origin string `json:"origin,omitempty"`
 	// Computed (not stored):
 	TotalAddresses     int64   `json:"total_addresses"`
 	UsedAddresses      int64   `json:"used_addresses"`
@@ -88,6 +100,13 @@ type IPAddress struct {
 	CreatedBy     string            `json:"created_by,omitempty"`
 	CreatedAt     time.Time         `json:"created_at"`
 	UpdatedAt     time.Time         `json:"updated_at"`
+	// Host sync (server-owned; never written through the address API).
+	ReportState      string     `json:"report_state,omitempty"`
+	PreviousDeviceID string     `json:"previous_device_id,omitempty"`
+	MovedAt          *time.Time `json:"moved_at,omitempty"`
+	MoveCount        int        `json:"-"`
+	MoveWindowStart  *time.Time `json:"-"`
+	Conflict         bool       `json:"conflict,omitempty"`
 }
 
 // Device is a managed network device/host. Unique (tenant_id,name).
@@ -121,7 +140,17 @@ type Device struct {
 	CreatedBy          string            `json:"created_by,omitempty"`
 	CreatedAt          time.Time         `json:"created_at"`
 	UpdatedAt          time.Time         `json:"updated_at"`
+	// Host sync (server-owned; never written through the device API).
+	Source             string     `json:"source,omitempty"`
+	InventoryHostID    string     `json:"inventory_host_id,omitempty"`
+	VirtualizationKind string     `json:"virtualization_kind,omitempty"`
+	HypervisorDeviceID string     `json:"hypervisor_device_id,omitempty"`
+	UpdateStatus       string     `json:"update_status,omitempty"`
+	ReportState        string     `json:"report_state,omitempty"`
+	LastReportAt       *time.Time `json:"last_report_at,omitempty"`
+	ReportDigest       string     `json:"-"`
 	// Computed:
+	GuestCount          int64 `json:"guest_count"`
 	InterfaceCount      int64 `json:"interface_count"`
 	AddressCount        int64 `json:"address_count"`
 	PackageUpdateCount  int64 `json:"package_update_count"`
@@ -148,6 +177,13 @@ type DeviceInterface struct {
 	LinkLastSeen      *time.Time `json:"link_last_seen,omitempty"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+	// ReportState is "", "reported" or "not_reported" (host sync, server-owned).
+	ReportState string `json:"report_state,omitempty"`
+	// Computed: the name of RemoteDeviceID (switch) and, for a switch port, the
+	// host device linked to it ("device behind").
+	RemoteDeviceName string `json:"remote_device_name,omitempty"`
+	BehindDeviceID   string `json:"behind_device_id,omitempty"`
+	BehindDeviceName string `json:"behind_device_name,omitempty"`
 }
 
 // DeviceInterfaceLink is an L2 neighbor link. Unique (interface_id,remote_device_id,link_source).
@@ -177,6 +213,71 @@ type DevicePackage struct {
 	Description      string    `json:"description,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// HypervisorGuest is a guest a hypervisor host reports (matched or not).
+type HypervisorGuest struct {
+	ID              string    `json:"id"`
+	TenantID        string    `json:"tenant_id"`
+	HostDeviceID    string    `json:"host_device_id"`
+	GuestRef        string    `json:"guest_ref"`
+	Name            string    `json:"name,omitempty"`
+	Kind            string    `json:"kind"`
+	Platform        string    `json:"platform,omitempty"`
+	MACs            []string  `json:"macs"`
+	GuestDeviceID   string    `json:"guest_device_id,omitempty"`
+	GuestDeviceName string    `json:"guest_device_name,omitempty"` // computed
+	LastReportedAt  time.Time `json:"last_reported_at"`
+}
+
+// HostSyncSettings is one tenant's host-sync configuration and state.
+type HostSyncSettings struct {
+	TenantID            string     `json:"-"`
+	Enabled             bool       `json:"enabled"`
+	FullIntervalMinutes int        `json:"full_interval_minutes"`
+	ExcludedInterfaces  []string   `json:"excluded_interfaces"`
+	ChangedSince        *time.Time `json:"-"`
+	LastPollAt          *time.Time `json:"-"`
+	LastReconcileAt     *time.Time `json:"-"`
+	ReconcileRequested  bool       `json:"-"`
+	Status              string     `json:"-"`
+	LastError           string     `json:"-"`
+	HostsReported       int        `json:"-"`
+	HostsFailed         int        `json:"-"`
+	UpdatedBy           string     `json:"updated_by,omitempty"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+}
+
+// HostSyncStatus is the state the runner records for a tenant after a cycle.
+type HostSyncStatus struct {
+	Status          string
+	LastError       string
+	ChangedSince    *time.Time // nil keeps the current watermark
+	LastPollAt      *time.Time
+	LastReconcileAt *time.Time // nil keeps the current value
+	ClearReconcile  bool       // reset reconcile_requested
+	HostsReported   int
+	HostsFailed     int
+}
+
+// HostSyncIssue is one skipped or truncated part of a host report.
+type HostSyncIssue struct {
+	Field  string `json:"field"`
+	Reason string `json:"reason"`
+	Count  int    `json:"count"`
+}
+
+// HostSyncDeviceState is the outcome of the last report applied to a device.
+type HostSyncDeviceState struct {
+	DeviceID        string          `json:"-"`
+	TenantID        string          `json:"-"`
+	InventoryHostID string          `json:"inventory_host_id"`
+	SnapshotID      string          `json:"snapshot_id,omitempty"`
+	CollectedAt     *time.Time      `json:"collected_at,omitempty"`
+	AppliedAt       *time.Time      `json:"applied_at,omitempty"`
+	Trigger         string          `json:"trigger,omitempty"`
+	Changes         int             `json:"changes"`
+	Issues          []HostSyncIssue `json:"issues"`
 }
 
 // Vlan. Unique (tenant_id,vlan_id) and (tenant_id,name).
@@ -349,12 +450,15 @@ type SubnetFilter struct {
 
 type AddressFilter struct {
 	SubnetID, DeviceID, Status, AddressType, AddressPrefix, HostnamePattern string
+	ReportState                                                             string
+	Conflict                                                                *bool
 	Limit                                                                   int
 	CursorID                                                                string
 }
 
 type DeviceFilter struct {
 	DeviceType, Status, LocationID, Manufacturer, RackID string
+	Source, ReportState                                  string
 	Query                                                string
 	Limit                                                int
 	CursorID                                             string
@@ -377,4 +481,30 @@ type ScanFilter struct {
 	SubnetID, Status string
 	Limit            int
 	CursorID         string
+}
+
+// FillEmptyDevice is the scan-path merge for a device maintained by host
+// reports (research D9): a discovery only fills fields that are still empty
+// and bumps last_seen; it never replaces a reported management address,
+// device type, OS or any other field the host sync owns.
+func FillEmptyDevice(dst, src Device) Device {
+	fill := func(d *string, s string) {
+		if *d == "" && s != "" {
+			*d = s
+		}
+	}
+	fill(&dst.DeviceType, src.DeviceType)
+	fill(&dst.Manufacturer, src.Manufacturer)
+	fill(&dst.Model, src.Model)
+	fill(&dst.SerialNumber, src.SerialNumber)
+	fill(&dst.PrimaryIP, src.PrimaryIP)
+	fill(&dst.PrimaryIPv6, src.PrimaryIPv6)
+	fill(&dst.ManagementIP, src.ManagementIP)
+	fill(&dst.OSType, src.OSType)
+	fill(&dst.OSVersion, src.OSVersion)
+	fill(&dst.FirmwareVersion, src.FirmwareVersion)
+	if src.LastSeen != nil {
+		dst.LastSeen = src.LastSeen
+	}
+	return dst
 }

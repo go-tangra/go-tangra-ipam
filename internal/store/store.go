@@ -67,6 +67,26 @@ func Migrate(ctx context.Context, dsn string) error {
 	return nil
 }
 
+// MigrateTo applies the embedded migrations up to version (tests of
+// migration upgrades, e.g. a database at 0003 with data upgraded to 0004).
+func MigrateTo(ctx context.Context, dsn string, version int64) error {
+	cfg, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
+	}
+	db := stdlib.OpenDB(*cfg)
+	defer func() { _ = db.Close() }()
+	goose.SetBaseFS(migrations)
+	goose.SetLogger(goose.NopLogger())
+	if err := goose.SetDialect("postgres"); err != nil {
+		return err
+	}
+	if err := goose.UpToContext(ctx, db, "migrations", version); err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
+	}
+	return nil
+}
+
 // Scope selects which RLS settings a transaction runs under. System-scoped
 // transactions (job claiming, cleanup, audit writing) set app.system so the RLS
 // policy admits cross-tenant reads/writes for the trusted worker paths.
