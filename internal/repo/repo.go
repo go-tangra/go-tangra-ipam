@@ -135,6 +135,24 @@ type Store interface {
 	AppendAudit(ctx context.Context, row store.AuditRow) error
 
 	HostSyncStore
+	PortLinkStore
+}
+
+// PortLinkData is what switch-port correlation reads for one tenant.
+type PortLinkData struct {
+	Switches     []store.Device              // devices typed switch
+	SwitchIfaces []store.DeviceInterface     // their interfaces
+	Links        []store.DeviceInterfaceLink // snmp_fdb / lldp rows on switch interfaces
+	Hosts        []store.Device              // host-reported devices
+	HostIfaces   []store.DeviceInterface     // their reported interfaces (with the flat link columns)
+}
+
+// PortLinkStore is the switch-port correlation persistence (US5).
+type PortLinkStore interface {
+	PortLinkData(ctx context.Context, tenantID string) (PortLinkData, error)
+	// SetInterfaceLinks writes the flat link columns of host interfaces and
+	// their audit rows in one tenant transaction.
+	SetInterfaceLinks(ctx context.Context, tenantID string, ifaces []store.DeviceInterface, audit []store.AuditRow) error
 }
 
 // MACOwner is a device interface carrying a MAC (hypervisor guest matching).

@@ -38,6 +38,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/portlink"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo/repodb"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
@@ -214,6 +215,10 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 		ConflictWindow: time.Duration(hs.ConflictWindowHours) * time.Hour,
 	}, a.Log, hostsync.NewMetrics(meter))
 	hostAdmin := hostsync.NewAdmin(a.Repo, inv, hostRunner, hs.Enabled)
+	// Switch-port correlation (US5) after SNMP scans and host-sync runs.
+	correlator := portlink.New(a.Repo, hs.MaxMACsPerPort, time.Duration(hs.LinkStaleDays)*24*time.Hour)
+	scanSvc.SetLinker(correlator)
+	hostRunner.SetLinker(correlator)
 	if hs.Enabled {
 		a.workers = append(a.workers, hostRunner.Run)
 	} else {

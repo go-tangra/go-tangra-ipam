@@ -879,6 +879,14 @@ func (m *Mem) ListInterfaces(_ context.Context, tenantID, deviceID string) ([]st
 	var out []store.DeviceInterface
 	for _, i := range m.ifaces {
 		if i.TenantID == tenantID && i.DeviceID == deviceID {
+			if d, ok := m.devices[i.RemoteDeviceID]; ok && d.TenantID == tenantID {
+				i.RemoteDeviceName = d.Name
+			}
+			for _, h := range m.ifaces {
+				if h.TenantID == tenantID && h.RemoteInterfaceID == i.ID {
+					i.BehindDeviceID, i.BehindDeviceName = h.DeviceID, m.devices[h.DeviceID].Name
+				}
+			}
 			out = append(out, i)
 		}
 	}
@@ -938,7 +946,13 @@ func (m *Mem) ReplaceInterfaceLinks(_ context.Context, tenantID, interfaceID str
 		return repo.ErrNotFound
 	}
 	cp := make([]store.DeviceInterfaceLink, 0, len(links))
+	uniq := map[[3]string]bool{} // UNIQUE (interface_id, link_source, remote_device_id, remote_port_name), 0005
 	for _, l := range links {
+		k := [3]string{l.LinkSource, l.RemoteDeviceID, l.RemotePortName}
+		if uniq[k] {
+			return repo.ErrConflict
+		}
+		uniq[k] = true
 		if l.ID == "" {
 			l.ID = store.NewID()
 		}

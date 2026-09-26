@@ -254,3 +254,47 @@ func TestSNMPScanGuardsHostReportedDevice(t *testing.T) {
 		t.Fatalf("scan-created device: %+v", l)
 	}
 }
+
+type countLinker struct{ tenants []string }
+
+func (c *countLinker) Correlate(_ context.Context, tid string) error {
+	c.tenants = append(c.tenants, tid)
+	return errors.New("logged only")
+}
+
+// TestPortCorrelationAfterSNMPScan (T108): correlation runs after a completed
+// scan with SNMP, not after one without SNMP nor after a failed one.
+func TestPortCorrelationAfterSNMPScan(t *testing.T) {
+	ctx := context.Background()
+	m := memstore.New()
+	clk := &clock{t: time.Now().UTC()}
+	m.Now = clk.now
+	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
+	l := &countLinker{}
+	svc := newService(m, icmp.NewFake("10.0.0.1"), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc.SetLinker(l)
+	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true}); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = svc.RunOnce(ctx, nil)
+	if len(l.tenants) != 0 {
+		t.Fatal("no correlation without SNMP")
+	}
+	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true, SkipReverseDNS: true}); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = svc.RunOnce(ctx, nil)
+	if len(l.tenants) != 1 || l.tenants[0] != "t1" {
+		t.Fatalf("correlation after an SNMP scan: %v", l.tenants)
+	}
+	// A failing job (subnet gone) never correlates.
+	failing := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	l2 := &countLinker{}
+	failing.SetLinker(l2)
+	job, _ := failing.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true})
+	_ = m.DeleteSubnet(ctx, "t1", "s1", true)
+	_, _ = failing.RunOnce(ctx, nil)
+	if got, _ := failing.GetScanJob(ctx, adminSubj("t1"), job.ID); got.Status == store.ScanCompleted || len(l2.tenants) != 0 {
+		t.Fatalf("failed scan correlated: %s %v", got.Status, l2.tenants)
+	}
+}

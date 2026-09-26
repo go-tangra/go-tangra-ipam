@@ -911,21 +911,37 @@ func (d *DB) GetInterface(ctx context.Context, tenantID, id string) (out store.D
 	return
 }
 
+// ListInterfaces returns a device's interfaces with the computed name of the
+// linked remote device and, for a switch port, the host device linked to it
+// ("device behind", US5).
 func (d *DB) ListInterfaces(ctx context.Context, tenantID, deviceID string) (out []store.DeviceInterface, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
-		rows, e := tx.Query(ctx, "SELECT "+ifaceCols+" FROM ipam_device_interfaces WHERE tenant_id=$1 AND device_id=$2 ORDER BY if_index, name", tenantID, deviceID)
+		rows, e := tx.Query(ctx, "SELECT "+ifaceCols+` FROM ipam_device_interfaces WHERE tenant_id=$1 AND device_id=$2 ORDER BY if_index, name`, tenantID, deviceID)
 		if e != nil {
 			return e
 		}
-		defer rows.Close()
 		for rows.Next() {
 			i, e := scanIface(rows)
 			if e != nil {
+				rows.Close()
 				return e
 			}
 			out = append(out, i)
 		}
-		return rows.Err()
+		rows.Close()
+		if e := rows.Err(); e != nil {
+			return e
+		}
+		for k := range out {
+			i := &out[k]
+			if i.RemoteDeviceID != "" {
+				_ = tx.QueryRow(ctx, "SELECT name FROM ipam_devices WHERE tenant_id=$1 AND id::text=$2", tenantID, i.RemoteDeviceID).Scan(&i.RemoteDeviceName)
+			}
+			_ = tx.QueryRow(ctx, `SELECT d.id::text, d.name FROM ipam_device_interfaces h JOIN ipam_devices d ON d.id = h.device_id
+				WHERE h.tenant_id=$1 AND h.remote_interface_id=$2 ORDER BY h.link_last_seen DESC NULLS LAST LIMIT 1`,
+				tenantID, i.ID).Scan(&i.BehindDeviceID, &i.BehindDeviceName)
+		}
+		return nil
 	})
 	return
 }
