@@ -94,6 +94,21 @@ const when = (t?: string) => (t ? new Date(t).toLocaleString() : '')
 const sourceLabel: Record<string, string> = { manual: 'manual', scan: 'discovered by scan', host_report: 'host report (inventory agent)' }
 // Unknown is never shown as "up to date" (US4 scenario 3).
 const updateColors = { up_to_date: 'success', updates_available: 'warning', unsupported: 'neutral', error: 'error', unknown: 'neutral' } as const
+const updateLabels: Record<string, string> = { up_to_date: 'up to date', updates_available: 'updates available', unsupported: 'not supported', error: 'check failed', unknown: 'unknown' }
+const updateLabel = computed(() => {
+  const d = device.value
+  const status = d?.update_status ?? 'unknown'
+  const label = updateLabels[status] ?? status
+  if (status !== 'updates_available' || !d) return label
+  const counts = [d.package_update_count ? `${d.package_update_count} packages` : '', d.security_update_count ? `${d.security_update_count} security` : ''].filter(Boolean)
+  return counts.length ? `${label} (${counts.join(', ')})` : label
+})
+// The stored trigger is "poll", "reconcile" or "resync:<actor>" / "resync_all:<actor>";
+// the actor is in the audit log, not shown here.
+function triggerLabel(t: string): string {
+  const kind = t.split(':', 1)[0] ?? t
+  return ({ poll: 'scheduled sync', reconcile: 'reconcile', resync: 'manual re-sync', resync_all: 're-sync of all hosts' } as Record<string, string>)[kind] ?? kind
+}
 const summary = computed<KeyValue[]>(() => {
   const d = device.value
   if (!d) return []
@@ -161,9 +176,9 @@ const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, 
       <UiKeyValueTable :items="summary" :columns="2" />
       <div v-if="device.source === 'host_report'" class="mt-3 flex flex-wrap items-center gap-2" data-test="device-hostsync">
         <span class="text-sm">Updates</span>
-        <UiStatusChip :status="device.update_status ?? 'unknown'" :colors="updateColors" data-test="device-update-status" />
+        <UiStatusChip :status="device.update_status ?? 'unknown'" :label="updateLabel" :colors="updateColors" data-test="device-update-status" />
         <UiBadge v-if="device.reboot_required" color="warning" size="xs">reboot required</UiBadge>
-        <span v-if="report" class="text-sm text-base-content/70">last applied {{ when(report.applied_at) }}<template v-if="report.trigger"> · {{ report.trigger }}</template></span>
+        <span v-if="report" class="text-sm text-base-content/70">last applied {{ when(report.applied_at) }}<template v-if="report.trigger"> · {{ triggerLabel(report.trigger) }}</template></span>
         <UiButton v-if="canResync" size="xs" variant="soft" icon="mdi-sync" :loading="resyncing" data-test="device-resync" @click="resync">Re-sync</UiButton>
       </div>
       <ul v-if="report && report.issues.length" class="mt-2 list-inside list-disc text-sm text-warning" data-test="device-issues">
