@@ -409,3 +409,40 @@ func TestEntityRoundTrips(t *testing.T) {
 		t.Fatalf("statsToPB: %+v", st)
 	}
 }
+
+// TestHostSyncFieldsMapped: the host-sync fields reach other modules over
+// the mesh; callers can never set them (server-owned).
+func TestHostSyncFieldsMapped(t *testing.T) {
+	ts := time.Unix(1700000000, 0).UTC()
+	d := deviceToPB(store.Device{Source: store.SrcHostReport, InventoryHostID: "h", VirtualizationKind: "kvm",
+		HypervisorDeviceID: "hv", UpdateStatus: store.UpdAvailable, ReportState: store.RepReported, LastReportAt: &ts, GuestCount: 2})
+	if d.GetSource() != "host_report" || d.GetInventoryHostId() != "h" || d.GetVirtualizationKind() != "kvm" ||
+		d.GetHypervisorDeviceId() != "hv" || d.GetUpdateStatus() != "updates_available" || d.GetReportState() != "reported" ||
+		d.GetLastReportAt() != 1700000000 || d.GetGuestCount() != 2 {
+		t.Fatalf("device %+v", d)
+	}
+	i := deviceInterfaceToPB(store.DeviceInterface{ReportState: store.RepNotReported})
+	a := addressToPB(store.IPAddress{ReportState: store.RepReported, PreviousDeviceID: "p", MovedAt: &ts, Conflict: true})
+	s := subnetToPB(store.Subnet{Origin: store.OriginHostSync})
+	if i.GetReportState() != "not_reported" || a.GetPreviousDeviceId() != "p" || a.GetMovedAt() != 1700000000 || !a.GetConflict() ||
+		a.GetReportState() != "reported" || s.GetOrigin() != "host_sync" {
+		t.Fatal("interface/address/subnet fields")
+	}
+	// Negative: server-owned fields sent by a caller are ignored.
+	in := deviceFromPB(&ipamv1.Device{Name: "x", Source: "host_report", InventoryHostId: "h", ReportState: "reported",
+		HypervisorDeviceId: "hv", VirtualizationKind: "kvm", UpdateStatus: "up_to_date", LastReportAt: 5})
+	if in.Source != "" || in.InventoryHostID != "" || in.ReportState != "" || in.HypervisorDeviceID != "" ||
+		in.VirtualizationKind != "" || in.UpdateStatus != "" || in.LastReportAt != nil {
+		t.Fatalf("device from caller %+v", in)
+	}
+	ai := addressFromPB(&ipamv1.IPAddress{Address: "10.0.0.1", ReportState: "reported", PreviousDeviceId: "p", MovedAt: 5, Conflict: true})
+	if ai.ReportState != "" || ai.PreviousDeviceID != "" || ai.MovedAt != nil || ai.Conflict {
+		t.Fatalf("address from caller %+v", ai)
+	}
+	if sf := subnetFromPB(&ipamv1.Subnet{Origin: "host_sync"}); sf.Origin != "" {
+		t.Fatal("subnet origin from caller")
+	}
+	if fi := deviceInterfaceFromPB(&ipamv1.DeviceInterface{ReportState: "reported"}); fi.ReportState != "" {
+		t.Fatal("interface report state from caller")
+	}
+}

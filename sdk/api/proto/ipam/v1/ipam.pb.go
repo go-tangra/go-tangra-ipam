@@ -841,6 +841,7 @@ type Subnet struct {
 	UsedAddresses      int64   `protobuf:"varint,24,opt,name=used_addresses,json=usedAddresses,proto3" json:"used_addresses,omitempty"`
 	AvailableAddresses int64   `protobuf:"varint,25,opt,name=available_addresses,json=availableAddresses,proto3" json:"available_addresses,omitempty"`
 	Utilization        float64 `protobuf:"fixed64,26,opt,name=utilization,proto3" json:"utilization,omitempty"`
+	Origin             string  `protobuf:"bytes,27,opt,name=origin,proto3" json:"origin,omitempty"` // "manual" | "host_sync" (server-owned)
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -1057,6 +1058,13 @@ func (x *Subnet) GetUtilization() float64 {
 	return 0
 }
 
+func (x *Subnet) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
+}
+
 // IPAddress is an address within a subnet. Unique (tenant_id,address).
 type IPAddress struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1082,8 +1090,13 @@ type IPAddress struct {
 	CreatedBy     string                 `protobuf:"bytes,20,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	CreatedAt     int64                  `protobuf:"varint,21,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // unix seconds
 	UpdatedAt     int64                  `protobuf:"varint,22,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // unix seconds
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Host sync (feature 020). Server-owned: ignored by Create/Update RPCs.
+	ReportState      string `protobuf:"bytes,23,opt,name=report_state,json=reportState,proto3" json:"report_state,omitempty"`
+	PreviousDeviceId string `protobuf:"bytes,24,opt,name=previous_device_id,json=previousDeviceId,proto3" json:"previous_device_id,omitempty"`
+	MovedAt          int64  `protobuf:"varint,25,opt,name=moved_at,json=movedAt,proto3" json:"moved_at,omitempty"` // unix seconds, 0 = never moved
+	Conflict         bool   `protobuf:"varint,26,opt,name=conflict,proto3" json:"conflict,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *IPAddress) Reset() {
@@ -1270,6 +1283,34 @@ func (x *IPAddress) GetUpdatedAt() int64 {
 	return 0
 }
 
+func (x *IPAddress) GetReportState() string {
+	if x != nil {
+		return x.ReportState
+	}
+	return ""
+}
+
+func (x *IPAddress) GetPreviousDeviceId() string {
+	if x != nil {
+		return x.PreviousDeviceId
+	}
+	return ""
+}
+
+func (x *IPAddress) GetMovedAt() int64 {
+	if x != nil {
+		return x.MovedAt
+	}
+	return 0
+}
+
+func (x *IPAddress) GetConflict() bool {
+	if x != nil {
+		return x.Conflict
+	}
+	return false
+}
+
 // Device is a managed network device/host. Unique (tenant_id,name). Sealed
 // contact fields are excluded; ipmi_secret_ref is a warden id, never the secret.
 type Device struct {
@@ -1307,8 +1348,17 @@ type Device struct {
 	AddressCount        int64 `protobuf:"varint,30,opt,name=address_count,json=addressCount,proto3" json:"address_count,omitempty"`
 	PackageUpdateCount  int64 `protobuf:"varint,31,opt,name=package_update_count,json=packageUpdateCount,proto3" json:"package_update_count,omitempty"`
 	SecurityUpdateCount int64 `protobuf:"varint,32,opt,name=security_update_count,json=securityUpdateCount,proto3" json:"security_update_count,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Host sync (feature 020). Server-owned: ignored by Create/Update RPCs.
+	Source             string `protobuf:"bytes,33,opt,name=source,proto3" json:"source,omitempty"` // "manual" | "scan" | "host_report"
+	InventoryHostId    string `protobuf:"bytes,34,opt,name=inventory_host_id,json=inventoryHostId,proto3" json:"inventory_host_id,omitempty"`
+	VirtualizationKind string `protobuf:"bytes,35,opt,name=virtualization_kind,json=virtualizationKind,proto3" json:"virtualization_kind,omitempty"`
+	HypervisorDeviceId string `protobuf:"bytes,36,opt,name=hypervisor_device_id,json=hypervisorDeviceId,proto3" json:"hypervisor_device_id,omitempty"`
+	UpdateStatus       string `protobuf:"bytes,37,opt,name=update_status,json=updateStatus,proto3" json:"update_status,omitempty"`    // unknown|up_to_date|updates_available|unsupported|error
+	ReportState        string `protobuf:"bytes,38,opt,name=report_state,json=reportState,proto3" json:"report_state,omitempty"`       // "" | "reported" | "not_reported"
+	LastReportAt       int64  `protobuf:"varint,39,opt,name=last_report_at,json=lastReportAt,proto3" json:"last_report_at,omitempty"` // unix seconds, 0 = never
+	GuestCount         int64  `protobuf:"varint,40,opt,name=guest_count,json=guestCount,proto3" json:"guest_count,omitempty"`         // computed
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -1565,6 +1615,62 @@ func (x *Device) GetSecurityUpdateCount() int64 {
 	return 0
 }
 
+func (x *Device) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *Device) GetInventoryHostId() string {
+	if x != nil {
+		return x.InventoryHostId
+	}
+	return ""
+}
+
+func (x *Device) GetVirtualizationKind() string {
+	if x != nil {
+		return x.VirtualizationKind
+	}
+	return ""
+}
+
+func (x *Device) GetHypervisorDeviceId() string {
+	if x != nil {
+		return x.HypervisorDeviceId
+	}
+	return ""
+}
+
+func (x *Device) GetUpdateStatus() string {
+	if x != nil {
+		return x.UpdateStatus
+	}
+	return ""
+}
+
+func (x *Device) GetReportState() string {
+	if x != nil {
+		return x.ReportState
+	}
+	return ""
+}
+
+func (x *Device) GetLastReportAt() int64 {
+	if x != nil {
+		return x.LastReportAt
+	}
+	return 0
+}
+
+func (x *Device) GetGuestCount() int64 {
+	if x != nil {
+		return x.GuestCount
+	}
+	return 0
+}
+
 // DeviceInterface is a NIC on a device. Unique (device_id,name).
 type DeviceInterface struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
@@ -1586,6 +1692,7 @@ type DeviceInterface struct {
 	LinkLastSeen      int64                  `protobuf:"varint,16,opt,name=link_last_seen,json=linkLastSeen,proto3" json:"link_last_seen,omitempty"` // unix seconds, 0 = unset
 	CreatedAt         int64                  `protobuf:"varint,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`            // unix seconds
 	UpdatedAt         int64                  `protobuf:"varint,18,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`            // unix seconds
+	ReportState       string                 `protobuf:"bytes,19,opt,name=report_state,json=reportState,proto3" json:"report_state,omitempty"`       // host sync, server-owned
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1744,6 +1851,13 @@ func (x *DeviceInterface) GetUpdatedAt() int64 {
 		return x.UpdatedAt
 	}
 	return 0
+}
+
+func (x *DeviceInterface) GetReportState() string {
+	if x != nil {
+		return x.ReportState
+	}
+	return ""
 }
 
 // DevicePackage is an OS package on a device. Unique (tenant_id,device_id,name).
@@ -8629,7 +8743,7 @@ var File_ipam_v1_ipam_proto protoreflect.FileDescriptor
 
 const file_ipam_v1_ipam_proto_rawDesc = "" +
 	"\n" +
-	"\x12ipam/v1/ipam.proto\x12\aipam.v1\"\xa1\a\n" +
+	"\x12ipam/v1/ipam.proto\x12\aipam.v1\"\xb9\a\n" +
 	"\x06Subnet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -8663,10 +8777,11 @@ const file_ipam_v1_ipam_proto_rawDesc = "" +
 	"\x0ftotal_addresses\x18\x17 \x01(\x03R\x0etotalAddresses\x12%\n" +
 	"\x0eused_addresses\x18\x18 \x01(\x03R\rusedAddresses\x12/\n" +
 	"\x13available_addresses\x18\x19 \x01(\x03R\x12availableAddresses\x12 \n" +
-	"\vutilization\x18\x1a \x01(\x01R\vutilization\x1a7\n" +
+	"\vutilization\x18\x1a \x01(\x01R\vutilization\x12\x16\n" +
+	"\x06origin\x18\x1b \x01(\tR\x06origin\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x93\x06\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9b\a\n" +
 	"\tIPAddress\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x18\n" +
@@ -8696,10 +8811,14 @@ const file_ipam_v1_ipam_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x15 \x01(\x03R\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x16 \x01(\x03R\tupdatedAt\x1a7\n" +
+	"updated_at\x18\x16 \x01(\x03R\tupdatedAt\x12!\n" +
+	"\freport_state\x18\x17 \x01(\tR\vreportState\x12,\n" +
+	"\x12previous_device_id\x18\x18 \x01(\tR\x10previousDeviceId\x12\x19\n" +
+	"\bmoved_at\x18\x19 \x01(\x03R\amovedAt\x12\x1a\n" +
+	"\bconflict\x18\x1a \x01(\bR\bconflict\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb5\t\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xeb\v\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -8740,10 +8859,19 @@ const file_ipam_v1_ipam_proto_rawDesc = "" +
 	"\x0finterface_count\x18\x1d \x01(\x03R\x0einterfaceCount\x12#\n" +
 	"\raddress_count\x18\x1e \x01(\x03R\faddressCount\x120\n" +
 	"\x14package_update_count\x18\x1f \x01(\x03R\x12packageUpdateCount\x122\n" +
-	"\x15security_update_count\x18  \x01(\x03R\x13securityUpdateCount\x1a7\n" +
+	"\x15security_update_count\x18  \x01(\x03R\x13securityUpdateCount\x12\x16\n" +
+	"\x06source\x18! \x01(\tR\x06source\x12*\n" +
+	"\x11inventory_host_id\x18\" \x01(\tR\x0finventoryHostId\x12/\n" +
+	"\x13virtualization_kind\x18# \x01(\tR\x12virtualizationKind\x120\n" +
+	"\x14hypervisor_device_id\x18$ \x01(\tR\x12hypervisorDeviceId\x12#\n" +
+	"\rupdate_status\x18% \x01(\tR\fupdateStatus\x12!\n" +
+	"\freport_state\x18& \x01(\tR\vreportState\x12$\n" +
+	"\x0elast_report_at\x18' \x01(\x03R\flastReportAt\x12\x1f\n" +
+	"\vguest_count\x18( \x01(\x03R\n" +
+	"guestCount\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd3\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf6\x04\n" +
 	"\x0fDeviceInterface\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x1b\n" +
@@ -8768,7 +8896,8 @@ const file_ipam_v1_ipam_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x11 \x01(\x03R\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x12 \x01(\x03R\tupdatedAt\"\x9d\x03\n" +
+	"updated_at\x18\x12 \x01(\x03R\tupdatedAt\x12!\n" +
+	"\freport_state\x18\x13 \x01(\tR\vreportState\"\x9d\x03\n" +
 	"\rDevicePackage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x1b\n" +
