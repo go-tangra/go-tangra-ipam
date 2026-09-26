@@ -235,3 +235,58 @@ func TestSetSNMPv3(t *testing.T) {
 		t.Fatalf("priv with authNoPriv: %v", err)
 	}
 }
+
+// TestSNMPInheritance (T035): children inherit from the nearest ancestor;
+// clearing or deleting the source falls back; host-sync subnets inherit too.
+func TestSNMPInheritance(t *testing.T) {
+	svc, st, _ := snmpSvc(t)
+	ctx := context.Background()
+	root := mkSubnet(t, svc, "supernet", "10.0.0.0/8", "")
+	site := mkSubnet(t, svc, "site", "10.1.0.0/16", root.ID)
+	lab := mkSubnet(t, svc, "lab", "10.1.2.0/24", site.ID)
+	if _, err := svc.SetSNMP(ctx, subj(), root.ID, snmpcred.Input{Version: 3, User: "u", SecurityLevel: "authNoPriv", AuthProtocol: "SHA", AuthPassword: "authpass1"}); err != nil {
+		t.Fatal(err)
+	}
+	st1, _ := svc.GetSNMP(ctx, subj(), lab.ID)
+	if st1.Own != nil || st1.Effective.State != store.SNMPStateInherited || st1.Effective.SourceSubnetID != root.ID ||
+		st1.Effective.SourceName != "supernet" || st1.Effective.SourceCIDR != "10.0.0.0/8" || st1.Effective.Version != 3 || !st1.Effective.Weak {
+		t.Fatalf("grandchild %+v", st1)
+	}
+	tree, _ := svc.GetTree(ctx, subj())
+	if tree[0].Children[0].Children[0].SNMP.State != store.SNMPStateInherited {
+		t.Fatal("tree summary for the grandchild")
+	}
+	list, _ := svc.List(ctx, subj(), store.SubnetFilter{ParentID: site.ID})
+	if len(list) != 1 || list[0].SNMP.SourceSubnetID != root.ID {
+		t.Fatalf("filtered list still resolves ancestors outside the page: %+v", list)
+	}
+	// Own credentials on the middle subnet win for it and its children.
+	if _, err := svc.SetSNMP(ctx, subj(), site.ID, snmpcred.Input{Version: 2, Community: "site-comm"}); err != nil {
+		t.Fatal(err)
+	}
+	if g, _ := svc.Get(ctx, subj(), lab.ID); g.SNMP.SourceSubnetID != site.ID || g.SNMPVersion != 2 {
+		t.Fatalf("nearest ancestor: %+v", g.SNMP)
+	}
+	// Clearing the site's own credentials: the lab inherits from the root again.
+	if err := st.DeleteSubnetSNMP(ctx, "t1", site.ID, store.AuditRow{TenantID: "t1"}); err != nil {
+		t.Fatal(err)
+	}
+	if g, _ := svc.Get(ctx, subj(), lab.ID); g.SNMP.SourceSubnetID != root.ID {
+		t.Fatalf("fallback after clear: %+v", g.SNMP)
+	}
+	// A subnet the host sync created inherits like any other.
+	auto := store.Subnet{ID: "auto-1", TenantID: "t1", Name: "auto", CIDR: "10.1.3.0/24", ParentID: site.ID, Origin: store.OriginHostSync}
+	if err := st.CreateSubnet(ctx, auto); err != nil {
+		t.Fatal(err)
+	}
+	if g, _ := svc.Get(ctx, subj(), "auto-1"); g.SNMP.State != store.SNMPStateInherited || g.SNMP.SourceSubnetID != root.ID {
+		t.Fatalf("host-sync subnet: %+v", g.SNMP)
+	}
+	// Deleting the root (cascade) leaves the children with nothing.
+	if err := svc.Delete(ctx, subj(), root.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if g, _ := svc.Get(ctx, subj(), lab.ID); g.SNMP.State != store.SNMPStateNone || g.SNMPVersion != 0 {
+		t.Fatalf("after parent delete: %+v", g.SNMP)
+	}
+}

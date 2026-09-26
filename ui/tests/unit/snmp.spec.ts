@@ -3,7 +3,9 @@ import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { abilitiesPlugin } from '@casl/vue'
 import { createMongoAbility } from '@casl/ability'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import SubnetSnmpCard from '@/components/SubnetSnmpCard.vue'
+import Subnets from '@/views/subnets/index.vue'
 import { snmpSchema } from '@/schemas'
 import type { Subnet, SubnetSNMPStatus } from '@/api/types'
 
@@ -148,6 +150,37 @@ describe('SubnetSnmpCard (v3)', () => {
     expect(JSON.parse(String(put?.init.body))).toEqual({ version: 3, user: 'labuser', security_level: 'authPriv', auth_protocol: 'SHA256', auth_password: 'authpass-1', priv_protocol: 'AES256', priv_password: 'privpass-1' })
     expect(w.html()).not.toContain('privpass-1')
     expect(w.find('[data-test=snmp-status]').text()).toContain('v3 authPriv')
+    w.unmount()
+  })
+})
+
+describe('SNMP inheritance in the UI', () => {
+  it('the card names the subnet the credentials are inherited from', async () => {
+    fetchMock(() => ({ body: { own: null, effective: { state: 'inherited', version: 3, security_level: 'authPriv', source_subnet_id: 'p1', source_name: 'supernet', source_cidr: '10.0.0.0/8' } } }))
+    const w = mount(SubnetSnmpCard, { props: { subnet }, global: withAbility(MANAGE) })
+    await flushPromises()
+    const txt = w.find('[data-test=snmp-status]').text()
+    expect(txt).toContain('Inherited from supernet (10.0.0.0/8)')
+    expect(txt).toContain('v3 authPriv')
+    expect(w.find('[data-test=snmp-set]').text()).toContain('Set')
+    w.unmount()
+  })
+
+  it('the subnet list shows an SNMP badge per subnet', async () => {
+    vi.stubGlobal('EventSource', class { onopen = null; onerror = null; addEventListener() {} close() {} })
+    const rows = [
+      { ...subnet, id: 'a', snmp: { state: 'own', version: 2 } },
+      { ...subnet, id: 'b', cidr: '10.1.112.0/25', parent_id: 'a', snmp: { state: 'inherited', version: 2, source_name: 'mgmt', source_cidr: '10.1.112.0/24' } },
+      { ...subnet, id: 'c', cidr: '192.168.0.0/24', snmp: { state: 'none' } },
+    ]
+    fetchMock((url) => ({ body: url.includes('/subnets/tree') ? { tree: [] } : { items: rows } }))
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div/>' } }] })
+    const w = mount(Subnets, { global: { plugins: [router, [abilitiesPlugin, createMongoAbility([]), { useGlobalProperties: true }]] as never }, attachTo: document.body })
+    await flushPromises()
+    expect(w.find('[data-test=subnet-row-a] [data-test=snmp-badge]').text()).toContain('v2c')
+    expect(w.find('[data-test=subnet-row-b] [data-test=snmp-badge]').text()).toContain('inherited')
+    expect(w.find('[data-test=subnet-row-b] [data-test=snmp-badge]').attributes('title')).toContain('mgmt (10.1.112.0/24)')
+    expect(w.find('[data-test=subnet-row-c] [data-test=snmp-badge]').exists()).toBe(false)
     w.unmount()
   })
 })

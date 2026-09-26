@@ -338,3 +338,52 @@ func TestSNMPv3CredsAndOutcomes(t *testing.T) {
 		t.Fatalf("phase: probed %d discovered %d rejected %d no-answer %d", got.SNMPProbed, got.SNMPDiscoveredCount, got.SNMPRejected, got.SNMPNoAnswer)
 	}
 }
+
+// TestSNMPInheritedCredsAndTenantIsolation (T036): the grandchild scan uses
+// the nearest ancestor's credentials and records it as the source; another
+// tenant's subnet never inherits them.
+func TestSNMPInheritedCredsAndTenantIsolation(t *testing.T) {
+	ctx := context.Background()
+	m := memstore.New()
+	clk := &clock{t: time.Now().UTC()}
+	m.Now = clk.now
+	for _, s := range []store.Subnet{
+		{ID: "root", TenantID: "t1", Name: "root", CIDR: "10.0.0.0/8"},
+		{ID: "mid", TenantID: "t1", Name: "mid", CIDR: "10.0.0.0/16", ParentID: "root"},
+		{ID: "leaf", TenantID: "t1", Name: "leaf", CIDR: "10.0.0.0/29", ParentID: "mid"},
+		{ID: "other", TenantID: "t2", Name: "other", CIDR: "10.0.0.0/29", ParentID: "root"},
+	} {
+		s.IPVersion, s.Status = 4, store.SubnetActive
+		if err := m.CreateSubnet(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setCreds(t, m, "t1", "root", snmpcred.Input{Version: 2, Community: "root-comm"})
+	setCreds(t, m, "t1", "mid", snmpcred.Input{Version: 2, Community: "mid-comm"})
+	disc := snmp.NewFake()
+	disc.Set("10.0.0.1", snmp.DiscoveredDevice{SysName: "sw"})
+	svc := newService(m, icmp.NewFake("10.0.0.1"), disc, &recPub{}, testConfig(), clk)
+	job, err := svc.StartScan(ctx, adminSubj("t1"), "leaf", Options{EnableSNMP: true, SkipReverseDNS: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := svc.StartScan(ctx, adminSubj("t2"), "other", Options{EnableSNMP: true, SkipReverseDNS: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.RunOnce(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.GetScanJob(ctx, "t1", job.ID)
+	if got.SNMPStatus != store.SNMPRan || got.SNMPSourceSubnetID != "mid" {
+		t.Fatalf("leaf phase %s from %q", got.SNMPStatus, got.SNMPSourceSubnetID)
+	}
+	seen := disc.Seen()
+	if len(seen) != 1 || seen[0].Community != "mid-comm" {
+		t.Fatalf("only the leaf scan probes, with the nearest ancestor's community (%d calls)", len(seen))
+	}
+	o, _ := m.GetScanJob(ctx, "t2", other.ID)
+	if o.SNMPStatus != store.SNMPNoCredentials || o.SNMPSourceSubnetID != "" || o.Status != store.ScanCompleted {
+		t.Fatalf("t2 must not inherit t1 credentials: %s %q", o.SNMPStatus, o.SNMPSourceSubnetID)
+	}
+}

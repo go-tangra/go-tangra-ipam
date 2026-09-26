@@ -116,13 +116,13 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T035 [P] [US3] Service tests in `internal/subnets/snmp_test.go`: child status `inherited` with source name/CIDR; list/tree summaries for a 3-level tree; parent cleared → child none; parent deleted → cascade + child falls back; host-sync auto subnet (origin host_sync) inherits
-- [ ] T036 [P] [US3] Executor test in `internal/scan/executor_test.go`: scan of grandchild uses nearest ancestor with creds and records its id as source; tenant B subnet never inherits tenant A creds (negative)
+- [x] T035 [P] [US3] Service tests in `internal/subnets/snmp_test.go`: child status `inherited` with source name/CIDR; list/tree summaries for a 3-level tree; parent cleared → child none; parent deleted → cascade + child falls back; host-sync auto subnet (origin host_sync) inherits
+- [x] T036 [P] [US3] Executor test in `internal/scan/executor_test.go`: scan of grandchild uses nearest ancestor with creds and records its id as source; tenant B subnet never inherits tenant A creds (negative)
 
 ### Implementation
 
-- [ ] T037 [US3] Shared resolution helper used by `internal/subnets/snmp.go` and `internal/scan/executor.go` (both call `snmpcred.Resolve` over the tenant's subnets + `ListSubnetSNMP`)
-- [ ] T038 [US3] UI: inherited status line with source in `ui/src/components/SubnetSnmpCard.vue`; SNMP column (badge own/inherited/none) in `ui/src/views/subnets/index.vue`; tests in `ui/tests/unit/snmp.spec.ts`
+- [x] T037 [US3] Shared resolution helper used by `internal/subnets/snmp.go` and `internal/scan/executor.go` (both call `snmpcred.Resolve` over the tenant's subnets + `ListSubnetSNMP`)
+- [x] T038 [US3] UI: inherited status line with source in `ui/src/components/SubnetSnmpCard.vue`; SNMP column (badge own/inherited/none) in `ui/src/views/subnets/index.vue`; tests in `ui/tests/unit/snmp.spec.ts`
 
 ---
 
