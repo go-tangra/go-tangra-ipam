@@ -33,9 +33,9 @@ confirmation before they are executed.
 **Purpose**: gates, tooling and module wiring both repositories need before any code.
 
 - [ ] T001 [P] Add `internal/hostreport` to `SECURITY_PKGS` in `go-tangra-inventory-v4/scripts/coverage-gate.sh`; add a `fuzz` target to `go-tangra-inventory-v4/Makefile` running every `Fuzz*` for 10 s (`FuzzEnrollToken`, `FuzzSubmitMapper`, `FuzzDiff` + the targets added by this feature) and keep `internal/agentfacts` inside `COVERPKG` (only `internal/collector` glue stays excluded)
-- [ ] T002 [P] Add `internal/hostreport` and `internal/hostplan` to `SECURITY_PKGS` in `scripts/coverage-gate.sh`; add a `fuzz` target to `Makefile` (existing `FuzzParseAllocate`, `FuzzScanTargets`, `FuzzMembership` + new targets); keep `internal/hostsync`, `internal/invclient`, `internal/portlink` inside `COVERPKG`
+- [X] T002 [P] Add `internal/hostreport` and `internal/hostplan` to `SECURITY_PKGS` in `scripts/coverage-gate.sh`; add a `fuzz` target to `Makefile` (existing `FuzzParseAllocate`, `FuzzScanTargets`, `FuzzMembership` + new targets); keep `internal/hostsync`, `internal/invclient`, `internal/portlink` inside `COVERPKG`
 - [ ] T003 Add `github.com/go-tangra/go-tangra-inventory/sdk/v4` to `go.mod` with a temporary `replace … => ../go-tangra-inventory-v4/sdk` for development (removed in T121 before release); `go mod tidy`; `GOWORK=off go build ./...`
-- [ ] T004 [P] Create empty package skeletons with package doc comments stating their security role: `go-tangra-inventory-v4/internal/agentfacts/doc.go`, `go-tangra-inventory-v4/internal/hostreport/doc.go`, `internal/hostreport/doc.go`, `internal/hostplan/doc.go`, `internal/hostsync/doc.go`, `internal/invclient/doc.go`, `internal/portlink/doc.go`
+- [X] T004 [P] Create empty package skeletons with package doc comments stating their security role: `go-tangra-inventory-v4/internal/agentfacts/doc.go`, `go-tangra-inventory-v4/internal/hostreport/doc.go`, `internal/hostreport/doc.go`, `internal/hostplan/doc.go`, `internal/hostsync/doc.go`, `internal/invclient/doc.go`, `internal/portlink/doc.go`
 
 ---
 
