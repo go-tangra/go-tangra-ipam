@@ -329,8 +329,7 @@ shows the three kinds of events with version only and no secret material.
 
 **Testing credentials**
 
-- **FR-019**: Users with the subnet-management or scan-run permission MUST be
-  able to test the subnet's effective credentials against one address inside
+- **FR-019**: Users with the scan-run permission MUST be able to test the subnet's effective credentials against one address inside
   the subnet, receiving success (system name and description) or a failure
   category: no response, authentication failure, unknown user, decryption /
   privacy failure, no credentials configured, address outside the subnet.
