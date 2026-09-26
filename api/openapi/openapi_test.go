@@ -167,6 +167,7 @@ func TestSubnetSNMPContract(t *testing.T) {
 		"/api/ipam/v1/subnets/{id}/snmp": {
 			"GET": {"ipam:read", 0}, "PUT": {"subnets:manage", 4096},
 		},
+		"/api/ipam/v1/subnets/{id}/snmp/test": {"POST": {"scan:run", 1024}},
 	} {
 		item := doc.Paths.Find(path)
 		if item == nil {
@@ -211,7 +212,7 @@ func TestSubnetSNMPContract(t *testing.T) {
 	if got := in.Properties["priv_protocol"].Value.Enum; len(got) != 4 {
 		t.Errorf("priv protocols %v", got)
 	}
-	for _, name := range []string{"SubnetSNMPStatus", "SNMPSummary"} {
+	for _, name := range []string{"SubnetSNMPStatus", "SNMPSummary", "SNMPTestResult"} {
 		s := doc.Components.Schemas[name]
 		if s == nil {
 			t.Fatalf("schema %s missing", name)

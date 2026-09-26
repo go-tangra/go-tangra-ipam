@@ -22,7 +22,7 @@ function fetchMock(handler: Handler) {
   return calls
 }
 const withAbility = (rules: { action: string; subject: string }[]) => ({ plugins: [[abilitiesPlugin, createMongoAbility(rules), { useGlobalProperties: true }]] as never })
-const MANAGE = [{ action: 'manage', subject: 'SubnetSnmp' }]
+const MANAGE = [{ action: 'configure', subject: 'SubnetSnmp' }]
 
 const subnet: Subnet = { id: 's1', name: 'mgmt', cidr: '10.1.112.0/24', status: 'active', ip_version: 4 }
 const none: SubnetSNMPStatus = { own: null, effective: { state: 'none' } }
@@ -93,7 +93,7 @@ describe('SubnetSnmpCard (v2c)', () => {
     w.unmount()
   })
 
-  it('hides the form without the manage SubnetSnmp ability', async () => {
+  it('hides the form without the configure SubnetSnmp ability', async () => {
     fetchMock(() => ({ body: ownV2 }))
     const w = mount(SubnetSnmpCard, { props: { subnet }, global: withAbility([{ action: 'read', subject: 'Subnet' }]) })
     await flushPromises()
@@ -182,5 +182,47 @@ describe('SNMP inheritance in the UI', () => {
     expect(w.find('[data-test=subnet-row-b] [data-test=snmp-badge]').attributes('title')).toContain('mgmt (10.1.112.0/24)')
     expect(w.find('[data-test=subnet-row-c] [data-test=snmp-badge]').exists()).toBe(false)
     w.unmount()
+  })
+})
+
+describe('Test SNMP', () => {
+  it('probes an address and shows the outcome', async () => {
+    const calls = fetchMock((url, init) => {
+      if (init.method === 'POST') {
+        const addr = JSON.parse(String(init.body)).address
+        return addr === '10.1.112.20'
+          ? { body: { outcome: 'ok', sys_name: 'sw-core-1', sys_descr: 'Cisco IOS', source_subnet_id: 's1', duration_ms: 42 } }
+          : { body: { outcome: 'auth_failed', source_subnet_id: 's1', duration_ms: 12 } }
+      }
+      return { body: ownV2 }
+    })
+    const w = mount(SubnetSnmpCard, { props: { subnet }, global: withAbility([{ action: 'test', subject: 'SubnetSnmp' }]) })
+    await flushPromises()
+    await w.find('[data-test=snmp-test-address] input').setValue('10.1.112.20')
+    await w.find('[data-test=snmp-test]').trigger('click')
+    await flushPromises()
+    const post = calls.find((c) => c.init.method === 'POST')
+    expect(post?.url).toContain('/subnets/s1/snmp/test')
+    expect(w.find('[data-test=snmp-test-result]').text()).toContain('sw-core-1')
+    await w.find('[data-test=snmp-test-address] input').setValue('10.1.112.21')
+    await w.find('[data-test=snmp-test]').trigger('click')
+    await flushPromises()
+    expect(w.find('[data-test=snmp-test-result]').text()).toContain('rejected')
+    w.unmount()
+  })
+
+  it('validates the address locally and hides the test without scan:run', async () => {
+    const calls = fetchMock(() => ({ body: ownV2 }))
+    const w = mount(SubnetSnmpCard, { props: { subnet }, global: withAbility([{ action: 'test', subject: 'SubnetSnmp' }]) })
+    await flushPromises()
+    await w.find('[data-test=snmp-test-address] input').setValue('not-an-ip')
+    await w.find('[data-test=snmp-test]').trigger('click')
+    await flushPromises()
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false)
+    w.unmount()
+    const r = mount(SubnetSnmpCard, { props: { subnet }, global: withAbility(MANAGE) })
+    await flushPromises()
+    expect(r.find('[data-test=snmp-test]').exists()).toBe(false)
+    r.unmount()
   })
 })

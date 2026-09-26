@@ -102,6 +102,17 @@ export interface SubnetSNMPInput {
   priv_password?: string
 }
 
+export type SNMPTestOutcome = 'ok' | 'no_response' | 'auth_failed' | 'unknown_user' | 'privacy_failed' | 'no_credentials' | 'credentials_unreadable' | 'error'
+
+// SNMPTestResult is POST /subnets/{id}/snmp/test.
+export interface SNMPTestResult {
+  outcome: SNMPTestOutcome
+  sys_name?: string
+  sys_descr?: string
+  source_subnet_id?: string
+  duration_ms: number
+}
+
 // SubnetTreeNode is a subnet enriched with nested children for /subnets/tree.
 export interface SubnetTreeNode extends Subnet {
   children?: SubnetTreeNode[]

@@ -1,9 +1,17 @@
 package httpapi
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
 )
+
+func snmpDevice(name, descr string) snmp.DiscoveredDevice {
+	return snmp.DiscoveredDevice{SysName: name, SysDescr: descr}
+}
 
 const snmpCommunity = "c0mm-HTTP-S3CRET"
 
@@ -127,5 +135,86 @@ func TestSubnetSNMPv3Routes(t *testing.T) {
 	w = f.req(t, "PUT", p+"/subnets/"+id+"/snmp", "admin", `{"version":3,"user":"u","security_level":"authNoPriv","auth_protocol":"SHA","auth_password":"short"}`)
 	if w.Code != 422 || decodeBody(t, w)["detail"].(map[string]any)["field"] != "auth_password" {
 		t.Fatalf("short password: %d %s", w.Code, w.Body)
+	}
+}
+
+// TestSubnetSNMPTestRoute (T040): outcome in the body, address confined to
+// the subnet (422 detail.field=address), 10 tests per user per minute, an
+// audit row per test, never a credential in the response.
+func TestSubnetSNMPTestRoute(t *testing.T) {
+	f := newAPI(t)
+	id := f.createSubnet(t, "mgmt", "10.1.112.0/24")
+	w := f.req(t, "POST", p+"/subnets/"+id+"/snmp/test", "admin", `{"address":"10.1.112.20"}`)
+	if w.Code != 200 || decodeBody(t, w)["outcome"] != "no_credentials" {
+		t.Fatalf("no creds: %d %s", w.Code, w.Body)
+	}
+	f.setSNMP(t, id, `{"version":2,"community":"`+snmpCommunity+`"}`)
+	f.snmp.Set("10.1.112.20", snmpDevice("sw-core-1", "Cisco IOS"))
+	w = f.req(t, "POST", p+"/subnets/"+id+"/snmp/test", "admin", `{"address":"10.1.112.20"}`)
+	b := decodeBody(t, w)
+	if w.Code != 200 || b["outcome"] != "ok" || b["sys_name"] != "sw-core-1" || b["source_subnet_id"] != id || b["duration_ms"] == nil {
+		t.Fatalf("ok: %d %s", w.Code, w.Body)
+	}
+	if strings.Contains(w.Body.String(), snmpCommunity) {
+		t.Fatal("community in the test result")
+	}
+	w = f.req(t, "POST", p+"/subnets/"+id+"/snmp/test", "admin", `{"address":"10.9.9.9"}`)
+	if w.Code != 422 || decodeBody(t, w)["detail"].(map[string]any)["field"] != "address" {
+		t.Fatalf("outside: %d %s", w.Code, w.Body)
+	}
+	if w := f.req(t, "POST", p+"/subnets/"+id+"/snmp/test", "admin", `{"address":"10.1.112.20","x":1}`); w.Code != 400 {
+		t.Fatalf("unknown field: %d", w.Code)
+	}
+	if w := f.req(t, "POST", p+"/subnets/"+id+"/snmp/test", "admin", `{"address":"`+strings.Repeat("1", 2000)+`"}`); w.Code != 413 {
+		t.Fatalf("body bound: %d", w.Code)
+	}
+	var tested int
+	for _, a := range f.mem.Audit() {
+		if a.Action == "snmp_credentials_tested" {
+			tested++
+		}
+	}
+	if tested != 2 {
+		t.Fatalf("audit rows %d, want 2 (refused targets are not probed)", tested)
+	}
+	// Rate limit: 10 per user per minute, counting every request (5 above).
+	codes := map[int]int{}
+	for i := 0; i < 8; i++ {
+		codes[f.req(t, "POST", p+"/subnets/"+id+"/snmp/test", "admin", `{"address":"10.1.112.20"}`).Code]++
+	}
+	if codes[200] != 5 || codes[429] != 3 {
+		t.Fatalf("rate limit: %v", codes)
+	}
+	w = f.req(t, "POST", p+"/subnets/"+id+"/snmp/test", "admin", `{"address":"10.1.112.20"}`)
+	if w.Code != 429 || decodeBody(t, w)["reason"] != "rate_limited" {
+		t.Fatalf("limited: %d %s", w.Code, w.Body)
+	}
+	// Another user has an own budget.
+	if w := f.req(t, "POST", p+"/subnets/"+id+"/snmp/test", "user", `{"address":"10.1.112.20"}`); w.Code != 200 {
+		t.Fatalf("other user: %d", w.Code)
+	}
+}
+
+func TestRateLimiter(t *testing.T) {
+	now := time.Unix(1000, 0)
+	l := newRateLimiter(2, time.Minute, func() time.Time { return now })
+	if !l.allow("a") || !l.allow("a") || l.allow("a") {
+		t.Fatal("two per window")
+	}
+	if !l.allow("b") {
+		t.Fatal("per key")
+	}
+	now = now.Add(61 * time.Second)
+	if !l.allow("a") {
+		t.Fatal("window slides")
+	}
+	for i := 0; i < maxLimiterKeys; i++ {
+		l.allow(fmt.Sprintf("k%d", i))
+	}
+	// Keys idle for a whole window are dropped once the map is full.
+	now = now.Add(61 * time.Second)
+	l.allow("fresh")
+	if len(l.hits) != 1 {
+		t.Fatalf("idle keys kept: %d", len(l.hits))
 	}
 }

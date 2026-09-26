@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
-import type { IPScanJob, SplitResult, Subnet, SubnetSNMPInput, SubnetSNMPStatus, SubnetStats, SubnetTreeNode } from '@/api/types'
+import type { IPScanJob, SNMPTestResult, SplitResult, Subnet, SubnetSNMPInput, SubnetSNMPStatus, SubnetStats, SubnetTreeNode } from '@/api/types'
 
 export interface SubnetFilter {
   vlan_id?: string | undefined
@@ -89,5 +89,11 @@ export const useSubnets = defineStore('ipam-subnets', () => {
     return api<SubnetSNMPStatus>('PUT', 'subnets/' + id + '/snmp', body)
   }
 
-  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan, split, snmpStatus, setSnmp }
+  // testSnmp probes one address of the subnet with its effective credentials
+  // (scan:run, rate-limited server side).
+  async function testSnmp(id: string, address: string): Promise<SNMPTestResult> {
+    return api<SNMPTestResult>('POST', 'subnets/' + id + '/snmp/test', { address })
+  }
+
+  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan, split, snmpStatus, setSnmp, testSnmp }
 })

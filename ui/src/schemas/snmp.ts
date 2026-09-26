@@ -61,3 +61,6 @@ export const snmpSchema = z
     return out
   })
 export type SnmpFormInput = z.input<typeof snmpSchema>
+
+/** POST /subnets/{id}/snmp/test: one address of the subnet. */
+export const snmpTestSchema = z.object({ address: z.string().trim().pipe(z.union([z.ipv4(), z.ipv6()], { error: 'an IPv4 or IPv6 address' })) })

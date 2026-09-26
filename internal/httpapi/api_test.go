@@ -26,6 +26,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
@@ -75,6 +76,7 @@ type apiFixture struct {
 	warden *warden.Fake
 	inv    *invclient.Fake
 	runner *hostsync.Runner
+	snmp   *snmp.Fake
 }
 
 func newAPI(t *testing.T) *apiFixture { return newAPIWith(t, nil) }
@@ -103,7 +105,8 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 	env, _ := sealed.NewEnvelope(bytes.Repeat([]byte{6}, 32))
 	subnetsSvc := subnets.New(mem)
 	subnetsSvc.SetEnvelope(env)
-	scanSvc := scan.New(mem, nil, nil, nil, pub, scan.Config{MaxHosts: 65536}, nil)
+	disc := snmp.NewFake()
+	scanSvc := scan.New(mem, nil, nil, disc, pub, scan.Config{MaxHosts: 65536, TimeoutMs: 200}, nil)
 	scanSvc.SetEnvelope(env)
 	deps := Deps{
 		Subnets:   subnetsSvc,
@@ -133,7 +136,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		t.Fatal(err)
 	}
 	s.Register(deps)
-	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner}
+	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner, snmp: disc}
 }
 
 const p = "/api/ipam/v1"

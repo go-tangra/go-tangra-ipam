@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ipam/v1/subnets/{id}/snmp/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["testSubnetSnmp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ipam/v1/subnets/{id}/scan": {
         parameters: {
             query?: never;
@@ -1062,6 +1078,18 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        SNMPTestInput: {
+            /** @description a usable IP address inside the subnet */
+            address: string;
+        };
+        SNMPTestResult: {
+            /** @enum {string} */
+            outcome?: "ok" | "no_response" | "auth_failed" | "unknown_user" | "privacy_failed" | "no_credentials" | "credentials_unreadable" | "error";
+            sys_name?: string;
+            sys_descr?: string;
+            source_subnet_id?: string;
+            duration_ms?: number;
+        };
         SubnetSNMPStatus: {
             own?: components["schemas"]["SubnetSNMPOwn"] | null;
             effective?: components["schemas"]["SNMPSummary"];
@@ -1349,6 +1377,56 @@ export interface operations {
             };
             /** @description validation_failed (detail.field names the field) */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    testSubnetSnmp: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SNMPTestInput"];
+            };
+        };
+        responses: {
+            /** @description test outcome with sysName/sysDescr on success (never credentials) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SNMPTestResult"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation_failed (detail.field = address: not a usable address of the subnet) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description rate_limited (more than 10 tests per user per minute) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

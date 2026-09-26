@@ -134,14 +134,14 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T039 [P] [US4] Scan service tests in `internal/scan/snmptest_test.go`: `TestCredentials` outcomes ok/no_response/auth_failed/unknown_user/privacy_failed/no_credentials/credentials_unreadable; address outside subnet, network and broadcast refused (SR-003); deadline = timeout + 2 s
-- [ ] T040 [P] [US4] HTTP tests in `internal/httpapi/snmp_test.go`: POST route with `scan:run`, 400 `detail.field=address`, **rate limit** 10/min/user → 429; response never contains creds; audit row `snmp_credentials_tested` with target/outcome
+- [x] T039 [P] [US4] Scan service tests in `internal/scan/snmptest_test.go`: `TestCredentials` outcomes ok/no_response/auth_failed/unknown_user/privacy_failed/no_credentials/credentials_unreadable; address outside subnet, network and broadcast refused (SR-003); deadline = timeout + 2 s
+- [x] T040 [P] [US4] HTTP tests in `internal/httpapi/snmp_test.go`: POST route with `scan:run`, 400 `detail.field=address`, **rate limit** 10/min/user → 429; response never contains creds; audit row `snmp_credentials_tested` with target/outcome
 
 ### Implementation
 
-- [ ] T041 [US4] Implement `TestCredentials(ctx, subj, subnetID, address)` in `internal/scan/snmptest.go` (resolve, open, `snmp.Probe`, classify, audit)
-- [ ] T042 [US4] Add the POST route and a per-user token-bucket limiter (10/min) in `internal/httpapi/snmp.go`; OpenAPI route + `SNMPTestResult` schema in `api/openapi/ipam.yaml`
-- [ ] T043 [US4] UI: "Test SNMP" (address input, result line) in `ui/src/components/SubnetSnmpCard.vue`, store action in `ui/src/stores/subnets.ts`; test in `ui/tests/unit/snmp.spec.ts`
+- [x] T041 [US4] Implement `TestCredentials(ctx, subj, subnetID, address)` in `internal/scan/snmptest.go` (resolve, open, `snmp.Probe`, classify, audit)
+- [x] T042 [US4] Add the POST route and a per-user token-bucket limiter (10/min) in `internal/httpapi/snmp.go`; OpenAPI route + `SNMPTestResult` schema in `api/openapi/ipam.yaml`
+- [x] T043 [US4] UI: "Test SNMP" (address input, result line) in `ui/src/components/SubnetSnmpCard.vue`, store action in `ui/src/stores/subnets.ts`; test in `ui/tests/unit/snmp.spec.ts`
 
 ---
 
