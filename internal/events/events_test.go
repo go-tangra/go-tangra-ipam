@@ -63,3 +63,16 @@ func assertNoSecrets(t *testing.T, p map[string]any) {
 		}
 	}
 }
+
+func TestHostSyncPayloads(t *testing.T) {
+	p := HostSyncAppliedPayload("d1", 3)
+	if p["device_id"] != "d1" || p["changes"] != 3 || len(p) != 2 {
+		t.Fatalf("applied payload %v", p)
+	}
+	if s := HostSyncStatusPayload("degraded"); s["state"] != "degraded" || len(s) != 1 {
+		t.Fatalf("status payload %v", s)
+	}
+	if HostSyncApplied != "ipam.hostsync.applied" || HostSyncStatus != "ipam.hostsync.status" || ActionMoved != "moved" {
+		t.Fatal("names")
+	}
+}

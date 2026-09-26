@@ -43,6 +43,24 @@ type Config struct {
 	Gateway    Gateway    `yaml:"gateway"`
 	MeshEnroll MeshEnroll `yaml:"mesh_enroll"`
 	Limits     Limits     `yaml:"limits_ipam"`
+	HostSync   HostSync   `yaml:"host_sync"`
+}
+
+// HostSync configures the host sync (feature 020): IPAM pulls host reports
+// from the inventory module over the mesh and applies them. Enabled is the
+// global kill switch; tenants can also disable the sync for themselves.
+type HostSync struct {
+	Enabled               bool   `yaml:"enabled"`
+	InventoryService      string `yaml:"inventory_service"`
+	PollIntervalSeconds   int    `yaml:"poll_interval_seconds"`   // 10-3600
+	Workers               int    `yaml:"workers"`                 // 1-8 tenants in parallel
+	PageSize              int    `yaml:"page_size"`               // 1-200
+	PaceMs                int    `yaml:"pace_ms"`                 // 0-10000 pause between hosts
+	RequestTimeoutSeconds int    `yaml:"request_timeout_seconds"` // 1-300
+	ConflictMoves         int    `yaml:"conflict_moves"`          // 2-100
+	ConflictWindowHours   int    `yaml:"conflict_window_hours"`   // 1-168
+	MaxMACsPerPort        int    `yaml:"max_macs_per_port"`       // 1-256 (US5)
+	LinkStaleDays         int    `yaml:"link_stale_days"`         // 1-365 (US5)
 }
 
 // DB configures the PostgreSQL/TimescaleDB store.
@@ -149,6 +167,11 @@ func Default() Config {
 		Events:     Events{Enabled: true},
 		Gateway:    Gateway{Service: "gateway"},
 		Limits:     Limits{MaxRequestBytes: 1 << 20, MaxBackupBytes: 32 << 20},
+		HostSync: HostSync{
+			Enabled: true, InventoryService: "inventory", PollIntervalSeconds: 60, Workers: 2, PageSize: 100,
+			PaceMs: 10, RequestTimeoutSeconds: 30, ConflictMoves: 3, ConflictWindowHours: 24,
+			MaxMACsPerPort: 16, LinkStaleDays: 14,
+		},
 	}
 }
 
@@ -242,6 +265,36 @@ func (c Config) Validate() error {
 	}
 	if c.Limits.MaxBackupBytes < 1<<10 || c.Limits.MaxBackupBytes > 256<<20 {
 		return errors.New("config: limits_ipam.max_backup_bytes must be within [1 KiB, 256 MiB]")
+	}
+	return c.HostSync.validate()
+}
+
+func (h HostSync) validate() error {
+	if !h.Enabled {
+		return nil
+	}
+	in := func(v, lo, hi int) bool { return v >= lo && v <= hi }
+	switch {
+	case h.InventoryService == "":
+		return errors.New("config: host_sync.inventory_service is required")
+	case !in(h.PollIntervalSeconds, 10, 3600):
+		return errors.New("config: host_sync.poll_interval_seconds must be within [10, 3600]")
+	case !in(h.Workers, 1, 8):
+		return errors.New("config: host_sync.workers must be within [1, 8]")
+	case !in(h.PageSize, 1, 200):
+		return errors.New("config: host_sync.page_size must be within [1, 200]")
+	case !in(h.PaceMs, 0, 10000):
+		return errors.New("config: host_sync.pace_ms must be within [0, 10000]")
+	case !in(h.RequestTimeoutSeconds, 1, 300):
+		return errors.New("config: host_sync.request_timeout_seconds must be within [1, 300]")
+	case !in(h.ConflictMoves, 2, 100):
+		return errors.New("config: host_sync.conflict_moves must be within [2, 100]")
+	case !in(h.ConflictWindowHours, 1, 168):
+		return errors.New("config: host_sync.conflict_window_hours must be within [1, 168]")
+	case !in(h.MaxMACsPerPort, 1, 256):
+		return errors.New("config: host_sync.max_macs_per_port must be within [1, 256]")
+	case !in(h.LinkStaleDays, 1, 365):
+		return errors.New("config: host_sync.link_stale_days must be within [1, 365]")
 	}
 	return nil
 }

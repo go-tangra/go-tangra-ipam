@@ -285,3 +285,52 @@ func TestFlushCanceled(t *testing.T) {
 	cancel()
 	w.Flush(ctx)
 }
+
+func TestHostSyncVocabulary(t *testing.T) {
+	for _, et := range []EventType{InterfaceCreated, InterfaceUpdated, InterfaceNotReported, AddressMoved,
+		AddressReleased, AddressConflict, AddressConflictCleared, PackagesUpdated, HypervisorLinked,
+		HypervisorUnlinked, PortLinked, PortUnlinked, DeviceNotReported, HostSyncSettingsUpdated,
+		HostSyncResyncRequested, HostSyncRun} {
+		if !Known(string(et)) {
+			t.Errorf("%s not known", et)
+		}
+	}
+	for _, sk := range []string{SubjectPackage, SubjectHostSync, SubjectInterface} {
+		e := Event{TenantID: "t", EventType: HostSyncRun, ActorKind: ActorSystem, ActorID: HostSyncActor, SubjectKind: sk, Outcome: OutcomeOK}
+		if err := Validate(e); err != nil {
+			t.Errorf("subject %s: %v", sk, err)
+		}
+	}
+}
+
+func TestRowGuardsHostSyncDetail(t *testing.T) {
+	at := time.Unix(10, 0)
+	row, err := Row(Event{
+		TenantID: "t", EventType: AddressMoved, ActorKind: ActorSystem, ActorID: HostSyncActor,
+		SubjectKind: SubjectAddress, SubjectID: "a", Outcome: OutcomeOK,
+		Details: map[string]any{
+			"previous_device_id": "d1", "bmc_address": "10.0.0.9", "inventory_host_id": "h",
+			"changes":        map[string]any{"hostname": map[string]any{"before": "a", "after": "b"}},
+			"previous_owner": "dropped", "ipmi_address": "dropped",
+		},
+	}, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"previous_device_id", "bmc_address", "inventory_host_id", "changes"} {
+		if _, ok := row.Detail[k]; !ok {
+			t.Errorf("%s must survive the guard", k)
+		}
+	}
+	for _, k := range []string{"previous_owner", "ipmi_address"} {
+		if _, ok := row.Detail[k]; ok {
+			t.Errorf("%s must be dropped by the guard", k)
+		}
+	}
+	if row.At != at || row.ID == "" || row.Action != "address_moved" || row.ActorID != "hostsync" {
+		t.Fatalf("row %+v", row)
+	}
+	if _, err := Row(Event{EventType: "nope"}, at); err == nil {
+		t.Fatal("unknown type")
+	}
+}

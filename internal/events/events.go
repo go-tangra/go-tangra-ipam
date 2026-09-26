@@ -19,6 +19,19 @@ const (
 
 	ScanStarted   = "ipam.scan.started"
 	ScanCompleted = "ipam.scan.completed"
+
+	// Host sync (feature 020): content-free UI notifications.
+	HostSyncApplied = "ipam.hostsync.applied"
+	HostSyncStatus  = "ipam.hostsync.status"
+)
+
+// Address event actions published by the host sync (payload "action").
+const (
+	ActionCreated  = "created"
+	ActionMoved    = "moved"
+	ActionClaimed  = "claimed"
+	ActionReleased = "released"
+	ActionUpdated  = "updated"
 )
 
 // Publisher emits a realtime event to all of a tenant's subscribers.
@@ -60,4 +73,15 @@ func ScanPayload(jobID, subnetID string, aliveCount, newCount int64) map[string]
 		"alive_count": aliveCount,
 		"new_count":   newCount,
 	}
+}
+
+// HostSyncAppliedPayload reports that a host report changed a device (ids and
+// counts only; never MACs, package names or BMC data).
+func HostSyncAppliedPayload(deviceID string, changes int) map[string]any {
+	return map[string]any{"device_id": deviceID, "changes": changes}
+}
+
+// HostSyncStatusPayload reports a tenant's sync state change.
+func HostSyncStatusPayload(state string) map[string]any {
+	return map[string]any{"state": state}
 }
