@@ -1,6 +1,9 @@
 package ipnet
 
-import "testing"
+import (
+	"net/netip"
+	"testing"
+)
 
 // FuzzParseAllocate drives Parse and the allocators with arbitrary CIDR, skip
 // and gateway strings. Contract: nothing panics, and whenever FirstFree returns
@@ -63,5 +66,44 @@ func FuzzParseAllocate(f *testing.F) {
 				}
 			}
 		}
+	})
+}
+
+// FuzzMostSpecific: whenever MostSpecific returns a candidate, its prefix
+// contains the address and no candidate with a longer prefix contains it.
+func FuzzMostSpecific(f *testing.F) {
+	f.Add("10.1.2.3", "10.0.0.0/8", "10.1.0.0/16", "10.1.2.0/24")
+	f.Add("2001:db8::1", "2001:db8::/32", "::/0", "bad")
+	f.Add("::ffff:1.2.3.4", "1.2.3.0/24", "1.0.0.0/8", "0.0.0.0/0")
+	f.Fuzz(func(t *testing.T, addr, c1, c2, c3 string) {
+		a, err := netip.ParseAddr(addr)
+		if err != nil {
+			return
+		}
+		cands := []Candidate{{"1", c1}, {"2", c2}, {"3", c3}}
+		got, ok := MostSpecific(cands, a)
+		a = a.Unmap().WithZone("")
+		best := -1
+		for _, c := range cands {
+			p, err := netip.ParsePrefix(c.CIDR)
+			if err == nil && p.Masked().Contains(a) && p.Bits() > best {
+				best = p.Bits()
+			}
+		}
+		if !ok {
+			if best >= 0 {
+				t.Fatalf("no match but %d-bit candidate contains %s", best, a)
+			}
+			return
+		}
+		p := netip.MustParsePrefix(got.CIDR)
+		if !p.Masked().Contains(a) || p.Bits() != best {
+			t.Fatalf("got %s for %s, best bits %d", got.CIDR, a, best)
+		}
+		if _, err := NetworkOf(a, p.Bits()); err != nil {
+			t.Fatal(err)
+		}
+		_ = AutoPrefix(a, p.Bits())
+		_ = Classify(a).Recordable()
 	})
 }
