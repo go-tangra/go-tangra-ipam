@@ -33,8 +33,8 @@ go-tangra-auth  <---->  go-tangra-portal (gateway)  <---->  go-tangra-ipam
 
 - Built on `github.com/go-tangra/go-tangra/v4` (mTLS transports, identity,
   service policy, audit, observability).
-- Verifies platform tokens and seeds its permissions and built-in role grants
-  with the auth SDK (`github.com/go-tangra/go-tangra-auth/sdk/v4`).
+- Verifies platform tokens and registers its permissions, module roles and
+  built-in role grants with the auth SDK (`github.com/go-tangra/go-tangra-auth/sdk/v4`).
 - Registers with the gateway through the portal SDK
   (`github.com/go-tangra/go-tangra-portal/sdk/v4`), which fronts the browser API
   (`/api/ipam`), the KVM proxy (`/bmc/`) and the federated UI remote.
@@ -56,7 +56,7 @@ SDK's published `sdk/vX.Y.Z` tag.
 | Path | Purpose |
 |------|---------|
 | `cmd/ipamsvc` | service binary (serve, `bootstrap`: migrate and exit; `version`) |
-| `internal/app` | wiring: config, platform, store, events, HTTP/gRPC, gateway lease, permission seeding, scan workers |
+| `internal/app` | wiring: config, platform, store, events, HTTP/gRPC, gateway lease, auth registration (permissions, module roles), scan workers |
 | `internal/{subnets,addresses,devices,vlans,locations,groups}` | domain services |
 | `internal/ipnet` | pure CIDR/IP arithmetic that bounds allocation and scans |
 | `internal/scan` | scan executor and ICMP/SNMP/TCP probes |
@@ -126,10 +126,27 @@ capability set (Docker's default; the platform stack adds it explicitly).
 
 ## API permissions
 
-`ipam:read`, `subnets:manage`, `addresses:manage`, `devices:manage`,
-`vlans:manage`, `locations:manage`, `groups:manage`, `dns:manage`,
-`backup:manage`. The gateway enforces the per-route permission from the
-manifest; power, IPMI and KVM additionally require the platform-admin role.
+`ipam:read`, `subnets:manage`, `addresses:manage`, `addresses:allocate`,
+`devices:manage`, `vlans:manage`, `locations:manage`, `groups:manage`,
+`scan:run`, `dns:manage`, `backup:manage`, `power:control`, `kvm:access`. The
+gateway enforces the per-route permission from the manifest; power, IPMI and
+KVM additionally require the platform-admin role.
+
+## Roles
+
+The module registers its permissions with auth at start and every five
+minutes, together with ready-made module roles that auth offers in every
+tenant (locked; administrators assign them or clone them into custom roles):
+
+| Role | Display name | Permissions |
+|---|---|---|
+| `administrator` | IPAM administrator | all 13, including `power:control` and `kvm:access` (the handlers still require platform-admin for those) |
+| `operator` | IPAM operator | `ipam:read`, `addresses:allocate`, `scan:run` |
+| `viewer` | IPAM viewer | `ipam:read` |
+
+Built-in role grants (scoped to IPAM by auth): `owner` and `admin` hold every
+permission; `operator` holds everything except `power:control` and
+`kvm:access`; `member` and `auditor` hold `ipam:read`.
 
 ## Versioning
 
