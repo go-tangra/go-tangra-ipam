@@ -89,7 +89,7 @@ describe('host sync page', () => {
 
 const reported = {
   id: 'd1', name: 'hv-01', device_type: 'server', status: 'active', source: 'host_report', inventory_host_id: 'inv-1',
-  report_state: 'reported', last_report_at: '2026-09-26T10:00:00Z', update_status: 'updates_available', reboot_required: true,
+  report_state: 'reported', last_report_at: '2026-09-26T10:00:00Z', update_status: 'updates_available', package_update_count: 12, security_update_count: 3, reboot_required: true,
   guest_count: 2, hypervisor_device_id: '', virtualization_kind: '',
 }
 function deviceHandler(overrides: Record<string, unknown> = {}) {
@@ -113,7 +113,8 @@ describe('device view (host sync)', () => {
     await flushPromises()
     expect(plain.text()).toContain('host report (inventory agent)')
     expect(plain.text()).toContain('inv-1')
-    expect(plain.find('[data-test=device-update-status]').text()).toContain('updates_available')
+    expect(plain.find('[data-test=device-update-status]').text()).toContain('updates available (12 packages, 3 security)')
+    expect(plain.find('[data-test=device-hostsync]').text()).toContain('scheduled sync')
     expect(plain.text()).toContain('reboot required')
     expect(plain.find('[data-test=device-resync]').exists()).toBe(false)
     const issues = plain.find('[data-test=device-issues]')
