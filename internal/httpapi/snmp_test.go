@@ -97,3 +97,35 @@ func TestSubnetPutKeepsSNMP(t *testing.T) {
 		t.Fatalf("subnet after edit %s", w.Body)
 	}
 }
+
+// TestSubnetSNMPv3Routes (T031): v3 over HTTP; responses carry level and
+// protocols but never the user or passwords.
+func TestSubnetSNMPv3Routes(t *testing.T) {
+	f := newAPI(t)
+	id := f.createSubnet(t, "core", "10.1.111.0/24")
+	w := f.req(t, "PUT", p+"/subnets/"+id+"/snmp", "admin",
+		`{"version":3,"user":"labuser-X","security_level":"authPriv","auth_protocol":"SHA512","auth_password":"authpass-X1","priv_protocol":"AES192","priv_password":"privpass-X1"}`)
+	if w.Code != 200 {
+		t.Fatalf("put v3: %d %s", w.Code, w.Body)
+	}
+	own := decodeBody(t, w)["own"].(map[string]any)
+	if own["security_level"] != "authPriv" || own["auth_protocol"] != "SHA512" || own["priv_protocol"] != "AES192" || own["weak"] != false {
+		t.Fatalf("own %v", own)
+	}
+	g := f.req(t, "GET", p+"/subnets/"+id+"/snmp", "user", "")
+	for _, body := range []string{w.Body.String(), g.Body.String()} {
+		for _, v := range []string{"labuser-X", "authpass-X1", "privpass-X1"} {
+			if strings.Contains(body, v) {
+				t.Fatalf("%q leaked: %s", v, body)
+			}
+		}
+	}
+	w = f.req(t, "PUT", p+"/subnets/"+id+"/snmp", "admin", `{"version":3,"user":"u","security_level":"authNoPriv","auth_protocol":"SHA","auth_password":"authpass1","priv_password":"privpass1"}`)
+	if w.Code != 422 || decodeBody(t, w)["detail"].(map[string]any)["field"] != "priv_password" {
+		t.Fatalf("priv with authNoPriv: %d %s", w.Code, w.Body)
+	}
+	w = f.req(t, "PUT", p+"/subnets/"+id+"/snmp", "admin", `{"version":3,"user":"u","security_level":"authNoPriv","auth_protocol":"SHA","auth_password":"short"}`)
+	if w.Code != 422 || decodeBody(t, w)["detail"].(map[string]any)["field"] != "auth_password" {
+		t.Fatalf("short password: %d %s", w.Code, w.Body)
+	}
+}

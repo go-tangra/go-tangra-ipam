@@ -196,3 +196,42 @@ func TestListAndTreeCarrySummary(t *testing.T) {
 		t.Fatal("community in list/tree")
 	}
 }
+
+// TestSetSNMPv3 (T031): authNoPriv and authPriv accepted; priv fields with
+// authNoPriv rejected; the status carries level/protocols/weak only.
+func TestSetSNMPv3(t *testing.T) {
+	svc, st, env := snmpSvc(t)
+	ctx := context.Background()
+	s := mkSubnet(t, svc, "core", "10.1.111.0/24", "")
+	in := snmpcred.Input{Version: 3, User: "labuser", SecurityLevel: "authPriv", AuthProtocol: "SHA256", AuthPassword: "authpass-S3CRET",
+		PrivProtocol: "AES256", PrivPassword: "privpass-S3CRET"}
+	status, err := svc.SetSNMP(ctx, subj(), s.ID, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Own.Version != 3 || status.Own.SecurityLevel != "authPriv" || status.Own.AuthProtocol != "SHA256" || status.Own.PrivProtocol != "AES256" || status.Own.Weak {
+		t.Fatalf("own %+v", status.Own)
+	}
+	txt := mustJSONText(t, status)
+	for _, v := range []string{"labuser", "authpass-S3CRET", "privpass-S3CRET"} {
+		if strings.Contains(txt, v) {
+			t.Fatalf("status carries %q", v)
+		}
+	}
+	row, _ := st.GetSubnetSNMP(ctx, "t1", s.ID)
+	sec, _ := snmpcred.Open(env, "t1", s.ID, row.Sealed)
+	if sec.User != "labuser" || sec.PrivPassword != "privpass-S3CRET" || sec.Community != "" {
+		t.Fatal("sealed v3 secret")
+	}
+	weak := snmpcred.Input{Version: 3, User: "u", SecurityLevel: "authNoPriv", AuthProtocol: "MD5", AuthPassword: "authpass1"}
+	status, err = svc.SetSNMP(ctx, subj(), s.ID, weak)
+	if err != nil || !status.Own.Weak || status.Own.PrivProtocol != "" || !status.Effective.Weak {
+		t.Fatalf("authNoPriv MD5: %+v %v", status, err)
+	}
+	var fe *snmpcred.FieldError
+	bad := weak
+	bad.PrivProtocol = "AES"
+	if _, err := svc.SetSNMP(ctx, subj(), s.ID, bad); !errors.As(err, &fe) || fe.Field != "priv_protocol" {
+		t.Fatalf("priv with authNoPriv: %v", err)
+	}
+}

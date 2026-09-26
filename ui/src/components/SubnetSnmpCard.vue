@@ -8,7 +8,7 @@ import { useAbility } from '@casl/vue'
 import { UiCard, UiButton, UiAlert, UiBadge, UiForm, UiSelect, UiSecretField } from '@go-tangra/ui'
 import { useZodForm } from '@go-tangra/ui/forms'
 import { useSubnets } from '@/stores/subnets'
-import { snmpSchema, type SnmpFormInput } from '@/schemas'
+import { snmpSchema, protocolLabel, SNMP_AUTH_PROTOCOLS, SNMP_PRIV_PROTOCOLS, type SnmpFormInput } from '@/schemas'
 import type { Subnet, SubnetSNMPStatus } from '@/api/types'
 import { describe } from '@/api/client'
 
@@ -33,7 +33,7 @@ async function load(): Promise<void> {
 }
 watch(() => props.subnet.id, load, { immediate: true })
 
-const blank = (): SnmpFormInput => ({ version: '2', community: '' })
+const blank = (): SnmpFormInput => ({ version: '2', community: '', user: '', security_level: 'authPriv', auth_protocol: 'SHA256', auth_password: '', priv_protocol: 'AES256', priv_password: '' })
 const form = useZodForm(snmpSchema, {
   initial: blank(),
   onSubmit: (body) => store.setSnmp(props.subnet.id, body),
@@ -61,7 +61,10 @@ const summary = computed(() => {
   return e.state === 'own' ? `Own · ${kind}` : `Inherited from ${e.source_name} (${e.source_cidr}) · ${kind}`
 })
 const stateColor = computed(() => ({ own: 'success', inherited: 'info', none: 'neutral' } as const)[status.value?.effective.state ?? 'none'])
-const versionOptions = [{ title: 'SNMP v2c (community)', value: '2' }]
+const versionOptions = [{ title: 'SNMP v2c (community)', value: '2' }, { title: 'SNMP v3 (user)', value: '3' }]
+const levelOptions = [{ title: 'Authentication only (authNoPriv)', value: 'authNoPriv' }, { title: 'Authentication and privacy (authPriv)', value: 'authPriv' }]
+const authOptions = SNMP_AUTH_PROTOCOLS.map((p) => ({ title: protocolLabel(p), value: p }))
+const privOptions = SNMP_PRIV_PROTOCOLS.map((p) => ({ title: protocolLabel(p), value: p }))
 </script>
 
 <template>
@@ -83,6 +86,16 @@ const versionOptions = [{ title: 'SNMP v2c (community)', value: '2' }]
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
             <UiSelect v-bind="form.field('version')" label="Version" :options="versionOptions" required />
             <UiSecretField v-if="form.values.version === '2'" v-bind="form.field('community')" label="Community" autocomplete="new-password" required />
+            <template v-else>
+              <UiSelect v-bind="form.field('security_level')" label="Security level" :options="levelOptions" required />
+              <UiSecretField v-bind="form.field('user')" label="User" autocomplete="off" required />
+              <UiSelect v-bind="form.field('auth_protocol')" label="Authentication protocol" :options="authOptions" required />
+              <UiSecretField v-bind="form.field('auth_password')" label="Authentication password" hint="At least 8 characters" autocomplete="new-password" required />
+              <template v-if="form.values.security_level === 'authPriv'">
+                <UiSelect v-bind="form.field('priv_protocol')" label="Privacy protocol" :options="privOptions" required />
+                <UiSecretField v-bind="form.field('priv_password')" label="Privacy password" hint="At least 8 characters" autocomplete="new-password" required />
+              </template>
+            </template>
           </div>
         </UiForm>
         <UiAlert v-if="form.serverError.value" kind="error" class="mt-2">{{ form.serverError.value }}</UiAlert>

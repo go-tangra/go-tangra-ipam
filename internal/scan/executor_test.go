@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gosnmp/gosnmp"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
@@ -297,5 +299,42 @@ func TestPortCorrelationAfterSNMPScan(t *testing.T) {
 	_, _ = failing.RunOnce(ctx, nil)
 	if got, _ := failing.GetScanJob(ctx, adminSubj("t1"), job.ID); got.Status == store.ScanCompleted || len(l2.tenants) != 0 {
 		t.Fatalf("failed scan correlated: %s %v", got.Status, l2.tenants)
+	}
+}
+
+// TestSNMPv3CredsAndOutcomes (T032): v3 level and protocols reach the client;
+// rejected credentials and silent hosts are counted.
+func TestSNMPv3CredsAndOutcomes(t *testing.T) {
+	ctx := context.Background()
+	m := memstore.New()
+	clk := &clock{t: time.Now().UTC()}
+	m.Now = clk.now
+	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
+	setCreds(t, m, "t1", "s1", snmpcred.Input{Version: 3, User: "lab", SecurityLevel: "authPriv", AuthProtocol: "SHA256",
+		AuthPassword: "authpass1", PrivProtocol: "AES256", PrivPassword: "privpass1"})
+	disc := snmp.NewFake()
+	disc.Set("10.0.0.1", snmp.DiscoveredDevice{SysName: "sw", DeviceType: store.DevSwitch})
+	disc.Fail("10.0.0.2", gosnmp.ErrDecryption)
+	disc.Fail("10.0.0.3", gosnmp.ErrWrongDigest)
+	disc.Fail("10.0.0.4", gosnmp.ErrUnknownUsername)
+	disc.Fail("10.0.0.6", errors.New("odd failure"))
+	// 10.0.0.5 is alive but silent.
+	svc := newService(m, icmp.NewFake("10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4", "10.0.0.5", "10.0.0.6"), disc, &recPub{}, testConfig(), clk)
+	job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true, SkipReverseDNS: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.RunOnce(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range disc.Seen() {
+		if c.Version != 3 || c.SecurityLevel != "authPriv" || c.AuthProtocol != "SHA256" || c.PrivProtocol != "AES256" ||
+			c.User != "lab" || c.AuthPassword != "authpass1" || c.PrivPassword != "privpass1" || c.Community != "" {
+			t.Fatal("v3 creds did not reach the client intact")
+		}
+	}
+	got, _ := m.GetScanJob(ctx, "t1", job.ID)
+	if got.SNMPStatus != store.SNMPRan || got.SNMPProbed != 6 || got.SNMPDiscoveredCount != 1 || got.SNMPRejected != 3 || got.SNMPNoAnswer != 1 {
+		t.Fatalf("phase: probed %d discovered %d rejected %d no-answer %d", got.SNMPProbed, got.SNMPDiscoveredCount, got.SNMPRejected, got.SNMPNoAnswer)
 	}
 }

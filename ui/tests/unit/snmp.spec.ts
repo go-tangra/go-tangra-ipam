@@ -101,3 +101,53 @@ describe('SubnetSnmpCard (v2c)', () => {
     w.unmount()
   })
 })
+
+describe('snmp schema (v3)', () => {
+  const base = { version: '3', user: 'lab', security_level: 'authNoPriv', auth_protocol: 'SHA256', auth_password: 'authpass1' }
+  it('authNoPriv sends no privacy fields', () => {
+    const r = snmpSchema.safeParse({ ...base, community: 'x', priv_protocol: 'AES', priv_password: 'privpass1' })
+    expect(r.success && r.data).toEqual({ version: 3, user: 'lab', security_level: 'authNoPriv', auth_protocol: 'SHA256', auth_password: 'authpass1' })
+  })
+  it('authPriv requires every field and 8-character passwords', () => {
+    const ok = snmpSchema.safeParse({ ...base, security_level: 'authPriv', priv_protocol: 'AES256', priv_password: 'privpass1' })
+    expect(ok.success && ok.data).toEqual({ version: 3, user: 'lab', security_level: 'authPriv', auth_protocol: 'SHA256', auth_password: 'authpass1', priv_protocol: 'AES256', priv_password: 'privpass1' })
+    for (const bad of [
+      { ...base, security_level: 'authPriv', priv_protocol: 'AES256' },
+      { ...base, security_level: 'authPriv', priv_password: 'privpass1' },
+      { ...base, auth_password: 'short' },
+      { ...base, user: '' },
+      { ...base, auth_protocol: '' },
+      { ...base, security_level: '' },
+    ]) expect(snmpSchema.safeParse(bad).success).toBe(false)
+  })
+})
+
+describe('SubnetSnmpCard (v3)', () => {
+  it('marks weak protocols and submits authPriv', async () => {
+    const calls = fetchMock((_url, init) => ({ body: init.method === 'PUT' ? { own: { version: 3, security_level: 'authPriv', weak: false }, effective: { state: 'own', version: 3, security_level: 'authPriv' } } : none }))
+    const w = mount(SubnetSnmpCard, { props: { subnet }, global: withAbility(MANAGE) })
+    await flushPromises()
+    await w.find('[data-test=snmp-set]').trigger('click')
+    const selects = () => w.findAll('[data-test=snmp-form] select')
+    await selects()[0]!.setValue('3')
+    expect(w.find('[data-test=snmp-form]').text()).not.toContain('Community')
+    await selects()[1]!.setValue('authPriv')
+    const opts = selects()[2]!.findAll('option').map((o) => o.text())
+    expect(opts.some((t) => t.includes('MD5') && t.includes('weak'))).toBe(true)
+    expect(opts.some((t) => t.includes('SHA-256') && !t.includes('weak'))).toBe(true)
+    await selects()[2]!.setValue('SHA256')
+    await selects()[3]!.setValue('AES256')
+    const secrets = w.findAll('[data-test=snmp-form] input[type=password]')
+    expect(secrets.length).toBe(3)
+    await secrets[0]!.setValue('labuser')
+    await secrets[1]!.setValue('authpass-1')
+    await secrets[2]!.setValue('privpass-1')
+    await w.find('[data-test=snmp-save]').trigger('click')
+    await flushPromises()
+    const put = calls.find((c) => c.init.method === 'PUT')
+    expect(JSON.parse(String(put?.init.body))).toEqual({ version: 3, user: 'labuser', security_level: 'authPriv', auth_protocol: 'SHA256', auth_password: 'authpass-1', priv_protocol: 'AES256', priv_password: 'privpass-1' })
+    expect(w.html()).not.toContain('privpass-1')
+    expect(w.find('[data-test=snmp-status]').text()).toContain('v3 authPriv')
+    w.unmount()
+  })
+})

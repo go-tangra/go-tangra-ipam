@@ -98,13 +98,13 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T031 [P] [US2] Service/HTTP tests in `internal/subnets/snmp_test.go` and `internal/httpapi/snmp_test.go`: v3 authNoPriv and authPriv accepted; priv fields with authNoPriv rejected; responses carry level/protocols/weak but never user/passwords
-- [ ] T032 [P] [US2] Executor test in `internal/scan/executor_test.go`: v3 creds reach the Fake with SecurityLevel/protocols; Fake returning privacy_failed/auth_failed increments `snmp_rejected`, no_response increments `snmp_no_answer`
+- [x] T031 [P] [US2] Service/HTTP tests in `internal/subnets/snmp_test.go` and `internal/httpapi/snmp_test.go`: v3 authNoPriv and authPriv accepted; priv fields with authNoPriv rejected; responses carry level/protocols/weak but never user/passwords
+- [x] T032 [P] [US2] Executor test in `internal/scan/executor_test.go`: v3 creds reach the Fake with SecurityLevel/protocols; Fake returning privacy_failed/auth_failed increments `snmp_rejected`, no_response increments `snmp_no_answer`
 
 ### Implementation
 
-- [ ] T033 [US2] Count outcomes per host with `snmp.Classify` in `discoverSNMP` in `internal/scan/executor.go`
-- [ ] T034 [US2] UI: v3 fields in `ui/src/components/SubnetSnmpCard.vue` (user, level, auth protocol + password, priv protocol + password, weak labels) and schema rules in `ui/src/schemas/snmp.ts`; tests in `ui/tests/unit/snmp.spec.ts`
+- [x] T033 [US2] Count outcomes per host with `snmp.Classify` in `discoverSNMP` in `internal/scan/executor.go`
+- [x] T034 [US2] UI: v3 fields in `ui/src/components/SubnetSnmpCard.vue` (user, level, auth protocol + password, priv protocol + password, weak labels) and schema rules in `ui/src/schemas/snmp.ts`; tests in `ui/tests/unit/snmp.spec.ts`
 
 ---
 
