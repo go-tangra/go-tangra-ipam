@@ -52,8 +52,8 @@ func TestHostSyncSettingsRoutes(t *testing.T) {
 		t.Fatal("settings audit with before/after and the user actor")
 	}
 	for body, code := range map[string]int{
-		`{"enabled":true,"full_interval_minutes":5,"excluded_interfaces":[]}`:                 400,
-		`{"enabled":true,"full_interval_minutes":60,"excluded_interfaces":["a b"]}`:           400,
+		`{"enabled":true,"full_interval_minutes":5,"excluded_interfaces":[]}`:                  400,
+		`{"enabled":true,"full_interval_minutes":60,"excluded_interfaces":["a b"]}`:            400,
 		`{"enabled":true,"full_interval_minutes":60,"excluded_interfaces":[],"surprise":true}`: 400,
 		`not json`: 400,
 		`{"enabled":true,"full_interval_minutes":60,"excluded_interfaces":["` + strings.Repeat("x", 17000) + `"]}`: 413,
