@@ -290,3 +290,80 @@ func TestSNMPInheritance(t *testing.T) {
 		t.Fatalf("after parent delete: %+v", g.SNMP)
 	}
 }
+
+// TestReplaceAndClearAudited (T048): replace needs every field and is audited
+// with the previous version; clear deletes the row and is audited; clearing
+// without own credentials is a no-op without audit; no audit detail carries
+// a credential.
+func TestReplaceAndClearAudited(t *testing.T) {
+	svc, st, _ := snmpSvc(t)
+	ctx := context.Background()
+	s := mkSubnet(t, svc, "mgmt", "10.1.112.0/24", "")
+	if _, err := svc.SetSNMP(ctx, subj(), s.ID, snmpcred.Input{Version: 2, Community: community}); err != nil {
+		t.Fatal(err)
+	}
+	var fe *snmpcred.FieldError
+	if _, err := svc.SetSNMP(ctx, subj(), s.ID, snmpcred.Input{Version: 3, User: "u", SecurityLevel: "authPriv", AuthProtocol: "SHA", AuthPassword: "authpass1"}); !errors.As(err, &fe) || fe.Field != "priv_protocol" {
+		t.Fatalf("replace must be complete: %v", err)
+	}
+	if _, err := svc.SetSNMP(ctx, subj(), s.ID, snmpcred.Input{Version: 3, User: "v3user-S3CRET", SecurityLevel: "authNoPriv", AuthProtocol: "SHA256", AuthPassword: "v3pass-S3CRET"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.ClearSNMP(ctx, subj(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetSubnetSNMP(ctx, "t1", s.ID); err == nil {
+		t.Fatal("credentials not deleted")
+	}
+	if err := svc.ClearSNMP(ctx, subj(), s.ID); err != nil {
+		t.Fatalf("clear without own credentials: %v", err)
+	}
+	want := []struct {
+		action string
+		detail map[string]any
+	}{
+		{"snmp_credentials_set", map[string]any{"protocol_version": 2, "security_level": ""}},
+		{"snmp_credentials_replaced", map[string]any{"protocol_version": 3, "security_level": "authNoPriv", "previous_version": 2}},
+		{"snmp_credentials_cleared", map[string]any{"previous_version": 3}},
+	}
+	var got []string
+	for _, a := range st.Audit() {
+		got = append(got, a.Action)
+		txt := mustJSONText(t, a)
+		for _, v := range []string{community, "v3user-S3CRET", "v3pass-S3CRET"} {
+			if strings.Contains(txt, v) {
+				t.Fatalf("audit %s carries %q", a.Action, v)
+			}
+		}
+	}
+	audits := st.Audit()
+	if len(audits) != len(want) {
+		t.Fatalf("audit actions %v", got)
+	}
+	for i, w := range want {
+		a := audits[i]
+		if a.Action != w.action || a.SubjectKind != "subnet" || a.SubjectID != s.ID || a.ActorID != "u1" || a.Outcome != "ok" {
+			t.Fatalf("audit %d: %+v", i, a)
+		}
+		if mustJSONText(t, a.Detail) != mustJSONText(t, w.detail) {
+			t.Fatalf("audit %d detail %v want %v", i, a.Detail, w.detail)
+		}
+	}
+	if err := svc.ClearSNMP(ctx, subj(), "missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing subnet: %v", err)
+	}
+	if err := svc.ClearSNMP(ctx, authz.Subjects{}, s.ID); !errors.Is(err, authz.ErrForbidden) {
+		t.Fatalf("no tenant: %v", err)
+	}
+	if _, err := svc.SetSNMP(ctx, subj(), s.ID, snmpcred.Input{Version: 2, Community: "c"}); err != nil {
+		t.Fatal(err)
+	}
+	st.FailNext("GetSubnetSNMP")
+	if err := svc.ClearSNMP(ctx, subj(), s.ID); err == nil {
+		t.Fatal("read failure")
+	}
+	st.FailNext("DeleteSubnetSNMP")
+	if err := svc.ClearSNMP(ctx, subj(), s.ID); err == nil {
+		t.Fatal("delete failure")
+	}
+}

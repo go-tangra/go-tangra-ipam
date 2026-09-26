@@ -89,11 +89,16 @@ export const useSubnets = defineStore('ipam-subnets', () => {
     return api<SubnetSNMPStatus>('PUT', 'subnets/' + id + '/snmp', body)
   }
 
+  // clearSnmp deletes the subnet's own credentials; it then inherits again.
+  async function clearSnmp(id: string): Promise<void> {
+    await api('DELETE', 'subnets/' + id + '/snmp')
+  }
+
   // testSnmp probes one address of the subnet with its effective credentials
   // (scan:run, rate-limited server side).
   async function testSnmp(id: string, address: string): Promise<SNMPTestResult> {
     return api<SNMPTestResult>('POST', 'subnets/' + id + '/snmp/test', { address })
   }
 
-  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan, split, snmpStatus, setSnmp, testSnmp }
+  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan, split, snmpStatus, setSnmp, clearSnmp, testSnmp }
 })

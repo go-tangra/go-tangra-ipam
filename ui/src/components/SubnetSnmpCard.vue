@@ -5,7 +5,7 @@
 // dropped from component state after every submit.
 import { computed, ref, watch } from 'vue'
 import { useAbility } from '@casl/vue'
-import { UiCard, UiButton, UiAlert, UiBadge, UiForm, UiInput, UiSelect, UiSecretField } from '@go-tangra/ui'
+import { UiCard, UiButton, UiAlert, UiBadge, UiForm, UiInput, UiSelect, UiSecretField, useConfirm } from '@go-tangra/ui'
 import { useZodForm } from '@go-tangra/ui/forms'
 import { useSubnets } from '@/stores/subnets'
 import { snmpSchema, snmpTestSchema, protocolLabel, SNMP_AUTH_PROTOCOLS, SNMP_PRIV_PROTOCOLS, type SnmpFormInput } from '@/schemas'
@@ -16,6 +16,7 @@ const props = defineProps<{ subnet: Subnet }>()
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
 const store = useSubnets()
+const confirm = useConfirm()
 const ability = useAbility()
 const canManage = computed(() => ability.can('configure', 'SubnetSnmp'))
 const canTest = computed(() => ability.can('test', 'SubnetSnmp'))
@@ -52,6 +53,18 @@ const form = useZodForm(snmpSchema, {
 function startEdit(): void {
   form.reset(blank())
   editing.value = true
+}
+async function clear(): Promise<void> {
+  const inherits = props.subnet.parent_id ? ' The subnet then inherits from its parents, if they have credentials.' : ''
+  if (!(await confirm.ask({ title: `Clear SNMP credentials of ${props.subnet.cidr}?`, text: 'They are deleted permanently.' + inherits, danger: true, confirmLabel: 'Clear' }))) return
+  error.value = ''
+  try {
+    await store.clearSnmp(props.subnet.id)
+    emit('changed')
+    await load()
+  } catch (e) {
+    error.value = describe(e)
+  }
 }
 function cancel(): void {
   form.reset(blank())
@@ -107,6 +120,7 @@ const privOptions = SNMP_PRIV_PROTOCOLS.map((p) => ({ title: protocolLabel(p), v
     <template v-if="canManage">
       <div v-if="!editing" class="mt-3 flex flex-wrap gap-2">
         <UiButton size="sm" variant="soft" icon="mdi-key-outline" data-test="snmp-set" @click="startEdit">{{ status?.own ? 'Replace' : 'Set' }}</UiButton>
+        <UiButton v-if="status?.own" size="sm" variant="text" color="error" icon="mdi-key-remove" data-test="snmp-clear" @click="clear">Clear</UiButton>
       </div>
       <div v-else class="mt-3" data-test="snmp-form">
         <UiForm :form="form">

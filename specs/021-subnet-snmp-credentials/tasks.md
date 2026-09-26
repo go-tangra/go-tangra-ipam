@@ -171,12 +171,12 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T048 [P] [US6] Service/HTTP tests in `internal/subnets/snmp_test.go` and `internal/httpapi/snmp_test.go`: DELETE route (`subnets:manage`, CSRF); replace requires all fields; audit rows for set/replaced/cleared contain version/level only (**negative**: no community/user/password anywhere in the audit detail)
+- [x] T048 [P] [US6] Service/HTTP tests in `internal/subnets/snmp_test.go` and `internal/httpapi/snmp_test.go`: DELETE route (`subnets:manage`, CSRF); replace requires all fields; audit rows for set/replaced/cleared contain version/level only (**negative**: no community/user/password anywhere in the audit detail)
 
 ### Implementation
 
-- [ ] T049 [US6] Implement `ClearSNMP` in `internal/subnets/snmp.go` and the DELETE route in `internal/httpapi/snmp.go`; OpenAPI in `api/openapi/ipam.yaml`
-- [ ] T050 [US6] UI: Clear button with the kit confirm dialog (not a browser dialog) in `ui/src/components/SubnetSnmpCard.vue`; test in `ui/tests/unit/snmp.spec.ts`
+- [x] T049 [US6] Implement `ClearSNMP` in `internal/subnets/snmp.go` and the DELETE route in `internal/httpapi/snmp.go`; OpenAPI in `api/openapi/ipam.yaml`
+- [x] T050 [US6] UI: Clear button with the kit confirm dialog (not a browser dialog) in `ui/src/components/SubnetSnmpCard.vue`; test in `ui/tests/unit/snmp.spec.ts`
 
 ---
 

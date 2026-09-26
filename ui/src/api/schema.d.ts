@@ -94,7 +94,7 @@ export interface paths {
         get: operations["getSubnetSnmp"];
         put: operations["setSubnetSnmp"];
         post?: never;
-        delete?: never;
+        delete: operations["clearSubnetSnmp"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1377,6 +1377,36 @@ export interface operations {
             };
             /** @description validation_failed (detail.field names the field) */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    clearSubnetSnmp: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description own credentials deleted (no-op when the subnet has none); the subnet inherits again or has none */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -218,3 +218,36 @@ func TestRateLimiter(t *testing.T) {
 		t.Fatalf("idle keys kept: %d", len(l.hits))
 	}
 }
+
+// TestSubnetSNMPDeleteRoute (T048): DELETE clears (204), is idempotent, and
+// the children fall back to inheriting.
+func TestSubnetSNMPDeleteRoute(t *testing.T) {
+	f := newAPI(t)
+	parent := f.createSubnet(t, "site", "10.1.0.0/16")
+	w := f.req(t, "POST", p+"/subnets", "admin", `{"name":"mgmt","cidr":"10.1.112.0/24","parent_id":"`+parent+`"}`)
+	child, _ := decodeBody(t, w)["id"].(string)
+	f.setSNMP(t, parent, `{"version":2,"community":"parent-comm"}`)
+	f.setSNMP(t, child, `{"version":2,"community":"`+snmpCommunity+`"}`)
+	if w := f.req(t, "DELETE", p+"/subnets/"+child+"/snmp", "admin", ""); w.Code != 204 {
+		t.Fatalf("delete: %d %s", w.Code, w.Body)
+	}
+	b := decodeBody(t, f.req(t, "GET", p+"/subnets/"+child+"/snmp", "user", ""))
+	if b["own"] != nil || b["effective"].(map[string]any)["state"] != "inherited" {
+		t.Fatalf("after clear %v", b)
+	}
+	if w := f.req(t, "DELETE", p+"/subnets/"+child+"/snmp", "admin", ""); w.Code != 204 {
+		t.Fatalf("idempotent delete: %d", w.Code)
+	}
+	if w := f.req(t, "DELETE", p+"/subnets/018f3a2b-0000-7000-8000-00000000dead/snmp", "admin", ""); w.Code != 404 {
+		t.Fatalf("missing subnet: %d", w.Code)
+	}
+	cleared := 0
+	for _, a := range f.mem.Audit() {
+		if a.Action == "snmp_credentials_cleared" {
+			cleared++
+		}
+	}
+	if cleared != 1 {
+		t.Fatalf("cleared audit rows %d", cleared)
+	}
+}

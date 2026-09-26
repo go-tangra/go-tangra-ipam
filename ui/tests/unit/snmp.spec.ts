@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { abilitiesPlugin } from '@casl/vue'
 import { createMongoAbility } from '@casl/ability'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { useConfirm } from '@go-tangra/ui'
 import SubnetSnmpCard from '@/components/SubnetSnmpCard.vue'
 import Subnets from '@/views/subnets/index.vue'
 import Scans from '@/views/scans/index.vue'
@@ -253,6 +254,34 @@ describe('scan SNMP phase', () => {
     const w = mount(Scans, { global: { plugins: [router, [abilitiesPlugin, createMongoAbility([]), { useGlobalProperties: true }]] as never }, attachTo: document.body })
     await flushPromises()
     expect(w.find('[data-test=scan-row-j1] [data-test=snmp-phase]').text()).toContain('no credentials')
+    w.unmount()
+  })
+})
+
+describe('Clear SNMP credentials', () => {
+  it('asks through the kit confirm dialog and deletes only when confirmed', async () => {
+    let status: SubnetSNMPStatus = ownV2
+    const calls = fetchMock((_url, init) => {
+      if (init.method === 'DELETE') {
+        status = none
+        return { status: 204, body: null }
+      }
+      return { body: status }
+    })
+    const confirm = useConfirm()
+    const w = mount(SubnetSnmpCard, { props: { subnet }, global: withAbility(MANAGE) })
+    await flushPromises()
+    await w.find('[data-test=snmp-clear]').trigger('click')
+    expect(confirm.state.pending?.title).toContain('Clear')
+    confirm.answer(false)
+    await flushPromises()
+    expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false)
+    await w.find('[data-test=snmp-clear]').trigger('click')
+    confirm.answer(true)
+    await flushPromises()
+    expect(calls.find((c) => c.init.method === 'DELETE')?.url).toContain('/subnets/s1/snmp')
+    expect(w.find('[data-test=snmp-status]').text()).toContain('Not configured')
+    expect(w.find('[data-test=snmp-clear]').exists()).toBe(false)
     w.unmount()
   })
 })

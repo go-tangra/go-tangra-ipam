@@ -165,7 +165,7 @@ func TestSubnetSNMPContract(t *testing.T) {
 	}
 	for path, ops := range map[string]map[string]want{
 		"/api/ipam/v1/subnets/{id}/snmp": {
-			"GET": {"ipam:read", 0}, "PUT": {"subnets:manage", 4096},
+			"GET": {"ipam:read", 0}, "PUT": {"subnets:manage", 4096}, "DELETE": {"subnets:manage", 0},
 		},
 		"/api/ipam/v1/subnets/{id}/snmp/test": {"POST": {"scan:run", 1024}},
 	} {

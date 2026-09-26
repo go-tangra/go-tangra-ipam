@@ -222,6 +222,13 @@ paths:
         '200': { description: 'credentials set or replaced (status, never values)', content: { application/json: { schema: { $ref: '#/components/schemas/SubnetSNMPStatus' } } } }
         '404': { description: not_found }
         '422': { description: 'validation_failed (detail.field names the field)' }
+    delete:
+      operationId: clearSubnetSnmp
+      x-freya-permission: 'subnets:manage'
+      parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
+      responses:
+        '204': { description: 'own credentials deleted (no-op when the subnet has none); the subnet inherits again or has none' }
+        '404': { description: not_found }
   /api/ipam/v1/subnets/{id}/snmp/test:
     post:
       operationId: testSubnetSnmp

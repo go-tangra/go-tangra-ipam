@@ -114,6 +114,18 @@ func (s *Server) registerSNMP(d Deps) {
 		}
 		WriteJSON(w, http.StatusOK, v)
 	})
+	s.MustHandle("DELETE", p, func(w http.ResponseWriter, r *http.Request) {
+		subj, err := subjects(r)
+		if err != nil {
+			failSvc(w, err)
+			return
+		}
+		if err := d.Subnets.ClearSNMP(r.Context(), subj, r.PathValue("id")); err != nil {
+			failSNMP(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 	limiter := newRateLimiter(snmpTestsPerWindow, snmpTestWindow, time.Now)
 	s.MustHandle("POST", p+"/test", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)

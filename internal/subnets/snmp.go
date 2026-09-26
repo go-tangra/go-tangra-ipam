@@ -104,6 +104,31 @@ func (s *Service) SetSNMP(ctx context.Context, subj authz.Subjects, subnetID str
 	return s.GetSNMP(ctx, subj, subnetID)
 }
 
+// ClearSNMP deletes the subnet's own credentials permanently (FR-007) with
+// its audit row; the subnet then inherits again or has none. Clearing a
+// subnet without own credentials is a no-op.
+func (s *Service) ClearSNMP(ctx context.Context, subj authz.Subjects, subnetID string) error {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return err
+	}
+	tid := subj.TenantID
+	if _, err := s.st.GetSubnet(ctx, tid, subnetID); err != nil {
+		return mapErr(err)
+	}
+	prev, err := s.st.GetSubnetSNMP(ctx, tid, subnetID)
+	if errors.Is(err, repo.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	row := s.snmpAudit(subj, audit.SNMPCredentialsCleared, subnetID, map[string]any{"previous_version": prev.Version})
+	if err := s.st.DeleteSubnetSNMP(ctx, tid, subnetID, row); err != nil && !errors.Is(err, repo.ErrNotFound) {
+		return err
+	}
+	return nil
+}
+
 // snmpAudit builds a user audit row for a credential change.
 func (s *Service) snmpAudit(subj authz.Subjects, t audit.EventType, subnetID string, detail map[string]any) store.AuditRow {
 	row, _ := audit.Row(audit.Event{TenantID: subj.TenantID, EventType: t, ActorKind: audit.ActorUser, ActorID: subj.ActorID(),
