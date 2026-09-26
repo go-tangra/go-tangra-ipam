@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiDataTable, UiStatusChip, UiBadge, UiRecordDrawer, type Column, type SelectOption } from '@go-tangra/ui'
 import { useZodForm } from '@go-tangra/ui/forms'
 import { useDevices } from '@/stores/devices'
-import { deviceFilterSchema, deviceSchema, DEVICE_TYPES, DEVICE_STATUSES } from '@/schemas'
+import { deviceFilterSchema, deviceSchema, DEVICE_TYPES, DEVICE_STATUSES, DEVICE_SOURCES } from '@/schemas'
 import type { Device } from '@/api/types'
 import { statusColors } from './colors'
 import { useDeviceFields } from './fields'
@@ -13,8 +13,10 @@ const router = useRouter()
 const store = useDevices()
 const typeOptions: SelectOption[] = DEVICE_TYPES.map((s) => ({ title: s, value: s }))
 const statusOptions: SelectOption[] = DEVICE_STATUSES.map((s) => ({ title: s, value: s }))
+const sourceLabels: Record<string, string> = { manual: 'manual', scan: 'scan', host_report: 'host report' }
+const sourceOptions: SelectOption[] = DEVICE_SOURCES.map((s) => ({ title: sourceLabels[s] ?? s, value: s }))
 onMounted(() => void store.list())
-const filter = useZodForm(deviceFilterSchema, { initial: { q: '' }, onSubmit: (f) => store.list({ query: f.q || undefined, device_type: f.device_type, status: f.status }) })
+const filter = useZodForm(deviceFilterSchema, { initial: { q: '' }, onSubmit: (f) => store.list({ query: f.q || undefined, device_type: f.device_type, status: f.status, source: f.source }) })
 const reload = () => void filter.submit()
 const creating = ref(false)
 const fields = useDeviceFields()
@@ -25,6 +27,7 @@ const columns: Column<Device>[] = [
   { key: 'model', label: 'Model', format: (d) => [d.manufacturer, d.model].filter(Boolean).join(' '), hideOnStack: true },
   { key: 'management_ip', label: 'Management IP', format: (d) => d.management_ip || d.primary_ip || '' },
   { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'source', label: 'Source', width: 'sm', hideOnStack: true, format: (d) => sourceLabels[d.source ?? 'manual'] ?? '' },
   { key: 'updates', label: 'Updates', width: 'sm', format: (d) => [d.security_update_count ? d.security_update_count + ' sec' : '', d.package_update_count ? d.package_update_count + ' pkg' : ''].filter(Boolean).join(' ') },
   { key: 'interface_count', label: 'NICs', align: 'end', format: (d) => String(d.interface_count ?? 0), hideOnStack: true },
 ]
@@ -39,9 +42,10 @@ const columns: Column<Device>[] = [
     <template #filters>
       <UiForm :form="filter" class="w-full">
         <div class="grid grid-cols-2 gap-2 md:grid-cols-12 md:items-end">
-          <div class="col-span-2 md:col-span-6"><UiInput v-bind="filter.field('q')" label="Search (name)" type="search" size="sm" @enter="reload" /></div>
+          <div class="col-span-2 md:col-span-4"><UiInput v-bind="filter.field('q')" label="Search (name)" type="search" size="sm" @enter="reload" /></div>
           <div class="md:col-span-3"><UiSelect v-bind="filter.field('device_type')" label="Type" :options="typeOptions" size="sm" @update:model-value="reload" /></div>
-          <div class="md:col-span-3"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="md:col-span-2"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="md:col-span-3"><UiSelect v-bind="filter.field('source')" label="Source" :options="sourceOptions" size="sm" data-test="device-source-filter" @update:model-value="reload" /></div>
         </div>
       </UiForm>
     </template>
@@ -49,7 +53,9 @@ const columns: Column<Device>[] = [
     <UiCard :padded="false">
       <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="Devices" empty-title="No devices match" clickable :row-attrs="(d) => ({ 'data-test': 'device-row-' + d.id })" data-test="devices-table" @row-click="router.push({ name: 'ipam-device', params: { id: $event.id } })">
         <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="statusColors" /></template>
+        <template #cell-source="{ row }"><UiBadge v-if="row.source === 'host_report'" :color="row.report_state === 'not_reported' ? 'neutral' : 'info'" size="xs">{{ row.report_state === 'not_reported' ? 'no longer reported' : 'host report' }}</UiBadge><span v-else class="text-xs">{{ sourceLabels[row.source ?? 'manual'] }}</span></template>
         <template #cell-updates="{ row }">
+          <UiBadge v-if="row.reboot_required" color="warning" size="xs">reboot</UiBadge>
           <UiBadge v-if="(row.security_update_count ?? 0) > 0" color="error" size="xs">{{ row.security_update_count }} sec</UiBadge>
           <UiBadge v-if="(row.package_update_count ?? 0) > 0" color="warning" size="xs">{{ row.package_update_count }} pkg</UiBadge>
         </template>

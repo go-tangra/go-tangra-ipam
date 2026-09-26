@@ -50,6 +50,8 @@ export interface Subnet {
   used_addresses?: number
   available_addresses?: number
   utilization?: number
+  // "host_sync" when the host sync created it for a reported network.
+  origin?: 'manual' | 'host_sync'
 }
 
 // SubnetTreeNode is a subnet enriched with nested children for /subnets/tree.
@@ -101,6 +103,11 @@ export interface IPAddress {
   created_by?: string
   created_at?: string
   updated_at?: string
+  // Host sync (server-owned).
+  report_state?: ReportState
+  previous_device_id?: string
+  moved_at?: string
+  conflict?: boolean
 }
 
 // PingResult is the /ip-addresses/{id}/ping response.
@@ -147,6 +154,15 @@ export interface Device {
   address_count?: number
   package_update_count?: number
   security_update_count?: number
+  // Host sync (server-owned).
+  source?: DeviceSource
+  inventory_host_id?: string
+  virtualization_kind?: string
+  hypervisor_device_id?: string
+  update_status?: UpdateStatus
+  report_state?: ReportState
+  last_report_at?: string
+  guest_count?: number
 }
 
 export interface DeviceInterface {
@@ -168,6 +184,11 @@ export interface DeviceInterface {
   link_last_seen?: string
   created_at?: string
   updated_at?: string
+  report_state?: ReportState
+  // Computed: the linked switch's name and, on a switch port, the host behind it.
+  remote_device_name?: string
+  behind_device_id?: string
+  behind_device_name?: string
 }
 
 export interface DevicePackage {
@@ -400,4 +421,68 @@ export interface DNSConfig {
   reverse_dns_enabled?: boolean
   created_at?: string
   updated_at?: string
+}
+
+// --- host sync (feature 020) ---
+
+export type DeviceSource = 'manual' | 'scan' | 'host_report'
+export type ReportState = '' | 'reported' | 'not_reported'
+export type UpdateStatus = 'unknown' | 'up_to_date' | 'updates_available' | 'unsupported' | 'error'
+export type HostSyncState = 'ok' | 'degraded' | 'disabled'
+
+export interface HostSyncSettings {
+  enabled: boolean
+  full_interval_minutes: number
+  excluded_interfaces: string[]
+  updated_by?: string
+  updated_at?: string
+}
+
+export interface HostSyncStatus {
+  enabled: boolean
+  state: HostSyncState
+  last_error?: string
+  last_poll_at?: string
+  last_reconcile_at?: string
+  next_reconcile_at?: string
+  hosts_reported: number
+  hosts_failed: number
+  devices_not_reported: number
+  addresses_in_conflict: number
+}
+
+export interface HostSyncIssue {
+  field: string
+  reason: string
+  count: number
+}
+
+export interface DeviceHostSync {
+  source: DeviceSource
+  inventory_host_id?: string
+  report_state: ReportState
+  snapshot_id?: string
+  collected_at?: string
+  applied_at?: string
+  trigger?: string
+  changes: number
+  issues: HostSyncIssue[]
+}
+
+export interface ResyncResult {
+  applied: boolean
+  changes: number
+  issues: HostSyncIssue[]
+}
+
+export interface HypervisorGuest {
+  id?: string
+  guest_ref: string
+  name?: string
+  kind: 'vm' | 'container'
+  platform?: string
+  macs: string[]
+  guest_device_id?: string
+  guest_device_name?: string
+  last_reported_at?: string
 }

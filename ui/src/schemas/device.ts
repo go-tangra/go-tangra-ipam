@@ -19,10 +19,13 @@ export const deviceSchema = z.object({
 })
 export type DeviceInput = z.output<typeof deviceSchema>
 
+export const DEVICE_SOURCES = ['manual', 'scan', 'host_report'] as const
+
 export const deviceFilterSchema = z.object({
   q: z.string().trim().max(200).optional(),
   device_type: z.enum(DEVICE_TYPES).optional(),
   status: z.enum(DEVICE_STATUSES).optional(),
+  source: z.enum(DEVICE_SOURCES).optional(),
 })
 
 /** Placing a device in a rack: the bottom U it sits in and its height. */

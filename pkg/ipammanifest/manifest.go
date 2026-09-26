@@ -89,6 +89,10 @@ var Abilities = []gatewayclient.Ability{
 	{Action: []string{"access"}, Subject: []string{"Kvm"}, Requires: "kvm:access"},
 	// Host sync settings: owners, admins and the IPAM administrator role only.
 	{Action: []string{"manage"}, Subject: []string{"HostSync"}, Requires: "hostsync:manage"},
+	// Re-sync (one host or all) and clearing an address conflict follow the
+	// device/address manage permissions.
+	{Action: []string{"resync"}, Subject: []string{"HostSync"}, Requires: "devices:manage"},
+	{Action: []string{"clear"}, Subject: []string{"AddressConflict"}, Requires: "addresses:manage"},
 }
 
 // Nav lists the navigation contributions.

@@ -26,9 +26,13 @@ export const suggestSchema = z.object({
   count,
 })
 
+export const REPORT_STATES = ['reported', 'not_reported'] as const
+
 export const addressFilterSchema = z.object({
   subnet_id: z.string().optional(),
   status: z.enum(ADDRESS_STATUSES).optional(),
   address_type: z.enum(ADDRESS_TYPES).optional(),
   hostname: z.string().trim().max(253).optional(),
+  report_state: z.enum(REPORT_STATES).optional(),
+  conflict: z.boolean().optional(),
 })

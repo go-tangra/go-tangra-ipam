@@ -196,6 +196,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ipam/v1/ip-addresses/{id}/clear-conflict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["clearIpAddressConflict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ipam/v1/ip-addresses/{id}/ping": {
         parameters: {
             query?: never;
@@ -388,6 +404,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ipam/v1/devices/{id}/host-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getDeviceHostSync"];
+        put?: never;
+        post: operations["resyncDeviceHostSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ipam/v1/devices/{id}/guests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listDeviceGuests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ipam/v1/devices/{id}/kvm-session": {
         parameters: {
             query?: never;
@@ -398,6 +446,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["startDeviceKvmSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ipam/v1/host-sync/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getHostSyncSettings"];
+        put: operations["updateHostSyncSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ipam/v1/host-sync/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getHostSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ipam/v1/host-sync/resync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resyncAllHosts"];
         delete?: never;
         options?: never;
         head?: never;
@@ -840,6 +936,70 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        HostSyncSettings: {
+            enabled: boolean;
+            full_interval_minutes: number;
+            excluded_interfaces: string[];
+            readonly updated_by?: string;
+            /** Format: date-time */
+            readonly updated_at?: string;
+        };
+        HostSyncStatus: {
+            enabled?: boolean;
+            /** @enum {string} */
+            state?: "ok" | "degraded" | "disabled";
+            /** @description code only, e.g. inventory_unavailable */
+            last_error?: string;
+            /** Format: date-time */
+            last_poll_at?: string;
+            /** Format: date-time */
+            last_reconcile_at?: string;
+            /** Format: date-time */
+            next_reconcile_at?: string;
+            hosts_reported?: number;
+            hosts_failed?: number;
+            devices_not_reported?: number;
+            addresses_in_conflict?: number;
+        };
+        HostSyncIssue: {
+            field?: string;
+            reason?: string;
+            count?: number;
+        };
+        DeviceHostSync: {
+            /** @enum {string} */
+            source?: "manual" | "scan" | "host_report";
+            /** Format: uuid */
+            inventory_host_id?: string;
+            /** @enum {string} */
+            report_state?: "" | "reported" | "not_reported";
+            snapshot_id?: string;
+            /** Format: date-time */
+            collected_at?: string;
+            /** Format: date-time */
+            applied_at?: string;
+            trigger?: string;
+            changes?: number;
+            issues?: components["schemas"]["HostSyncIssue"][];
+        };
+        ResyncResult: {
+            applied?: boolean;
+            changes?: number;
+            issues?: components["schemas"]["HostSyncIssue"][];
+        };
+        HypervisorGuest: {
+            guest_ref?: string;
+            name?: string;
+            /** @enum {string} */
+            kind?: "vm" | "container";
+            platform?: string;
+            macs?: string[];
+            /** Format: uuid */
+            guest_device_id?: string;
+            guest_device_name?: string;
+            /** Format: date-time */
+            last_reported_at?: string;
+        };
         /**
          * @example {
          *       "reason": "not_found",
@@ -863,6 +1023,7 @@ export interface components {
         cursor: string;
         limit: number;
         force: boolean;
+        reportState: "reported" | "not_reported";
     };
     requestBodies: never;
     headers: never;
@@ -1084,6 +1245,8 @@ export interface operations {
             query?: {
                 cursor?: components["parameters"]["cursor"];
                 limit?: components["parameters"]["limit"];
+                report_state?: components["parameters"]["reportState"];
+                conflict?: boolean;
             };
             header?: never;
             path?: never;
@@ -1282,6 +1445,36 @@ export interface operations {
             };
         };
     };
+    clearIpAddressConflict: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description address with the conflict flag cleared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     pingIpAddress: {
         parameters: {
             query?: never;
@@ -1310,6 +1503,8 @@ export interface operations {
             query?: {
                 cursor?: components["parameters"]["cursor"];
                 limit?: components["parameters"]["limit"];
+                report_state?: components["parameters"]["reportState"];
+                source?: "manual" | "scan" | "host_report";
             };
             header?: never;
             path?: never;
@@ -1663,6 +1858,96 @@ export interface operations {
             };
         };
     };
+    getDeviceHostSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description report source, last report and issues */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceHostSync"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resyncDeviceHostSync: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description latest report applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResyncResult"];
+                };
+            };
+            /** @description not_host_reported | host_sync_disabled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description temporarily_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listDeviceGuests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description guests reported by a hypervisor (matched and unmatched) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     startDeviceKvmSession: {
         parameters: {
             query?: never;
@@ -1679,6 +1964,104 @@ export interface operations {
         responses: {
             /** @description kvm session token + console url */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getHostSyncSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostSyncSettings"];
+                };
+            };
+        };
+    };
+    updateHostSyncSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HostSyncSettings"];
+            };
+        };
+        responses: {
+            /** @description settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getHostSyncStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostSyncStatus"];
+                };
+            };
+        };
+    };
+    resyncAllHosts: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description full reconcile scheduled */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description host_sync_disabled */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

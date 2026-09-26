@@ -6,6 +6,8 @@ import { useAddresses } from '@/stores/addresses'
 import { useSubnets } from '@/stores/subnets'
 import { useLive } from '@/stores/live'
 import { addressFilterSchema, allocateSchema, bulkAllocateSchema, suggestSchema, ADDRESS_STATUSES, ADDRESS_TYPES } from '@/schemas'
+import { useHostSync } from '@/stores/hostsync'
+import { useAbility } from '@casl/vue'
 import type { IPAddress, PingResult } from '@/api/types'
 import { describe } from '@/api/client'
 
@@ -13,6 +15,11 @@ const store = useAddresses()
 const subnets = useSubnets()
 const live = useLive()
 const confirm = useConfirm()
+const hostSync = useHostSync()
+const ability = useAbility()
+const canClear = computed(() => ability.can('clear', 'AddressConflict'))
+const reportOptions: SelectOption[] = [{ title: 'reported', value: 'reported' }, { title: 'no longer reported', value: 'not_reported' }, { title: 'in conflict', value: 'conflict' }]
+const reportFilter = ref<string | undefined>(undefined)
 const statusOptions: SelectOption[] = ADDRESS_STATUSES.map((s) => ({ title: s, value: s }))
 const typeOptions: SelectOption[] = ADDRESS_TYPES.map((s) => ({ title: s, value: s }))
 const subnetOptions = computed<SelectOption[]>(() => subnets.items.map((s) => ({ title: s.name + ' (' + s.cidr + ')', value: s.id })))
@@ -27,7 +34,10 @@ onUnmounted(() => release?.())
 
 const filter = useZodForm(addressFilterSchema, {
   initial: { hostname: '' },
-  onSubmit: (f) => store.list({ subnet_id: f.subnet_id || undefined, status: f.status, address_type: f.address_type, hostname: f.hostname || undefined }),
+  onSubmit: (f) => store.list({
+    subnet_id: f.subnet_id || undefined, status: f.status, address_type: f.address_type, hostname: f.hostname || undefined,
+    report_state: reportFilter.value === 'conflict' ? undefined : reportFilter.value, conflict: reportFilter.value === 'conflict' ? true : undefined,
+  }),
 })
 const reload = () => void filter.submit()
 
@@ -70,6 +80,15 @@ function pingLabel(id: string): string {
   const p = pingResult.value[id]
   return !p ? 'Ping' : p.available === false ? 'Unavailable' : p.alive ? `${p.rtt_ms ?? 0} ms` : 'No reply'
 }
+async function clearConflict(a: IPAddress): Promise<void> {
+  actionError.value = ''
+  try {
+    const updated = await hostSync.clearConflict(a.id)
+    store.items = store.items.map((x) => (x.id === a.id ? updated : x))
+  } catch (e) {
+    actionError.value = describe(e)
+  }
+}
 async function removeAddr(a: IPAddress): Promise<void> {
   if (!(await confirm.ask({ title: `Release ${a.address}?`, danger: true, confirmLabel: 'Release' }))) return
   actionError.value = ''
@@ -100,9 +119,10 @@ const columns: Column<IPAddress>[] = [
     <template #filters>
       <UiForm :form="filter" class="w-full">
         <div class="grid grid-cols-2 gap-2 md:grid-cols-12 md:items-end">
-          <div class="col-span-2 md:col-span-4"><UiSelect v-bind="filter.field('subnet_id')" label="Subnet" :options="subnetOptions" size="sm" @update:model-value="reload" /></div>
-          <div class="md:col-span-3"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
-          <div class="md:col-span-3"><UiSelect v-bind="filter.field('address_type')" label="Type" :options="typeOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="col-span-2 md:col-span-3"><UiSelect v-bind="filter.field('subnet_id')" label="Subnet" :options="subnetOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="md:col-span-2"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="md:col-span-2"><UiSelect v-bind="filter.field('address_type')" label="Type" :options="typeOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="md:col-span-3"><UiSelect id="address-report-filter" v-model="reportFilter" label="Host report" :options="reportOptions" size="sm" data-test="address-report-filter" @update:model-value="reload" /></div>
           <div class="col-span-2 md:col-span-2"><UiInput v-bind="filter.field('hostname')" label="Hostname" size="sm" @enter="reload" /></div>
         </div>
       </UiForm>
@@ -111,11 +131,12 @@ const columns: Column<IPAddress>[] = [
     <UiAlert v-if="actionError" kind="error" class="mb-3">{{ actionError }}</UiAlert>
     <UiCard :padded="false">
       <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="IP addresses" empty-title="No addresses match" :row-attrs="(a) => ({ 'data-test': 'address-row-' + a.id })" data-test="addresses-table">
-        <template #cell-address="{ row }">{{ row.address }} <UiBadge v-if="row.is_primary" color="primary" size="xs">primary</UiBadge></template>
+        <template #cell-address="{ row }">{{ row.address }} <UiBadge v-if="row.is_primary" color="primary" size="xs">primary</UiBadge> <UiBadge v-if="row.report_state === 'not_reported'" color="neutral" size="xs">not reported</UiBadge> <UiBadge v-if="row.conflict" color="error" size="xs">conflict</UiBadge></template>
         <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', dhcp: 'accent', deprecated: 'warning', offline: 'neutral' }" /></template>
         <template #cell-ping="{ row }"><UiStatusChip v-if="pingResult[row.id]" :status="pingResult[row.id]!.alive ? 'alive' : 'down'" :label="pingResult[row.id]!.alive ? (pingResult[row.id]!.rtt_ms ?? 0) + ' ms' : 'down'" :colors="{ alive: 'success', down: 'neutral' }" /><span v-else class="text-base-content/70">—</span></template>
         <template #actions="{ row }">
           <UiButton size="xs" variant="text" :color="pingResult[row.id] ? (pingResult[row.id]!.alive ? 'success' : 'error') : 'primary'" icon="mdi-lan-pending" :loading="pinging[row.id] ?? false" :data-test="'address-ping-' + row.id" @click="ping(row)">{{ pingLabel(row.id) }}</UiButton>
+          <UiButton v-if="row.conflict && canClear" size="xs" variant="text" icon="mdi-check-circle-outline" :data-test="'address-clear-' + row.id" @click="clearConflict(row)">Clear conflict</UiButton>
           <UiButton size="xs" variant="text" color="error" icon="mdi-delete-outline" icon-only label="Release" @click="removeAddr(row)" />
         </template>
       </UiDataTable>

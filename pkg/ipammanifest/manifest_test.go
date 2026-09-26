@@ -251,6 +251,15 @@ func TestHostSyncPermission(t *testing.T) {
 	if !ability {
 		t.Fatal("CASL {manage, HostSync}")
 	}
+	for _, want := range [][3]string{{"resync", "HostSync", "devices:manage"}, {"clear", "AddressConflict", "addresses:manage"}} {
+		ok := false
+		for _, a := range Abilities {
+			ok = ok || (reflect.DeepEqual(a.Action, []string{want[0]}) && reflect.DeepEqual(a.Subject, []string{want[1]}) && a.Requires == want[2])
+		}
+		if !ok {
+			t.Errorf("CASL %v", want)
+		}
+	}
 	nav := false
 	for _, n := range Nav {
 		nav = nav || (n.Path == "/ipam/host-sync" && n.Requires == "ipam:read" && n.Order == 765 && n.Icon == "mdi-sync")
