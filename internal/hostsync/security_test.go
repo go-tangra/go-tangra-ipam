@@ -60,7 +60,7 @@ func TestHostileReportBounded(t *testing.T) {
 	r.Host.Manufacturer = "ACME\x1b[31m"
 	r.Host.Model = strings.Repeat("m", 1000)
 	for i := 0; i < 10*hostreport.MaxInterfaces; i++ {
-		r.Interfaces = append(r.Interfaces, invclient.Interface{Name: fmt.Sprintf("if%d‮", i)})
+		r.Interfaces = append(r.Interfaces, invclient.Interface{Name: fmt.Sprintf("if%d\u202e", i)})
 	}
 	for i := 0; i < 10*hostreport.MaxPackages; i++ {
 		r.PendingUpdates = append(r.PendingUpdates, invclient.PendingUpdate{Name: fmt.Sprintf("p%d", i), AvailableVersion: "2"})

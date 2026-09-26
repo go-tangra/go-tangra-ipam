@@ -125,3 +125,12 @@ func TestClassify(t *testing.T) {
 		t.Fatal("class names")
 	}
 }
+
+// TestSubdivideHugeShift pins the shift guard of Subdivide (a pre-existing
+// branch the 100 % gate needs): more than 2^20 children is refused before any
+// allocation.
+func TestSubdivideHugeShift(t *testing.T) {
+	if _, err := Subdivide("10.0.0.0/8", 30); err != ErrTooLarge {
+		t.Fatalf("want ErrTooLarge, got %v", err)
+	}
+}
