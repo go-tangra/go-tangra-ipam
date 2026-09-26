@@ -6,6 +6,8 @@ import { createMongoAbility } from '@casl/ability'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import SubnetSnmpCard from '@/components/SubnetSnmpCard.vue'
 import Subnets from '@/views/subnets/index.vue'
+import Scans from '@/views/scans/index.vue'
+import { snmpPhaseText } from '@/views/scans/snmp'
 import { snmpSchema } from '@/schemas'
 import type { Subnet, SubnetSNMPStatus } from '@/api/types'
 
@@ -224,5 +226,33 @@ describe('Test SNMP', () => {
     await flushPromises()
     expect(r.find('[data-test=snmp-test]').exists()).toBe(false)
     r.unmount()
+  })
+})
+
+describe('scan SNMP phase', () => {
+  it('states a reason for every SNMP outcome', () => {
+    const label = (id: string) => (id === 'p1' ? '10.0.0.0/8' : id)
+    const base = { id: 'j', subnet_id: 's1', status: 'completed' as const, progress: 100 }
+    expect(snmpPhaseText({ ...base, snmp_status: 'not_requested' }, label)).toBe('not requested')
+    expect(snmpPhaseText({ ...base, enable_snmp: true, snmp_status: 'no_credentials' }, label)).toContain('no credentials')
+    expect(snmpPhaseText({ ...base, enable_snmp: true, snmp_status: 'credentials_unreadable' }, label)).toContain('unreadable')
+    expect(snmpPhaseText({ ...base, enable_snmp: true, snmp_status: 'no_live_hosts' }, label)).toContain('no live hosts')
+    const ran = snmpPhaseText({ ...base, enable_snmp: true, snmp_status: 'ran', snmp_source_subnet_id: 'p1', snmp_probed: 5, snmp_discovered_count: 0, snmp_no_answer: 3, snmp_rejected: 2 }, label)
+    expect(ran).toContain('inherited from 10.0.0.0/8')
+    expect(ran).toContain('probed 5')
+    expect(ran).toContain('discovered 0')
+    expect(ran).toContain('rejected 2')
+    expect(snmpPhaseText({ ...base, enable_snmp: true, snmp_status: 'ran', snmp_source_subnet_id: 's1', snmp_probed: 1, snmp_discovered_count: 1 }, label)).toContain('own credentials')
+    expect(snmpPhaseText({ ...base, status: 'scanning', enable_snmp: true }, label)).toBe('')
+  })
+
+  it('the scans table shows the SNMP phase per job', async () => {
+    vi.stubGlobal('EventSource', class { onopen = null; onerror = null; addEventListener() {} close() {} })
+    fetchMock((url) => ({ body: url.includes('/ip-scans') ? { items: [{ id: 'j1', subnet_id: 's1', status: 'completed', progress: 100, enable_snmp: true, snmp_status: 'no_credentials' }] } : { items: [subnet] } }))
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div/>' } }] })
+    const w = mount(Scans, { global: { plugins: [router, [abilitiesPlugin, createMongoAbility([]), { useGlobalProperties: true }]] as never }, attachTo: document.body })
+    await flushPromises()
+    expect(w.find('[data-test=scan-row-j1] [data-test=snmp-phase]').text()).toContain('no credentials')
+    w.unmount()
   })
 })

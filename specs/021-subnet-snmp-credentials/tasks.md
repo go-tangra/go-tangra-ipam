@@ -153,13 +153,13 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T044 [P] [US5] Executor tests in `internal/scan/executor_test.go` for `snmp_status` = not_requested, no_live_hosts, no_credentials, credentials_unreadable (blob opened with another KEK), ran; the non-SNMP part of the scan completes in every case
-- [ ] T045 [P] [US5] Repo test in `internal/memstore/snmp_test.go` (and integration T054) that the new scan job fields persist and list
+- [x] T044 [P] [US5] Executor tests in `internal/scan/executor_test.go` for `snmp_status` = not_requested, no_live_hosts, no_credentials, credentials_unreadable (blob opened with another KEK), ran; the non-SNMP part of the scan completes in every case
+- [x] T045 [P] [US5] Repo test in `internal/memstore/snmp_test.go` (and integration T054) that the new scan job fields persist and list
 
 ### Implementation
 
-- [ ] T046 [US5] Set `snmp_status` in every branch of `processJob`/`discoverSNMP` in `internal/scan/executor.go`
-- [ ] T047 [US5] UI: SNMP phase line in `ui/src/views/scans/index.vue` (status → human text, source, probed/discovered/no answer/rejected), types in `ui/src/api/types.ts`; test in `ui/tests/unit/snmp.spec.ts`
+- [x] T046 [US5] Set `snmp_status` in every branch of `processJob`/`discoverSNMP` in `internal/scan/executor.go`
+- [x] T047 [US5] UI: SNMP phase line in `ui/src/views/scans/index.vue` (status → human text, source, probed/discovered/no answer/rejected), types in `ui/src/api/types.ts`; test in `ui/tests/unit/snmp.spec.ts`
 
 ---
 

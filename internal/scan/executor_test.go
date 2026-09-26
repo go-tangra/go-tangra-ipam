@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/snmpcred"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
@@ -385,5 +387,76 @@ func TestSNMPInheritedCredsAndTenantIsolation(t *testing.T) {
 	o, _ := m.GetScanJob(ctx, "t2", other.ID)
 	if o.SNMPStatus != store.SNMPNoCredentials || o.SNMPSourceSubnetID != "" || o.Status != store.ScanCompleted {
 		t.Fatalf("t2 must not inherit t1 credentials: %s %q", o.SNMPStatus, o.SNMPSourceSubnetID)
+	}
+}
+
+// TestSNMPPhaseReasons (T044): every scan states why SNMP ran or not, and the
+// non-SNMP part completes in every case (SC-005).
+func TestSNMPPhaseReasons(t *testing.T) {
+	ctx := context.Background()
+	other, _ := sealed.NewEnvelope(bytes.Repeat([]byte{8}, 32))
+	cases := []struct {
+		name   string
+		alive  []string
+		snmp   bool
+		creds  bool
+		env    snmpcred.Sealer
+		status string
+	}{
+		{"not requested", []string{"10.0.0.1"}, false, true, testEnv, store.SNMPNotRequested},
+		{"no live hosts", nil, true, true, testEnv, store.SNMPNoLiveHosts},
+		{"no credentials", []string{"10.0.0.1"}, true, false, testEnv, store.SNMPNoCredentials},
+		{"unreadable (other KEK)", []string{"10.0.0.1"}, true, true, other, store.SNMPUnreadable},
+		{"ran", []string{"10.0.0.1"}, true, true, testEnv, store.SNMPRan},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := memstore.New()
+			clk := &clock{t: time.Now().UTC()}
+			m.Now = clk.now
+			mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
+			if c.creds {
+				setCreds(t, m, "t1", "s1", snmpcred.Input{Version: 2, Community: "c"})
+			}
+			svc := newService(m, icmp.NewFake(c.alive...), snmp.NewFake(), &recPub{}, testConfig(), clk)
+			svc.SetEnvelope(c.env)
+			job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: c.snmp, SkipReverseDNS: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := svc.RunOnce(ctx, nil); err != nil {
+				t.Fatal(err)
+			}
+			got, _ := m.GetScanJob(ctx, "t1", job.ID)
+			if got.Status != store.ScanCompleted || got.AliveCount != int64(len(c.alive)) {
+				t.Fatalf("scan did not complete: %s alive %d", got.Status, got.AliveCount)
+			}
+			if got.SNMPStatus != c.status {
+				t.Fatalf("snmp_status %q want %q", got.SNMPStatus, c.status)
+			}
+			if c.status == store.SNMPUnreadable && got.SNMPSourceSubnetID != "s1" {
+				t.Fatalf("unreadable source %q", got.SNMPSourceSubnetID)
+			}
+		})
+	}
+}
+
+// TestSNMPResolutionFailureRetries: a store failure while resolving the
+// credentials is a job failure (retried), not a silent skip.
+func TestSNMPResolutionFailureRetries(t *testing.T) {
+	ctx := context.Background()
+	m := memstore.New()
+	clk := &clock{t: time.Now().UTC()}
+	m.Now = clk.now
+	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
+	svc := newService(m, icmp.NewFake("10.0.0.1"), snmp.NewFake(), &recPub{}, testConfig(), clk)
+	job, _ := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true, SkipReverseDNS: true})
+	m.FailNext("ListSubnetSNMP")
+	if _, err := svc.RunOnce(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.GetScanJob(ctx, "t1", job.ID)
+	if got.Status != store.ScanPending || got.RetryCount != 1 {
+		t.Fatalf("status %s retry %d", got.Status, got.RetryCount)
 	}
 }

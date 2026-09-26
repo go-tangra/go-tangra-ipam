@@ -8,6 +8,7 @@ import { useLive } from '@/stores/live'
 import { startScanSchema } from '@/schemas'
 import type { IPScanJob } from '@/api/types'
 import { describe } from '@/api/client'
+import { snmpPhaseText } from './snmp'
 
 const store = useScans()
 const subnets = useSubnets()
@@ -51,6 +52,7 @@ const columns: Column<IPScanJob>[] = [
   { key: 'progress', label: 'Progress', width: 'lg', format: (j) => j.progress + '%' },
   { key: 'alive_count', label: 'Alive', align: 'end', format: (j) => String(j.alive_count ?? 0) },
   { key: 'new_count', label: 'New', align: 'end', format: (j) => String(j.new_count ?? 0), hideOnStack: true },
+  { key: 'snmp_status', label: 'SNMP', format: (j) => snmpPhaseText(j, subnetLabel), hideOnStack: true },
 ]
 </script>
 
@@ -69,6 +71,7 @@ const columns: Column<IPScanJob>[] = [
             <span class="text-xs">{{ row.progress }}%</span>
           </div>
         </template>
+        <template #cell-snmp_status="{ row }"><span class="text-xs" :class="row.snmp_status && row.snmp_status !== 'ran' && row.snmp_status !== 'not_requested' ? 'text-warning' : ''" data-test="snmp-phase">{{ snmpPhaseText(row, subnetLabel) }}</span></template>
         <template #actions="{ row }">
           <UiButton v-if="row.status === 'pending' || row.status === 'scanning'" size="xs" variant="text" color="error" icon="mdi-cancel" @click="cancel(row)">Cancel</UiButton>
         </template>

@@ -437,6 +437,12 @@ export interface IPScanJob {
   new_count?: number
   updated_count?: number
   snmp_discovered_count?: number
+  // SNMP phase (feature 021): why SNMP ran or not, and its counters.
+  snmp_status?: '' | 'not_requested' | 'no_live_hosts' | 'no_credentials' | 'credentials_unreadable' | 'ran'
+  snmp_source_subnet_id?: string
+  snmp_probed?: number
+  snmp_no_answer?: number
+  snmp_rejected?: number
   triggered_by?: string
   retry_count?: number
   max_retries?: number
