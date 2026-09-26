@@ -111,11 +111,11 @@ func TestHostSyncContract(t *testing.T) {
 		}
 	}
 	for path, methods := range map[string][]string{
-		"/api/ipam/v1/host-sync/settings":                {"GET", "PUT"},
-		"/api/ipam/v1/host-sync/status":                  {"GET"},
-		"/api/ipam/v1/host-sync/resync":                  {"POST"},
-		"/api/ipam/v1/devices/{id}/host-sync":            {"GET", "POST"},
-		"/api/ipam/v1/devices/{id}/guests":               {"GET"},
+		"/api/ipam/v1/host-sync/settings":               {"GET", "PUT"},
+		"/api/ipam/v1/host-sync/status":                 {"GET"},
+		"/api/ipam/v1/host-sync/resync":                 {"POST"},
+		"/api/ipam/v1/devices/{id}/host-sync":           {"GET", "POST"},
+		"/api/ipam/v1/devices/{id}/guests":              {"GET"},
 		"/api/ipam/v1/ip-addresses/{id}/clear-conflict": {"POST"},
 	} {
 		item := doc.Paths.Find(path)
