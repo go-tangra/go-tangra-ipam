@@ -24,7 +24,8 @@ In the containerized platform stack it comes up with one command; see
   source preserved as the conflict-detection layer),
 - serves the browser API (via the gateway) and `ipam.v1` gRPC on `:9985`, with
   admin health/readiness on `:9820`,
-- runs the scan-executor worker pool,
+- runs the scan-executor worker pool and the host sync (unless
+  `host_sync.enabled: false`),
 - registers routes/permissions/abilities/nav with the gateway and seeds its API
   permissions into auth,
 - mounts the token-gated **KVM console proxy** at `/bmc/`.
@@ -57,8 +58,34 @@ privilege and is confined to the scanner.
 `container.yaml` sections: `db`, `valkey`, `kek` (envelope key), `warden`
 (secret-reference service), `scan` (max_hosts, concurrency, timeout, workers,
 retries), `allocation` (skip_first/skip_last, reserved ranges), `ipmi`
-(timeout), `kvm` (token/session TTLs), `events`, `gateway`, `mesh_enroll`, and
-`limits_ipam`. Framework `server`/`admin`/`discovery` supply the mesh listeners.
+(timeout), `kvm` (token/session TTLs), `events`, `gateway`, `mesh_enroll`,
+`limits_ipam` and `host_sync` (see the repository README). Framework
+`server`/`admin`/`discovery` supply the mesh listeners.
+
+## Host sync and service policy
+
+ipam calls inventory's `inventory.v1.HostReportService` as a client, so the
+rule that allows it lives in **inventory's** policy (policies are inbound), not
+in `deploy/policy.yaml` here:
+
+```yaml
+  - id: ipam-hostsync
+    from: ["spiffe://<trust-domain>/svc/ipam"]
+    to: ["inventory"]
+    operations: ["/inventory.v1.HostReportService/ListReportTenants",
+                 "/inventory.v1.HostReportService/ListHostReports",
+                 "/inventory.v1.HostReportService/GetHostReport",
+                 "/grpc.health.v1.Health/Check"]
+    effect: allow
+```
+
+Inventory additionally lists `ipam` in `host_reports.consumers`. Without the
+rule (or with an inventory older than 4.3.0) the sync status is `degraded`
+(`permission_denied` / `inventory_outdated` / `inventory_unavailable`) and
+nothing is written. Set `host_sync.enabled: false` to keep the feature off at
+rollout. Sync metrics (`hostsync_hosts_total`, `hostsync_changes_total`,
+`hostsync_entries_skipped_total`, `hostsync_apply_seconds`,
+`hostsync_degraded`) are on the admin listener.
 
 ## Secrets
 
