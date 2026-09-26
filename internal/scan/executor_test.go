@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
@@ -212,5 +213,44 @@ func TestRunOnceRetriesWithBackoffThenFails(t *testing.T) {
 	}
 	if got.CompletedAt == nil {
 		t.Fatalf("failed job should carry completed_at")
+	}
+}
+
+// TestSNMPScanGuardsHostReportedDevice (T051, research D9): an SNMP discovery
+// answering with the sysName of a host-reported device only fills its empty
+// fields and bumps last_seen; SNMP-created devices get source=scan.
+func TestSNMPScanGuardsHostReportedDevice(t *testing.T) {
+	ctx := context.Background()
+	m := memstore.New()
+	clk := &clock{t: time.Now().UTC()}
+	m.Now = clk.now
+	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
+	sub, _ := m.GetSubnet(ctx, "t1", "s1")
+	sub.SNMPSecretRef = "snmp-ref"
+	_ = m.UpdateSubnet(ctx, sub)
+	w := warden.NewFake()
+	w.Put("snmp-ref", map[string]string{"community": "public"}, warden.SecretMeta{Name: "snmp"})
+	_ = m.ApplyHostReport(ctx, "t1", func(tx repo.HostTx) error {
+		return tx.InsertDevice(store.Device{ID: "web", Name: "web-01", DeviceType: store.DevServer, ManagementIP: "10.9.0.5",
+			OSVersion: "Ubuntu 24.04", Source: store.SrcHostReport, InventoryHostID: "h1", Status: store.DevStActive})
+	})
+	disc := snmp.NewFake()
+	disc.Set("10.0.0.1", snmp.DiscoveredDevice{SysName: "web-01", DeviceType: store.DevOther, OSVersion: "Linux 6.8", Model: "net-snmp"})
+	disc.Set("10.0.0.2", snmp.DiscoveredDevice{SysName: "switch-9", DeviceType: store.DevSwitch})
+	svc := newService(m, icmp.NewFake("10.0.0.1", "10.0.0.2"), disc, w, &recPub{}, testConfig(), clk)
+	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true, SkipReverseDNS: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.RunOnce(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := m.GetDevice(ctx, "t1", "web")
+	if d.ManagementIP != "10.9.0.5" || d.DeviceType != store.DevServer || d.OSVersion != "Ubuntu 24.04" || d.Model != "net-snmp" ||
+		d.LastSeen == nil || d.Source != store.SrcHostReport {
+		t.Fatalf("host-reported device overwritten by the scan: %+v", d)
+	}
+	l, _ := m.ListDevices(ctx, "t1", store.DeviceFilter{Query: "switch-9"})
+	if len(l) != 1 || l[0].Source != store.SrcScan {
+		t.Fatalf("scan-created device: %+v", l)
 	}
 }
