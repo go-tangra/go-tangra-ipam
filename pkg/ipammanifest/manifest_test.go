@@ -1,6 +1,10 @@
 package ipammanifest
 
-import "testing"
+import (
+	"reflect"
+	"regexp"
+	"testing"
+)
 
 func TestManifestBuilds(t *testing.T) {
 	m, err := Manifest()
@@ -117,13 +121,88 @@ func TestNavEntries(t *testing.T) {
 	}
 }
 
-func TestSeedRequest(t *testing.T) {
-	req := SeedRequest()
-	if len(req.Permissions) != len(Permissions) {
-		t.Fatalf("seed permissions = %d, want %d", len(req.Permissions), len(Permissions))
+// TestRoles pins the module role set (feature 019, research D9).
+func TestRoles(t *testing.T) {
+	want := map[string][]string{
+		"administrator": PermissionRefs(),
+		"operator":      {"ipam:read", "addresses:allocate", "scan:run"},
+		"viewer":        {"ipam:read"},
 	}
-	if len(req.BuiltinGrants) != 5 {
-		t.Fatalf("want 5 builtin grants, got %d", len(req.BuiltinGrants))
+	names := map[string]string{"administrator": "IPAM administrator", "operator": "IPAM operator", "viewer": "IPAM viewer"}
+	if len(Roles) != len(want) {
+		t.Fatalf("want %d roles, got %d", len(want), len(Roles))
+	}
+	own := map[string]bool{}
+	for _, r := range PermissionRefs() {
+		own[r] = true
+	}
+	slug := regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$`)
+	for _, r := range Roles {
+		if !slug.MatchString(r.Slug) {
+			t.Errorf("role slug %q", r.Slug)
+		}
+		if r.DisplayName != names[r.Slug] || r.Description == "" {
+			t.Errorf("role %q: display name %q, description %q", r.Slug, r.DisplayName, r.Description)
+		}
+		if !reflect.DeepEqual(r.Permissions, want[r.Slug]) {
+			t.Errorf("role %q: permissions %v, want %v", r.Slug, r.Permissions, want[r.Slug])
+		}
+		for _, p := range r.Permissions {
+			if !own[p] {
+				t.Errorf("role %q names %q, not an IPAM permission", r.Slug, p)
+			}
+		}
+	}
+	admin := Roles[0].Permissions
+	if !contains(admin, "power:control") || !contains(admin, "kvm:access") {
+		t.Error("administrator must hold power:control and kvm:access")
+	}
+}
+
+// TestBuiltinGrantsUnchanged: the built-in grants are those registered before
+// module roles existed (auth now scopes them to the module).
+func TestBuiltinGrantsUnchanged(t *testing.T) {
+	all := []string{
+		"ipam:read", "subnets:manage", "addresses:manage", "addresses:allocate",
+		"devices:manage", "vlans:manage", "locations:manage", "groups:manage",
+		"scan:run", "dns:manage", "backup:manage", "power:control", "kvm:access",
+	}
+	want := map[string][]string{
+		"owner": all,
+		"admin": all,
+		"operator": {
+			"ipam:read", "subnets:manage", "addresses:manage", "addresses:allocate",
+			"devices:manage", "vlans:manage", "locations:manage", "groups:manage",
+			"scan:run", "dns:manage", "backup:manage",
+		},
+		"member":  {"ipam:read"},
+		"auditor": {"ipam:read"},
+	}
+	if !reflect.DeepEqual(Grants, want) {
+		t.Fatalf("built-in grants changed:\n got %v\nwant %v", Grants, want)
+	}
+}
+
+// TestRegistration: the auth registration carries the module identity, every
+// permission, the complete role set and the built-in grants, and is valid.
+func TestRegistration(t *testing.T) {
+	reg := Registration()
+	if err := reg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	req := reg.Request()
+	if req.GetModule() != "ipam" || req.GetModuleDisplayName() != "IPAM" || !req.GetDeclaresRoles() {
+		t.Fatalf("module %q display %q declares_roles %v", req.GetModule(), req.GetModuleDisplayName(), req.GetDeclaresRoles())
+	}
+	if len(req.GetPermissions()) != len(Permissions) || len(req.GetRoles()) != len(Roles) {
+		t.Fatalf("%d permissions, %d roles", len(req.GetPermissions()), len(req.GetRoles()))
+	}
+	got := map[string][]string{}
+	for _, g := range req.GetBuiltinGrants() {
+		got[g.GetRole()] = g.GetPermissions()
+	}
+	if !reflect.DeepEqual(got, Grants) {
+		t.Fatalf("builtin grants %v", got)
 	}
 }
 

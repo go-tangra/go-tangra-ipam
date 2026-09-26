@@ -7,7 +7,7 @@ toolchain go1.26.8
 require (
 	github.com/bougou/go-ipmi v0.8.1
 	github.com/getkin/kin-openapi v0.149.0
-	github.com/go-tangra/go-tangra-auth/sdk/v4 v4.0.0
+	github.com/go-tangra/go-tangra-auth/sdk/v4 v4.1.0
 	github.com/go-tangra/go-tangra-ipam/sdk/v4 v4.0.0
 	github.com/go-tangra/go-tangra-lcm/sdk/v4 v4.1.0
 	github.com/go-tangra/go-tangra-portal/sdk/v4 v4.0.0
@@ -20,6 +20,7 @@ require (
 	github.com/valkey-io/valkey-go v1.0.78
 	golang.org/x/net v0.59.0
 	google.golang.org/grpc v1.83.2
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -107,7 +108,6 @@ require (
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260831171406-18b4a7587f8a // indirect
-	google.golang.org/protobuf v1.36.12 // indirect
 )
 
 replace github.com/go-tangra/go-tangra-ipam/sdk/v4 => ./sdk

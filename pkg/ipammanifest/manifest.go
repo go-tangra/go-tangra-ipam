@@ -7,16 +7,14 @@
 package ipammanifest
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"google.golang.org/grpc"
 
-	authv1 "github.com/go-tangra/go-tangra-auth/sdk/v4/api/proto/auth/v1"
+	"github.com/go-tangra/go-tangra-auth/sdk/v4/pkg/authclient"
 	"github.com/go-tangra/go-tangra-ipam/v4/api/openapi"
 	"github.com/go-tangra/go-tangra-portal/sdk/v4/pkg/gatewayclient"
 )
@@ -180,26 +178,34 @@ func Manifest() (gatewayclient.Manifest, error) {
 	}, nil
 }
 
-// SeedRequest builds the auth registration request: every module permission plus
-// the built-in role grants.
-func SeedRequest() *authv1.RegisterPermissionsRequest {
-	req := &authv1.RegisterPermissionsRequest{}
-	for _, p := range Permissions {
-		req.Permissions = append(req.Permissions, &authv1.PermissionDef{Resource: p.Resource, Action: p.Action, Description: p.Description})
-	}
-	for _, slug := range []string{"owner", "admin", "member", "auditor", "operator"} {
-		req.BuiltinGrants = append(req.BuiltinGrants, &authv1.BuiltinGrant{Role: slug, Permissions: Grants[slug]})
-	}
-	return req
+// Roles is the module's role set (feature 019): ready-made roles auth offers in
+// every tenant, locked there (administrators assign or clone them). The
+// out-of-band permissions stay platform-admin gated in the handlers even for
+// administrators.
+var Roles = []authclient.ModuleRole{
+	{
+		Slug: "administrator", DisplayName: DisplayName + " administrator",
+		Description: "Full IPAM management, including out-of-band power control and KVM consoles",
+		Permissions: PermissionRefs(),
+	},
+	{
+		Slug: "operator", DisplayName: DisplayName + " operator",
+		Description: "Read IPAM data, allocate addresses and run discovery scans",
+		Permissions: []string{"ipam:read", "addresses:allocate", "scan:run"},
+	},
+	{
+		Slug: "viewer", DisplayName: DisplayName + " viewer",
+		Description: "Read subnets, addresses, devices, groups and scans",
+		Permissions: []string{"ipam:read"},
+	},
 }
 
-// SeedPermissions registers the module's permissions with the auth service and
-// grants them to the built-in roles (idempotent). The gateway registers the
-// permissions from the manifest for routing; only the IPAM module knows the role
-// grants, so it pushes them to auth here.
-func SeedPermissions(ctx context.Context, cc grpc.ClientConnInterface) error {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	_, err := authv1.NewAuthorizationClient(cc).RegisterPermissions(ctx, SeedRequest())
-	return err
+// Registration is what the module registers with auth: every module
+// permission, the module roles and the built-in role grants.
+func Registration() authclient.Registration {
+	reg := authclient.Registration{Module: Module, DisplayName: DisplayName, Roles: Roles, BuiltinGrants: Grants}
+	for _, p := range Permissions {
+		reg.Permissions = append(reg.Permissions, authclient.Permission{Resource: p.Resource, Action: p.Action, Description: p.Description})
+	}
+	return reg
 }
