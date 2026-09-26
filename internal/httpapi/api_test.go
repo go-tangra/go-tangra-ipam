@@ -18,6 +18,8 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/hostsync"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/invclient"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
@@ -69,6 +71,8 @@ type apiFixture struct {
 	mem    *memstore.Mem
 	bmc    *ipmi.Fake
 	warden *warden.Fake
+	inv    *invclient.Fake
+	runner *hostsync.Runner
 }
 
 func newAPI(t *testing.T) *apiFixture { return newAPIWith(t, nil) }
@@ -92,6 +96,8 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 	})
 
 	bmc := ipmi.NewFake()
+	inv := invclient.NewFake()
+	runner := hostsync.New(mem, inv, pub, hostsync.Config{Workers: 1, ConflictMoves: 3, ConflictWindow: 24 * time.Hour}, nil, nil)
 	deps := Deps{
 		Subnets:   subnets.New(mem),
 		Addresses: addresses.New(mem, pub, 0, 0),
@@ -107,18 +113,20 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		KVM:       kvm.NewManager(nil, 0),
 		Warden:    wf,
 		Hub:       hub,
+		HostSync:  hostsync.NewAdmin(mem, inv, runner, true),
 	}
 
 	v := fakeVerifier{ids: map[string]authclient.Identity{
 		"admin": {UserID: apiAdmin, TenantID: apiTenant, Roles: []string{"admin"}},
 		"user":  {UserID: apiUser, TenantID: apiTenant, Roles: []string{"user"}},
+		"other": {UserID: apiUser, TenantID: "44444444-4444-7444-8444-444444444444", Roles: []string{"admin"}},
 	}}
 	s, err := NewHandler(rt, WithVerifier(v))
 	if err != nil {
 		t.Fatal(err)
 	}
 	s.Register(deps)
-	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf}
+	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner}
 }
 
 const p = "/api/ipam/v1"

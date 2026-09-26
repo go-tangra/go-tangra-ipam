@@ -52,7 +52,74 @@ components:
       in: query
       required: false
       schema: { type: boolean }
+    reportState:
+      name: report_state
+      in: query
+      required: false
+      schema: { type: string, enum: [reported, not_reported] }
   schemas:
+    HostSyncSettings:
+      type: object
+      additionalProperties: false
+      required: [enabled, full_interval_minutes, excluded_interfaces]
+      properties:
+        enabled: { type: boolean }
+        full_interval_minutes: { type: integer, minimum: 15, maximum: 1440 }
+        excluded_interfaces:
+          type: array
+          maxItems: 64
+          items: { type: string, pattern: '^[A-Za-z0-9*?._:-]{1,64}$' }
+        updated_by: { type: string, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+    HostSyncStatus:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        state: { type: string, enum: [ok, degraded, disabled] }
+        last_error: { type: string, description: 'code only, e.g. inventory_unavailable' }
+        last_poll_at: { type: string, format: date-time }
+        last_reconcile_at: { type: string, format: date-time }
+        next_reconcile_at: { type: string, format: date-time }
+        hosts_reported: { type: integer }
+        hosts_failed: { type: integer }
+        devices_not_reported: { type: integer }
+        addresses_in_conflict: { type: integer }
+    HostSyncIssue:
+      type: object
+      properties:
+        field: { type: string }
+        reason: { type: string }
+        count: { type: integer }
+    DeviceHostSync:
+      type: object
+      properties:
+        source: { type: string, enum: [manual, scan, host_report] }
+        inventory_host_id: { type: string, format: uuid }
+        report_state: { type: string, enum: ['', reported, not_reported] }
+        snapshot_id: { type: string }
+        collected_at: { type: string, format: date-time }
+        applied_at: { type: string, format: date-time }
+        trigger: { type: string }
+        changes: { type: integer }
+        issues: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/HostSyncIssue' } }
+    ResyncResult:
+      type: object
+      properties:
+        applied: { type: boolean }
+        changes: { type: integer }
+        issues: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/HostSyncIssue' } }
+    HypervisorGuest:
+      type: object
+      properties:
+        guest_ref: { type: string }
+        name: { type: string }
+        kind: { type: string, enum: [vm, container] }
+        platform: { type: string }
+        macs: { type: array, items: { type: string } }
+        guest_device_id: { type: string, format: uuid }
+        guest_device_name: { type: string }
+        last_reported_at: { type: string, format: date-time }
+
     Error:
       type: object
       properties:
@@ -81,7 +148,15 @@ paths:
 
   # ---- IP addresses ----
   /api/ipam/v1/ip-addresses:
-    get: { operationId: listIpAddresses, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    get:
+      operationId: listIpAddresses
+      x-freya-permission: 'ipam:read'
+      parameters:
+        - { $ref: '#/components/parameters/cursor' }
+        - { $ref: '#/components/parameters/limit' }
+        - { $ref: '#/components/parameters/reportState' }
+        - { name: conflict, in: query, required: false, schema: { type: boolean } }
+      responses: { '200': { description: list } }
     post: { operationId: createIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
   /api/ipam/v1/ip-addresses/allocate:
     post: { operationId: allocateIpAddress, x-freya-permission: 'addresses:allocate', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: 'next-free allocated' } } }
@@ -106,12 +181,27 @@ paths:
     get: { operationId: getIpAddress, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: address }, '404': { description: not_found } } }
     put: { operationId: updateIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
     delete: { operationId: deleteIpAddress, x-freya-permission: 'addresses:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '204': { description: deleted } } }
+  /api/ipam/v1/ip-addresses/{id}/clear-conflict:
+    post:
+      operationId: clearIpAddressConflict
+      x-freya-permission: 'addresses:manage'
+      x-freya-max-body-bytes: 1024
+      parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
+      responses: { '200': { description: 'address with the conflict flag cleared' }, '404': { description: not_found } }
   /api/ipam/v1/ip-addresses/{id}/ping:
     post: { operationId: pingIpAddress, x-freya-permission: 'scan:run', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'reachability result' } } }
 
   # ---- Devices ----
   /api/ipam/v1/devices:
-    get: { operationId: listDevices, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    get:
+      operationId: listDevices
+      x-freya-permission: 'ipam:read'
+      parameters:
+        - { $ref: '#/components/parameters/cursor' }
+        - { $ref: '#/components/parameters/limit' }
+        - { $ref: '#/components/parameters/reportState' }
+        - { name: source, in: query, required: false, schema: { type: string, enum: [manual, scan, host_report] } }
+      responses: { '200': { description: list } }
     post: { operationId: createDevice, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
   /api/ipam/v1/devices/{id}:
     get: { operationId: getDevice, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: device }, '404': { description: not_found } } }
@@ -137,8 +227,57 @@ paths:
     get: { operationId: getDeviceSensors, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: sensors } } }
   /api/ipam/v1/devices/{id}/sel:
     get: { operationId: getDeviceSel, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'system event log' } } }
+  /api/ipam/v1/devices/{id}/host-sync:
+    get:
+      operationId: getDeviceHostSync
+      x-freya-permission: 'ipam:read'
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: 'report source, last report and issues', content: { application/json: { schema: { $ref: '#/components/schemas/DeviceHostSync' } } } }
+        '404': { description: not_found }
+    post:
+      operationId: resyncDeviceHostSync
+      x-freya-permission: 'devices:manage'
+      x-freya-max-body-bytes: 1024
+      parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: 'latest report applied', content: { application/json: { schema: { $ref: '#/components/schemas/ResyncResult' } } } }
+        '409': { description: 'not_host_reported | host_sync_disabled' }
+        '503': { description: temporarily_unavailable }
+  /api/ipam/v1/devices/{id}/guests:
+    get:
+      operationId: listDeviceGuests
+      x-freya-permission: 'ipam:read'
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses: { '200': { description: 'guests reported by a hypervisor (matched and unmatched)' } }
   /api/ipam/v1/devices/{id}/kvm-session:
     post: { operationId: startDeviceKvmSession, x-freya-permission: 'kvm:access', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: 'kvm session token + console url' } } }
+
+  # ---- Host sync (feature 020) ----
+  /api/ipam/v1/host-sync/settings:
+    get:
+      operationId: getHostSyncSettings
+      x-freya-permission: 'ipam:read'
+      responses: { '200': { description: settings, content: { application/json: { schema: { $ref: '#/components/schemas/HostSyncSettings' } } } } }
+    put:
+      operationId: updateHostSyncSettings
+      x-freya-permission: 'hostsync:manage'
+      x-freya-max-body-bytes: 16384
+      parameters: [{ $ref: '#/components/parameters/csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/HostSyncSettings' } } } }
+      responses: { '200': { description: settings }, '400': { description: validation } }
+  /api/ipam/v1/host-sync/status:
+    get:
+      operationId: getHostSyncStatus
+      x-freya-permission: 'ipam:read'
+      responses: { '200': { description: status, content: { application/json: { schema: { $ref: '#/components/schemas/HostSyncStatus' } } } } }
+  /api/ipam/v1/host-sync/resync:
+    post:
+      operationId: resyncAllHosts
+      x-freya-permission: 'devices:manage'
+      x-freya-max-body-bytes: 1024
+      parameters: [{ $ref: '#/components/parameters/csrf' }]
+      responses: { '202': { description: 'full reconcile scheduled' }, '409': { description: host_sync_disabled } }
 
   # ---- Warden secret references (metadata only) ----
   /api/ipam/v1/warden-secrets:

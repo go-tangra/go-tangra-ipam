@@ -10,6 +10,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/hostsync"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
@@ -44,6 +45,9 @@ type Deps struct {
 	KVM       *kvm.Manager
 	Warden    warden.Client
 	Hub       *stream.Hub // optional: enables GET /stream (SSE) when set
+	// HostSync is the host-sync administrator surface (feature 020); when nil
+	// its routes answer 503 temporarily_unavailable.
+	HostSync *hostsync.Admin
 }
 
 // subjects derives the authz subject from the verified platform identity. The

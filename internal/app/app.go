@@ -14,6 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/metric"
+	"google.golang.org/grpc"
+
 	"github.com/go-tangra/go-tangra-lcm/sdk/v4/pkg/lcmidentity"
 	"github.com/go-tangra/go-tangra/v4"
 
@@ -29,7 +32,9 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/grpcapi"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/hostsync"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/httpapi"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/invclient"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
@@ -193,6 +198,28 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 		Workers: cfg.Scan.Workers, MaxRetries: cfg.Scan.MaxRetries,
 	}, nil)
 
+	// Host sync (feature 020): IPAM pulls host reports from inventory over the
+	// mesh; the connection is dialled lazily through the Freya pool.
+	hs := cfg.HostSync
+	inv := invclient.NewMesh(func(c context.Context) (grpc.ClientConnInterface, error) {
+		return a.Freya.Client(c, hs.InventoryService)
+	}, time.Duration(hs.RequestTimeoutSeconds)*time.Second, hs.PageSize)
+	var meter metric.Meter
+	if m := a.Freya.Metrics(); m != nil {
+		meter = m.Meter("ipam.hostsync")
+	}
+	hostRunner := hostsync.New(a.Repo, inv, pub, hostsync.Config{
+		PollInterval: time.Duration(hs.PollIntervalSeconds) * time.Second, Workers: hs.Workers,
+		Pace: time.Duration(hs.PaceMs) * time.Millisecond, ConflictMoves: hs.ConflictMoves,
+		ConflictWindow: time.Duration(hs.ConflictWindowHours) * time.Hour,
+	}, a.Log, hostsync.NewMetrics(meter))
+	hostAdmin := hostsync.NewAdmin(a.Repo, inv, hostRunner, hs.Enabled)
+	if hs.Enabled {
+		a.workers = append(a.workers, hostRunner.Run)
+	} else {
+		a.Log.Warn("host sync disabled by configuration (host_sync.enabled=false): host reports are not applied")
+	}
+
 	// Mesh HTTP surface + the /bmc KVM console proxy on the outer mux.
 	hopts := []httpapi.Option{httpapi.WithVerifier(a.Verifier)}
 	if o.Remote != nil {
@@ -205,6 +232,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 		Subnets: subnetsSvc, Addresses: addressesSvc, Devices: devicesSvc, Vlans: vlansSvc,
 		Locations: locationsSvc, Groups: groupsSvc, Stats: statsSvc, Backup: backupSvc,
 		DNS: dnsSvc, Scan: scanSvc, BMC: bmc, KVM: kvmMgr, Warden: wclient, Hub: a.Hub,
+		HostSync: hostAdmin,
 	}
 	a.HTTP.Register(deps)
 	mux := http.NewServeMux()

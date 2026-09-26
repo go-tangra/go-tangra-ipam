@@ -63,7 +63,7 @@ func TestRegisterPermissionsSendsRoles(t *testing.T) {
 		roles[r.GetSlug()] = r
 	}
 	if len(roles) != 3 || roles["administrator"].GetDisplayName() != "IPAM administrator" ||
-		len(roles["administrator"].GetPermissions()) != 13 ||
+		len(roles["administrator"].GetPermissions()) != 14 ||
 		len(roles["operator"].GetPermissions()) != 3 || len(roles["viewer"].GetPermissions()) != 1 {
 		t.Fatalf("roles %v", req.GetRoles())
 	}
@@ -71,7 +71,7 @@ func TestRegisterPermissionsSendsRoles(t *testing.T) {
 	for _, g := range req.GetBuiltinGrants() {
 		grants[g.GetRole()] = len(g.GetPermissions())
 	}
-	want := map[string]int{"owner": 13, "admin": 13, "operator": 11, "member": 1, "auditor": 1}
+	want := map[string]int{"owner": 14, "admin": 14, "operator": 11, "member": 1, "auditor": 1}
 	for role, n := range want {
 		if grants[role] != n {
 			t.Errorf("builtin grant %s: %d permissions, want %d", role, grants[role], n)
