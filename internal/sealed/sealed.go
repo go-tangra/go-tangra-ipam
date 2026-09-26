@@ -259,3 +259,8 @@ func Scrub(text string, stored Settings, secretFields []string) string {
 
 // ADConfig is the associated data of a target-configuration credential blob.
 func ADConfig(id string) []byte { return []byte("config:" + id) }
+
+// ADSNMP is the associated data of a subnet's SNMP credential blob: bound to
+// the tenant and the subnet so a blob copied to another row or tenant fails
+// to open.
+func ADSNMP(tenantID, subnetID string) []byte { return []byte("snmp:" + tenantID + ":" + subnetID) }

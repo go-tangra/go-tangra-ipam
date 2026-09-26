@@ -4,11 +4,12 @@
 # active operations (ipam: the authorizer, sealed envelopes, and the CIDR/IP
 # math that constrains scans and allocation, plus the host-sync report
 # validation and the pure host-sync planner that decide what a host report may
-# write).
+# write, and the SNMP credential rules: validation, sealing binding,
+# inheritance and error scrubbing).
 set -euo pipefail
 PROFILE="${1:-coverage.out}"
 MODULE="github.com/go-tangra/go-tangra-ipam/v4"
-SECURITY_PKGS=("internal/authz" "internal/sealed" "internal/ipnet" "internal/hostreport" "internal/hostplan")
+SECURITY_PKGS=("internal/authz" "internal/sealed" "internal/ipnet" "internal/hostreport" "internal/hostplan" "internal/snmpcred")
 total=$(go tool cover -func="$PROFILE" | awk '/^total:/ {gsub("%","",$3); print $3}')
 echo "coverage: total ${total}%"
 fail=0

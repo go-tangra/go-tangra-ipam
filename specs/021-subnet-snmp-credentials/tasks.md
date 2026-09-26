@@ -27,8 +27,8 @@ explicit user confirmation before they are executed.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `internal/snmpcred` to the 100 % coverage list in `scripts/coverage-gate.sh` (next to authz/sealed/ipnet/hostreport/hostplan)
-- [ ] T002 [P] Add `ADSNMP(tenantID, subnetID string) []byte` returning `snmp:<tenant>:<subnet>` to `internal/sealed/sealed.go` with a test in `internal/sealed/sealed_test.go` (keeps sealed at 100 %)
+- [x] T001 Add `internal/snmpcred` to the 100 % coverage list in `scripts/coverage-gate.sh` (next to authz/sealed/ipnet/hostreport/hostplan)
+- [x] T002 [P] Add `ADSNMP(tenantID, subnetID string) []byte` returning `snmp:<tenant>:<subnet>` to `internal/sealed/sealed.go` with a test in `internal/sealed/sealed_test.go` (keeps sealed at 100 %)
 
 ---
 
