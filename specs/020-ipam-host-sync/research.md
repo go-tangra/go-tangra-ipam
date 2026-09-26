@@ -775,7 +775,7 @@ Tags, PR merges and pins require explicit user confirmation.
   `FuzzDnfOutput`, `FuzzApkPacmanOutput`, `FuzzNetlinkAddr`,
   `FuzzBmcLanParams`, extended `FuzzSubmitMapper`, `FuzzHostReport`
   (projection); IPAM `FuzzNormalizeReport`, `FuzzExclusionPattern`,
-  `FuzzMostSpecific`, `FuzzPlan` (idempotence + admin-field invariants).
+  `FuzzMostSpecific`, `FuzzPlan` (idempotence + admin-field invariants), `FuzzRank` (US5).
 - **V**: transactional audit (D11), metrics on the admin listener (D19).
 - **VI**: new direct dependencies — inventory: `github.com/bougou/go-ipmi`
   (justified in D3); ipam: `github.com/go-tangra/go-tangra-inventory/sdk/v4`
