@@ -8,7 +8,7 @@ import { useLive } from '@/stores/live'
 import { addressFilterSchema, allocateSchema, bulkAllocateSchema, suggestSchema, ADDRESS_STATUSES, ADDRESS_TYPES } from '@/schemas'
 import { useHostSync } from '@/stores/hostsync'
 import { useDevices } from '@/stores/devices'
-import { linkText, linkTitle, macSourceLabel, macSourceText } from './mac'
+import { addressLinkText, addressLinkTitle, macSourceLabel, macSourceText } from './mac'
 import { useAbility } from '@casl/vue'
 import type { IPAddress, PingResult } from '@/api/types'
 import { describe } from '@/api/client'
@@ -117,7 +117,7 @@ const columns: Column<IPAddress>[] = [
   { key: 'address', label: 'Address', sortable: true },
   { key: 'hostname', label: 'Hostname' },
   { key: 'mac_address', label: 'MAC', hideOnStack: true },
-  { key: 'link', label: 'Connected to', hideOnStack: true, format: (a) => linkText(a.link) },
+  { key: 'link', label: 'Connected to', hideOnStack: true, format: addressLinkText },
   { key: 'address_type', label: 'Type', hideOnStack: true },
   { key: 'status', label: 'Status', width: 'sm' },
   { key: 'ping', label: 'Ping', width: 'sm', format: (a) => { const p = pingResult.value[a.id]; return p ? (p.alive ? (p.rtt_ms ?? 0) + ' ms' : 'down') : '' } },
@@ -157,7 +157,7 @@ const columns: Column<IPAddress>[] = [
           </span>
           <span v-else class="text-base-content/70">—</span>
         </template>
-        <template #cell-link="{ row }"><UiTooltip v-if="row.link" :text="linkTitle(row.link)"><span class="text-xs" :data-test="'address-link-' + row.id">{{ linkText(row.link) }}</span></UiTooltip><span v-else class="text-base-content/70">—</span></template>
+        <template #cell-link="{ row }"><UiTooltip v-if="row.link || row.links?.length" :text="addressLinkTitle(row)"><span class="text-xs" :data-test="'address-link-' + row.id">{{ addressLinkText(row) }}</span></UiTooltip><span v-else class="text-base-content/70">—</span></template>
         <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', dhcp: 'accent', deprecated: 'warning', offline: 'neutral' }" /></template>
         <template #cell-ping="{ row }"><UiStatusChip v-if="pingResult[row.id]" :status="pingResult[row.id]!.alive ? 'alive' : 'down'" :label="pingResult[row.id]!.alive ? (pingResult[row.id]!.rtt_ms ?? 0) + ' ms' : 'down'" :colors="{ alive: 'success', down: 'neutral' }" /><span v-else class="text-base-content/70">—</span></template>
         <template #actions="{ row }">

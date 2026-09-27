@@ -179,6 +179,14 @@ export interface IPAddress {
   origin?: '' | 'arp'
   // Switch port the address is connected to (inferred, server-owned).
   link?: AddressLink
+  // Per-switch links, primary first (a host bonded across a switch pair has
+  // one per switch; link is the primary).
+  links?: HostSwitchLink[]
+}
+
+// HostSwitchLink is one per-switch link of a host interface or an address.
+export interface HostSwitchLink extends AddressLink {
+  primary: boolean
 }
 
 export interface AddressLink {
@@ -281,6 +289,8 @@ export interface DeviceInterface {
   behind_device_name?: string
   // Addresses linked to this switch port (feature 022).
   behind_addresses?: BehindAddress[]
+  // Per-switch links of a host interface, primary first.
+  links?: HostSwitchLink[]
 }
 
 export interface DevicePackage {

@@ -1141,6 +1141,21 @@ export interface components {
             /** @enum {string} */
             readonly origin?: "" | "arp";
             link?: components["schemas"]["AddressLink"];
+            /** @description per-switch links, primary first: a host bonded across a switch pair (MLAG / LACP) has one per switch; link is the primary */
+            readonly links?: components["schemas"]["HostSwitchLink"][];
+        };
+        /** @description One per-switch link of a host interface or an address: on that switch the most direct port that learned the MAC (fewest MACs) or whose LLDP neighbour names the host. primary marks the link mirrored into the flat link fields. */
+        HostSwitchLink: {
+            switch_id: string;
+            switch_name?: string;
+            port_id: string;
+            port_name?: string;
+            vlan?: number;
+            /** @enum {string} */
+            source: "snmp_fdb" | "lldp";
+            /** Format: date-time */
+            last_seen?: string;
+            primary: boolean;
         };
         /** @description switch port the address is connected to (inferred from switch forwarding tables / LLDP) */
         AddressLink: {
@@ -1174,8 +1189,10 @@ export interface components {
             link_last_seen?: string;
             behind_device_id?: string;
             behind_device_name?: string;
-            /** @description addresses linked to this switch port (feature 022) */
+            /** @description addresses linked to this switch port as primary or per-switch link (feature 022) */
             behind_addresses?: components["schemas"]["BehindAddress"][];
+            /** @description per-switch links of a host interface, primary first (the flat remote_* / link_* fields are the primary) */
+            readonly links?: components["schemas"]["HostSwitchLink"][];
         };
         /** @description Per-tenant ARP collection (feature 022): scans with SNMP discovery read the ARP/neighbour tables of the devices that answer unless disabled; excluded devices are never used as ARP sources; a MAC answering for more than proxy_threshold IPs in one scan is treated as proxy ARP. */
         ARPSettingsInput: {

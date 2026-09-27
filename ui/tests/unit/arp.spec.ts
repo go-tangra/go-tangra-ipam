@@ -10,7 +10,7 @@ import Detail from '@/views/devices/detail.vue'
 import ArpSettingsCard from '@/components/ArpSettingsCard.vue'
 import { addressFilterSchema, arpSettingsSchema } from '@/schemas'
 import { arpPhaseText } from '@/views/scans/snmp'
-import { linkText, macSourceLabel, macSourceText } from '@/views/addresses/mac'
+import { addressLinkText, addressLinkTitle, linkText, linksText, macSourceLabel, macSourceText } from '@/views/addresses/mac'
 import type { IPAddress, IPScanJob } from '@/api/types'
 
 // Feature 022: MAC provenance on addresses and the ARP phase of scans.
@@ -122,6 +122,45 @@ describe('switch-port links (US2)', () => {
     await tab.trigger('click')
     await flushPromises()
     expect(w.text()).toContain('MSW-RACK2 port 14 (VLAN 30)')
+    w.unmount()
+  })
+})
+
+describe('per-switch links (bond across a switch pair)', () => {
+  const l1 = { switch_id: 'cs1', switch_name: 'cs1', port_id: 'p1', port_name: 'Port 17', vlan: 30, source: 'snmp_fdb' as const, last_seen: '2026-09-27T10:00:00Z', primary: true }
+  const l2 = { ...l1, switch_id: 'cs2', switch_name: 'cs2', port_id: 'p2', primary: false }
+
+  it('lists every switch port, primary first, a shared VLAN once', () => {
+    expect(linksText([l2, l1])).toBe('cs1 Port 17 + cs2 Port 17 (VLAN 30)')
+    expect(linksText([l1, { ...l2, vlan: 40 }])).toBe('cs1 Port 17 (VLAN 30) + cs2 Port 17 (VLAN 40)')
+    expect(linksText([{ ...l1, vlan: 0 }, { ...l2, vlan: 0 }])).toBe('cs1 Port 17 + cs2 Port 17')
+    expect(linksText([l1])).toBe('cs1 Port 17 (VLAN 30)')
+    expect(linksText(undefined)).toBe('')
+    expect(addressLinkText({ ...arpAddr, link: l1 })).toBe('cs1 Port 17 (VLAN 30)')
+    expect(addressLinkText({ ...arpAddr, link: l1, links: [l1, l2] })).toBe('cs1 Port 17 + cs2 Port 17 (VLAN 30)')
+    expect(addressLinkTitle({ ...arpAddr, link: l1, links: [l2, l1] })).toMatch(/^cs1 Port 17 \(primary\): switch MAC table.*\ncs2 Port 17: switch MAC table/)
+    expect(addressLinkTitle({ ...arpAddr, link: { switch_id: 'cs1', port_id: 'p1', source: 'lldp' } })).toBe('LLDP')
+    expect(addressLinkTitle(arpAddr)).toBe('')
+    expect(linkText({ ...l1, switch_name: '', port_name: 'ge-0/0/1' })).toBe('cs1 port ge-0/0/1 (VLAN 30)')
+  })
+
+  it('the address list shows both switches', async () => {
+    fetchMock((url) => (url.includes('/ip-addresses') ? { items: [{ ...arpAddr, link: l1, links: [l1, l2] }] } : { items: [] }))
+    const w = mount(Addresses, { global, attachTo: document.body })
+    await flushPromises()
+    expect(w.find('[data-test=address-link-a1]').text()).toBe('cs1 Port 17 + cs2 Port 17 (VLAN 30)')
+    w.unmount()
+  })
+
+  it('a bonded host interface shows every switch port', async () => {
+    fetchMock((url) => {
+      if (url.includes('/interfaces')) return { items: [{ id: 'i1', device_id: 'ns1', name: 'bond0', remote_device_name: 'cs1', remote_interface_id: 'p1', remote_port_name: 'Port 17', link_vlan: 30, link_source: 'snmp_fdb', links: [l2, l1] }] }
+      if (url.includes('/addresses') || url.includes('/packages')) return { items: [] }
+      return { id: 'ns1', name: 'ns1', device_type: 'server', status: 'active' }
+    })
+    const w = mount(Detail, { global, attachTo: document.body })
+    await flushPromises()
+    expect(w.text()).toContain('cs1 Port 17 + cs2 Port 17 (VLAN 30) · MAC table')
     w.unmount()
   })
 })
