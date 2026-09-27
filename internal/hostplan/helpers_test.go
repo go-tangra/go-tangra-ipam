@@ -109,6 +109,9 @@ func apply(t *testing.T, st State, p Plan) State {
 			st.Packages = slices.Clone(o.Packages)
 		case OpReplaceGuests:
 			st.Guests = slices.Clone(o.Guests)
+		case OpReplaceHardware:
+			h := *o.Hardware
+			st.Hardware = &h
 		case OpSetHypervisor:
 			for i := range st.MACOwners {
 				if st.MACOwners[i].DeviceID == o.DeviceID {

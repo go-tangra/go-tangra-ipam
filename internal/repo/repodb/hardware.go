@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
@@ -81,10 +82,13 @@ func (t *hostTx) ReplaceHardware(h store.DeviceHardware) error {
 		return err
 	}
 	s := h.Summary
-	_, err = t.tx.Exec(t.ctx, `INSERT INTO ipam_device_hardware
+	// The device must be one of this tenant's (ipam_devices is RLS-scoped;
+	// a foreign key check alone would not see the tenant).
+	ct, err := t.tx.Exec(t.ctx, `INSERT INTO ipam_device_hardware
 		(device_id, tenant_id, profile, digest, cpu_model, cpu_sockets, cpu_cores, cpu_threads, memory_total_bytes,
 		 memory_type, memory_slots_total, memory_slots_used, disk_count, disk_total_bytes, reported_at, updated_at)
-		VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+		SELECT d.id, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+		FROM ipam_devices d WHERE d.id = $1 AND d.tenant_id = $2
 		ON CONFLICT (device_id) DO UPDATE SET profile=EXCLUDED.profile, digest=EXCLUDED.digest,
 		  cpu_model=EXCLUDED.cpu_model, cpu_sockets=EXCLUDED.cpu_sockets, cpu_cores=EXCLUDED.cpu_cores,
 		  cpu_threads=EXCLUDED.cpu_threads, memory_total_bytes=EXCLUDED.memory_total_bytes,
@@ -93,5 +97,11 @@ func (t *hostTx) ReplaceHardware(h store.DeviceHardware) error {
 		  disk_total_bytes=EXCLUDED.disk_total_bytes, reported_at=EXCLUDED.reported_at, updated_at=EXCLUDED.updated_at`,
 		h.DeviceID, t.tid, string(profile), h.Digest, s.CPUModel, s.CPUSockets, s.CPUCores, s.CPUThreads, s.MemoryTotalBytes,
 		s.MemoryType, s.MemorySlotsTotal, s.MemorySlotsUsed, s.DiskCount, s.DiskTotalBytes, h.ReportedAt, time.Now().UTC())
-	return mapErr(err)
+	if err != nil {
+		return mapErr(err)
+	}
+	if ct.RowsAffected() == 0 {
+		return repo.ErrNotFound
+	}
+	return nil
 }

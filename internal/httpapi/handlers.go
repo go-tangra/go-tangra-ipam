@@ -388,6 +388,7 @@ func (s *Server) Register(d Deps) {
 			RackID:       q.Get("rack_id"),
 			Source:       q.Get("source"),
 			ReportState:  q.Get("report_state"),
+			HasHardware:  q.Get("has_hardware"),
 			Query:        q.Get("query"),
 			Limit:        atoiDefault(q.Get("limit"), 0),
 			CursorID:     q.Get("cursor"),
@@ -460,6 +461,7 @@ func (s *Server) Register(d Deps) {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
+	s.registerHardware(p, d)
 	s.MustHandle("GET", p+"/devices/{id}/addresses", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
 		if err != nil {

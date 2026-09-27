@@ -59,6 +59,73 @@ components:
       required: false
       schema: { type: string, enum: [reported, not_reported] }
   schemas:
+    HardwareSummary:
+      type: object
+      readOnly: true
+      description: 'Summary of a device''s reported hardware (feature 023): CPU, memory and physical, non-removable disks.'
+      properties:
+        cpu_model:          { type: string }
+        cpu_sockets:        { type: integer }
+        cpu_cores:          { type: integer }
+        cpu_threads:        { type: integer }
+        memory_total_bytes: { type: integer, format: int64 }
+        memory_type:        { type: string }
+        memory_slots_total: { type: integer }
+        memory_slots_used:  { type: integer }
+        disk_count:         { type: integer }
+        disk_total_bytes:   { type: integer, format: int64 }
+        reported_at:        { type: string, format: date-time }
+    DeviceHardware:
+      type: object
+      readOnly: true
+      description: 'Normalised hardware profile reported by the inventory agent (replaced by every report; fields without a value are omitted).'
+      properties:
+        device_id:   { type: string, format: uuid }
+        reported_at: { type: string, format: date-time }
+        schema:      { type: integer }
+        summary:     { $ref: '#/components/schemas/HardwareSummary' }
+        bios:        { type: object, properties: { vendor: { type: string }, version: { type: string }, release_date: { type: string } } }
+        system:      { type: object, properties: { manufacturer: { type: string }, product: { type: string }, version: { type: string }, serial: { type: string }, uuid: { type: string }, sku: { type: string }, family: { type: string } } }
+        board:       { type: object, properties: { manufacturer: { type: string }, product: { type: string }, serial: { type: string } } }
+        chassis:     { type: object, properties: { type: { type: string }, manufacturer: { type: string }, serial: { type: string }, asset_tag: { type: string } } }
+        processors:
+          type: array
+          maxItems: 256
+          items: { type: object, properties: { socket: { type: string }, manufacturer: { type: string }, model: { type: string }, family: { type: string }, max_mhz: { type: integer }, current_mhz: { type: integer }, cores: { type: integer }, threads: { type: integer }, populated: { type: boolean } } }
+        memory:
+          type: object
+          properties:
+            total_bytes:        { type: integer, format: int64 }
+            error_correction:   { type: string }
+            location:           { type: string }
+            use:                { type: string }
+            max_capacity_bytes: { type: integer, format: int64 }
+            slots_total:        { type: integer }
+            slots_used:         { type: integer }
+            slots:
+              type: array
+              maxItems: 1024
+              items: { type: object, properties: { locator: { type: string }, bank: { type: string }, populated: { type: boolean }, size_bytes: { type: integer, format: int64 }, type: { type: string }, form_factor: { type: string }, type_detail: { type: array, maxItems: 16, items: { type: string } }, speed_mts: { type: integer }, configured_mts: { type: integer }, manufacturer: { type: string }, part_number: { type: string }, serial: { type: string } } }
+        disks:
+          type: array
+          maxItems: 256
+          items:
+            type: object
+            properties:
+              name:      { type: string }
+              model:     { type: string }
+              vendor:    { type: string }
+              serial:    { type: string }
+              size_bytes: { type: integer, format: int64 }
+              media:     { type: string, enum: [ssd, hdd, nvme_ssd, unknown] }
+              interface: { type: string, enum: [nvme, sata, sas, scsi, usb, virtio, hyperv, xen, mmc, other] }
+              removable: { type: boolean }
+        filesystems:
+          type: array
+          maxItems: 1024
+          items: { type: object, properties: { mount: { type: string }, fs: { type: string }, size_bytes: { type: integer, format: int64 }, free_bytes: { type: integer, format: int64 }, disks: { type: array, maxItems: 64, items: { type: string } } } }
+        availability: { type: object, properties: { smbios: { type: string, enum: [ok, partial, unavailable, unsupported, unknown] }, disks: { type: string, enum: [ok, partial, unavailable, unsupported, unknown] } } }
+        truncated:    { type: object, additionalProperties: { type: integer } }
     HostSyncSettings:
       type: object
       additionalProperties: false
@@ -467,10 +534,11 @@ paths:
         - { $ref: '#/components/parameters/limit' }
         - { $ref: '#/components/parameters/reportState' }
         - { name: source, in: query, required: false, schema: { type: string, enum: [manual, scan, host_report] } }
-      responses: { '200': { description: list } }
+        - { name: has_hardware, in: query, required: false, description: 'only devices with (true) or without (false) reported hardware (feature 023)', schema: { type: string, enum: ['true', 'false'] } }
+      responses: { '200': { description: 'list; items carry a read-only hardware_summary (HardwareSummary) when hardware is reported' } }
     post: { operationId: createDevice, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
   /api/ipam/v1/devices/{id}:
-    get: { operationId: getDevice, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: device }, '404': { description: not_found } } }
+    get: { operationId: getDevice, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'device; carries a read-only hardware_summary (HardwareSummary) when hardware is reported' }, '404': { description: not_found } } }
     put: { operationId: updateDevice, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
     delete: { operationId: deleteDevice, x-freya-permission: 'devices:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/force' }], responses: { '204': { description: deleted } } }
   /api/ipam/v1/devices/{id}/addresses:
@@ -510,6 +578,15 @@ paths:
         '200': { description: 'latest report applied', content: { application/json: { schema: { $ref: '#/components/schemas/ResyncResult' } } } }
         '409': { description: 'not_host_reported | host_sync_disabled' }
         '503': { description: temporarily_unavailable }
+  /api/ipam/v1/devices/{id}/hardware:
+    get:
+      operationId: getDeviceHardware
+      x-freya-permission: 'ipam:read'
+      description: 'Hardware reported by the host''s inventory agent (feature 023). Read-only: there is no write route; device create/update refuse hardware fields.'
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: 'reported hardware', content: { application/json: { schema: { $ref: '#/components/schemas/DeviceHardware' } } } }
+        '404': { description: 'not_found (no such device, another tenant''s device, or no reported hardware)' }
   /api/ipam/v1/devices/{id}/guests:
     get:
       operationId: listDeviceGuests

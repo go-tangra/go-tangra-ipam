@@ -336,3 +336,50 @@ func TestARPSettingsContract(t *testing.T) {
 		t.Error("ARPSettings response schema missing")
 	}
 }
+
+// TestDeviceHardwareContract (023 T056): the read-only hardware route, its
+// permission, the schemas and the has_hardware filter. There is no write
+// route for hardware (FR-008).
+func TestDeviceHardwareContract(t *testing.T) {
+	doc := loadDoc(t)
+	item := doc.Paths.Find("/api/ipam/v1/devices/{id}/hardware")
+	if item == nil || item.Get == nil || item.Put != nil || item.Post != nil || item.Delete != nil || item.Patch != nil {
+		t.Fatal("hardware route must exist and be read-only")
+	}
+	if perm, _ := item.Get.Extensions["x-freya-permission"].(string); perm != "ipam:read" {
+		t.Errorf("permission %q", perm)
+	}
+	if ref := item.Get.Responses.Value("200").Value.Content["application/json"].Schema.Ref; ref != "#/components/schemas/DeviceHardware" {
+		t.Errorf("200 schema %q", ref)
+	}
+	if item.Get.Responses.Value("404") == nil {
+		t.Error("404 missing")
+	}
+	hw := doc.Components.Schemas["DeviceHardware"].Value
+	for _, f := range []string{"device_id", "reported_at", "summary", "bios", "system", "board", "chassis", "processors", "memory", "disks", "filesystems", "availability", "truncated"} {
+		if hw.Properties[f] == nil {
+			t.Errorf("DeviceHardware.%s missing", f)
+		}
+	}
+	if !hw.ReadOnly {
+		t.Error("DeviceHardware must be read-only")
+	}
+	sum := doc.Components.Schemas["HardwareSummary"].Value
+	for _, f := range []string{"cpu_model", "cpu_sockets", "cpu_cores", "cpu_threads", "memory_total_bytes", "memory_type",
+		"memory_slots_total", "memory_slots_used", "disk_count", "disk_total_bytes", "reported_at"} {
+		if sum.Properties[f] == nil {
+			t.Errorf("HardwareSummary.%s missing", f)
+		}
+	}
+	media := hw.Properties["disks"].Value.Items.Value.Properties["media"].Value.Enum
+	if len(media) != 4 {
+		t.Errorf("media enum %v", media)
+	}
+	found := false
+	for _, prm := range doc.Paths.Find("/api/ipam/v1/devices").Get.Parameters {
+		found = found || (prm.Value != nil && prm.Value.Name == "has_hardware")
+	}
+	if !found {
+		t.Error("listDevices has_hardware filter missing")
+	}
+}
