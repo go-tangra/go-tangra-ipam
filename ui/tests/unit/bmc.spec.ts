@@ -180,3 +180,74 @@ describe('WardenSecretPicker', () => {
     w.unmount()
   })
 })
+
+describe('Power / KVM tab (024 US3)', () => {
+  const POWER = [{ action: 'control', subject: 'Power' }, { action: 'access', subject: 'Kvm' }]
+  const mountTab = async (rules: { action: string; subject: string }[]) => {
+    const { default: IpmiKvm } = await import('@/views/devices/ipmi-kvm.vue')
+    const w = mount(IpmiKvm, { props: { deviceId: 'd1' }, global: withAbility(rules) })
+    await flushPromises()
+    return w
+  }
+
+  it.each([
+    [{ ...none }, 'No BMC credentials configured'],
+    [{ ...ready, address: undefined, address_source: undefined, ready: false, reason: 'bmc_no_address' }, 'No BMC address'],
+    [{ ...ready, access: 'forbidden', secret: undefined, ready: false, reason: 'bmc_secret_forbidden' }, 'no access'],
+    [{ ...ready, access: 'not_found', secret: undefined, ready: false, reason: 'bmc_secret_not_found' }, 'no longer exists'],
+    [{ ...ready, access: 'unavailable', secret: undefined, ready: false, reason: 'warden_unavailable' }, 'Warden is unavailable'],
+  ] as [BmcStatus, string][])('explains a status that is not ready and calls no BMC route (%#)', async (st, text) => {
+    const calls = fetchMock(() => ({ body: st }))
+    const w = await mountTab(POWER)
+    expect(w.find('[data-test=oob-blocked]').text()).toContain(text)
+    expect(calls.some((c) => /\/(power|sensors|sel)$/.test(c.url))).toBe(false)
+    expect(w.find('[data-test=power-on]').exists()).toBe(false)
+    expect(w.find('[data-test=kvm-start]').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('offers attaching credentials only to device managers', async () => {
+    fetchMock(() => ({ body: none }))
+    let w = await mountTab(POWER)
+    expect(w.find('[data-test=oob-attach-hint]').exists()).toBe(false)
+    w.unmount()
+    fetchMock(() => ({ body: none }))
+    w = await mountTab([...POWER, { action: 'configure', subject: 'DeviceBmc' }])
+    expect(w.find('[data-test=oob-attach-hint]').text()).toContain('BMC credentials card')
+    w.unmount()
+  })
+
+  it('loads power and sensors when ready and shows the BMC answer reasons', async () => {
+    const calls = fetchMock((url) => {
+      if (url.endsWith('/bmc')) return { body: ready }
+      if (url.endsWith('/power')) return { body: { on: true } }
+      return { status: 504, body: { reason: 'bmc_unreachable', detail: { address: '10.1.112.14' } } }
+    })
+    const w = await mountTab(POWER)
+    expect(calls.some((c) => c.url.endsWith('/power'))).toBe(true)
+    expect(w.find('[data-test=oob-error]').text()).toContain('BMC 10.1.112.14 did not answer')
+    expect(w.find('[data-test=power-cycle]').exists()).toBe(true)
+    expect(w.find('[data-test=kvm-start]').exists()).toBe(true)
+    w.unmount()
+  })
+
+  it.each([
+    ['bmc_auth_failed', 502, 'rejected the credentials'],
+    ['bmc_error', 502, 'reported an error'],
+    ['bmc_secret_forbidden', 403, 'no access'],
+  ])('explains %s from a power call', async (reason, status, text) => {
+    fetchMock((url) => (url.endsWith('/bmc') ? { body: ready } : { status, body: { reason, detail: { address: '10.1.112.14' } } }))
+    const w = await mountTab(POWER)
+    expect(w.find('[data-test=oob-error]').text()).toContain(text)
+    w.unmount()
+  })
+
+  it('hides power actions and KVM without the platform abilities', async () => {
+    const calls = fetchMock(() => ({ body: ready }))
+    const w = await mountTab([{ action: 'access', subject: 'Kvm' }])
+    expect(w.find('[data-test=power-on]').exists()).toBe(false)
+    expect(w.find('[data-test=kvm-start]').exists()).toBe(true)
+    expect(calls.some((c) => c.url.endsWith('/power'))).toBe(false)
+    w.unmount()
+  })
+})

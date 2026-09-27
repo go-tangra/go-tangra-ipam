@@ -125,12 +125,12 @@ research D12. `FuzzReferenceInput` joined `make fuzz`.)
 ### Tests first
 
 - [x] T035 [P] [US3] Table test in `internal/httpapi/power_test.go`: for each reason (not configured, no address, forbidden, not found, Warden unavailable, BMC unreachable, BMC auth failed, BMC error) × {GET power, POST power, GET sensors, GET SEL, POST kvm-session} the documented status + reason; `detail.address` only for BMC reasons; body never contains the password
-- [ ] T036 [P] [US3] UI unit tests `ui/src/views/devices/__tests__/ipmi-kvm.spec.ts`: status not ready → explained state with corrective action and no power/sensor calls; each reason text; attach link only with `configure DeviceBmc`; power buttons only with `control Power`, KVM only with `access Kvm`; per-call failure shows the reason text (not a generic error)
+- [x] T036 [P] [US3] UI unit tests in `ui/tests/unit/bmc.spec.ts` (Power / KVM tab) and `views.spec.ts`: status not ready → explained state with corrective action and no power/sensor calls; each reason text; attach link only with `configure DeviceBmc`; power buttons only with `control Power`, KVM only with `access Kvm`; per-call failure shows the reason text (not a generic error)
 
 ### Implementation
 
-- [ ] T037 [US3] `ui/src/views/devices/ipmi-kvm.vue` + `ui/src/api/bmc.ts` reason texts: load `/bmc` status first, explained states, per-call reason mapping
-- [ ] T038 [US3] OpenAPI response docs for the power/sensors/SEL/KVM routes (409/403/503/504/502 reasons)
+- [x] T037 [US3] `ui/src/views/devices/ipmi-kvm.vue` + `ui/src/api/bmc.ts` reason texts: load `/bmc` status first, explained states, per-call reason mapping
+- [x] T038 [US3] OpenAPI response docs for the power/sensors/SEL/KVM routes (409/403/503/504/502 reasons) — landed with T024
 
 **Checkpoint**: no bare 422 remains.
 

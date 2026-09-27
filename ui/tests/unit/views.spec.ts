@@ -98,7 +98,8 @@ describe('ipam views on the kit', () => {
 
   it('device detail: power/KVM tab only with the platform-admin abilities', async () => {
     await router.push('/ipam/devices/d1')
-    fetchMock((url) => (url.endsWith('/devices/d1') ? { id: 'd1', name: 'core-sw', device_type: 'switch', status: 'active', ipmi_secret_ref: 'ref' } : url.endsWith('/power') ? { on: true } : url.endsWith('/sensors') ? { items: [{ name: 'Temp', reading: '40 C', value: 40, unit: 'C', status: 'ok' }] } : { items: [] }))
+    const ready = { configured: true, reference: 'ref', access: 'ok', secret: { name: 'sw BMC' }, address: '10.0.0.9', address_source: 'management_ip', ready: true }
+    fetchMock((url) => (url.endsWith('/devices/d1') ? { id: 'd1', name: 'core-sw', device_type: 'switch', status: 'active', ipmi_secret_ref: 'ref' } : url.endsWith('/bmc') ? ready : url.endsWith('/power') ? { on: true } : url.endsWith('/sensors') ? { items: [{ name: 'Temp', reading: '40 C', value: 40, unit: 'C', status: 'ok' }] } : { items: [] }))
     const plain = mount(Detail, { global: withAbility([{ action: 'read', subject: 'Device' }]) })
     await flushPromises()
     expect(plain.findAll('[role=tab]').map((t) => t.text())).not.toContain('Power / KVM')
@@ -111,6 +112,8 @@ describe('ipam views on the kit', () => {
     expect(admin.find('[data-test=power-off]').exists()).toBe(true)
     expect(admin.find('[data-test=kvm-start]').exists()).toBe(true)
     expect(admin.text()).toContain('Temp')
+    // 024: the summary names the Warden secret once the BMC card read it.
+    expect(admin.text()).toContain('sw BMC (Warden)')
     admin.unmount()
   })
 
