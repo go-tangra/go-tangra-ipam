@@ -190,7 +190,7 @@ explicit user confirmation before they are executed.
 - [x] T056 [P] README "SNMP credentials" section (storage, inheritance, test endpoint, permissions, audit) in `README.md`
 - [x] T057 Run `go vet ./...`, `go test -race ./...`, `make cover` (snmpcred/sealed 100 %, total ≥ 80 %), `make vuln`, `(cd ui && npm run lint && npm run test:unit && npm run build)`
 - [x] T058 Update quickstart results and tick tasks in `specs/021-subnet-snmp-credentials/tasks.md`
-- [ ] T059 Release (user-confirmed): PR → merge → tag `v4.4.0`; bump `IPAM_IMAGE` in go-tangra-docker `.env.example`; deploy to production on explicit request
+- [x] T059 Release (user-confirmed): PR → merge → tag `v4.4.0`; bump `IPAM_IMAGE` in go-tangra-docker `.env.example`; deploy to production on explicit request
 
 ---
 
