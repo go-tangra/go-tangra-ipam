@@ -36,6 +36,9 @@ describe('ipam schemas', () => {
     expect(vlanSchema.parse({ vlan_id: '100', name: 'Users' })).toMatchObject({ vlan_id: 100 })
     for (const bad of [0, 4095, 'abc', 1.5]) expect(vlanSchema.safeParse({ vlan_id: bad, name: 'x' }).success, String(bad)).toBe(false)
     expect(deviceSchema.safeParse({ name: 'sw1', device_type: 'toaster' }).success).toBe(false)
+    expect(deviceSchema.parse({ name: 'sw1', device_type: 'switch', description: '  core  ' }).description).toBe('core')
+    expect(deviceSchema.parse({ name: 'sw1', device_type: 'switch', description: '' }).description).toBeUndefined()
+    expect(deviceSchema.safeParse({ name: 'sw1', device_type: 'switch', description: 'x'.repeat(2001) }).success).toBe(false)
     expect(locationSchema.safeParse({ name: 'DC1', location_type: 'moon' }).success).toBe(false)
   })
   it('scan + membership check: subnet required, IPv4 only for the lookup', () => {

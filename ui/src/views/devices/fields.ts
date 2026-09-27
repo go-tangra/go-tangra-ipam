@@ -20,6 +20,7 @@ export function useDeviceFields() {
       rack_id: { label: 'Rack', type: 'select', cols: 6, options: locations.items.filter((l) => l.location_type === 'rack').map((l) => ({ title: `${l.name} (${l.rack_size_u ?? 0}U)`, value: l.id })) },
       rack_position: { label: 'Bottom U', cols: 3 },
       device_height_u: { label: 'Height (U)', cols: 3 },
+      description: { type: 'textarea', cols: 12, hint: 'Administrator notes; the host sync never changes them.' },
     }),
   )
 }

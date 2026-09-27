@@ -16,6 +16,8 @@ export const deviceSchema = z.object({
   rack_id: optionalString(64),
   rack_position: positiveInt.pipe(z.number().max(100)),
   device_height_u: positiveInt.pipe(z.number().max(50)),
+  // Administrator notes; the host sync never overwrites them.
+  description: optionalString(2000),
 })
 export type DeviceInput = z.output<typeof deviceSchema>
 

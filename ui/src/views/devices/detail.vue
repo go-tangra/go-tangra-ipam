@@ -122,6 +122,7 @@ const summary = computed<KeyValue[]>(() => {
       ]
     : []
   return [
+    ...(d.description ? [{ label: 'Description', value: d.description }] : []),
     { label: 'Source', value: sourceLabel[d.source ?? 'manual'] ?? d.source ?? '' },
     ...reported,
     ...(d.virtualization_kind ? [{ label: 'Virtualization', value: d.virtualization_kind }] : []),
