@@ -522,25 +522,20 @@ func (m *Mem) UpsertAddressByAddress(_ context.Context, a store.IPAddress) (bool
 	}
 	t := now(m)
 	if ex, id, ok := m.findAddrLocked(a.TenantID, a.Address); ok {
-		a.ID = id
-		a.CreatedAt = ex.CreatedAt
-		keepAddrServerFields(&a, ex)
-		if ex.ReportState == store.RepReported {
-			// D9: a scan never unlinks a host-reported address.
-			a.DeviceID, a.InterfaceName, a.MACAddress, a.Hostname, a.IsPrimary = ex.DeviceID, ex.InterfaceName, ex.MACAddress, ex.Hostname, ex.IsPrimary
+		// A scan only records what it observed (liveness, a found reverse-DNS
+		// name, a MAC); every administrator field of the existing row is kept.
+		obs := a
+		a = ex
+		if obs.Hostname != "" && ex.ReportState != store.RepReported {
+			a.Hostname, a.HasReverseDNS = obs.Hostname, obs.HasReverseDNS
 		}
-		// 022: a sweep carries no MAC; it never drops a known one or its
-		// provenance.
-		if a.MACAddress == "" {
-			a.MACAddress = ex.MACAddress
+		if obs.MACAddress != "" && ex.ReportState != store.RepReported {
+			a.MACAddress = obs.MACAddress
 		}
-		a.MACSource, a.MACSourceDeviceID, a.MACSeenAt, a.MACConflict = ex.MACSource, ex.MACSourceDeviceID, ex.MACSeenAt, ex.MACConflict
-		if a.Status == "" {
-			a.Status = ex.Status
+		if ex.Status == store.IPOffline && obs.Status != "" {
+			a.Status = obs.Status
 		}
-		if a.AddressType == "" {
-			a.AddressType = ex.AddressType
-		}
+		a.LastSeen = obs.LastSeen
 		a.UpdatedAt = t
 		m.addrs[id] = a
 		return false, nil

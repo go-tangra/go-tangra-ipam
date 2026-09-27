@@ -550,17 +550,15 @@ func (d *DB) UpsertAddressByAddress(ctx context.Context, a store.IPAddress) (cre
 			 has_reverse_dns, note, tags, created_by, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$22)
 			ON CONFLICT (tenant_id, address) DO UPDATE SET
-				subnet_id=EXCLUDED.subnet_id,
-				hostname=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.hostname ELSE EXCLUDED.hostname END,
+				-- A scan only records what it observed: liveness, and the reverse-DNS
+				-- name when it found one. Administrator fields (description, owner,
+				-- note, tags, device binding, status, type, subnet, DNS/PTR, lease)
+				-- are never touched; an offline address that answers becomes active.
+				hostname=CASE WHEN ipam_ip_addresses.report_state='reported' OR EXCLUDED.hostname='' THEN ipam_ip_addresses.hostname ELSE EXCLUDED.hostname END,
+				has_reverse_dns=CASE WHEN EXCLUDED.hostname='' THEN ipam_ip_addresses.has_reverse_dns ELSE EXCLUDED.has_reverse_dns END,
 				mac_address=CASE WHEN ipam_ip_addresses.report_state='reported' OR EXCLUDED.mac_address='' THEN ipam_ip_addresses.mac_address ELSE EXCLUDED.mac_address END,
-				description=EXCLUDED.description,
-				device_id=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.device_id ELSE EXCLUDED.device_id END,
-				interface_name=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.interface_name ELSE EXCLUDED.interface_name END,
-				status=EXCLUDED.status, address_type=EXCLUDED.address_type,
-				is_primary=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.is_primary ELSE EXCLUDED.is_primary END,
-				ptr_record=EXCLUDED.ptr_record, dns_name=EXCLUDED.dns_name, owner=EXCLUDED.owner,
-				last_seen=EXCLUDED.last_seen, lease_expiry=EXCLUDED.lease_expiry, has_reverse_dns=EXCLUDED.has_reverse_dns,
-				note=EXCLUDED.note, tags=EXCLUDED.tags, updated_at=EXCLUDED.updated_at
+				status=CASE WHEN ipam_ip_addresses.status='offline' THEN EXCLUDED.status ELSE ipam_ip_addresses.status END,
+				last_seen=EXCLUDED.last_seen, updated_at=EXCLUDED.updated_at
 			RETURNING (xmax = 0)`,
 			a.ID, a.TenantID, a.Address, a.SubnetID, a.Hostname, a.MACAddress, a.Description, np(a.DeviceID),
 			a.InterfaceName, a.Status, a.AddressType, a.IsPrimary, a.PTRRecord, a.DNSName, a.Owner, a.LastSeen,

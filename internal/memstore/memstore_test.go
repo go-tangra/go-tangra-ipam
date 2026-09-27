@@ -922,3 +922,31 @@ func mustListJ(out []store.IPScanJob, err error) []store.IPScanJob {
 	}
 	return out
 }
+
+// TestScanUpsertKeepsAdminFields mirrors the repodb integration test: a scan
+// records liveness and a found reverse-DNS name only; administrator fields of
+// an existing address survive, and offline becomes active.
+func TestScanUpsertKeepsAdminFields(t *testing.T) {
+	ctx := context.Background()
+	m := New()
+	_ = m.CreateSubnet(ctx, store.Subnet{ID: "s1", TenantID: "t1", Name: "lab", CIDR: "10.40.0.0/24", Status: "active", IPVersion: 4})
+	orig := store.IPAddress{TenantID: "t1", Address: "10.40.0.5", SubnetID: "s1", Hostname: "printer-2",
+		Description: "2nd floor printer", Note: "ask facilities", Tags: map[string]string{"room": "204"},
+		DeviceID: "d1", Status: store.IPReserved, AddressType: store.AddrGateway, DNSName: "printer-2.lab"}
+	if err := m.CreateAddress(ctx, orig); err != nil {
+		t.Fatal(err)
+	}
+	seen := time.Now().UTC()
+	if created, err := m.UpsertAddressByAddress(ctx, store.IPAddress{TenantID: "t1", Address: "10.40.0.5",
+		SubnetID: "s1", Status: store.IPActive, AddressType: store.AddrHost, LastSeen: &seen}); err != nil || created {
+		t.Fatalf("upsert: %v %v", created, err)
+	}
+	got, _ := m.FindAddress(ctx, "t1", "10.40.0.5")
+	if got.Description != orig.Description || got.Note != orig.Note || got.Tags["room"] != "204" || got.DeviceID != "d1" ||
+		got.Hostname != "printer-2" || got.Status != store.IPReserved || got.AddressType != store.AddrGateway || got.DNSName != orig.DNSName {
+		t.Fatalf("scan changed administrator fields: %+v", got)
+	}
+	if got.LastSeen == nil || !got.LastSeen.Equal(seen) {
+		t.Fatalf("last_seen %v", got.LastSeen)
+	}
+}
