@@ -446,3 +446,17 @@ func TestHostSyncFieldsMapped(t *testing.T) {
 		t.Fatal("interface report state from caller")
 	}
 }
+
+// TestSubnetSNMPMapping (021 T052): gRPC subnets carry the effective SNMP
+// version and never the legacy warden reference; inbound SNMP fields are
+// dropped.
+func TestSubnetSNMPMapping(t *testing.T) {
+	pb := subnetToPB(store.Subnet{ID: "s1", SNMPSecretRef: "warden-ref", SNMPVersion: 3})
+	if pb.GetSnmpSecretRef() != "" || pb.GetSnmpVersion() != 3 {
+		t.Fatalf("outbound snmp fields: %q %d", pb.GetSnmpSecretRef(), pb.GetSnmpVersion())
+	}
+	in := subnetFromPB(&ipamv1.Subnet{Id: "s1", SnmpSecretRef: "warden-ref", SnmpVersion: 2})
+	if in.SNMPSecretRef != "" || in.SNMPVersion != 0 {
+		t.Fatalf("inbound snmp fields kept: %+v", in)
+	}
+}

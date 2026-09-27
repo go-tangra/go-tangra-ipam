@@ -34,3 +34,23 @@ make cover                     # snmpcred 100 %, sealed 100 %
 6. Audit (ipam audit events) shows set / tested / cleared rows with version
    only; searching the logs and a tenant backup for the community finds
    nothing (SC-003).
+
+## Results (2026-09-27, branch 021-subnet-snmp-credentials)
+
+- `go vet ./...` (also `-tags integration`), `staticcheck ./...`: clean.
+- `go test -race ./...`: green.
+- `make cover`: total 92.3 %; `internal/snmpcred` 100 %, `internal/sealed`
+  100 % (authz, ipnet, hostreport, hostplan 100 %).
+- `make vuln`: no reachable vulnerabilities (service and SDK).
+- `FuzzDecodeValidate` (10 s): no failure.
+- UI: `npm run lint`, `npm run test:unit` (49 tests), `npm run build`: green.
+- SC-003 sweep (`internal/httpapi/snmp_leak_test.go`): no community, v3 user
+  or password in any subnet/status/test/scan/backup response, event payload,
+  audit row or scan log line; an agent error echoing the community is logged
+  as `[REDACTED]`.
+- `make test-integration`: `internal/repo/repodb/snmp_integration_test.go`
+  (0005 → 0006 upgrade with a legacy reference, RLS, cascade, CHECK
+  constraints, seal/open through PostgreSQL, scan job SNMP columns) compiles
+  but was skipped here: the Docker socket is not accessible to this user.
+  Run it where testcontainers can start TimescaleDB.
+- Manual stack steps above: pending (needs the freya-stack and an SNMP agent).

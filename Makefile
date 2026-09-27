@@ -41,7 +41,8 @@ FUZZ_TARGETS := \
 	./internal/hostreport:FuzzNormalizeReport \
 	./internal/hostreport:FuzzExclusionPattern \
 	./internal/hostplan:FuzzPlan \
-	./internal/portlink:FuzzRank
+	./internal/portlink:FuzzRank \
+	./internal/snmpcred:FuzzDecodeValidate
 
 fuzz:
 	@set -e; for t in $(FUZZ_TARGETS); do \

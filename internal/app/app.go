@@ -139,6 +139,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	}
 	a.closers = append(a.closers, a.Store.Close)
 	a.Repo = repodb.New(a.Store)
+	a.reportLegacySNMPRefs(ctx)
 
 	// Verifier (platform token) from auth.
 	a.Verifier = o.Verifier
@@ -258,6 +259,19 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	// Scan executor worker pool.
 	a.workers = append(a.workers, func(c context.Context) { _ = scanSvc.Run(c, a.Log) })
 	return a, nil
+}
+
+// reportLegacySNMPRefs logs how many subnets still carry the retired warden
+// SNMP reference (FR-023): it never worked, so their SNMP credentials must be
+// entered again through the subnet's SNMP credentials.
+func (a *App) reportLegacySNMPRefs(ctx context.Context) {
+	n, err := a.Repo.LegacySNMPRefCount(ctx)
+	switch {
+	case err != nil:
+		a.Log.Warn("legacy snmp_secret_ref count", "err", err)
+	case n > 0:
+		a.Log.Warn("legacy snmp_secret_ref present: the warden reference is no longer used; re-enter SNMP credentials on these subnets", "subnets", n)
+	}
 }
 
 // Run starts the verifier, gateway registration, workers, and the Freya runtime.

@@ -198,8 +198,10 @@ func TestSubnetSNMPTestRoute(t *testing.T) {
 func TestRateLimiter(t *testing.T) {
 	now := time.Unix(1000, 0)
 	l := newRateLimiter(2, time.Minute, func() time.Time { return now })
-	if !l.allow("a") || !l.allow("a") || l.allow("a") {
-		t.Fatal("two per window")
+	for i, want := range []bool{true, true, false} {
+		if got := l.allow("a"); got != want {
+			t.Fatalf("request %d: allow=%v, two per window", i+1, got)
+		}
 	}
 	if !l.allow("b") {
 		t.Fatal("per key")

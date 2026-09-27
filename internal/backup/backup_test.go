@@ -1,7 +1,9 @@
 package backup_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -300,5 +302,66 @@ func TestImportDeleteFailures(t *testing.T) {
 		if _, err := svc.Import(ctx, subj(tenant), b, backup.ModeOverwrite); err == nil {
 			t.Fatalf("%s: expected injected delete error", mth)
 		}
+	}
+}
+
+// TestBackupSNMPSummaryOnly (T051, FR-022): the export carries the effective
+// SNMP summary and never a blob or credential; restoring leaves SNMP
+// unconfigured and names the subnets whose credentials must be re-entered.
+func TestBackupSNMPSummaryOnly(t *testing.T) {
+	ctx := context.Background()
+	m := memstore.New()
+	for _, sn := range []store.Subnet{
+		{ID: "p", TenantID: "t1", Name: "parent", CIDR: "10.0.0.0/16", SNMPSecretRef: "legacy", SNMPVersion: 2},
+		{ID: "c", TenantID: "t1", Name: "child", CIDR: "10.0.1.0/24", ParentID: "p"},
+		{ID: "x", TenantID: "t1", Name: "none", CIDR: "192.168.0.0/24"},
+	} {
+		if err := m.CreateSubnet(ctx, sn); err != nil {
+			t.Fatal(err)
+		}
+	}
+	blob := []byte("SEALED-BLOB-BYTES")
+	if err := m.PutSubnetSNMP(ctx, store.SubnetSNMP{TenantID: "t1", SubnetID: "p", Version: 3, SecurityLevel: "authPriv",
+		AuthProtocol: "SHA256", PrivProtocol: "AES256", Sealed: blob}, store.AuditRow{TenantID: "t1"}); err != nil {
+		t.Fatal(err)
+	}
+	svc := backup.New(m)
+	b, err := svc.Export(ctx, subj("t1"), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(b)
+	if bytes.Contains(raw, blob) || bytes.Contains(raw, []byte("legacy")) || bytes.Contains(raw, []byte("sealed")) {
+		t.Fatalf("export carries credential material: %s", raw)
+	}
+	by := map[string]store.Subnet{}
+	for _, s := range b.Subnets {
+		by[s.ID] = s
+	}
+	if by["p"].SNMP == nil || by["p"].SNMP.State != store.SNMPStateOwn || by["p"].SNMPVersion != 3 {
+		t.Fatalf("parent summary %+v", by["p"].SNMP)
+	}
+	if by["c"].SNMP == nil || by["c"].SNMP.State != store.SNMPStateInherited || by["x"].SNMP == nil || by["x"].SNMP.State != store.SNMPStateNone {
+		t.Fatal("child/none summaries")
+	}
+
+	m2 := memstore.New()
+	res, err := backup.New(m2).Import(ctx, subj("t2"), b, backup.ModeSkip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.SNMPCredentialsRequired) != 1 || res.SNMPCredentialsRequired[0] != "10.0.0.0/16" {
+		t.Fatalf("credentials required %v", res.SNMPCredentialsRequired)
+	}
+	if l, _ := m2.ListSubnetSNMP(ctx, "t2"); len(l) != 0 {
+		t.Fatal("import created credentials")
+	}
+	got, _ := m2.GetSubnet(ctx, "t2", "p")
+	if got.SNMPVersion != 0 || got.SNMPSecretRef != "" || got.SNMP != nil {
+		t.Fatalf("imported subnet keeps SNMP fields: %+v", got)
+	}
+	m.FailNext("ListSubnetSNMP")
+	if _, err := svc.Export(ctx, subj("t1"), false); err == nil {
+		t.Fatal("export must fail when the SNMP summary cannot be read")
 	}
 }

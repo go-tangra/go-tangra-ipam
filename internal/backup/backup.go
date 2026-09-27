@@ -1,8 +1,10 @@
 // Package backup exports and imports a tenant's IPAM data (subnets, addresses,
 // devices, vlans, locations, and ip/host groups with their members) for backup
-// or tenant migration. Secrets are NEVER exported: the SNMP and IPMI credential
-// references and the sealed contact/owner PII fields are stripped from the
-// export, so a restored tenant carries only non-sensitive inventory. Entity ids
+// or tenant migration. Secrets are NEVER exported: SNMP credentials (only the
+// effective summary: state and version), the IPMI credential references and
+// the sealed contact/owner PII fields are stripped from the export, so a
+// restored tenant carries only non-sensitive inventory and reports which
+// subnets need their SNMP credentials re-entered. Entity ids
 // are preserved on import so cross-references (parent/vlan/location/device) stay
 // valid. Duplicate handling is per id: skip or overwrite.
 package backup
@@ -16,6 +18,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 )
 
 // SchemaVersion is the export format version.
@@ -75,6 +78,10 @@ type Result struct {
 	IPGroupsSkipped    int `json:"ip_groups_skipped"`
 	HostGroupsImported int `json:"host_groups_imported"`
 	HostGroupsSkipped  int `json:"host_groups_skipped"`
+	// SNMPCredentialsRequired lists the CIDRs of imported subnets that had
+	// their own SNMP credentials when exported: credentials are never part of
+	// a backup, so they must be re-entered (FR-022).
+	SNMPCredentialsRequired []string `json:"snmp_credentials_required"`
 }
 
 // Service exports and imports tenant data.
@@ -101,12 +108,19 @@ func (s *Service) Export(ctx context.Context, subj authz.Subjects, includeSecret
 	tenant := subj.TenantID
 	b := Backup{SchemaVersion: SchemaVersion, ExportedAt: s.now().UTC()}
 
-	subnets, err := s.st.AllSubnetCIDRs(ctx, tenant)
+	subs, err := s.st.AllSubnetCIDRs(ctx, tenant)
 	if err != nil {
 		return Backup{}, err
 	}
-	for _, sn := range subnets {
-		b.Subnets = append(b.Subnets, sanitizeSubnet(sn))
+	idx, err := subnets.SNMPIndex(ctx, s.st, tenant)
+	if err != nil {
+		return Backup{}, err
+	}
+	for _, sn := range subs {
+		sn = sanitizeSubnet(sn)
+		eff, _, _ := idx.Effective(sn.ID)
+		sn.SNMP, sn.SNMPVersion = &eff, eff.Version
+		b.Subnets = append(b.Subnets, sn)
 	}
 
 	// Addresses (page through every subnet's rows via the address filter).
@@ -257,8 +271,11 @@ func (s *Service) Import(ctx context.Context, subj authz.Subjects, b Backup, mod
 		res.VlansImported++
 	}
 
+	res.SNMPCredentialsRequired = []string{}
 	for _, sn := range b.Subnets {
 		sn.TenantID = tenant
+		hadOwn := sn.SNMP != nil && sn.SNMP.State == store.SNMPStateOwn
+		sn.SNMPSecretRef, sn.SNMPVersion, sn.SNMP = "", 0, nil // credentials are never restored
 		exists, err := s.exists(func() error { _, e := s.st.GetSubnet(ctx, tenant, sn.ID); return e })
 		if err != nil {
 			return res, err
@@ -276,6 +293,9 @@ func (s *Service) Import(ctx context.Context, subj authz.Subjects, b Backup, mod
 			return res, err
 		}
 		res.SubnetsImported++
+		if hadOwn {
+			res.SNMPCredentialsRequired = append(res.SNMPCredentialsRequired, sn.CIDR)
+		}
 	}
 
 	for _, d := range b.Devices {
@@ -397,7 +417,7 @@ func (s *Service) exists(get func() error) (bool, error) {
 // ---- sanitizers: clear every secret reference and sealed PII field.
 
 func sanitizeSubnet(s store.Subnet) store.Subnet {
-	s.SNMPSecretRef = ""
+	s.SNMPSecretRef, s.SNMPVersion, s.SNMP = "", 0, nil
 	return s
 }
 

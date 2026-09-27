@@ -26,6 +26,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
@@ -57,26 +58,33 @@ func (f fakeVerifier) Verify(_ context.Context, token string) (authclient.Identi
 	return authclient.Identity{}, ErrUnauthenticated
 }
 
-// recPub records the event types published (a stand-in for the real hub).
+// recPub records the event types and payloads published (a stand-in for
+// the real hub).
 type recPub struct {
-	mu     sync.Mutex
-	events []string
+	mu       sync.Mutex
+	events   []string
+	payloads []string
 }
 
-func (p *recPub) Publish(_ context.Context, _ string, eventType string, _ any) {
+func (p *recPub) Publish(_ context.Context, _ string, eventType string, payload any) {
+	b, _ := json.Marshal(payload)
 	p.mu.Lock()
 	p.events = append(p.events, eventType)
+	p.payloads = append(p.payloads, string(b))
 	p.mu.Unlock()
 }
 
 type apiFixture struct {
-	s      *Server
-	mem    *memstore.Mem
-	bmc    *ipmi.Fake
-	warden *warden.Fake
-	inv    *invclient.Fake
-	runner *hostsync.Runner
-	snmp   *snmp.Fake
+	s       *Server
+	mem     *memstore.Mem
+	bmc     *ipmi.Fake
+	warden  *warden.Fake
+	inv     *invclient.Fake
+	runner  *hostsync.Runner
+	snmp    *snmp.Fake
+	sweeper *icmp.Fake
+	scan    *scan.Service
+	pub     *recPub
 }
 
 func newAPI(t *testing.T) *apiFixture { return newAPIWith(t, nil) }
@@ -106,7 +114,8 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 	subnetsSvc := subnets.New(mem)
 	subnetsSvc.SetEnvelope(env)
 	disc := snmp.NewFake()
-	scanSvc := scan.New(mem, nil, nil, disc, pub, scan.Config{MaxHosts: 65536, TimeoutMs: 200}, nil)
+	sweeper := icmp.NewFake()
+	scanSvc := scan.New(mem, sweeper, sweeper, disc, pub, scan.Config{MaxHosts: 65536, TimeoutMs: 200, Workers: 2}, nil)
 	scanSvc.SetEnvelope(env)
 	deps := Deps{
 		Subnets:   subnetsSvc,
@@ -136,7 +145,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		t.Fatal(err)
 	}
 	s.Register(deps)
-	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner, snmp: disc}
+	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner, snmp: disc, sweeper: sweeper, scan: scanSvc, pub: pub}
 }
 
 const p = "/api/ipam/v1"

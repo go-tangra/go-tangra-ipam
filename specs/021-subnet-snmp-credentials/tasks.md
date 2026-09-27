@@ -182,14 +182,14 @@ explicit user confirmation before they are executed.
 
 ## Phase 9: Polish, Release & Cross-Cutting Concerns
 
-- [ ] T051 [P] Backup: exported subnets carry the summary only; `backup.Result.SNMPCredentialsRequired` lists CIDRs with own creds; test that no blob/secret is exported in `internal/backup/backup_test.go` and changes in `internal/backup/backup.go` (FR-022)
-- [ ] T052 [P] gRPC mapper: `snmp_version` = effective version, `snmp_secret_ref` empty in `internal/grpcapi/mapper.go` with test in `internal/grpcapi/mapper_test.go`
-- [ ] T053 [P] Startup log of the legacy `snmp_secret_ref` count in `internal/app/app.go` (FR-023)
-- [ ] T054 Integration tests (testcontainers) in `tests/integration/snmp_test.go`: migration upgrade to 0006; RLS isolation of `ipam_subnet_snmp`; cascade on subnet delete; seal/open round trip through the real store; CHECK constraints reject invalid rows
-- [ ] T055 [P] SC-003 sweep test in `internal/httpapi/snmp_leak_test.go`: set creds, exercise list/get/tree/status/test/scan/backup, assert the community, user and passwords appear in no response body, event payload or captured log line
-- [ ] T056 [P] README "SNMP credentials" section (storage, inheritance, test endpoint, permissions, audit) in `README.md`
-- [ ] T057 Run `go vet ./...`, `go test -race ./...`, `make cover` (snmpcred/sealed 100 %, total ≥ 80 %), `make vuln`, `(cd ui && npm run lint && npm run test:unit && npm run build)`
-- [ ] T058 Update quickstart results and tick tasks in `specs/021-subnet-snmp-credentials/tasks.md`
+- [x] T051 [P] Backup: exported subnets carry the summary only; `backup.Result.SNMPCredentialsRequired` lists CIDRs with own creds; test that no blob/secret is exported in `internal/backup/backup_test.go` and changes in `internal/backup/backup.go` (FR-022)
+- [x] T052 [P] gRPC mapper: `snmp_version` = effective version, `snmp_secret_ref` empty in `internal/grpcapi/mapper.go` with test in `internal/grpcapi/mapper_test.go`
+- [x] T053 [P] Startup log of the legacy `snmp_secret_ref` count in `internal/app/app.go` (FR-023)
+- [x] T054 Integration tests (testcontainers) in `tests/integration/snmp_test.go`: migration upgrade to 0006; RLS isolation of `ipam_subnet_snmp`; cascade on subnet delete; seal/open round trip through the real store; CHECK constraints reject invalid rows
+- [x] T055 [P] SC-003 sweep test in `internal/httpapi/snmp_leak_test.go`: set creds, exercise list/get/tree/status/test/scan/backup, assert the community, user and passwords appear in no response body, event payload or captured log line
+- [x] T056 [P] README "SNMP credentials" section (storage, inheritance, test endpoint, permissions, audit) in `README.md`
+- [x] T057 Run `go vet ./...`, `go test -race ./...`, `make cover` (snmpcred/sealed 100 %, total ≥ 80 %), `make vuln`, `(cd ui && npm run lint && npm run test:unit && npm run build)`
+- [x] T058 Update quickstart results and tick tasks in `specs/021-subnet-snmp-credentials/tasks.md`
 - [ ] T059 Release (user-confirmed): PR → merge → tag `v4.4.0`; bump `IPAM_IMAGE` in go-tangra-docker `.env.example`; deploy to production on explicit request
 
 ---
