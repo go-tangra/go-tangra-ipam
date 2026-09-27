@@ -49,6 +49,7 @@ type Mem struct {
 	snmp        map[string]store.SubnetSNMP          // keyed by subnet id
 	arp         map[string]store.ARPSettings         // keyed by tenant id
 	hostLinks   map[hostKey][]store.HostSwitchLink   // per-switch links (022)
+	hardware    map[string]store.DeviceHardware      // keyed by device id (023)
 
 	failNext map[string]bool
 	Now      func() time.Time
@@ -77,6 +78,7 @@ func New() *Mem {
 		snmp:        map[string]store.SubnetSNMP{},
 		arp:         map[string]store.ARPSettings{},
 		hostLinks:   map[hostKey][]store.HostSwitchLink{},
+		hardware:    map[string]store.DeviceHardware{},
 		failNext:    map[string]bool{},
 		Now:         func() time.Time { return time.Now().UTC() },
 	}
@@ -577,6 +579,12 @@ func (m *Mem) AddressesForDevice(_ context.Context, tenantID, deviceID string) (
 
 // fillDevice computes the interface/address/package counts. Caller holds the lock.
 func (m *Mem) fillDevice(d *store.Device) {
+	d.HardwareSummary = nil
+	if h, ok := m.hardware[d.ID]; ok && h.TenantID == d.TenantID {
+		s := h.Summary
+		s.ReportedAt = h.ReportedAt
+		d.HardwareSummary = &s
+	}
 	var ifc, ac, pu, su int64
 	for _, i := range m.ifaces {
 		if i.TenantID == d.TenantID && i.DeviceID == d.ID {
@@ -738,6 +746,9 @@ func (m *Mem) ListDevices(_ context.Context, tenantID string, f store.DeviceFilt
 			if !strings.Contains(strings.ToLower(d.Name), q) && !strings.Contains(strings.ToLower(d.PrimaryIP), q) {
 				continue
 			}
+		}
+		if _, has := m.hardware[d.ID]; (f.HasHardware == "true" && !has) || (f.HasHardware == "false" && has) {
+			continue
 		}
 		out = append(out, d)
 	}

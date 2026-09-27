@@ -313,6 +313,9 @@ type Device struct {
 	ReportState        string     `json:"report_state,omitempty"`
 	LastReportAt       *time.Time `json:"last_report_at,omitempty"`
 	ReportDigest       string     `json:"-"`
+	// HardwareSummary is the read-only summary of the hardware the host's
+	// inventory agent reports (feature 023); nil when none is stored.
+	HardwareSummary *HardwareSummary `json:"hardware_summary,omitempty"`
 	// Computed:
 	GuestCount          int64 `json:"guest_count"`
 	InterfaceCount      int64 `json:"interface_count"`
@@ -646,6 +649,7 @@ type DeviceFilter struct {
 	DeviceType, Status, LocationID, Manufacturer, RackID string
 	Source, ReportState                                  string
 	Query                                                string
+	HasHardware                                          string // "" | "true" | "false"
 	Limit                                                int
 	CursorID                                             string
 }
@@ -712,4 +716,150 @@ func MarkPrimary(links []HostSwitchLink, primaryPort string) []HostSwitchLink {
 		return a.SwitchID < b.SwitchID
 	})
 	return links
+}
+
+// ---- Device hardware (feature 023)
+
+// HardwareSummary is the device-level summary of a reported hardware
+// profile: CPU, memory and physical (non-removable) disks.
+type HardwareSummary struct {
+	CPUModel         string    `json:"cpu_model"`
+	CPUSockets       int       `json:"cpu_sockets"`
+	CPUCores         int       `json:"cpu_cores"`
+	CPUThreads       int       `json:"cpu_threads"`
+	MemoryTotalBytes int64     `json:"memory_total_bytes"`
+	MemoryType       string    `json:"memory_type"`
+	MemorySlotsTotal int       `json:"memory_slots_total"`
+	MemorySlotsUsed  int       `json:"memory_slots_used"`
+	DiskCount        int       `json:"disk_count"`
+	DiskTotalBytes   int64     `json:"disk_total_bytes"`
+	ReportedAt       time.Time `json:"reported_at"`
+}
+
+// DeviceHardware is the stored hardware of one host-reported device.
+type DeviceHardware struct {
+	DeviceID   string
+	TenantID   string
+	Profile    HardwareProfile
+	Digest     string
+	Summary    HardwareSummary
+	ReportedAt time.Time
+	UpdatedAt  time.Time
+}
+
+// HardwareProfile is the normalised hardware a host reports (reported data,
+// replaced by each report; contracts/ipam-http.md DeviceHardware).
+type HardwareProfile struct {
+	Schema       int                  `json:"schema,omitempty"`
+	BIOS         HardwareBIOS         `json:"bios"`
+	System       HardwareSystem       `json:"system"`
+	Board        HardwareBoard        `json:"board"`
+	Chassis      HardwareChassis      `json:"chassis"`
+	Processors   []HardwareProcessor  `json:"processors,omitempty"`
+	Memory       HardwareMemory       `json:"memory"`
+	Disks        []HardwareDisk       `json:"disks,omitempty"`
+	Filesystems  []HardwareFilesystem `json:"filesystems,omitempty"`
+	Availability HardwareAvailability `json:"availability"`
+	Truncated    map[string]int       `json:"truncated,omitempty"`
+}
+
+// HardwareBIOS is the reported BIOS.
+type HardwareBIOS struct {
+	Vendor      string `json:"vendor,omitempty"`
+	Version     string `json:"version,omitempty"`
+	ReleaseDate string `json:"release_date,omitempty"`
+}
+
+// HardwareSystem is the reported system information.
+type HardwareSystem struct {
+	Manufacturer string `json:"manufacturer,omitempty"`
+	Product      string `json:"product,omitempty"`
+	Version      string `json:"version,omitempty"`
+	Serial       string `json:"serial,omitempty"`
+	UUID         string `json:"uuid,omitempty"`
+	SKU          string `json:"sku,omitempty"`
+	Family       string `json:"family,omitempty"`
+}
+
+// HardwareBoard is the reported baseboard.
+type HardwareBoard struct {
+	Manufacturer string `json:"manufacturer,omitempty"`
+	Product      string `json:"product,omitempty"`
+	Serial       string `json:"serial,omitempty"`
+}
+
+// HardwareChassis is the reported chassis.
+type HardwareChassis struct {
+	Type         string `json:"type,omitempty"`
+	Manufacturer string `json:"manufacturer,omitempty"`
+	Serial       string `json:"serial,omitempty"`
+	AssetTag     string `json:"asset_tag,omitempty"`
+}
+
+// HardwareProcessor is one reported processor socket.
+type HardwareProcessor struct {
+	Socket       string `json:"socket,omitempty"`
+	Manufacturer string `json:"manufacturer,omitempty"`
+	Model        string `json:"model,omitempty"`
+	Family       string `json:"family,omitempty"`
+	MaxMHz       int    `json:"max_mhz,omitempty"`
+	CurrentMHz   int    `json:"current_mhz,omitempty"`
+	Cores        int    `json:"cores,omitempty"`
+	Threads      int    `json:"threads,omitempty"`
+	Populated    bool   `json:"populated,omitempty"`
+}
+
+// HardwareMemory is the reported memory subsystem (primary array + slots).
+type HardwareMemory struct {
+	TotalBytes       int64                `json:"total_bytes,omitempty"`
+	ErrorCorrection  string               `json:"error_correction,omitempty"`
+	Location         string               `json:"location,omitempty"`
+	Use              string               `json:"use,omitempty"`
+	MaxCapacityBytes int64                `json:"max_capacity_bytes,omitempty"`
+	SlotsTotal       int                  `json:"slots_total,omitempty"`
+	SlotsUsed        int                  `json:"slots_used,omitempty"`
+	Slots            []HardwareMemorySlot `json:"slots,omitempty"`
+}
+
+// HardwareMemorySlot is one memory slot, populated or empty.
+type HardwareMemorySlot struct {
+	Locator       string   `json:"locator,omitempty"`
+	Bank          string   `json:"bank,omitempty"`
+	Populated     bool     `json:"populated,omitempty"`
+	SizeBytes     int64    `json:"size_bytes,omitempty"`
+	Type          string   `json:"type,omitempty"`
+	FormFactor    string   `json:"form_factor,omitempty"`
+	TypeDetail    []string `json:"type_detail,omitempty"`
+	SpeedMTs      int      `json:"speed_mts,omitempty"`
+	ConfiguredMTs int      `json:"configured_mts,omitempty"`
+	Manufacturer  string   `json:"manufacturer,omitempty"`
+	PartNumber    string   `json:"part_number,omitempty"`
+	Serial        string   `json:"serial,omitempty"`
+}
+
+// HardwareDisk is one reported physical disk.
+type HardwareDisk struct {
+	Name      string `json:"name,omitempty"`
+	Model     string `json:"model,omitempty"`
+	Vendor    string `json:"vendor,omitempty"`
+	Serial    string `json:"serial,omitempty"`
+	SizeBytes int64  `json:"size_bytes,omitempty"`
+	Media     string `json:"media,omitempty"`
+	Interface string `json:"interface,omitempty"`
+	Removable bool   `json:"removable,omitempty"`
+}
+
+// HardwareFilesystem is one mounted filesystem and the disks it lives on.
+type HardwareFilesystem struct {
+	Mount     string   `json:"mount,omitempty"`
+	FS        string   `json:"fs,omitempty"`
+	SizeBytes int64    `json:"size_bytes,omitempty"`
+	FreeBytes int64    `json:"free_bytes,omitempty"`
+	Disks     []string `json:"disks,omitempty"`
+}
+
+// HardwareAvailability says how complete the agent's collection was.
+type HardwareAvailability struct {
+	SMBIOS string `json:"smbios,omitempty"`
+	Disks  string `json:"disks,omitempty"`
 }

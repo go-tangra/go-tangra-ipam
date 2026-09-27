@@ -261,6 +261,98 @@ export interface Device {
   report_state?: ReportState
   last_report_at?: string
   guest_count?: number
+  // Feature 023: read-only summary of the reported hardware.
+  hardware_summary?: HardwareSummary
+}
+
+// ---- Device hardware (feature 023, reported by the inventory agent; read-only)
+
+export interface HardwareSummary {
+  cpu_model?: string
+  cpu_sockets?: number
+  cpu_cores?: number
+  cpu_threads?: number
+  memory_total_bytes?: number
+  memory_type?: string
+  memory_slots_total?: number
+  memory_slots_used?: number
+  disk_count?: number
+  disk_total_bytes?: number
+  reported_at?: string
+}
+
+export interface HardwareProcessor {
+  socket?: string
+  manufacturer?: string
+  model?: string
+  family?: string
+  max_mhz?: number
+  current_mhz?: number
+  cores?: number
+  threads?: number
+  populated?: boolean
+}
+
+export interface HardwareMemorySlot {
+  locator?: string
+  bank?: string
+  populated?: boolean
+  size_bytes?: number
+  type?: string
+  form_factor?: string
+  type_detail?: string[]
+  speed_mts?: number
+  configured_mts?: number
+  manufacturer?: string
+  part_number?: string
+  serial?: string
+}
+
+export type DiskMedia = 'ssd' | 'hdd' | 'nvme_ssd' | 'unknown'
+
+export interface HardwareDisk {
+  name?: string
+  model?: string
+  vendor?: string
+  serial?: string
+  size_bytes?: number
+  media?: DiskMedia
+  interface?: string
+  removable?: boolean
+}
+
+export interface HardwareFilesystem {
+  mount?: string
+  fs?: string
+  size_bytes?: number
+  free_bytes?: number
+  disks?: string[]
+}
+
+export interface DeviceHardware {
+  device_id: string
+  reported_at: string
+  summary: HardwareSummary
+  schema?: number
+  bios?: { vendor?: string; version?: string; release_date?: string }
+  system?: { manufacturer?: string; product?: string; version?: string; serial?: string; uuid?: string; sku?: string; family?: string }
+  board?: { manufacturer?: string; product?: string; serial?: string }
+  chassis?: { type?: string; manufacturer?: string; serial?: string; asset_tag?: string }
+  processors?: HardwareProcessor[]
+  memory?: {
+    total_bytes?: number
+    error_correction?: string
+    location?: string
+    use?: string
+    max_capacity_bytes?: number
+    slots_total?: number
+    slots_used?: number
+    slots?: HardwareMemorySlot[]
+  }
+  disks?: HardwareDisk[]
+  filesystems?: HardwareFilesystem[]
+  availability?: { smbios?: string; disks?: string }
+  truncated?: Record<string, number>
 }
 
 export interface DeviceInterface {

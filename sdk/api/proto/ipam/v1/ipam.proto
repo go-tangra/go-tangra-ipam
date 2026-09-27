@@ -260,6 +260,25 @@ message Device {
   string report_state = 38;          // "" | "reported" | "not_reported"
   int64 last_report_at = 39;         // unix seconds, 0 = never
   int64 guest_count = 40;            // computed
+  // Read-only summary of the hardware the host's inventory agent reports
+  // (feature 023); absent when none is stored. Ignored on create/update.
+  HardwareSummary hardware_summary = 41;
+}
+
+// HardwareSummary summarises a device's reported hardware: CPU, memory and
+// physical (non-removable) disks.
+message HardwareSummary {
+  string cpu_model = 1;
+  int32 cpu_sockets = 2;
+  int32 cpu_cores = 3;
+  int32 cpu_threads = 4;
+  int64 memory_total_bytes = 5;
+  string memory_type = 6;
+  int32 memory_slots_total = 7;
+  int32 memory_slots_used = 8;
+  int32 disk_count = 9;
+  int64 disk_total_bytes = 10;
+  int64 reported_at = 11;            // unix seconds
 }
 
 // DeviceInterface is a NIC on a device. Unique (device_id,name).

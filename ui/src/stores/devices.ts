@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { api } from '@/api/client'
 import type {
   Device,
+  DeviceHardware,
   DeviceInterface,
   DevicePackage,
   IPAddress,
@@ -21,6 +22,7 @@ export interface DeviceFilter {
   rack_id?: string | undefined
   source?: string | undefined
   report_state?: string | undefined
+  has_hardware?: 'true' | 'false' | undefined
   query?: string | undefined
   cursor?: string | undefined
   limit?: number | undefined
@@ -69,7 +71,10 @@ export const useDevices = defineStore('ipam-devices', () => {
   }
 
   async function update(id: string, body: Partial<Device>): Promise<Device> {
-    const d = await api<Device>('PUT', 'devices/' + id, body)
+    // The hardware summary is server-owned (reported data): the API refuses it.
+    const rest: Partial<Device> = { ...body }
+    delete rest.hardware_summary
+    const d = await api<Device>('PUT', 'devices/' + id, rest)
     items.value = items.value.map((x) => (x.id === id ? d : x))
     return d
   }
@@ -97,6 +102,11 @@ export const useDevices = defineStore('ipam-devices', () => {
   async function packages(id: string): Promise<DevicePackage[]> {
     const res = await api<{ items: DevicePackage[] }>('GET', 'devices/' + id + '/packages')
     return res.items ?? []
+  }
+
+  // hardware reads the device's reported hardware (feature 023).
+  async function hardware(id: string): Promise<DeviceHardware> {
+    return api<DeviceHardware>('GET', 'devices/' + id + '/hardware')
   }
 
   async function addresses(id: string): Promise<IPAddress[]> {
@@ -134,7 +144,7 @@ export const useDevices = defineStore('ipam-devices', () => {
     items, loading, error,
     list, lookup, inRack, get, create, update, remove,
     interfaces, addInterface, removeInterface,
-    packages, addresses,
+    packages, addresses, hardware,
     power, setPower, sensors, sel, kvmSession,
   }
 })

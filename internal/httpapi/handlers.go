@@ -388,6 +388,7 @@ func (s *Server) Register(d Deps) {
 			RackID:       q.Get("rack_id"),
 			Source:       q.Get("source"),
 			ReportState:  q.Get("report_state"),
+			HasHardware:  q.Get("has_hardware"),
 			Query:        q.Get("query"),
 			Limit:        atoiDefault(q.Get("limit"), 0),
 			CursorID:     q.Get("cursor"),
@@ -404,12 +405,12 @@ func (s *Server) Register(d Deps) {
 			failSvc(w, err)
 			return
 		}
-		var in store.Device
+		var in deviceBody
 		if err := DecodeJSON(r, &in, 0); err != nil {
 			Fail(w, r, nil, err)
 			return
 		}
-		v, err := d.Devices.Create(r.Context(), subj, in)
+		v, err := d.Devices.Create(r.Context(), subj, in.Device)
 		if err != nil {
 			failSvc(w, err)
 			return
@@ -435,13 +436,13 @@ func (s *Server) Register(d Deps) {
 			failSvc(w, err)
 			return
 		}
-		var in store.Device
+		var in deviceBody
 		if err := DecodeJSON(r, &in, 0); err != nil {
 			Fail(w, r, nil, err)
 			return
 		}
 		in.ID = r.PathValue("id")
-		v, err := d.Devices.Update(r.Context(), subj, in)
+		v, err := d.Devices.Update(r.Context(), subj, in.Device)
 		if err != nil {
 			failSvc(w, err)
 			return
@@ -460,6 +461,7 @@ func (s *Server) Register(d Deps) {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
+	s.registerHardware(p, d)
 	s.MustHandle("GET", p+"/devices/{id}/addresses", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
 		if err != nil {

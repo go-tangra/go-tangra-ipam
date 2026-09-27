@@ -48,6 +48,11 @@ func load(tx repo.HostTx, r hostreport.Report) (hostplan.State, error) {
 		if st.GuestDevices, err = tx.GuestDevicesOf(dev.ID); err != nil {
 			return st, err
 		}
+		if r.Hardware != nil {
+			if st.Hardware, err = tx.GetHardware(dev.ID); err != nil {
+				return st, err
+			}
+		}
 	}
 	var addrs, ownMACs, guestMACs []string
 	for _, i := range r.Interfaces {
@@ -117,6 +122,8 @@ func execute(tx repo.HostTx, p hostplan.Plan) error {
 			err = tx.SetHypervisor(op.DeviceID, op.RefID)
 		case hostplan.OpSetGuestDevice:
 			err = tx.SetGuestDevice(op.GuestRowID, op.RefID)
+		case hostplan.OpReplaceHardware:
+			err = tx.ReplaceHardware(*op.Hardware)
 		default:
 			err = fmt.Errorf("hostsync: unknown op %q", op.Kind)
 		}

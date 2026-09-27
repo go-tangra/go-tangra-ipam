@@ -1357,8 +1357,11 @@ type Device struct {
 	ReportState        string `protobuf:"bytes,38,opt,name=report_state,json=reportState,proto3" json:"report_state,omitempty"`       // "" | "reported" | "not_reported"
 	LastReportAt       int64  `protobuf:"varint,39,opt,name=last_report_at,json=lastReportAt,proto3" json:"last_report_at,omitempty"` // unix seconds, 0 = never
 	GuestCount         int64  `protobuf:"varint,40,opt,name=guest_count,json=guestCount,proto3" json:"guest_count,omitempty"`         // computed
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Read-only summary of the hardware the host's inventory agent reports
+	// (feature 023); absent when none is stored. Ignored on create/update.
+	HardwareSummary *HardwareSummary `protobuf:"bytes,41,opt,name=hardware_summary,json=hardwareSummary,proto3" json:"hardware_summary,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -1671,6 +1674,139 @@ func (x *Device) GetGuestCount() int64 {
 	return 0
 }
 
+func (x *Device) GetHardwareSummary() *HardwareSummary {
+	if x != nil {
+		return x.HardwareSummary
+	}
+	return nil
+}
+
+// HardwareSummary summarises a device's reported hardware: CPU, memory and
+// physical (non-removable) disks.
+type HardwareSummary struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	CpuModel         string                 `protobuf:"bytes,1,opt,name=cpu_model,json=cpuModel,proto3" json:"cpu_model,omitempty"`
+	CpuSockets       int32                  `protobuf:"varint,2,opt,name=cpu_sockets,json=cpuSockets,proto3" json:"cpu_sockets,omitempty"`
+	CpuCores         int32                  `protobuf:"varint,3,opt,name=cpu_cores,json=cpuCores,proto3" json:"cpu_cores,omitempty"`
+	CpuThreads       int32                  `protobuf:"varint,4,opt,name=cpu_threads,json=cpuThreads,proto3" json:"cpu_threads,omitempty"`
+	MemoryTotalBytes int64                  `protobuf:"varint,5,opt,name=memory_total_bytes,json=memoryTotalBytes,proto3" json:"memory_total_bytes,omitempty"`
+	MemoryType       string                 `protobuf:"bytes,6,opt,name=memory_type,json=memoryType,proto3" json:"memory_type,omitempty"`
+	MemorySlotsTotal int32                  `protobuf:"varint,7,opt,name=memory_slots_total,json=memorySlotsTotal,proto3" json:"memory_slots_total,omitempty"`
+	MemorySlotsUsed  int32                  `protobuf:"varint,8,opt,name=memory_slots_used,json=memorySlotsUsed,proto3" json:"memory_slots_used,omitempty"`
+	DiskCount        int32                  `protobuf:"varint,9,opt,name=disk_count,json=diskCount,proto3" json:"disk_count,omitempty"`
+	DiskTotalBytes   int64                  `protobuf:"varint,10,opt,name=disk_total_bytes,json=diskTotalBytes,proto3" json:"disk_total_bytes,omitempty"`
+	ReportedAt       int64                  `protobuf:"varint,11,opt,name=reported_at,json=reportedAt,proto3" json:"reported_at,omitempty"` // unix seconds
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *HardwareSummary) Reset() {
+	*x = HardwareSummary{}
+	mi := &file_ipam_v1_ipam_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HardwareSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HardwareSummary) ProtoMessage() {}
+
+func (x *HardwareSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_ipam_v1_ipam_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HardwareSummary.ProtoReflect.Descriptor instead.
+func (*HardwareSummary) Descriptor() ([]byte, []int) {
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *HardwareSummary) GetCpuModel() string {
+	if x != nil {
+		return x.CpuModel
+	}
+	return ""
+}
+
+func (x *HardwareSummary) GetCpuSockets() int32 {
+	if x != nil {
+		return x.CpuSockets
+	}
+	return 0
+}
+
+func (x *HardwareSummary) GetCpuCores() int32 {
+	if x != nil {
+		return x.CpuCores
+	}
+	return 0
+}
+
+func (x *HardwareSummary) GetCpuThreads() int32 {
+	if x != nil {
+		return x.CpuThreads
+	}
+	return 0
+}
+
+func (x *HardwareSummary) GetMemoryTotalBytes() int64 {
+	if x != nil {
+		return x.MemoryTotalBytes
+	}
+	return 0
+}
+
+func (x *HardwareSummary) GetMemoryType() string {
+	if x != nil {
+		return x.MemoryType
+	}
+	return ""
+}
+
+func (x *HardwareSummary) GetMemorySlotsTotal() int32 {
+	if x != nil {
+		return x.MemorySlotsTotal
+	}
+	return 0
+}
+
+func (x *HardwareSummary) GetMemorySlotsUsed() int32 {
+	if x != nil {
+		return x.MemorySlotsUsed
+	}
+	return 0
+}
+
+func (x *HardwareSummary) GetDiskCount() int32 {
+	if x != nil {
+		return x.DiskCount
+	}
+	return 0
+}
+
+func (x *HardwareSummary) GetDiskTotalBytes() int64 {
+	if x != nil {
+		return x.DiskTotalBytes
+	}
+	return 0
+}
+
+func (x *HardwareSummary) GetReportedAt() int64 {
+	if x != nil {
+		return x.ReportedAt
+	}
+	return 0
+}
+
 // DeviceInterface is a NIC on a device. Unique (device_id,name).
 type DeviceInterface struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
@@ -1699,7 +1835,7 @@ type DeviceInterface struct {
 
 func (x *DeviceInterface) Reset() {
 	*x = DeviceInterface{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[3]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1711,7 +1847,7 @@ func (x *DeviceInterface) String() string {
 func (*DeviceInterface) ProtoMessage() {}
 
 func (x *DeviceInterface) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[3]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1724,7 +1860,7 @@ func (x *DeviceInterface) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceInterface.ProtoReflect.Descriptor instead.
 func (*DeviceInterface) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{3}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DeviceInterface) GetId() string {
@@ -1881,7 +2017,7 @@ type DevicePackage struct {
 
 func (x *DevicePackage) Reset() {
 	*x = DevicePackage{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[4]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1893,7 +2029,7 @@ func (x *DevicePackage) String() string {
 func (*DevicePackage) ProtoMessage() {}
 
 func (x *DevicePackage) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[4]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1906,7 +2042,7 @@ func (x *DevicePackage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DevicePackage.ProtoReflect.Descriptor instead.
 func (*DevicePackage) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{4}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DevicePackage) GetId() string {
@@ -2015,7 +2151,7 @@ type Vlan struct {
 
 func (x *Vlan) Reset() {
 	*x = Vlan{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[5]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2027,7 +2163,7 @@ func (x *Vlan) String() string {
 func (*Vlan) ProtoMessage() {}
 
 func (x *Vlan) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[5]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2040,7 +2176,7 @@ func (x *Vlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Vlan.ProtoReflect.Descriptor instead.
 func (*Vlan) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{5}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Vlan) GetId() string {
@@ -2168,7 +2304,7 @@ type Location struct {
 
 func (x *Location) Reset() {
 	*x = Location{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[6]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2180,7 +2316,7 @@ func (x *Location) String() string {
 func (*Location) ProtoMessage() {}
 
 func (x *Location) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[6]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2193,7 +2329,7 @@ func (x *Location) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Location.ProtoReflect.Descriptor instead.
 func (*Location) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{6}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Location) GetId() string {
@@ -2391,7 +2527,7 @@ type IPGroup struct {
 
 func (x *IPGroup) Reset() {
 	*x = IPGroup{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[7]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2403,7 +2539,7 @@ func (x *IPGroup) String() string {
 func (*IPGroup) ProtoMessage() {}
 
 func (x *IPGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[7]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2416,7 +2552,7 @@ func (x *IPGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPGroup.ProtoReflect.Descriptor instead.
 func (*IPGroup) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{7}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *IPGroup) GetId() string {
@@ -2512,7 +2648,7 @@ type IPGroupMember struct {
 
 func (x *IPGroupMember) Reset() {
 	*x = IPGroupMember{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[8]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2524,7 +2660,7 @@ func (x *IPGroupMember) String() string {
 func (*IPGroupMember) ProtoMessage() {}
 
 func (x *IPGroupMember) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[8]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2537,7 +2673,7 @@ func (x *IPGroupMember) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPGroupMember.ProtoReflect.Descriptor instead.
 func (*IPGroupMember) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{8}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *IPGroupMember) GetId() string {
@@ -2609,7 +2745,7 @@ type HostGroup struct {
 
 func (x *HostGroup) Reset() {
 	*x = HostGroup{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[9]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2621,7 +2757,7 @@ func (x *HostGroup) String() string {
 func (*HostGroup) ProtoMessage() {}
 
 func (x *HostGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[9]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2634,7 +2770,7 @@ func (x *HostGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostGroup.ProtoReflect.Descriptor instead.
 func (*HostGroup) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{9}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *HostGroup) GetId() string {
@@ -2732,7 +2868,7 @@ type HostGroupMember struct {
 
 func (x *HostGroupMember) Reset() {
 	*x = HostGroupMember{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[10]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2744,7 +2880,7 @@ func (x *HostGroupMember) String() string {
 func (*HostGroupMember) ProtoMessage() {}
 
 func (x *HostGroupMember) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[10]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2757,7 +2893,7 @@ func (x *HostGroupMember) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostGroupMember.ProtoReflect.Descriptor instead.
 func (*HostGroupMember) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{10}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *HostGroupMember) GetId() string {
@@ -2859,7 +2995,7 @@ type IPScanJob struct {
 
 func (x *IPScanJob) Reset() {
 	*x = IPScanJob{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[11]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2871,7 +3007,7 @@ func (x *IPScanJob) String() string {
 func (*IPScanJob) ProtoMessage() {}
 
 func (x *IPScanJob) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[11]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2884,7 +3020,7 @@ func (x *IPScanJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPScanJob.ProtoReflect.Descriptor instead.
 func (*IPScanJob) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{11}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *IPScanJob) GetId() string {
@@ -3093,7 +3229,7 @@ type DNSConfig struct {
 
 func (x *DNSConfig) Reset() {
 	*x = DNSConfig{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[12]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3105,7 +3241,7 @@ func (x *DNSConfig) String() string {
 func (*DNSConfig) ProtoMessage() {}
 
 func (x *DNSConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[12]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3118,7 +3254,7 @@ func (x *DNSConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DNSConfig.ProtoReflect.Descriptor instead.
 func (*DNSConfig) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{12}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DNSConfig) GetId() string {
@@ -3201,7 +3337,7 @@ type Stats struct {
 
 func (x *Stats) Reset() {
 	*x = Stats{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[13]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3213,7 +3349,7 @@ func (x *Stats) String() string {
 func (*Stats) ProtoMessage() {}
 
 func (x *Stats) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[13]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3226,7 +3362,7 @@ func (x *Stats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Stats.ProtoReflect.Descriptor instead.
 func (*Stats) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{13}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Stats) GetSubnetsTotal() int64 {
@@ -3344,7 +3480,7 @@ type CreateSubnetRequest struct {
 
 func (x *CreateSubnetRequest) Reset() {
 	*x = CreateSubnetRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[14]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3356,7 +3492,7 @@ func (x *CreateSubnetRequest) String() string {
 func (*CreateSubnetRequest) ProtoMessage() {}
 
 func (x *CreateSubnetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[14]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3369,7 +3505,7 @@ func (x *CreateSubnetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSubnetRequest.ProtoReflect.Descriptor instead.
 func (*CreateSubnetRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{14}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CreateSubnetRequest) GetTenantId() string {
@@ -3396,7 +3532,7 @@ type GetSubnetRequest struct {
 
 func (x *GetSubnetRequest) Reset() {
 	*x = GetSubnetRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[15]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3408,7 +3544,7 @@ func (x *GetSubnetRequest) String() string {
 func (*GetSubnetRequest) ProtoMessage() {}
 
 func (x *GetSubnetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[15]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3421,7 +3557,7 @@ func (x *GetSubnetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubnetRequest.ProtoReflect.Descriptor instead.
 func (*GetSubnetRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{15}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetSubnetRequest) GetTenantId() string {
@@ -3455,7 +3591,7 @@ type ListSubnetsRequest struct {
 
 func (x *ListSubnetsRequest) Reset() {
 	*x = ListSubnetsRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[16]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3467,7 +3603,7 @@ func (x *ListSubnetsRequest) String() string {
 func (*ListSubnetsRequest) ProtoMessage() {}
 
 func (x *ListSubnetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[16]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3480,7 +3616,7 @@ func (x *ListSubnetsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSubnetsRequest.ProtoReflect.Descriptor instead.
 func (*ListSubnetsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{16}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListSubnetsRequest) GetTenantId() string {
@@ -3556,7 +3692,7 @@ type ListSubnetsResponse struct {
 
 func (x *ListSubnetsResponse) Reset() {
 	*x = ListSubnetsResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[17]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3568,7 +3704,7 @@ func (x *ListSubnetsResponse) String() string {
 func (*ListSubnetsResponse) ProtoMessage() {}
 
 func (x *ListSubnetsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[17]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3581,7 +3717,7 @@ func (x *ListSubnetsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSubnetsResponse.ProtoReflect.Descriptor instead.
 func (*ListSubnetsResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{17}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListSubnetsResponse) GetSubnets() []*Subnet {
@@ -3609,7 +3745,7 @@ type UpdateSubnetRequest struct {
 
 func (x *UpdateSubnetRequest) Reset() {
 	*x = UpdateSubnetRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[18]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3621,7 +3757,7 @@ func (x *UpdateSubnetRequest) String() string {
 func (*UpdateSubnetRequest) ProtoMessage() {}
 
 func (x *UpdateSubnetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[18]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3634,7 +3770,7 @@ func (x *UpdateSubnetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSubnetRequest.ProtoReflect.Descriptor instead.
 func (*UpdateSubnetRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{18}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UpdateSubnetRequest) GetTenantId() string {
@@ -3669,7 +3805,7 @@ type DeleteSubnetRequest struct {
 
 func (x *DeleteSubnetRequest) Reset() {
 	*x = DeleteSubnetRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[19]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3681,7 +3817,7 @@ func (x *DeleteSubnetRequest) String() string {
 func (*DeleteSubnetRequest) ProtoMessage() {}
 
 func (x *DeleteSubnetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[19]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3694,7 +3830,7 @@ func (x *DeleteSubnetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSubnetRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSubnetRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{19}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DeleteSubnetRequest) GetTenantId() string {
@@ -3727,7 +3863,7 @@ type GetSubnetTreeRequest struct {
 
 func (x *GetSubnetTreeRequest) Reset() {
 	*x = GetSubnetTreeRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[20]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3739,7 +3875,7 @@ func (x *GetSubnetTreeRequest) String() string {
 func (*GetSubnetTreeRequest) ProtoMessage() {}
 
 func (x *GetSubnetTreeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[20]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3752,7 +3888,7 @@ func (x *GetSubnetTreeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubnetTreeRequest.ProtoReflect.Descriptor instead.
 func (*GetSubnetTreeRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{20}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetSubnetTreeRequest) GetTenantId() string {
@@ -3772,7 +3908,7 @@ type SubnetTreeNode struct {
 
 func (x *SubnetTreeNode) Reset() {
 	*x = SubnetTreeNode{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[21]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3784,7 +3920,7 @@ func (x *SubnetTreeNode) String() string {
 func (*SubnetTreeNode) ProtoMessage() {}
 
 func (x *SubnetTreeNode) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[21]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3797,7 +3933,7 @@ func (x *SubnetTreeNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubnetTreeNode.ProtoReflect.Descriptor instead.
 func (*SubnetTreeNode) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{21}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SubnetTreeNode) GetSubnet() *Subnet {
@@ -3823,7 +3959,7 @@ type SubnetTree struct {
 
 func (x *SubnetTree) Reset() {
 	*x = SubnetTree{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[22]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3835,7 +3971,7 @@ func (x *SubnetTree) String() string {
 func (*SubnetTree) ProtoMessage() {}
 
 func (x *SubnetTree) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[22]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3848,7 +3984,7 @@ func (x *SubnetTree) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubnetTree.ProtoReflect.Descriptor instead.
 func (*SubnetTree) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{22}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SubnetTree) GetRoots() []*SubnetTreeNode {
@@ -3868,7 +4004,7 @@ type GetSubnetStatsRequest struct {
 
 func (x *GetSubnetStatsRequest) Reset() {
 	*x = GetSubnetStatsRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[23]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3880,7 +4016,7 @@ func (x *GetSubnetStatsRequest) String() string {
 func (*GetSubnetStatsRequest) ProtoMessage() {}
 
 func (x *GetSubnetStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[23]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3893,7 +4029,7 @@ func (x *GetSubnetStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubnetStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetSubnetStatsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{23}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetSubnetStatsRequest) GetTenantId() string {
@@ -3923,7 +4059,7 @@ type ScanSubnetRequest struct {
 
 func (x *ScanSubnetRequest) Reset() {
 	*x = ScanSubnetRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[24]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3935,7 +4071,7 @@ func (x *ScanSubnetRequest) String() string {
 func (*ScanSubnetRequest) ProtoMessage() {}
 
 func (x *ScanSubnetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[24]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3948,7 +4084,7 @@ func (x *ScanSubnetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScanSubnetRequest.ProtoReflect.Descriptor instead.
 func (*ScanSubnetRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{24}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ScanSubnetRequest) GetTenantId() string {
@@ -3995,7 +4131,7 @@ type DeleteResponse struct {
 
 func (x *DeleteResponse) Reset() {
 	*x = DeleteResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[25]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4007,7 +4143,7 @@ func (x *DeleteResponse) String() string {
 func (*DeleteResponse) ProtoMessage() {}
 
 func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[25]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4020,7 +4156,7 @@ func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteResponse.ProtoReflect.Descriptor instead.
 func (*DeleteResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{25}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{26}
 }
 
 type CreateIpAddressRequest struct {
@@ -4033,7 +4169,7 @@ type CreateIpAddressRequest struct {
 
 func (x *CreateIpAddressRequest) Reset() {
 	*x = CreateIpAddressRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[26]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4045,7 +4181,7 @@ func (x *CreateIpAddressRequest) String() string {
 func (*CreateIpAddressRequest) ProtoMessage() {}
 
 func (x *CreateIpAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[26]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4058,7 +4194,7 @@ func (x *CreateIpAddressRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateIpAddressRequest.ProtoReflect.Descriptor instead.
 func (*CreateIpAddressRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{26}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *CreateIpAddressRequest) GetTenantId() string {
@@ -4085,7 +4221,7 @@ type GetIpAddressRequest struct {
 
 func (x *GetIpAddressRequest) Reset() {
 	*x = GetIpAddressRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[27]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4097,7 +4233,7 @@ func (x *GetIpAddressRequest) String() string {
 func (*GetIpAddressRequest) ProtoMessage() {}
 
 func (x *GetIpAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[27]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4110,7 +4246,7 @@ func (x *GetIpAddressRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIpAddressRequest.ProtoReflect.Descriptor instead.
 func (*GetIpAddressRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{27}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetIpAddressRequest) GetTenantId() string {
@@ -4144,7 +4280,7 @@ type ListIpAddressesRequest struct {
 
 func (x *ListIpAddressesRequest) Reset() {
 	*x = ListIpAddressesRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[28]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4156,7 +4292,7 @@ func (x *ListIpAddressesRequest) String() string {
 func (*ListIpAddressesRequest) ProtoMessage() {}
 
 func (x *ListIpAddressesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[28]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4169,7 +4305,7 @@ func (x *ListIpAddressesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIpAddressesRequest.ProtoReflect.Descriptor instead.
 func (*ListIpAddressesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{28}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListIpAddressesRequest) GetTenantId() string {
@@ -4245,7 +4381,7 @@ type ListIpAddressesResponse struct {
 
 func (x *ListIpAddressesResponse) Reset() {
 	*x = ListIpAddressesResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[29]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4257,7 +4393,7 @@ func (x *ListIpAddressesResponse) String() string {
 func (*ListIpAddressesResponse) ProtoMessage() {}
 
 func (x *ListIpAddressesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[29]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4270,7 +4406,7 @@ func (x *ListIpAddressesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIpAddressesResponse.ProtoReflect.Descriptor instead.
 func (*ListIpAddressesResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{29}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListIpAddressesResponse) GetAddresses() []*IPAddress {
@@ -4298,7 +4434,7 @@ type UpdateIpAddressRequest struct {
 
 func (x *UpdateIpAddressRequest) Reset() {
 	*x = UpdateIpAddressRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[30]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4310,7 +4446,7 @@ func (x *UpdateIpAddressRequest) String() string {
 func (*UpdateIpAddressRequest) ProtoMessage() {}
 
 func (x *UpdateIpAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[30]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4323,7 +4459,7 @@ func (x *UpdateIpAddressRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIpAddressRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIpAddressRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{30}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *UpdateIpAddressRequest) GetTenantId() string {
@@ -4357,7 +4493,7 @@ type DeleteIpAddressRequest struct {
 
 func (x *DeleteIpAddressRequest) Reset() {
 	*x = DeleteIpAddressRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[31]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4369,7 +4505,7 @@ func (x *DeleteIpAddressRequest) String() string {
 func (*DeleteIpAddressRequest) ProtoMessage() {}
 
 func (x *DeleteIpAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[31]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4382,7 +4518,7 @@ func (x *DeleteIpAddressRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteIpAddressRequest.ProtoReflect.Descriptor instead.
 func (*DeleteIpAddressRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{31}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DeleteIpAddressRequest) GetTenantId() string {
@@ -4412,7 +4548,7 @@ type AllocateNextRequest struct {
 
 func (x *AllocateNextRequest) Reset() {
 	*x = AllocateNextRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[32]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4424,7 +4560,7 @@ func (x *AllocateNextRequest) String() string {
 func (*AllocateNextRequest) ProtoMessage() {}
 
 func (x *AllocateNextRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[32]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4437,7 +4573,7 @@ func (x *AllocateNextRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AllocateNextRequest.ProtoReflect.Descriptor instead.
 func (*AllocateNextRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{32}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *AllocateNextRequest) GetTenantId() string {
@@ -4487,7 +4623,7 @@ type BulkAllocateRequest struct {
 
 func (x *BulkAllocateRequest) Reset() {
 	*x = BulkAllocateRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[33]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4499,7 +4635,7 @@ func (x *BulkAllocateRequest) String() string {
 func (*BulkAllocateRequest) ProtoMessage() {}
 
 func (x *BulkAllocateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[33]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4512,7 +4648,7 @@ func (x *BulkAllocateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BulkAllocateRequest.ProtoReflect.Descriptor instead.
 func (*BulkAllocateRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{33}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *BulkAllocateRequest) GetTenantId() string {
@@ -4552,7 +4688,7 @@ type BulkAllocateResponse struct {
 
 func (x *BulkAllocateResponse) Reset() {
 	*x = BulkAllocateResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[34]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4564,7 +4700,7 @@ func (x *BulkAllocateResponse) String() string {
 func (*BulkAllocateResponse) ProtoMessage() {}
 
 func (x *BulkAllocateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[34]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4577,7 +4713,7 @@ func (x *BulkAllocateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BulkAllocateResponse.ProtoReflect.Descriptor instead.
 func (*BulkAllocateResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{34}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *BulkAllocateResponse) GetAddresses() []*IPAddress {
@@ -4597,7 +4733,7 @@ type FindIpAddressRequest struct {
 
 func (x *FindIpAddressRequest) Reset() {
 	*x = FindIpAddressRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[35]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4609,7 +4745,7 @@ func (x *FindIpAddressRequest) String() string {
 func (*FindIpAddressRequest) ProtoMessage() {}
 
 func (x *FindIpAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[35]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4622,7 +4758,7 @@ func (x *FindIpAddressRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindIpAddressRequest.ProtoReflect.Descriptor instead.
 func (*FindIpAddressRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{35}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *FindIpAddressRequest) GetTenantId() string {
@@ -4650,7 +4786,7 @@ type SuggestIpAddressRequest struct {
 
 func (x *SuggestIpAddressRequest) Reset() {
 	*x = SuggestIpAddressRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[36]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4662,7 +4798,7 @@ func (x *SuggestIpAddressRequest) String() string {
 func (*SuggestIpAddressRequest) ProtoMessage() {}
 
 func (x *SuggestIpAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[36]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4675,7 +4811,7 @@ func (x *SuggestIpAddressRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestIpAddressRequest.ProtoReflect.Descriptor instead.
 func (*SuggestIpAddressRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{36}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *SuggestIpAddressRequest) GetTenantId() string {
@@ -4708,7 +4844,7 @@ type SuggestIpAddressResponse struct {
 
 func (x *SuggestIpAddressResponse) Reset() {
 	*x = SuggestIpAddressResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[37]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4720,7 +4856,7 @@ func (x *SuggestIpAddressResponse) String() string {
 func (*SuggestIpAddressResponse) ProtoMessage() {}
 
 func (x *SuggestIpAddressResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[37]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4733,7 +4869,7 @@ func (x *SuggestIpAddressResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestIpAddressResponse.ProtoReflect.Descriptor instead.
 func (*SuggestIpAddressResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{37}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *SuggestIpAddressResponse) GetAddresses() []string {
@@ -4753,7 +4889,7 @@ type PingIpAddressRequest struct {
 
 func (x *PingIpAddressRequest) Reset() {
 	*x = PingIpAddressRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[38]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4765,7 +4901,7 @@ func (x *PingIpAddressRequest) String() string {
 func (*PingIpAddressRequest) ProtoMessage() {}
 
 func (x *PingIpAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[38]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4778,7 +4914,7 @@ func (x *PingIpAddressRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingIpAddressRequest.ProtoReflect.Descriptor instead.
 func (*PingIpAddressRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{38}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *PingIpAddressRequest) GetTenantId() string {
@@ -4805,7 +4941,7 @@ type PingResponse struct {
 
 func (x *PingResponse) Reset() {
 	*x = PingResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[39]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4817,7 +4953,7 @@ func (x *PingResponse) String() string {
 func (*PingResponse) ProtoMessage() {}
 
 func (x *PingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[39]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4830,7 +4966,7 @@ func (x *PingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingResponse.ProtoReflect.Descriptor instead.
 func (*PingResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{39}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *PingResponse) GetAlive() bool {
@@ -4857,7 +4993,7 @@ type CreateDeviceRequest struct {
 
 func (x *CreateDeviceRequest) Reset() {
 	*x = CreateDeviceRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[40]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4869,7 +5005,7 @@ func (x *CreateDeviceRequest) String() string {
 func (*CreateDeviceRequest) ProtoMessage() {}
 
 func (x *CreateDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[40]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4882,7 +5018,7 @@ func (x *CreateDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDeviceRequest.ProtoReflect.Descriptor instead.
 func (*CreateDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{40}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *CreateDeviceRequest) GetTenantId() string {
@@ -4909,7 +5045,7 @@ type GetDeviceRequest struct {
 
 func (x *GetDeviceRequest) Reset() {
 	*x = GetDeviceRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[41]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4921,7 +5057,7 @@ func (x *GetDeviceRequest) String() string {
 func (*GetDeviceRequest) ProtoMessage() {}
 
 func (x *GetDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[41]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4934,7 +5070,7 @@ func (x *GetDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{41}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetDeviceRequest) GetTenantId() string {
@@ -4968,7 +5104,7 @@ type ListDevicesRequest struct {
 
 func (x *ListDevicesRequest) Reset() {
 	*x = ListDevicesRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[42]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4980,7 +5116,7 @@ func (x *ListDevicesRequest) String() string {
 func (*ListDevicesRequest) ProtoMessage() {}
 
 func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[42]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4993,7 +5129,7 @@ func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesRequest.ProtoReflect.Descriptor instead.
 func (*ListDevicesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{42}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ListDevicesRequest) GetTenantId() string {
@@ -5069,7 +5205,7 @@ type ListDevicesResponse struct {
 
 func (x *ListDevicesResponse) Reset() {
 	*x = ListDevicesResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[43]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5081,7 +5217,7 @@ func (x *ListDevicesResponse) String() string {
 func (*ListDevicesResponse) ProtoMessage() {}
 
 func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[43]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5094,7 +5230,7 @@ func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesResponse.ProtoReflect.Descriptor instead.
 func (*ListDevicesResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{43}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ListDevicesResponse) GetDevices() []*Device {
@@ -5122,7 +5258,7 @@ type UpdateDeviceRequest struct {
 
 func (x *UpdateDeviceRequest) Reset() {
 	*x = UpdateDeviceRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[44]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5134,7 +5270,7 @@ func (x *UpdateDeviceRequest) String() string {
 func (*UpdateDeviceRequest) ProtoMessage() {}
 
 func (x *UpdateDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[44]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5147,7 +5283,7 @@ func (x *UpdateDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDeviceRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{44}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *UpdateDeviceRequest) GetTenantId() string {
@@ -5182,7 +5318,7 @@ type DeleteDeviceRequest struct {
 
 func (x *DeleteDeviceRequest) Reset() {
 	*x = DeleteDeviceRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[45]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5194,7 +5330,7 @@ func (x *DeleteDeviceRequest) String() string {
 func (*DeleteDeviceRequest) ProtoMessage() {}
 
 func (x *DeleteDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[45]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5207,7 +5343,7 @@ func (x *DeleteDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDeviceRequest.ProtoReflect.Descriptor instead.
 func (*DeleteDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{45}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *DeleteDeviceRequest) GetTenantId() string {
@@ -5241,7 +5377,7 @@ type GetDeviceAddressesRequest struct {
 
 func (x *GetDeviceAddressesRequest) Reset() {
 	*x = GetDeviceAddressesRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[46]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5253,7 +5389,7 @@ func (x *GetDeviceAddressesRequest) String() string {
 func (*GetDeviceAddressesRequest) ProtoMessage() {}
 
 func (x *GetDeviceAddressesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[46]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5266,7 +5402,7 @@ func (x *GetDeviceAddressesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceAddressesRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceAddressesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{46}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *GetDeviceAddressesRequest) GetTenantId() string {
@@ -5293,7 +5429,7 @@ type GetDeviceInterfacesRequest struct {
 
 func (x *GetDeviceInterfacesRequest) Reset() {
 	*x = GetDeviceInterfacesRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[47]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5305,7 +5441,7 @@ func (x *GetDeviceInterfacesRequest) String() string {
 func (*GetDeviceInterfacesRequest) ProtoMessage() {}
 
 func (x *GetDeviceInterfacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[47]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5318,7 +5454,7 @@ func (x *GetDeviceInterfacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceInterfacesRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceInterfacesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{47}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *GetDeviceInterfacesRequest) GetTenantId() string {
@@ -5344,7 +5480,7 @@ type ListInterfacesResponse struct {
 
 func (x *ListInterfacesResponse) Reset() {
 	*x = ListInterfacesResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[48]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5356,7 +5492,7 @@ func (x *ListInterfacesResponse) String() string {
 func (*ListInterfacesResponse) ProtoMessage() {}
 
 func (x *ListInterfacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[48]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5369,7 +5505,7 @@ func (x *ListInterfacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInterfacesResponse.ProtoReflect.Descriptor instead.
 func (*ListInterfacesResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{48}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *ListInterfacesResponse) GetInterfaces() []*DeviceInterface {
@@ -5390,7 +5526,7 @@ type CreateInterfaceRequest struct {
 
 func (x *CreateInterfaceRequest) Reset() {
 	*x = CreateInterfaceRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[49]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5402,7 +5538,7 @@ func (x *CreateInterfaceRequest) String() string {
 func (*CreateInterfaceRequest) ProtoMessage() {}
 
 func (x *CreateInterfaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[49]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5415,7 +5551,7 @@ func (x *CreateInterfaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateInterfaceRequest.ProtoReflect.Descriptor instead.
 func (*CreateInterfaceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{49}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *CreateInterfaceRequest) GetTenantId() string {
@@ -5450,7 +5586,7 @@ type DeleteInterfaceRequest struct {
 
 func (x *DeleteInterfaceRequest) Reset() {
 	*x = DeleteInterfaceRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[50]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5462,7 +5598,7 @@ func (x *DeleteInterfaceRequest) String() string {
 func (*DeleteInterfaceRequest) ProtoMessage() {}
 
 func (x *DeleteInterfaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[50]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5475,7 +5611,7 @@ func (x *DeleteInterfaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteInterfaceRequest.ProtoReflect.Descriptor instead.
 func (*DeleteInterfaceRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{50}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *DeleteInterfaceRequest) GetTenantId() string {
@@ -5509,7 +5645,7 @@ type SyncPackagesRequest struct {
 
 func (x *SyncPackagesRequest) Reset() {
 	*x = SyncPackagesRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[51]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5521,7 +5657,7 @@ func (x *SyncPackagesRequest) String() string {
 func (*SyncPackagesRequest) ProtoMessage() {}
 
 func (x *SyncPackagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[51]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5534,7 +5670,7 @@ func (x *SyncPackagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncPackagesRequest.ProtoReflect.Descriptor instead.
 func (*SyncPackagesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{51}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *SyncPackagesRequest) GetTenantId() string {
@@ -5561,7 +5697,7 @@ type ListPackagesRequest struct {
 
 func (x *ListPackagesRequest) Reset() {
 	*x = ListPackagesRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[52]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5573,7 +5709,7 @@ func (x *ListPackagesRequest) String() string {
 func (*ListPackagesRequest) ProtoMessage() {}
 
 func (x *ListPackagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[52]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5586,7 +5722,7 @@ func (x *ListPackagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPackagesRequest.ProtoReflect.Descriptor instead.
 func (*ListPackagesRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{52}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *ListPackagesRequest) GetTenantId() string {
@@ -5612,7 +5748,7 @@ type ListPackagesResponse struct {
 
 func (x *ListPackagesResponse) Reset() {
 	*x = ListPackagesResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[53]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5624,7 +5760,7 @@ func (x *ListPackagesResponse) String() string {
 func (*ListPackagesResponse) ProtoMessage() {}
 
 func (x *ListPackagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[53]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5637,7 +5773,7 @@ func (x *ListPackagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPackagesResponse.ProtoReflect.Descriptor instead.
 func (*ListPackagesResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{53}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *ListPackagesResponse) GetPackages() []*DevicePackage {
@@ -5657,7 +5793,7 @@ type PowerStatusRequest struct {
 
 func (x *PowerStatusRequest) Reset() {
 	*x = PowerStatusRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[54]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5669,7 +5805,7 @@ func (x *PowerStatusRequest) String() string {
 func (*PowerStatusRequest) ProtoMessage() {}
 
 func (x *PowerStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[54]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5682,7 +5818,7 @@ func (x *PowerStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PowerStatusRequest.ProtoReflect.Descriptor instead.
 func (*PowerStatusRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{54}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *PowerStatusRequest) GetTenantId() string {
@@ -5708,7 +5844,7 @@ type PowerStatusResponse struct {
 
 func (x *PowerStatusResponse) Reset() {
 	*x = PowerStatusResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[55]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5720,7 +5856,7 @@ func (x *PowerStatusResponse) String() string {
 func (*PowerStatusResponse) ProtoMessage() {}
 
 func (x *PowerStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[55]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5733,7 +5869,7 @@ func (x *PowerStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PowerStatusResponse.ProtoReflect.Descriptor instead.
 func (*PowerStatusResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{55}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *PowerStatusResponse) GetState() string {
@@ -5754,7 +5890,7 @@ type PowerRequest struct {
 
 func (x *PowerRequest) Reset() {
 	*x = PowerRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[56]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5766,7 +5902,7 @@ func (x *PowerRequest) String() string {
 func (*PowerRequest) ProtoMessage() {}
 
 func (x *PowerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[56]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5779,7 +5915,7 @@ func (x *PowerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PowerRequest.ProtoReflect.Descriptor instead.
 func (*PowerRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{56}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *PowerRequest) GetTenantId() string {
@@ -5813,7 +5949,7 @@ type StartKvmSessionRequest struct {
 
 func (x *StartKvmSessionRequest) Reset() {
 	*x = StartKvmSessionRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[57]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5825,7 +5961,7 @@ func (x *StartKvmSessionRequest) String() string {
 func (*StartKvmSessionRequest) ProtoMessage() {}
 
 func (x *StartKvmSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[57]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5838,7 +5974,7 @@ func (x *StartKvmSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartKvmSessionRequest.ProtoReflect.Descriptor instead.
 func (*StartKvmSessionRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{57}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *StartKvmSessionRequest) GetTenantId() string {
@@ -5866,7 +6002,7 @@ type KvmSession struct {
 
 func (x *KvmSession) Reset() {
 	*x = KvmSession{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[58]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5878,7 +6014,7 @@ func (x *KvmSession) String() string {
 func (*KvmSession) ProtoMessage() {}
 
 func (x *KvmSession) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[58]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5891,7 +6027,7 @@ func (x *KvmSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KvmSession.ProtoReflect.Descriptor instead.
 func (*KvmSession) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{58}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *KvmSession) GetToken() string {
@@ -5925,7 +6061,7 @@ type CreateVlanRequest struct {
 
 func (x *CreateVlanRequest) Reset() {
 	*x = CreateVlanRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[59]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5937,7 +6073,7 @@ func (x *CreateVlanRequest) String() string {
 func (*CreateVlanRequest) ProtoMessage() {}
 
 func (x *CreateVlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[59]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5950,7 +6086,7 @@ func (x *CreateVlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVlanRequest.ProtoReflect.Descriptor instead.
 func (*CreateVlanRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{59}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *CreateVlanRequest) GetTenantId() string {
@@ -5977,7 +6113,7 @@ type GetVlanRequest struct {
 
 func (x *GetVlanRequest) Reset() {
 	*x = GetVlanRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[60]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5989,7 +6125,7 @@ func (x *GetVlanRequest) String() string {
 func (*GetVlanRequest) ProtoMessage() {}
 
 func (x *GetVlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[60]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6002,7 +6138,7 @@ func (x *GetVlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVlanRequest.ProtoReflect.Descriptor instead.
 func (*GetVlanRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{60}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *GetVlanRequest) GetTenantId() string {
@@ -6035,7 +6171,7 @@ type ListVlansRequest struct {
 
 func (x *ListVlansRequest) Reset() {
 	*x = ListVlansRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[61]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6047,7 +6183,7 @@ func (x *ListVlansRequest) String() string {
 func (*ListVlansRequest) ProtoMessage() {}
 
 func (x *ListVlansRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[61]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6060,7 +6196,7 @@ func (x *ListVlansRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVlansRequest.ProtoReflect.Descriptor instead.
 func (*ListVlansRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{61}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *ListVlansRequest) GetTenantId() string {
@@ -6129,7 +6265,7 @@ type ListVlansResponse struct {
 
 func (x *ListVlansResponse) Reset() {
 	*x = ListVlansResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[62]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6141,7 +6277,7 @@ func (x *ListVlansResponse) String() string {
 func (*ListVlansResponse) ProtoMessage() {}
 
 func (x *ListVlansResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[62]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6154,7 +6290,7 @@ func (x *ListVlansResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVlansResponse.ProtoReflect.Descriptor instead.
 func (*ListVlansResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{62}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *ListVlansResponse) GetVlans() []*Vlan {
@@ -6182,7 +6318,7 @@ type UpdateVlanRequest struct {
 
 func (x *UpdateVlanRequest) Reset() {
 	*x = UpdateVlanRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[63]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6194,7 +6330,7 @@ func (x *UpdateVlanRequest) String() string {
 func (*UpdateVlanRequest) ProtoMessage() {}
 
 func (x *UpdateVlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[63]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6207,7 +6343,7 @@ func (x *UpdateVlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateVlanRequest.ProtoReflect.Descriptor instead.
 func (*UpdateVlanRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{63}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *UpdateVlanRequest) GetTenantId() string {
@@ -6241,7 +6377,7 @@ type DeleteVlanRequest struct {
 
 func (x *DeleteVlanRequest) Reset() {
 	*x = DeleteVlanRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[64]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6253,7 +6389,7 @@ func (x *DeleteVlanRequest) String() string {
 func (*DeleteVlanRequest) ProtoMessage() {}
 
 func (x *DeleteVlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[64]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6266,7 +6402,7 @@ func (x *DeleteVlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteVlanRequest.ProtoReflect.Descriptor instead.
 func (*DeleteVlanRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{64}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *DeleteVlanRequest) GetTenantId() string {
@@ -6293,7 +6429,7 @@ type GetVlanSubnetsRequest struct {
 
 func (x *GetVlanSubnetsRequest) Reset() {
 	*x = GetVlanSubnetsRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[65]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6305,7 +6441,7 @@ func (x *GetVlanSubnetsRequest) String() string {
 func (*GetVlanSubnetsRequest) ProtoMessage() {}
 
 func (x *GetVlanSubnetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[65]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6318,7 +6454,7 @@ func (x *GetVlanSubnetsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVlanSubnetsRequest.ProtoReflect.Descriptor instead.
 func (*GetVlanSubnetsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{65}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *GetVlanSubnetsRequest) GetTenantId() string {
@@ -6345,7 +6481,7 @@ type CreateLocationRequest struct {
 
 func (x *CreateLocationRequest) Reset() {
 	*x = CreateLocationRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[66]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6357,7 +6493,7 @@ func (x *CreateLocationRequest) String() string {
 func (*CreateLocationRequest) ProtoMessage() {}
 
 func (x *CreateLocationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[66]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6370,7 +6506,7 @@ func (x *CreateLocationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateLocationRequest.ProtoReflect.Descriptor instead.
 func (*CreateLocationRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{66}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *CreateLocationRequest) GetTenantId() string {
@@ -6397,7 +6533,7 @@ type GetLocationRequest struct {
 
 func (x *GetLocationRequest) Reset() {
 	*x = GetLocationRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[67]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6409,7 +6545,7 @@ func (x *GetLocationRequest) String() string {
 func (*GetLocationRequest) ProtoMessage() {}
 
 func (x *GetLocationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[67]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6422,7 +6558,7 @@ func (x *GetLocationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLocationRequest.ProtoReflect.Descriptor instead.
 func (*GetLocationRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{67}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *GetLocationRequest) GetTenantId() string {
@@ -6454,7 +6590,7 @@ type ListLocationsRequest struct {
 
 func (x *ListLocationsRequest) Reset() {
 	*x = ListLocationsRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[68]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6466,7 +6602,7 @@ func (x *ListLocationsRequest) String() string {
 func (*ListLocationsRequest) ProtoMessage() {}
 
 func (x *ListLocationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[68]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6479,7 +6615,7 @@ func (x *ListLocationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListLocationsRequest.ProtoReflect.Descriptor instead.
 func (*ListLocationsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{68}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *ListLocationsRequest) GetTenantId() string {
@@ -6541,7 +6677,7 @@ type ListLocationsResponse struct {
 
 func (x *ListLocationsResponse) Reset() {
 	*x = ListLocationsResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[69]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6553,7 +6689,7 @@ func (x *ListLocationsResponse) String() string {
 func (*ListLocationsResponse) ProtoMessage() {}
 
 func (x *ListLocationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[69]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6566,7 +6702,7 @@ func (x *ListLocationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListLocationsResponse.ProtoReflect.Descriptor instead.
 func (*ListLocationsResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{69}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *ListLocationsResponse) GetLocations() []*Location {
@@ -6594,7 +6730,7 @@ type UpdateLocationRequest struct {
 
 func (x *UpdateLocationRequest) Reset() {
 	*x = UpdateLocationRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[70]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6606,7 +6742,7 @@ func (x *UpdateLocationRequest) String() string {
 func (*UpdateLocationRequest) ProtoMessage() {}
 
 func (x *UpdateLocationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[70]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6619,7 +6755,7 @@ func (x *UpdateLocationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateLocationRequest.ProtoReflect.Descriptor instead.
 func (*UpdateLocationRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{70}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *UpdateLocationRequest) GetTenantId() string {
@@ -6654,7 +6790,7 @@ type DeleteLocationRequest struct {
 
 func (x *DeleteLocationRequest) Reset() {
 	*x = DeleteLocationRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[71]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6666,7 +6802,7 @@ func (x *DeleteLocationRequest) String() string {
 func (*DeleteLocationRequest) ProtoMessage() {}
 
 func (x *DeleteLocationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[71]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6679,7 +6815,7 @@ func (x *DeleteLocationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteLocationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteLocationRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{71}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *DeleteLocationRequest) GetTenantId() string {
@@ -6712,7 +6848,7 @@ type GetLocationTreeRequest struct {
 
 func (x *GetLocationTreeRequest) Reset() {
 	*x = GetLocationTreeRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[72]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6724,7 +6860,7 @@ func (x *GetLocationTreeRequest) String() string {
 func (*GetLocationTreeRequest) ProtoMessage() {}
 
 func (x *GetLocationTreeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[72]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6737,7 +6873,7 @@ func (x *GetLocationTreeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLocationTreeRequest.ProtoReflect.Descriptor instead.
 func (*GetLocationTreeRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{72}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *GetLocationTreeRequest) GetTenantId() string {
@@ -6757,7 +6893,7 @@ type LocationTreeNode struct {
 
 func (x *LocationTreeNode) Reset() {
 	*x = LocationTreeNode{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[73]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6769,7 +6905,7 @@ func (x *LocationTreeNode) String() string {
 func (*LocationTreeNode) ProtoMessage() {}
 
 func (x *LocationTreeNode) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[73]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6782,7 +6918,7 @@ func (x *LocationTreeNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocationTreeNode.ProtoReflect.Descriptor instead.
 func (*LocationTreeNode) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{73}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *LocationTreeNode) GetLocation() *Location {
@@ -6808,7 +6944,7 @@ type LocationTree struct {
 
 func (x *LocationTree) Reset() {
 	*x = LocationTree{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[74]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6820,7 +6956,7 @@ func (x *LocationTree) String() string {
 func (*LocationTree) ProtoMessage() {}
 
 func (x *LocationTree) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[74]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6833,7 +6969,7 @@ func (x *LocationTree) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocationTree.ProtoReflect.Descriptor instead.
 func (*LocationTree) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{74}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *LocationTree) GetRoots() []*LocationTreeNode {
@@ -6853,7 +6989,7 @@ type CreateIpGroupRequest struct {
 
 func (x *CreateIpGroupRequest) Reset() {
 	*x = CreateIpGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[75]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6865,7 +7001,7 @@ func (x *CreateIpGroupRequest) String() string {
 func (*CreateIpGroupRequest) ProtoMessage() {}
 
 func (x *CreateIpGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[75]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6878,7 +7014,7 @@ func (x *CreateIpGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateIpGroupRequest.ProtoReflect.Descriptor instead.
 func (*CreateIpGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{75}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *CreateIpGroupRequest) GetTenantId() string {
@@ -6906,7 +7042,7 @@ type GetIpGroupRequest struct {
 
 func (x *GetIpGroupRequest) Reset() {
 	*x = GetIpGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[76]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6918,7 +7054,7 @@ func (x *GetIpGroupRequest) String() string {
 func (*GetIpGroupRequest) ProtoMessage() {}
 
 func (x *GetIpGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[76]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6931,7 +7067,7 @@ func (x *GetIpGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIpGroupRequest.ProtoReflect.Descriptor instead.
 func (*GetIpGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{76}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *GetIpGroupRequest) GetTenantId() string {
@@ -6967,7 +7103,7 @@ type ListIpGroupsRequest struct {
 
 func (x *ListIpGroupsRequest) Reset() {
 	*x = ListIpGroupsRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[77]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6979,7 +7115,7 @@ func (x *ListIpGroupsRequest) String() string {
 func (*ListIpGroupsRequest) ProtoMessage() {}
 
 func (x *ListIpGroupsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[77]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6992,7 +7128,7 @@ func (x *ListIpGroupsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIpGroupsRequest.ProtoReflect.Descriptor instead.
 func (*ListIpGroupsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{77}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *ListIpGroupsRequest) GetTenantId() string {
@@ -7033,7 +7169,7 @@ type ListIpGroupsResponse struct {
 
 func (x *ListIpGroupsResponse) Reset() {
 	*x = ListIpGroupsResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[78]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7045,7 +7181,7 @@ func (x *ListIpGroupsResponse) String() string {
 func (*ListIpGroupsResponse) ProtoMessage() {}
 
 func (x *ListIpGroupsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[78]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7058,7 +7194,7 @@ func (x *ListIpGroupsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIpGroupsResponse.ProtoReflect.Descriptor instead.
 func (*ListIpGroupsResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{78}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *ListIpGroupsResponse) GetGroups() []*IPGroup {
@@ -7086,7 +7222,7 @@ type UpdateIpGroupRequest struct {
 
 func (x *UpdateIpGroupRequest) Reset() {
 	*x = UpdateIpGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[79]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7098,7 +7234,7 @@ func (x *UpdateIpGroupRequest) String() string {
 func (*UpdateIpGroupRequest) ProtoMessage() {}
 
 func (x *UpdateIpGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[79]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7111,7 +7247,7 @@ func (x *UpdateIpGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIpGroupRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIpGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{79}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *UpdateIpGroupRequest) GetTenantId() string {
@@ -7145,7 +7281,7 @@ type DeleteIpGroupRequest struct {
 
 func (x *DeleteIpGroupRequest) Reset() {
 	*x = DeleteIpGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[80]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7157,7 +7293,7 @@ func (x *DeleteIpGroupRequest) String() string {
 func (*DeleteIpGroupRequest) ProtoMessage() {}
 
 func (x *DeleteIpGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[80]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7170,7 +7306,7 @@ func (x *DeleteIpGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteIpGroupRequest.ProtoReflect.Descriptor instead.
 func (*DeleteIpGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{80}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *DeleteIpGroupRequest) GetTenantId() string {
@@ -7198,7 +7334,7 @@ type AddIpGroupMemberRequest struct {
 
 func (x *AddIpGroupMemberRequest) Reset() {
 	*x = AddIpGroupMemberRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[81]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7210,7 +7346,7 @@ func (x *AddIpGroupMemberRequest) String() string {
 func (*AddIpGroupMemberRequest) ProtoMessage() {}
 
 func (x *AddIpGroupMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[81]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7223,7 +7359,7 @@ func (x *AddIpGroupMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddIpGroupMemberRequest.ProtoReflect.Descriptor instead.
 func (*AddIpGroupMemberRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{81}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *AddIpGroupMemberRequest) GetTenantId() string {
@@ -7259,7 +7395,7 @@ type UpdateIpGroupMemberRequest struct {
 
 func (x *UpdateIpGroupMemberRequest) Reset() {
 	*x = UpdateIpGroupMemberRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[82]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7271,7 +7407,7 @@ func (x *UpdateIpGroupMemberRequest) String() string {
 func (*UpdateIpGroupMemberRequest) ProtoMessage() {}
 
 func (x *UpdateIpGroupMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[82]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7284,7 +7420,7 @@ func (x *UpdateIpGroupMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIpGroupMemberRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIpGroupMemberRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{82}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *UpdateIpGroupMemberRequest) GetTenantId() string {
@@ -7326,7 +7462,7 @@ type RemoveIpGroupMemberRequest struct {
 
 func (x *RemoveIpGroupMemberRequest) Reset() {
 	*x = RemoveIpGroupMemberRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[83]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7338,7 +7474,7 @@ func (x *RemoveIpGroupMemberRequest) String() string {
 func (*RemoveIpGroupMemberRequest) ProtoMessage() {}
 
 func (x *RemoveIpGroupMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[83]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7351,7 +7487,7 @@ func (x *RemoveIpGroupMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveIpGroupMemberRequest.ProtoReflect.Descriptor instead.
 func (*RemoveIpGroupMemberRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{83}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *RemoveIpGroupMemberRequest) GetTenantId() string {
@@ -7385,7 +7521,7 @@ type ListIpGroupMembersRequest struct {
 
 func (x *ListIpGroupMembersRequest) Reset() {
 	*x = ListIpGroupMembersRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[84]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7397,7 +7533,7 @@ func (x *ListIpGroupMembersRequest) String() string {
 func (*ListIpGroupMembersRequest) ProtoMessage() {}
 
 func (x *ListIpGroupMembersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[84]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7410,7 +7546,7 @@ func (x *ListIpGroupMembersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIpGroupMembersRequest.ProtoReflect.Descriptor instead.
 func (*ListIpGroupMembersRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{84}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *ListIpGroupMembersRequest) GetTenantId() string {
@@ -7436,7 +7572,7 @@ type ListIpGroupMembersResponse struct {
 
 func (x *ListIpGroupMembersResponse) Reset() {
 	*x = ListIpGroupMembersResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[85]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7448,7 +7584,7 @@ func (x *ListIpGroupMembersResponse) String() string {
 func (*ListIpGroupMembersResponse) ProtoMessage() {}
 
 func (x *ListIpGroupMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[85]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7461,7 +7597,7 @@ func (x *ListIpGroupMembersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIpGroupMembersResponse.ProtoReflect.Descriptor instead.
 func (*ListIpGroupMembersResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{85}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *ListIpGroupMembersResponse) GetMembers() []*IPGroupMember {
@@ -7481,7 +7617,7 @@ type CheckIpInGroupRequest struct {
 
 func (x *CheckIpInGroupRequest) Reset() {
 	*x = CheckIpInGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[86]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7493,7 +7629,7 @@ func (x *CheckIpInGroupRequest) String() string {
 func (*CheckIpInGroupRequest) ProtoMessage() {}
 
 func (x *CheckIpInGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[86]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7506,7 +7642,7 @@ func (x *CheckIpInGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckIpInGroupRequest.ProtoReflect.Descriptor instead.
 func (*CheckIpInGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{86}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *CheckIpInGroupRequest) GetTenantId() string {
@@ -7532,7 +7668,7 @@ type CheckIpInGroupResponse struct {
 
 func (x *CheckIpInGroupResponse) Reset() {
 	*x = CheckIpInGroupResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[87]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7544,7 +7680,7 @@ func (x *CheckIpInGroupResponse) String() string {
 func (*CheckIpInGroupResponse) ProtoMessage() {}
 
 func (x *CheckIpInGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[87]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7557,7 +7693,7 @@ func (x *CheckIpInGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckIpInGroupResponse.ProtoReflect.Descriptor instead.
 func (*CheckIpInGroupResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{87}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *CheckIpInGroupResponse) GetGroups() []*IPGroup {
@@ -7577,7 +7713,7 @@ type CreateHostGroupRequest struct {
 
 func (x *CreateHostGroupRequest) Reset() {
 	*x = CreateHostGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[88]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7589,7 +7725,7 @@ func (x *CreateHostGroupRequest) String() string {
 func (*CreateHostGroupRequest) ProtoMessage() {}
 
 func (x *CreateHostGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[88]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7602,7 +7738,7 @@ func (x *CreateHostGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateHostGroupRequest.ProtoReflect.Descriptor instead.
 func (*CreateHostGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{88}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *CreateHostGroupRequest) GetTenantId() string {
@@ -7630,7 +7766,7 @@ type GetHostGroupRequest struct {
 
 func (x *GetHostGroupRequest) Reset() {
 	*x = GetHostGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[89]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7642,7 +7778,7 @@ func (x *GetHostGroupRequest) String() string {
 func (*GetHostGroupRequest) ProtoMessage() {}
 
 func (x *GetHostGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[89]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7655,7 +7791,7 @@ func (x *GetHostGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHostGroupRequest.ProtoReflect.Descriptor instead.
 func (*GetHostGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{89}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *GetHostGroupRequest) GetTenantId() string {
@@ -7691,7 +7827,7 @@ type ListHostGroupsRequest struct {
 
 func (x *ListHostGroupsRequest) Reset() {
 	*x = ListHostGroupsRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[90]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7703,7 +7839,7 @@ func (x *ListHostGroupsRequest) String() string {
 func (*ListHostGroupsRequest) ProtoMessage() {}
 
 func (x *ListHostGroupsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[90]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7716,7 +7852,7 @@ func (x *ListHostGroupsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListHostGroupsRequest.ProtoReflect.Descriptor instead.
 func (*ListHostGroupsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{90}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *ListHostGroupsRequest) GetTenantId() string {
@@ -7757,7 +7893,7 @@ type ListHostGroupsResponse struct {
 
 func (x *ListHostGroupsResponse) Reset() {
 	*x = ListHostGroupsResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[91]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7769,7 +7905,7 @@ func (x *ListHostGroupsResponse) String() string {
 func (*ListHostGroupsResponse) ProtoMessage() {}
 
 func (x *ListHostGroupsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[91]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7782,7 +7918,7 @@ func (x *ListHostGroupsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListHostGroupsResponse.ProtoReflect.Descriptor instead.
 func (*ListHostGroupsResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{91}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *ListHostGroupsResponse) GetGroups() []*HostGroup {
@@ -7810,7 +7946,7 @@ type UpdateHostGroupRequest struct {
 
 func (x *UpdateHostGroupRequest) Reset() {
 	*x = UpdateHostGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[92]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7822,7 +7958,7 @@ func (x *UpdateHostGroupRequest) String() string {
 func (*UpdateHostGroupRequest) ProtoMessage() {}
 
 func (x *UpdateHostGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[92]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7835,7 +7971,7 @@ func (x *UpdateHostGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateHostGroupRequest.ProtoReflect.Descriptor instead.
 func (*UpdateHostGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{92}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *UpdateHostGroupRequest) GetTenantId() string {
@@ -7869,7 +8005,7 @@ type DeleteHostGroupRequest struct {
 
 func (x *DeleteHostGroupRequest) Reset() {
 	*x = DeleteHostGroupRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[93]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7881,7 +8017,7 @@ func (x *DeleteHostGroupRequest) String() string {
 func (*DeleteHostGroupRequest) ProtoMessage() {}
 
 func (x *DeleteHostGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[93]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7894,7 +8030,7 @@ func (x *DeleteHostGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteHostGroupRequest.ProtoReflect.Descriptor instead.
 func (*DeleteHostGroupRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{93}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *DeleteHostGroupRequest) GetTenantId() string {
@@ -7923,7 +8059,7 @@ type AddHostGroupMemberRequest struct {
 
 func (x *AddHostGroupMemberRequest) Reset() {
 	*x = AddHostGroupMemberRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[94]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7935,7 +8071,7 @@ func (x *AddHostGroupMemberRequest) String() string {
 func (*AddHostGroupMemberRequest) ProtoMessage() {}
 
 func (x *AddHostGroupMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[94]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7948,7 +8084,7 @@ func (x *AddHostGroupMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddHostGroupMemberRequest.ProtoReflect.Descriptor instead.
 func (*AddHostGroupMemberRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{94}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *AddHostGroupMemberRequest) GetTenantId() string {
@@ -7990,7 +8126,7 @@ type RemoveHostGroupMemberRequest struct {
 
 func (x *RemoveHostGroupMemberRequest) Reset() {
 	*x = RemoveHostGroupMemberRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[95]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8002,7 +8138,7 @@ func (x *RemoveHostGroupMemberRequest) String() string {
 func (*RemoveHostGroupMemberRequest) ProtoMessage() {}
 
 func (x *RemoveHostGroupMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[95]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8015,7 +8151,7 @@ func (x *RemoveHostGroupMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveHostGroupMemberRequest.ProtoReflect.Descriptor instead.
 func (*RemoveHostGroupMemberRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{95}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *RemoveHostGroupMemberRequest) GetTenantId() string {
@@ -8049,7 +8185,7 @@ type ListHostGroupMembersRequest struct {
 
 func (x *ListHostGroupMembersRequest) Reset() {
 	*x = ListHostGroupMembersRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[96]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8061,7 +8197,7 @@ func (x *ListHostGroupMembersRequest) String() string {
 func (*ListHostGroupMembersRequest) ProtoMessage() {}
 
 func (x *ListHostGroupMembersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[96]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8074,7 +8210,7 @@ func (x *ListHostGroupMembersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListHostGroupMembersRequest.ProtoReflect.Descriptor instead.
 func (*ListHostGroupMembersRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{96}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *ListHostGroupMembersRequest) GetTenantId() string {
@@ -8100,7 +8236,7 @@ type ListHostGroupMembersResponse struct {
 
 func (x *ListHostGroupMembersResponse) Reset() {
 	*x = ListHostGroupMembersResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[97]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8112,7 +8248,7 @@ func (x *ListHostGroupMembersResponse) String() string {
 func (*ListHostGroupMembersResponse) ProtoMessage() {}
 
 func (x *ListHostGroupMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[97]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8125,7 +8261,7 @@ func (x *ListHostGroupMembersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListHostGroupMembersResponse.ProtoReflect.Descriptor instead.
 func (*ListHostGroupMembersResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{97}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *ListHostGroupMembersResponse) GetMembers() []*HostGroupMember {
@@ -8145,7 +8281,7 @@ type ListDeviceHostGroupsRequest struct {
 
 func (x *ListDeviceHostGroupsRequest) Reset() {
 	*x = ListDeviceHostGroupsRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[98]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8157,7 +8293,7 @@ func (x *ListDeviceHostGroupsRequest) String() string {
 func (*ListDeviceHostGroupsRequest) ProtoMessage() {}
 
 func (x *ListDeviceHostGroupsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[98]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8170,7 +8306,7 @@ func (x *ListDeviceHostGroupsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDeviceHostGroupsRequest.ProtoReflect.Descriptor instead.
 func (*ListDeviceHostGroupsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{98}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *ListDeviceHostGroupsRequest) GetTenantId() string {
@@ -8203,7 +8339,7 @@ type StartScanRequest struct {
 
 func (x *StartScanRequest) Reset() {
 	*x = StartScanRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[99]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8215,7 +8351,7 @@ func (x *StartScanRequest) String() string {
 func (*StartScanRequest) ProtoMessage() {}
 
 func (x *StartScanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[99]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8228,7 +8364,7 @@ func (x *StartScanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartScanRequest.ProtoReflect.Descriptor instead.
 func (*StartScanRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{99}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *StartScanRequest) GetTenantId() string {
@@ -8297,7 +8433,7 @@ type GetScanRequest struct {
 
 func (x *GetScanRequest) Reset() {
 	*x = GetScanRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[100]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8309,7 +8445,7 @@ func (x *GetScanRequest) String() string {
 func (*GetScanRequest) ProtoMessage() {}
 
 func (x *GetScanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[100]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8322,7 +8458,7 @@ func (x *GetScanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScanRequest.ProtoReflect.Descriptor instead.
 func (*GetScanRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{100}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *GetScanRequest) GetTenantId() string {
@@ -8352,7 +8488,7 @@ type ListScansRequest struct {
 
 func (x *ListScansRequest) Reset() {
 	*x = ListScansRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[101]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8364,7 +8500,7 @@ func (x *ListScansRequest) String() string {
 func (*ListScansRequest) ProtoMessage() {}
 
 func (x *ListScansRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[101]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8377,7 +8513,7 @@ func (x *ListScansRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScansRequest.ProtoReflect.Descriptor instead.
 func (*ListScansRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{101}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *ListScansRequest) GetTenantId() string {
@@ -8425,7 +8561,7 @@ type ListScansResponse struct {
 
 func (x *ListScansResponse) Reset() {
 	*x = ListScansResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[102]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8437,7 +8573,7 @@ func (x *ListScansResponse) String() string {
 func (*ListScansResponse) ProtoMessage() {}
 
 func (x *ListScansResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[102]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8450,7 +8586,7 @@ func (x *ListScansResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScansResponse.ProtoReflect.Descriptor instead.
 func (*ListScansResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{102}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *ListScansResponse) GetJobs() []*IPScanJob {
@@ -8477,7 +8613,7 @@ type CancelScanRequest struct {
 
 func (x *CancelScanRequest) Reset() {
 	*x = CancelScanRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[103]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8489,7 +8625,7 @@ func (x *CancelScanRequest) String() string {
 func (*CancelScanRequest) ProtoMessage() {}
 
 func (x *CancelScanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[103]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8502,7 +8638,7 @@ func (x *CancelScanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelScanRequest.ProtoReflect.Descriptor instead.
 func (*CancelScanRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{103}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *CancelScanRequest) GetTenantId() string {
@@ -8527,7 +8663,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[104]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8539,7 +8675,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[104]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8552,7 +8688,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{104}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{105}
 }
 
 type HealthResponse struct {
@@ -8564,7 +8700,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[105]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8576,7 +8712,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[105]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8589,7 +8725,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{105}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *HealthResponse) GetStatus() string {
@@ -8608,7 +8744,7 @@ type GetStatsRequest struct {
 
 func (x *GetStatsRequest) Reset() {
 	*x = GetStatsRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[106]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8620,7 +8756,7 @@ func (x *GetStatsRequest) String() string {
 func (*GetStatsRequest) ProtoMessage() {}
 
 func (x *GetStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[106]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8633,7 +8769,7 @@ func (x *GetStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetStatsRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{106}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *GetStatsRequest) GetTenantId() string {
@@ -8652,7 +8788,7 @@ type GetDnsConfigRequest struct {
 
 func (x *GetDnsConfigRequest) Reset() {
 	*x = GetDnsConfigRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[107]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8664,7 +8800,7 @@ func (x *GetDnsConfigRequest) String() string {
 func (*GetDnsConfigRequest) ProtoMessage() {}
 
 func (x *GetDnsConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[107]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8677,7 +8813,7 @@ func (x *GetDnsConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDnsConfigRequest.ProtoReflect.Descriptor instead.
 func (*GetDnsConfigRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{107}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *GetDnsConfigRequest) GetTenantId() string {
@@ -8697,7 +8833,7 @@ type UpdateDnsConfigRequest struct {
 
 func (x *UpdateDnsConfigRequest) Reset() {
 	*x = UpdateDnsConfigRequest{}
-	mi := &file_ipam_v1_ipam_proto_msgTypes[108]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8709,7 +8845,7 @@ func (x *UpdateDnsConfigRequest) String() string {
 func (*UpdateDnsConfigRequest) ProtoMessage() {}
 
 func (x *UpdateDnsConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ipam_v1_ipam_proto_msgTypes[108]
+	mi := &file_ipam_v1_ipam_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8722,7 +8858,7 @@ func (x *UpdateDnsConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDnsConfigRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDnsConfigRequest) Descriptor() ([]byte, []int) {
-	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{108}
+	return file_ipam_v1_ipam_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *UpdateDnsConfigRequest) GetTenantId() string {
@@ -8818,7 +8954,7 @@ const file_ipam_v1_ipam_proto_rawDesc = "" +
 	"\bconflict\x18\x1a \x01(\bR\bconflict\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xeb\v\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb0\f\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -8868,10 +9004,29 @@ const file_ipam_v1_ipam_proto_rawDesc = "" +
 	"\freport_state\x18& \x01(\tR\vreportState\x12$\n" +
 	"\x0elast_report_at\x18' \x01(\x03R\flastReportAt\x12\x1f\n" +
 	"\vguest_count\x18( \x01(\x03R\n" +
-	"guestCount\x1a7\n" +
+	"guestCount\x12C\n" +
+	"\x10hardware_summary\x18) \x01(\v2\x18.ipam.v1.HardwareSummaryR\x0fhardwareSummary\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf6\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa0\x03\n" +
+	"\x0fHardwareSummary\x12\x1b\n" +
+	"\tcpu_model\x18\x01 \x01(\tR\bcpuModel\x12\x1f\n" +
+	"\vcpu_sockets\x18\x02 \x01(\x05R\n" +
+	"cpuSockets\x12\x1b\n" +
+	"\tcpu_cores\x18\x03 \x01(\x05R\bcpuCores\x12\x1f\n" +
+	"\vcpu_threads\x18\x04 \x01(\x05R\n" +
+	"cpuThreads\x12,\n" +
+	"\x12memory_total_bytes\x18\x05 \x01(\x03R\x10memoryTotalBytes\x12\x1f\n" +
+	"\vmemory_type\x18\x06 \x01(\tR\n" +
+	"memoryType\x12,\n" +
+	"\x12memory_slots_total\x18\a \x01(\x05R\x10memorySlotsTotal\x12*\n" +
+	"\x11memory_slots_used\x18\b \x01(\x05R\x0fmemorySlotsUsed\x12\x1d\n" +
+	"\n" +
+	"disk_count\x18\t \x01(\x05R\tdiskCount\x12(\n" +
+	"\x10disk_total_bytes\x18\n" +
+	" \x01(\x03R\x0ediskTotalBytes\x12\x1f\n" +
+	"\vreported_at\x18\v \x01(\x03R\n" +
+	"reportedAt\"\xf6\x04\n" +
 	"\x0fDeviceInterface\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x1b\n" +
@@ -9665,7 +9820,7 @@ func file_ipam_v1_ipam_proto_rawDescGZIP() []byte {
 }
 
 var file_ipam_v1_ipam_proto_enumTypes = make([]protoimpl.EnumInfo, 13)
-var file_ipam_v1_ipam_proto_msgTypes = make([]protoimpl.MessageInfo, 120)
+var file_ipam_v1_ipam_proto_msgTypes = make([]protoimpl.MessageInfo, 121)
 var file_ipam_v1_ipam_proto_goTypes = []any{
 	(SubnetStatus)(0),                    // 0: ipam.v1.SubnetStatus
 	(IpStatus)(0),                        // 1: ipam.v1.IpStatus
@@ -9683,348 +9838,350 @@ var file_ipam_v1_ipam_proto_goTypes = []any{
 	(*Subnet)(nil),                       // 13: ipam.v1.Subnet
 	(*IPAddress)(nil),                    // 14: ipam.v1.IPAddress
 	(*Device)(nil),                       // 15: ipam.v1.Device
-	(*DeviceInterface)(nil),              // 16: ipam.v1.DeviceInterface
-	(*DevicePackage)(nil),                // 17: ipam.v1.DevicePackage
-	(*Vlan)(nil),                         // 18: ipam.v1.Vlan
-	(*Location)(nil),                     // 19: ipam.v1.Location
-	(*IPGroup)(nil),                      // 20: ipam.v1.IPGroup
-	(*IPGroupMember)(nil),                // 21: ipam.v1.IPGroupMember
-	(*HostGroup)(nil),                    // 22: ipam.v1.HostGroup
-	(*HostGroupMember)(nil),              // 23: ipam.v1.HostGroupMember
-	(*IPScanJob)(nil),                    // 24: ipam.v1.IPScanJob
-	(*DNSConfig)(nil),                    // 25: ipam.v1.DNSConfig
-	(*Stats)(nil),                        // 26: ipam.v1.Stats
-	(*CreateSubnetRequest)(nil),          // 27: ipam.v1.CreateSubnetRequest
-	(*GetSubnetRequest)(nil),             // 28: ipam.v1.GetSubnetRequest
-	(*ListSubnetsRequest)(nil),           // 29: ipam.v1.ListSubnetsRequest
-	(*ListSubnetsResponse)(nil),          // 30: ipam.v1.ListSubnetsResponse
-	(*UpdateSubnetRequest)(nil),          // 31: ipam.v1.UpdateSubnetRequest
-	(*DeleteSubnetRequest)(nil),          // 32: ipam.v1.DeleteSubnetRequest
-	(*GetSubnetTreeRequest)(nil),         // 33: ipam.v1.GetSubnetTreeRequest
-	(*SubnetTreeNode)(nil),               // 34: ipam.v1.SubnetTreeNode
-	(*SubnetTree)(nil),                   // 35: ipam.v1.SubnetTree
-	(*GetSubnetStatsRequest)(nil),        // 36: ipam.v1.GetSubnetStatsRequest
-	(*ScanSubnetRequest)(nil),            // 37: ipam.v1.ScanSubnetRequest
-	(*DeleteResponse)(nil),               // 38: ipam.v1.DeleteResponse
-	(*CreateIpAddressRequest)(nil),       // 39: ipam.v1.CreateIpAddressRequest
-	(*GetIpAddressRequest)(nil),          // 40: ipam.v1.GetIpAddressRequest
-	(*ListIpAddressesRequest)(nil),       // 41: ipam.v1.ListIpAddressesRequest
-	(*ListIpAddressesResponse)(nil),      // 42: ipam.v1.ListIpAddressesResponse
-	(*UpdateIpAddressRequest)(nil),       // 43: ipam.v1.UpdateIpAddressRequest
-	(*DeleteIpAddressRequest)(nil),       // 44: ipam.v1.DeleteIpAddressRequest
-	(*AllocateNextRequest)(nil),          // 45: ipam.v1.AllocateNextRequest
-	(*BulkAllocateRequest)(nil),          // 46: ipam.v1.BulkAllocateRequest
-	(*BulkAllocateResponse)(nil),         // 47: ipam.v1.BulkAllocateResponse
-	(*FindIpAddressRequest)(nil),         // 48: ipam.v1.FindIpAddressRequest
-	(*SuggestIpAddressRequest)(nil),      // 49: ipam.v1.SuggestIpAddressRequest
-	(*SuggestIpAddressResponse)(nil),     // 50: ipam.v1.SuggestIpAddressResponse
-	(*PingIpAddressRequest)(nil),         // 51: ipam.v1.PingIpAddressRequest
-	(*PingResponse)(nil),                 // 52: ipam.v1.PingResponse
-	(*CreateDeviceRequest)(nil),          // 53: ipam.v1.CreateDeviceRequest
-	(*GetDeviceRequest)(nil),             // 54: ipam.v1.GetDeviceRequest
-	(*ListDevicesRequest)(nil),           // 55: ipam.v1.ListDevicesRequest
-	(*ListDevicesResponse)(nil),          // 56: ipam.v1.ListDevicesResponse
-	(*UpdateDeviceRequest)(nil),          // 57: ipam.v1.UpdateDeviceRequest
-	(*DeleteDeviceRequest)(nil),          // 58: ipam.v1.DeleteDeviceRequest
-	(*GetDeviceAddressesRequest)(nil),    // 59: ipam.v1.GetDeviceAddressesRequest
-	(*GetDeviceInterfacesRequest)(nil),   // 60: ipam.v1.GetDeviceInterfacesRequest
-	(*ListInterfacesResponse)(nil),       // 61: ipam.v1.ListInterfacesResponse
-	(*CreateInterfaceRequest)(nil),       // 62: ipam.v1.CreateInterfaceRequest
-	(*DeleteInterfaceRequest)(nil),       // 63: ipam.v1.DeleteInterfaceRequest
-	(*SyncPackagesRequest)(nil),          // 64: ipam.v1.SyncPackagesRequest
-	(*ListPackagesRequest)(nil),          // 65: ipam.v1.ListPackagesRequest
-	(*ListPackagesResponse)(nil),         // 66: ipam.v1.ListPackagesResponse
-	(*PowerStatusRequest)(nil),           // 67: ipam.v1.PowerStatusRequest
-	(*PowerStatusResponse)(nil),          // 68: ipam.v1.PowerStatusResponse
-	(*PowerRequest)(nil),                 // 69: ipam.v1.PowerRequest
-	(*StartKvmSessionRequest)(nil),       // 70: ipam.v1.StartKvmSessionRequest
-	(*KvmSession)(nil),                   // 71: ipam.v1.KvmSession
-	(*CreateVlanRequest)(nil),            // 72: ipam.v1.CreateVlanRequest
-	(*GetVlanRequest)(nil),               // 73: ipam.v1.GetVlanRequest
-	(*ListVlansRequest)(nil),             // 74: ipam.v1.ListVlansRequest
-	(*ListVlansResponse)(nil),            // 75: ipam.v1.ListVlansResponse
-	(*UpdateVlanRequest)(nil),            // 76: ipam.v1.UpdateVlanRequest
-	(*DeleteVlanRequest)(nil),            // 77: ipam.v1.DeleteVlanRequest
-	(*GetVlanSubnetsRequest)(nil),        // 78: ipam.v1.GetVlanSubnetsRequest
-	(*CreateLocationRequest)(nil),        // 79: ipam.v1.CreateLocationRequest
-	(*GetLocationRequest)(nil),           // 80: ipam.v1.GetLocationRequest
-	(*ListLocationsRequest)(nil),         // 81: ipam.v1.ListLocationsRequest
-	(*ListLocationsResponse)(nil),        // 82: ipam.v1.ListLocationsResponse
-	(*UpdateLocationRequest)(nil),        // 83: ipam.v1.UpdateLocationRequest
-	(*DeleteLocationRequest)(nil),        // 84: ipam.v1.DeleteLocationRequest
-	(*GetLocationTreeRequest)(nil),       // 85: ipam.v1.GetLocationTreeRequest
-	(*LocationTreeNode)(nil),             // 86: ipam.v1.LocationTreeNode
-	(*LocationTree)(nil),                 // 87: ipam.v1.LocationTree
-	(*CreateIpGroupRequest)(nil),         // 88: ipam.v1.CreateIpGroupRequest
-	(*GetIpGroupRequest)(nil),            // 89: ipam.v1.GetIpGroupRequest
-	(*ListIpGroupsRequest)(nil),          // 90: ipam.v1.ListIpGroupsRequest
-	(*ListIpGroupsResponse)(nil),         // 91: ipam.v1.ListIpGroupsResponse
-	(*UpdateIpGroupRequest)(nil),         // 92: ipam.v1.UpdateIpGroupRequest
-	(*DeleteIpGroupRequest)(nil),         // 93: ipam.v1.DeleteIpGroupRequest
-	(*AddIpGroupMemberRequest)(nil),      // 94: ipam.v1.AddIpGroupMemberRequest
-	(*UpdateIpGroupMemberRequest)(nil),   // 95: ipam.v1.UpdateIpGroupMemberRequest
-	(*RemoveIpGroupMemberRequest)(nil),   // 96: ipam.v1.RemoveIpGroupMemberRequest
-	(*ListIpGroupMembersRequest)(nil),    // 97: ipam.v1.ListIpGroupMembersRequest
-	(*ListIpGroupMembersResponse)(nil),   // 98: ipam.v1.ListIpGroupMembersResponse
-	(*CheckIpInGroupRequest)(nil),        // 99: ipam.v1.CheckIpInGroupRequest
-	(*CheckIpInGroupResponse)(nil),       // 100: ipam.v1.CheckIpInGroupResponse
-	(*CreateHostGroupRequest)(nil),       // 101: ipam.v1.CreateHostGroupRequest
-	(*GetHostGroupRequest)(nil),          // 102: ipam.v1.GetHostGroupRequest
-	(*ListHostGroupsRequest)(nil),        // 103: ipam.v1.ListHostGroupsRequest
-	(*ListHostGroupsResponse)(nil),       // 104: ipam.v1.ListHostGroupsResponse
-	(*UpdateHostGroupRequest)(nil),       // 105: ipam.v1.UpdateHostGroupRequest
-	(*DeleteHostGroupRequest)(nil),       // 106: ipam.v1.DeleteHostGroupRequest
-	(*AddHostGroupMemberRequest)(nil),    // 107: ipam.v1.AddHostGroupMemberRequest
-	(*RemoveHostGroupMemberRequest)(nil), // 108: ipam.v1.RemoveHostGroupMemberRequest
-	(*ListHostGroupMembersRequest)(nil),  // 109: ipam.v1.ListHostGroupMembersRequest
-	(*ListHostGroupMembersResponse)(nil), // 110: ipam.v1.ListHostGroupMembersResponse
-	(*ListDeviceHostGroupsRequest)(nil),  // 111: ipam.v1.ListDeviceHostGroupsRequest
-	(*StartScanRequest)(nil),             // 112: ipam.v1.StartScanRequest
-	(*GetScanRequest)(nil),               // 113: ipam.v1.GetScanRequest
-	(*ListScansRequest)(nil),             // 114: ipam.v1.ListScansRequest
-	(*ListScansResponse)(nil),            // 115: ipam.v1.ListScansResponse
-	(*CancelScanRequest)(nil),            // 116: ipam.v1.CancelScanRequest
-	(*HealthRequest)(nil),                // 117: ipam.v1.HealthRequest
-	(*HealthResponse)(nil),               // 118: ipam.v1.HealthResponse
-	(*GetStatsRequest)(nil),              // 119: ipam.v1.GetStatsRequest
-	(*GetDnsConfigRequest)(nil),          // 120: ipam.v1.GetDnsConfigRequest
-	(*UpdateDnsConfigRequest)(nil),       // 121: ipam.v1.UpdateDnsConfigRequest
-	nil,                                  // 122: ipam.v1.Subnet.TagsEntry
-	nil,                                  // 123: ipam.v1.IPAddress.TagsEntry
-	nil,                                  // 124: ipam.v1.Device.TagsEntry
-	nil,                                  // 125: ipam.v1.Vlan.TagsEntry
-	nil,                                  // 126: ipam.v1.Location.TagsEntry
-	nil,                                  // 127: ipam.v1.IPGroup.TagsEntry
-	nil,                                  // 128: ipam.v1.HostGroup.TagsEntry
-	nil,                                  // 129: ipam.v1.Stats.DevicesByStatusEntry
-	nil,                                  // 130: ipam.v1.Stats.DevicesByTypeEntry
-	nil,                                  // 131: ipam.v1.Stats.AddressesByStatusEntry
-	nil,                                  // 132: ipam.v1.Stats.SubnetsByStatusEntry
+	(*HardwareSummary)(nil),              // 16: ipam.v1.HardwareSummary
+	(*DeviceInterface)(nil),              // 17: ipam.v1.DeviceInterface
+	(*DevicePackage)(nil),                // 18: ipam.v1.DevicePackage
+	(*Vlan)(nil),                         // 19: ipam.v1.Vlan
+	(*Location)(nil),                     // 20: ipam.v1.Location
+	(*IPGroup)(nil),                      // 21: ipam.v1.IPGroup
+	(*IPGroupMember)(nil),                // 22: ipam.v1.IPGroupMember
+	(*HostGroup)(nil),                    // 23: ipam.v1.HostGroup
+	(*HostGroupMember)(nil),              // 24: ipam.v1.HostGroupMember
+	(*IPScanJob)(nil),                    // 25: ipam.v1.IPScanJob
+	(*DNSConfig)(nil),                    // 26: ipam.v1.DNSConfig
+	(*Stats)(nil),                        // 27: ipam.v1.Stats
+	(*CreateSubnetRequest)(nil),          // 28: ipam.v1.CreateSubnetRequest
+	(*GetSubnetRequest)(nil),             // 29: ipam.v1.GetSubnetRequest
+	(*ListSubnetsRequest)(nil),           // 30: ipam.v1.ListSubnetsRequest
+	(*ListSubnetsResponse)(nil),          // 31: ipam.v1.ListSubnetsResponse
+	(*UpdateSubnetRequest)(nil),          // 32: ipam.v1.UpdateSubnetRequest
+	(*DeleteSubnetRequest)(nil),          // 33: ipam.v1.DeleteSubnetRequest
+	(*GetSubnetTreeRequest)(nil),         // 34: ipam.v1.GetSubnetTreeRequest
+	(*SubnetTreeNode)(nil),               // 35: ipam.v1.SubnetTreeNode
+	(*SubnetTree)(nil),                   // 36: ipam.v1.SubnetTree
+	(*GetSubnetStatsRequest)(nil),        // 37: ipam.v1.GetSubnetStatsRequest
+	(*ScanSubnetRequest)(nil),            // 38: ipam.v1.ScanSubnetRequest
+	(*DeleteResponse)(nil),               // 39: ipam.v1.DeleteResponse
+	(*CreateIpAddressRequest)(nil),       // 40: ipam.v1.CreateIpAddressRequest
+	(*GetIpAddressRequest)(nil),          // 41: ipam.v1.GetIpAddressRequest
+	(*ListIpAddressesRequest)(nil),       // 42: ipam.v1.ListIpAddressesRequest
+	(*ListIpAddressesResponse)(nil),      // 43: ipam.v1.ListIpAddressesResponse
+	(*UpdateIpAddressRequest)(nil),       // 44: ipam.v1.UpdateIpAddressRequest
+	(*DeleteIpAddressRequest)(nil),       // 45: ipam.v1.DeleteIpAddressRequest
+	(*AllocateNextRequest)(nil),          // 46: ipam.v1.AllocateNextRequest
+	(*BulkAllocateRequest)(nil),          // 47: ipam.v1.BulkAllocateRequest
+	(*BulkAllocateResponse)(nil),         // 48: ipam.v1.BulkAllocateResponse
+	(*FindIpAddressRequest)(nil),         // 49: ipam.v1.FindIpAddressRequest
+	(*SuggestIpAddressRequest)(nil),      // 50: ipam.v1.SuggestIpAddressRequest
+	(*SuggestIpAddressResponse)(nil),     // 51: ipam.v1.SuggestIpAddressResponse
+	(*PingIpAddressRequest)(nil),         // 52: ipam.v1.PingIpAddressRequest
+	(*PingResponse)(nil),                 // 53: ipam.v1.PingResponse
+	(*CreateDeviceRequest)(nil),          // 54: ipam.v1.CreateDeviceRequest
+	(*GetDeviceRequest)(nil),             // 55: ipam.v1.GetDeviceRequest
+	(*ListDevicesRequest)(nil),           // 56: ipam.v1.ListDevicesRequest
+	(*ListDevicesResponse)(nil),          // 57: ipam.v1.ListDevicesResponse
+	(*UpdateDeviceRequest)(nil),          // 58: ipam.v1.UpdateDeviceRequest
+	(*DeleteDeviceRequest)(nil),          // 59: ipam.v1.DeleteDeviceRequest
+	(*GetDeviceAddressesRequest)(nil),    // 60: ipam.v1.GetDeviceAddressesRequest
+	(*GetDeviceInterfacesRequest)(nil),   // 61: ipam.v1.GetDeviceInterfacesRequest
+	(*ListInterfacesResponse)(nil),       // 62: ipam.v1.ListInterfacesResponse
+	(*CreateInterfaceRequest)(nil),       // 63: ipam.v1.CreateInterfaceRequest
+	(*DeleteInterfaceRequest)(nil),       // 64: ipam.v1.DeleteInterfaceRequest
+	(*SyncPackagesRequest)(nil),          // 65: ipam.v1.SyncPackagesRequest
+	(*ListPackagesRequest)(nil),          // 66: ipam.v1.ListPackagesRequest
+	(*ListPackagesResponse)(nil),         // 67: ipam.v1.ListPackagesResponse
+	(*PowerStatusRequest)(nil),           // 68: ipam.v1.PowerStatusRequest
+	(*PowerStatusResponse)(nil),          // 69: ipam.v1.PowerStatusResponse
+	(*PowerRequest)(nil),                 // 70: ipam.v1.PowerRequest
+	(*StartKvmSessionRequest)(nil),       // 71: ipam.v1.StartKvmSessionRequest
+	(*KvmSession)(nil),                   // 72: ipam.v1.KvmSession
+	(*CreateVlanRequest)(nil),            // 73: ipam.v1.CreateVlanRequest
+	(*GetVlanRequest)(nil),               // 74: ipam.v1.GetVlanRequest
+	(*ListVlansRequest)(nil),             // 75: ipam.v1.ListVlansRequest
+	(*ListVlansResponse)(nil),            // 76: ipam.v1.ListVlansResponse
+	(*UpdateVlanRequest)(nil),            // 77: ipam.v1.UpdateVlanRequest
+	(*DeleteVlanRequest)(nil),            // 78: ipam.v1.DeleteVlanRequest
+	(*GetVlanSubnetsRequest)(nil),        // 79: ipam.v1.GetVlanSubnetsRequest
+	(*CreateLocationRequest)(nil),        // 80: ipam.v1.CreateLocationRequest
+	(*GetLocationRequest)(nil),           // 81: ipam.v1.GetLocationRequest
+	(*ListLocationsRequest)(nil),         // 82: ipam.v1.ListLocationsRequest
+	(*ListLocationsResponse)(nil),        // 83: ipam.v1.ListLocationsResponse
+	(*UpdateLocationRequest)(nil),        // 84: ipam.v1.UpdateLocationRequest
+	(*DeleteLocationRequest)(nil),        // 85: ipam.v1.DeleteLocationRequest
+	(*GetLocationTreeRequest)(nil),       // 86: ipam.v1.GetLocationTreeRequest
+	(*LocationTreeNode)(nil),             // 87: ipam.v1.LocationTreeNode
+	(*LocationTree)(nil),                 // 88: ipam.v1.LocationTree
+	(*CreateIpGroupRequest)(nil),         // 89: ipam.v1.CreateIpGroupRequest
+	(*GetIpGroupRequest)(nil),            // 90: ipam.v1.GetIpGroupRequest
+	(*ListIpGroupsRequest)(nil),          // 91: ipam.v1.ListIpGroupsRequest
+	(*ListIpGroupsResponse)(nil),         // 92: ipam.v1.ListIpGroupsResponse
+	(*UpdateIpGroupRequest)(nil),         // 93: ipam.v1.UpdateIpGroupRequest
+	(*DeleteIpGroupRequest)(nil),         // 94: ipam.v1.DeleteIpGroupRequest
+	(*AddIpGroupMemberRequest)(nil),      // 95: ipam.v1.AddIpGroupMemberRequest
+	(*UpdateIpGroupMemberRequest)(nil),   // 96: ipam.v1.UpdateIpGroupMemberRequest
+	(*RemoveIpGroupMemberRequest)(nil),   // 97: ipam.v1.RemoveIpGroupMemberRequest
+	(*ListIpGroupMembersRequest)(nil),    // 98: ipam.v1.ListIpGroupMembersRequest
+	(*ListIpGroupMembersResponse)(nil),   // 99: ipam.v1.ListIpGroupMembersResponse
+	(*CheckIpInGroupRequest)(nil),        // 100: ipam.v1.CheckIpInGroupRequest
+	(*CheckIpInGroupResponse)(nil),       // 101: ipam.v1.CheckIpInGroupResponse
+	(*CreateHostGroupRequest)(nil),       // 102: ipam.v1.CreateHostGroupRequest
+	(*GetHostGroupRequest)(nil),          // 103: ipam.v1.GetHostGroupRequest
+	(*ListHostGroupsRequest)(nil),        // 104: ipam.v1.ListHostGroupsRequest
+	(*ListHostGroupsResponse)(nil),       // 105: ipam.v1.ListHostGroupsResponse
+	(*UpdateHostGroupRequest)(nil),       // 106: ipam.v1.UpdateHostGroupRequest
+	(*DeleteHostGroupRequest)(nil),       // 107: ipam.v1.DeleteHostGroupRequest
+	(*AddHostGroupMemberRequest)(nil),    // 108: ipam.v1.AddHostGroupMemberRequest
+	(*RemoveHostGroupMemberRequest)(nil), // 109: ipam.v1.RemoveHostGroupMemberRequest
+	(*ListHostGroupMembersRequest)(nil),  // 110: ipam.v1.ListHostGroupMembersRequest
+	(*ListHostGroupMembersResponse)(nil), // 111: ipam.v1.ListHostGroupMembersResponse
+	(*ListDeviceHostGroupsRequest)(nil),  // 112: ipam.v1.ListDeviceHostGroupsRequest
+	(*StartScanRequest)(nil),             // 113: ipam.v1.StartScanRequest
+	(*GetScanRequest)(nil),               // 114: ipam.v1.GetScanRequest
+	(*ListScansRequest)(nil),             // 115: ipam.v1.ListScansRequest
+	(*ListScansResponse)(nil),            // 116: ipam.v1.ListScansResponse
+	(*CancelScanRequest)(nil),            // 117: ipam.v1.CancelScanRequest
+	(*HealthRequest)(nil),                // 118: ipam.v1.HealthRequest
+	(*HealthResponse)(nil),               // 119: ipam.v1.HealthResponse
+	(*GetStatsRequest)(nil),              // 120: ipam.v1.GetStatsRequest
+	(*GetDnsConfigRequest)(nil),          // 121: ipam.v1.GetDnsConfigRequest
+	(*UpdateDnsConfigRequest)(nil),       // 122: ipam.v1.UpdateDnsConfigRequest
+	nil,                                  // 123: ipam.v1.Subnet.TagsEntry
+	nil,                                  // 124: ipam.v1.IPAddress.TagsEntry
+	nil,                                  // 125: ipam.v1.Device.TagsEntry
+	nil,                                  // 126: ipam.v1.Vlan.TagsEntry
+	nil,                                  // 127: ipam.v1.Location.TagsEntry
+	nil,                                  // 128: ipam.v1.IPGroup.TagsEntry
+	nil,                                  // 129: ipam.v1.HostGroup.TagsEntry
+	nil,                                  // 130: ipam.v1.Stats.DevicesByStatusEntry
+	nil,                                  // 131: ipam.v1.Stats.DevicesByTypeEntry
+	nil,                                  // 132: ipam.v1.Stats.AddressesByStatusEntry
+	nil,                                  // 133: ipam.v1.Stats.SubnetsByStatusEntry
 }
 var file_ipam_v1_ipam_proto_depIdxs = []int32{
 	0,   // 0: ipam.v1.Subnet.status:type_name -> ipam.v1.SubnetStatus
-	122, // 1: ipam.v1.Subnet.tags:type_name -> ipam.v1.Subnet.TagsEntry
+	123, // 1: ipam.v1.Subnet.tags:type_name -> ipam.v1.Subnet.TagsEntry
 	1,   // 2: ipam.v1.IPAddress.status:type_name -> ipam.v1.IpStatus
 	2,   // 3: ipam.v1.IPAddress.address_type:type_name -> ipam.v1.AddressType
-	123, // 4: ipam.v1.IPAddress.tags:type_name -> ipam.v1.IPAddress.TagsEntry
+	124, // 4: ipam.v1.IPAddress.tags:type_name -> ipam.v1.IPAddress.TagsEntry
 	3,   // 5: ipam.v1.Device.device_type:type_name -> ipam.v1.DeviceType
 	4,   // 6: ipam.v1.Device.status:type_name -> ipam.v1.DeviceStatus
-	124, // 7: ipam.v1.Device.tags:type_name -> ipam.v1.Device.TagsEntry
-	5,   // 8: ipam.v1.Vlan.status:type_name -> ipam.v1.VlanStatus
-	125, // 9: ipam.v1.Vlan.tags:type_name -> ipam.v1.Vlan.TagsEntry
-	6,   // 10: ipam.v1.Location.location_type:type_name -> ipam.v1.LocationType
-	7,   // 11: ipam.v1.Location.status:type_name -> ipam.v1.LocationStatus
-	126, // 12: ipam.v1.Location.tags:type_name -> ipam.v1.Location.TagsEntry
-	9,   // 13: ipam.v1.IPGroup.status:type_name -> ipam.v1.GroupStatus
-	127, // 14: ipam.v1.IPGroup.tags:type_name -> ipam.v1.IPGroup.TagsEntry
-	21,  // 15: ipam.v1.IPGroup.members:type_name -> ipam.v1.IPGroupMember
-	8,   // 16: ipam.v1.IPGroupMember.member_type:type_name -> ipam.v1.MemberType
-	9,   // 17: ipam.v1.HostGroup.status:type_name -> ipam.v1.GroupStatus
-	128, // 18: ipam.v1.HostGroup.tags:type_name -> ipam.v1.HostGroup.TagsEntry
-	23,  // 19: ipam.v1.HostGroup.members:type_name -> ipam.v1.HostGroupMember
-	3,   // 20: ipam.v1.HostGroupMember.device_type:type_name -> ipam.v1.DeviceType
-	4,   // 21: ipam.v1.HostGroupMember.device_status:type_name -> ipam.v1.DeviceStatus
-	10,  // 22: ipam.v1.IPScanJob.status:type_name -> ipam.v1.ScanStatus
-	11,  // 23: ipam.v1.IPScanJob.triggered_by:type_name -> ipam.v1.ScanTrigger
-	129, // 24: ipam.v1.Stats.devices_by_status:type_name -> ipam.v1.Stats.DevicesByStatusEntry
-	130, // 25: ipam.v1.Stats.devices_by_type:type_name -> ipam.v1.Stats.DevicesByTypeEntry
-	131, // 26: ipam.v1.Stats.addresses_by_status:type_name -> ipam.v1.Stats.AddressesByStatusEntry
-	132, // 27: ipam.v1.Stats.subnets_by_status:type_name -> ipam.v1.Stats.SubnetsByStatusEntry
-	13,  // 28: ipam.v1.CreateSubnetRequest.subnet:type_name -> ipam.v1.Subnet
-	0,   // 29: ipam.v1.ListSubnetsRequest.status:type_name -> ipam.v1.SubnetStatus
-	13,  // 30: ipam.v1.ListSubnetsResponse.subnets:type_name -> ipam.v1.Subnet
-	13,  // 31: ipam.v1.UpdateSubnetRequest.subnet:type_name -> ipam.v1.Subnet
-	13,  // 32: ipam.v1.SubnetTreeNode.subnet:type_name -> ipam.v1.Subnet
-	34,  // 33: ipam.v1.SubnetTreeNode.children:type_name -> ipam.v1.SubnetTreeNode
-	34,  // 34: ipam.v1.SubnetTree.roots:type_name -> ipam.v1.SubnetTreeNode
-	14,  // 35: ipam.v1.CreateIpAddressRequest.address:type_name -> ipam.v1.IPAddress
-	1,   // 36: ipam.v1.ListIpAddressesRequest.status:type_name -> ipam.v1.IpStatus
-	2,   // 37: ipam.v1.ListIpAddressesRequest.address_type:type_name -> ipam.v1.AddressType
-	14,  // 38: ipam.v1.ListIpAddressesResponse.addresses:type_name -> ipam.v1.IPAddress
-	14,  // 39: ipam.v1.UpdateIpAddressRequest.address:type_name -> ipam.v1.IPAddress
-	14,  // 40: ipam.v1.BulkAllocateResponse.addresses:type_name -> ipam.v1.IPAddress
-	15,  // 41: ipam.v1.CreateDeviceRequest.device:type_name -> ipam.v1.Device
-	3,   // 42: ipam.v1.ListDevicesRequest.device_type:type_name -> ipam.v1.DeviceType
-	4,   // 43: ipam.v1.ListDevicesRequest.status:type_name -> ipam.v1.DeviceStatus
-	15,  // 44: ipam.v1.ListDevicesResponse.devices:type_name -> ipam.v1.Device
-	15,  // 45: ipam.v1.UpdateDeviceRequest.device:type_name -> ipam.v1.Device
-	16,  // 46: ipam.v1.ListInterfacesResponse.interfaces:type_name -> ipam.v1.DeviceInterface
-	16,  // 47: ipam.v1.CreateInterfaceRequest.iface:type_name -> ipam.v1.DeviceInterface
-	17,  // 48: ipam.v1.ListPackagesResponse.packages:type_name -> ipam.v1.DevicePackage
-	12,  // 49: ipam.v1.PowerRequest.action:type_name -> ipam.v1.PowerAction
-	18,  // 50: ipam.v1.CreateVlanRequest.vlan:type_name -> ipam.v1.Vlan
-	5,   // 51: ipam.v1.ListVlansRequest.status:type_name -> ipam.v1.VlanStatus
-	18,  // 52: ipam.v1.ListVlansResponse.vlans:type_name -> ipam.v1.Vlan
-	18,  // 53: ipam.v1.UpdateVlanRequest.vlan:type_name -> ipam.v1.Vlan
-	19,  // 54: ipam.v1.CreateLocationRequest.location:type_name -> ipam.v1.Location
-	6,   // 55: ipam.v1.ListLocationsRequest.location_type:type_name -> ipam.v1.LocationType
-	7,   // 56: ipam.v1.ListLocationsRequest.status:type_name -> ipam.v1.LocationStatus
-	19,  // 57: ipam.v1.ListLocationsResponse.locations:type_name -> ipam.v1.Location
-	19,  // 58: ipam.v1.UpdateLocationRequest.location:type_name -> ipam.v1.Location
-	19,  // 59: ipam.v1.LocationTreeNode.location:type_name -> ipam.v1.Location
-	86,  // 60: ipam.v1.LocationTreeNode.children:type_name -> ipam.v1.LocationTreeNode
-	86,  // 61: ipam.v1.LocationTree.roots:type_name -> ipam.v1.LocationTreeNode
-	20,  // 62: ipam.v1.CreateIpGroupRequest.group:type_name -> ipam.v1.IPGroup
-	20,  // 63: ipam.v1.ListIpGroupsResponse.groups:type_name -> ipam.v1.IPGroup
-	20,  // 64: ipam.v1.UpdateIpGroupRequest.group:type_name -> ipam.v1.IPGroup
-	21,  // 65: ipam.v1.AddIpGroupMemberRequest.member:type_name -> ipam.v1.IPGroupMember
-	21,  // 66: ipam.v1.UpdateIpGroupMemberRequest.member:type_name -> ipam.v1.IPGroupMember
-	21,  // 67: ipam.v1.ListIpGroupMembersResponse.members:type_name -> ipam.v1.IPGroupMember
-	20,  // 68: ipam.v1.CheckIpInGroupResponse.groups:type_name -> ipam.v1.IPGroup
-	22,  // 69: ipam.v1.CreateHostGroupRequest.group:type_name -> ipam.v1.HostGroup
-	22,  // 70: ipam.v1.ListHostGroupsResponse.groups:type_name -> ipam.v1.HostGroup
-	22,  // 71: ipam.v1.UpdateHostGroupRequest.group:type_name -> ipam.v1.HostGroup
-	23,  // 72: ipam.v1.ListHostGroupMembersResponse.members:type_name -> ipam.v1.HostGroupMember
-	10,  // 73: ipam.v1.ListScansRequest.status:type_name -> ipam.v1.ScanStatus
-	24,  // 74: ipam.v1.ListScansResponse.jobs:type_name -> ipam.v1.IPScanJob
-	25,  // 75: ipam.v1.UpdateDnsConfigRequest.config:type_name -> ipam.v1.DNSConfig
-	27,  // 76: ipam.v1.SubnetService.Create:input_type -> ipam.v1.CreateSubnetRequest
-	28,  // 77: ipam.v1.SubnetService.Get:input_type -> ipam.v1.GetSubnetRequest
-	29,  // 78: ipam.v1.SubnetService.List:input_type -> ipam.v1.ListSubnetsRequest
-	31,  // 79: ipam.v1.SubnetService.Update:input_type -> ipam.v1.UpdateSubnetRequest
-	32,  // 80: ipam.v1.SubnetService.Delete:input_type -> ipam.v1.DeleteSubnetRequest
-	33,  // 81: ipam.v1.SubnetService.GetTree:input_type -> ipam.v1.GetSubnetTreeRequest
-	36,  // 82: ipam.v1.SubnetService.GetStats:input_type -> ipam.v1.GetSubnetStatsRequest
-	37,  // 83: ipam.v1.SubnetService.Scan:input_type -> ipam.v1.ScanSubnetRequest
-	39,  // 84: ipam.v1.IpAddressService.Create:input_type -> ipam.v1.CreateIpAddressRequest
-	40,  // 85: ipam.v1.IpAddressService.Get:input_type -> ipam.v1.GetIpAddressRequest
-	41,  // 86: ipam.v1.IpAddressService.List:input_type -> ipam.v1.ListIpAddressesRequest
-	43,  // 87: ipam.v1.IpAddressService.Update:input_type -> ipam.v1.UpdateIpAddressRequest
-	44,  // 88: ipam.v1.IpAddressService.Delete:input_type -> ipam.v1.DeleteIpAddressRequest
-	45,  // 89: ipam.v1.IpAddressService.AllocateNext:input_type -> ipam.v1.AllocateNextRequest
-	46,  // 90: ipam.v1.IpAddressService.BulkAllocate:input_type -> ipam.v1.BulkAllocateRequest
-	48,  // 91: ipam.v1.IpAddressService.Find:input_type -> ipam.v1.FindIpAddressRequest
-	49,  // 92: ipam.v1.IpAddressService.Suggest:input_type -> ipam.v1.SuggestIpAddressRequest
-	51,  // 93: ipam.v1.IpAddressService.Ping:input_type -> ipam.v1.PingIpAddressRequest
-	53,  // 94: ipam.v1.DeviceService.Create:input_type -> ipam.v1.CreateDeviceRequest
-	54,  // 95: ipam.v1.DeviceService.Get:input_type -> ipam.v1.GetDeviceRequest
-	55,  // 96: ipam.v1.DeviceService.List:input_type -> ipam.v1.ListDevicesRequest
-	57,  // 97: ipam.v1.DeviceService.Update:input_type -> ipam.v1.UpdateDeviceRequest
-	58,  // 98: ipam.v1.DeviceService.Delete:input_type -> ipam.v1.DeleteDeviceRequest
-	59,  // 99: ipam.v1.DeviceService.GetAddresses:input_type -> ipam.v1.GetDeviceAddressesRequest
-	60,  // 100: ipam.v1.DeviceService.GetInterfaces:input_type -> ipam.v1.GetDeviceInterfacesRequest
-	62,  // 101: ipam.v1.DeviceService.CreateInterface:input_type -> ipam.v1.CreateInterfaceRequest
-	63,  // 102: ipam.v1.DeviceService.DeleteInterface:input_type -> ipam.v1.DeleteInterfaceRequest
-	64,  // 103: ipam.v1.DeviceService.SyncPackages:input_type -> ipam.v1.SyncPackagesRequest
-	65,  // 104: ipam.v1.DeviceService.ListPackages:input_type -> ipam.v1.ListPackagesRequest
-	67,  // 105: ipam.v1.DeviceService.PowerStatus:input_type -> ipam.v1.PowerStatusRequest
-	69,  // 106: ipam.v1.DeviceService.Power:input_type -> ipam.v1.PowerRequest
-	70,  // 107: ipam.v1.DeviceService.StartKvmSession:input_type -> ipam.v1.StartKvmSessionRequest
-	72,  // 108: ipam.v1.VlanService.Create:input_type -> ipam.v1.CreateVlanRequest
-	73,  // 109: ipam.v1.VlanService.Get:input_type -> ipam.v1.GetVlanRequest
-	74,  // 110: ipam.v1.VlanService.List:input_type -> ipam.v1.ListVlansRequest
-	76,  // 111: ipam.v1.VlanService.Update:input_type -> ipam.v1.UpdateVlanRequest
-	77,  // 112: ipam.v1.VlanService.Delete:input_type -> ipam.v1.DeleteVlanRequest
-	78,  // 113: ipam.v1.VlanService.GetSubnets:input_type -> ipam.v1.GetVlanSubnetsRequest
-	79,  // 114: ipam.v1.LocationService.Create:input_type -> ipam.v1.CreateLocationRequest
-	80,  // 115: ipam.v1.LocationService.Get:input_type -> ipam.v1.GetLocationRequest
-	81,  // 116: ipam.v1.LocationService.List:input_type -> ipam.v1.ListLocationsRequest
-	83,  // 117: ipam.v1.LocationService.Update:input_type -> ipam.v1.UpdateLocationRequest
-	84,  // 118: ipam.v1.LocationService.Delete:input_type -> ipam.v1.DeleteLocationRequest
-	85,  // 119: ipam.v1.LocationService.GetTree:input_type -> ipam.v1.GetLocationTreeRequest
-	88,  // 120: ipam.v1.IpGroupService.Create:input_type -> ipam.v1.CreateIpGroupRequest
-	89,  // 121: ipam.v1.IpGroupService.Get:input_type -> ipam.v1.GetIpGroupRequest
-	90,  // 122: ipam.v1.IpGroupService.List:input_type -> ipam.v1.ListIpGroupsRequest
-	92,  // 123: ipam.v1.IpGroupService.Update:input_type -> ipam.v1.UpdateIpGroupRequest
-	93,  // 124: ipam.v1.IpGroupService.Delete:input_type -> ipam.v1.DeleteIpGroupRequest
-	94,  // 125: ipam.v1.IpGroupService.AddMember:input_type -> ipam.v1.AddIpGroupMemberRequest
-	95,  // 126: ipam.v1.IpGroupService.UpdateMember:input_type -> ipam.v1.UpdateIpGroupMemberRequest
-	96,  // 127: ipam.v1.IpGroupService.RemoveMember:input_type -> ipam.v1.RemoveIpGroupMemberRequest
-	97,  // 128: ipam.v1.IpGroupService.ListMembers:input_type -> ipam.v1.ListIpGroupMembersRequest
-	99,  // 129: ipam.v1.IpGroupService.CheckIpInGroup:input_type -> ipam.v1.CheckIpInGroupRequest
-	101, // 130: ipam.v1.HostGroupService.Create:input_type -> ipam.v1.CreateHostGroupRequest
-	102, // 131: ipam.v1.HostGroupService.Get:input_type -> ipam.v1.GetHostGroupRequest
-	103, // 132: ipam.v1.HostGroupService.List:input_type -> ipam.v1.ListHostGroupsRequest
-	105, // 133: ipam.v1.HostGroupService.Update:input_type -> ipam.v1.UpdateHostGroupRequest
-	106, // 134: ipam.v1.HostGroupService.Delete:input_type -> ipam.v1.DeleteHostGroupRequest
-	107, // 135: ipam.v1.HostGroupService.AddMember:input_type -> ipam.v1.AddHostGroupMemberRequest
-	108, // 136: ipam.v1.HostGroupService.RemoveMember:input_type -> ipam.v1.RemoveHostGroupMemberRequest
-	109, // 137: ipam.v1.HostGroupService.ListMembers:input_type -> ipam.v1.ListHostGroupMembersRequest
-	111, // 138: ipam.v1.HostGroupService.ListDeviceHostGroups:input_type -> ipam.v1.ListDeviceHostGroupsRequest
-	112, // 139: ipam.v1.IpScanService.Start:input_type -> ipam.v1.StartScanRequest
-	113, // 140: ipam.v1.IpScanService.Get:input_type -> ipam.v1.GetScanRequest
-	114, // 141: ipam.v1.IpScanService.List:input_type -> ipam.v1.ListScansRequest
-	116, // 142: ipam.v1.IpScanService.Cancel:input_type -> ipam.v1.CancelScanRequest
-	117, // 143: ipam.v1.SystemService.Health:input_type -> ipam.v1.HealthRequest
-	119, // 144: ipam.v1.SystemService.GetStats:input_type -> ipam.v1.GetStatsRequest
-	120, // 145: ipam.v1.SystemService.GetDnsConfig:input_type -> ipam.v1.GetDnsConfigRequest
-	121, // 146: ipam.v1.SystemService.UpdateDnsConfig:input_type -> ipam.v1.UpdateDnsConfigRequest
-	13,  // 147: ipam.v1.SubnetService.Create:output_type -> ipam.v1.Subnet
-	13,  // 148: ipam.v1.SubnetService.Get:output_type -> ipam.v1.Subnet
-	30,  // 149: ipam.v1.SubnetService.List:output_type -> ipam.v1.ListSubnetsResponse
-	13,  // 150: ipam.v1.SubnetService.Update:output_type -> ipam.v1.Subnet
-	38,  // 151: ipam.v1.SubnetService.Delete:output_type -> ipam.v1.DeleteResponse
-	35,  // 152: ipam.v1.SubnetService.GetTree:output_type -> ipam.v1.SubnetTree
-	13,  // 153: ipam.v1.SubnetService.GetStats:output_type -> ipam.v1.Subnet
-	24,  // 154: ipam.v1.SubnetService.Scan:output_type -> ipam.v1.IPScanJob
-	14,  // 155: ipam.v1.IpAddressService.Create:output_type -> ipam.v1.IPAddress
-	14,  // 156: ipam.v1.IpAddressService.Get:output_type -> ipam.v1.IPAddress
-	42,  // 157: ipam.v1.IpAddressService.List:output_type -> ipam.v1.ListIpAddressesResponse
-	14,  // 158: ipam.v1.IpAddressService.Update:output_type -> ipam.v1.IPAddress
-	38,  // 159: ipam.v1.IpAddressService.Delete:output_type -> ipam.v1.DeleteResponse
-	14,  // 160: ipam.v1.IpAddressService.AllocateNext:output_type -> ipam.v1.IPAddress
-	47,  // 161: ipam.v1.IpAddressService.BulkAllocate:output_type -> ipam.v1.BulkAllocateResponse
-	14,  // 162: ipam.v1.IpAddressService.Find:output_type -> ipam.v1.IPAddress
-	50,  // 163: ipam.v1.IpAddressService.Suggest:output_type -> ipam.v1.SuggestIpAddressResponse
-	52,  // 164: ipam.v1.IpAddressService.Ping:output_type -> ipam.v1.PingResponse
-	15,  // 165: ipam.v1.DeviceService.Create:output_type -> ipam.v1.Device
-	15,  // 166: ipam.v1.DeviceService.Get:output_type -> ipam.v1.Device
-	56,  // 167: ipam.v1.DeviceService.List:output_type -> ipam.v1.ListDevicesResponse
-	15,  // 168: ipam.v1.DeviceService.Update:output_type -> ipam.v1.Device
-	38,  // 169: ipam.v1.DeviceService.Delete:output_type -> ipam.v1.DeleteResponse
-	42,  // 170: ipam.v1.DeviceService.GetAddresses:output_type -> ipam.v1.ListIpAddressesResponse
-	61,  // 171: ipam.v1.DeviceService.GetInterfaces:output_type -> ipam.v1.ListInterfacesResponse
-	16,  // 172: ipam.v1.DeviceService.CreateInterface:output_type -> ipam.v1.DeviceInterface
-	38,  // 173: ipam.v1.DeviceService.DeleteInterface:output_type -> ipam.v1.DeleteResponse
-	66,  // 174: ipam.v1.DeviceService.SyncPackages:output_type -> ipam.v1.ListPackagesResponse
-	66,  // 175: ipam.v1.DeviceService.ListPackages:output_type -> ipam.v1.ListPackagesResponse
-	68,  // 176: ipam.v1.DeviceService.PowerStatus:output_type -> ipam.v1.PowerStatusResponse
-	68,  // 177: ipam.v1.DeviceService.Power:output_type -> ipam.v1.PowerStatusResponse
-	71,  // 178: ipam.v1.DeviceService.StartKvmSession:output_type -> ipam.v1.KvmSession
-	18,  // 179: ipam.v1.VlanService.Create:output_type -> ipam.v1.Vlan
-	18,  // 180: ipam.v1.VlanService.Get:output_type -> ipam.v1.Vlan
-	75,  // 181: ipam.v1.VlanService.List:output_type -> ipam.v1.ListVlansResponse
-	18,  // 182: ipam.v1.VlanService.Update:output_type -> ipam.v1.Vlan
-	38,  // 183: ipam.v1.VlanService.Delete:output_type -> ipam.v1.DeleteResponse
-	30,  // 184: ipam.v1.VlanService.GetSubnets:output_type -> ipam.v1.ListSubnetsResponse
-	19,  // 185: ipam.v1.LocationService.Create:output_type -> ipam.v1.Location
-	19,  // 186: ipam.v1.LocationService.Get:output_type -> ipam.v1.Location
-	82,  // 187: ipam.v1.LocationService.List:output_type -> ipam.v1.ListLocationsResponse
-	19,  // 188: ipam.v1.LocationService.Update:output_type -> ipam.v1.Location
-	38,  // 189: ipam.v1.LocationService.Delete:output_type -> ipam.v1.DeleteResponse
-	87,  // 190: ipam.v1.LocationService.GetTree:output_type -> ipam.v1.LocationTree
-	20,  // 191: ipam.v1.IpGroupService.Create:output_type -> ipam.v1.IPGroup
-	20,  // 192: ipam.v1.IpGroupService.Get:output_type -> ipam.v1.IPGroup
-	91,  // 193: ipam.v1.IpGroupService.List:output_type -> ipam.v1.ListIpGroupsResponse
-	20,  // 194: ipam.v1.IpGroupService.Update:output_type -> ipam.v1.IPGroup
-	38,  // 195: ipam.v1.IpGroupService.Delete:output_type -> ipam.v1.DeleteResponse
-	21,  // 196: ipam.v1.IpGroupService.AddMember:output_type -> ipam.v1.IPGroupMember
-	21,  // 197: ipam.v1.IpGroupService.UpdateMember:output_type -> ipam.v1.IPGroupMember
-	38,  // 198: ipam.v1.IpGroupService.RemoveMember:output_type -> ipam.v1.DeleteResponse
-	98,  // 199: ipam.v1.IpGroupService.ListMembers:output_type -> ipam.v1.ListIpGroupMembersResponse
-	100, // 200: ipam.v1.IpGroupService.CheckIpInGroup:output_type -> ipam.v1.CheckIpInGroupResponse
-	22,  // 201: ipam.v1.HostGroupService.Create:output_type -> ipam.v1.HostGroup
-	22,  // 202: ipam.v1.HostGroupService.Get:output_type -> ipam.v1.HostGroup
-	104, // 203: ipam.v1.HostGroupService.List:output_type -> ipam.v1.ListHostGroupsResponse
-	22,  // 204: ipam.v1.HostGroupService.Update:output_type -> ipam.v1.HostGroup
-	38,  // 205: ipam.v1.HostGroupService.Delete:output_type -> ipam.v1.DeleteResponse
-	23,  // 206: ipam.v1.HostGroupService.AddMember:output_type -> ipam.v1.HostGroupMember
-	38,  // 207: ipam.v1.HostGroupService.RemoveMember:output_type -> ipam.v1.DeleteResponse
-	110, // 208: ipam.v1.HostGroupService.ListMembers:output_type -> ipam.v1.ListHostGroupMembersResponse
-	104, // 209: ipam.v1.HostGroupService.ListDeviceHostGroups:output_type -> ipam.v1.ListHostGroupsResponse
-	24,  // 210: ipam.v1.IpScanService.Start:output_type -> ipam.v1.IPScanJob
-	24,  // 211: ipam.v1.IpScanService.Get:output_type -> ipam.v1.IPScanJob
-	115, // 212: ipam.v1.IpScanService.List:output_type -> ipam.v1.ListScansResponse
-	24,  // 213: ipam.v1.IpScanService.Cancel:output_type -> ipam.v1.IPScanJob
-	118, // 214: ipam.v1.SystemService.Health:output_type -> ipam.v1.HealthResponse
-	26,  // 215: ipam.v1.SystemService.GetStats:output_type -> ipam.v1.Stats
-	25,  // 216: ipam.v1.SystemService.GetDnsConfig:output_type -> ipam.v1.DNSConfig
-	25,  // 217: ipam.v1.SystemService.UpdateDnsConfig:output_type -> ipam.v1.DNSConfig
-	147, // [147:218] is the sub-list for method output_type
-	76,  // [76:147] is the sub-list for method input_type
-	76,  // [76:76] is the sub-list for extension type_name
-	76,  // [76:76] is the sub-list for extension extendee
-	0,   // [0:76] is the sub-list for field type_name
+	125, // 7: ipam.v1.Device.tags:type_name -> ipam.v1.Device.TagsEntry
+	16,  // 8: ipam.v1.Device.hardware_summary:type_name -> ipam.v1.HardwareSummary
+	5,   // 9: ipam.v1.Vlan.status:type_name -> ipam.v1.VlanStatus
+	126, // 10: ipam.v1.Vlan.tags:type_name -> ipam.v1.Vlan.TagsEntry
+	6,   // 11: ipam.v1.Location.location_type:type_name -> ipam.v1.LocationType
+	7,   // 12: ipam.v1.Location.status:type_name -> ipam.v1.LocationStatus
+	127, // 13: ipam.v1.Location.tags:type_name -> ipam.v1.Location.TagsEntry
+	9,   // 14: ipam.v1.IPGroup.status:type_name -> ipam.v1.GroupStatus
+	128, // 15: ipam.v1.IPGroup.tags:type_name -> ipam.v1.IPGroup.TagsEntry
+	22,  // 16: ipam.v1.IPGroup.members:type_name -> ipam.v1.IPGroupMember
+	8,   // 17: ipam.v1.IPGroupMember.member_type:type_name -> ipam.v1.MemberType
+	9,   // 18: ipam.v1.HostGroup.status:type_name -> ipam.v1.GroupStatus
+	129, // 19: ipam.v1.HostGroup.tags:type_name -> ipam.v1.HostGroup.TagsEntry
+	24,  // 20: ipam.v1.HostGroup.members:type_name -> ipam.v1.HostGroupMember
+	3,   // 21: ipam.v1.HostGroupMember.device_type:type_name -> ipam.v1.DeviceType
+	4,   // 22: ipam.v1.HostGroupMember.device_status:type_name -> ipam.v1.DeviceStatus
+	10,  // 23: ipam.v1.IPScanJob.status:type_name -> ipam.v1.ScanStatus
+	11,  // 24: ipam.v1.IPScanJob.triggered_by:type_name -> ipam.v1.ScanTrigger
+	130, // 25: ipam.v1.Stats.devices_by_status:type_name -> ipam.v1.Stats.DevicesByStatusEntry
+	131, // 26: ipam.v1.Stats.devices_by_type:type_name -> ipam.v1.Stats.DevicesByTypeEntry
+	132, // 27: ipam.v1.Stats.addresses_by_status:type_name -> ipam.v1.Stats.AddressesByStatusEntry
+	133, // 28: ipam.v1.Stats.subnets_by_status:type_name -> ipam.v1.Stats.SubnetsByStatusEntry
+	13,  // 29: ipam.v1.CreateSubnetRequest.subnet:type_name -> ipam.v1.Subnet
+	0,   // 30: ipam.v1.ListSubnetsRequest.status:type_name -> ipam.v1.SubnetStatus
+	13,  // 31: ipam.v1.ListSubnetsResponse.subnets:type_name -> ipam.v1.Subnet
+	13,  // 32: ipam.v1.UpdateSubnetRequest.subnet:type_name -> ipam.v1.Subnet
+	13,  // 33: ipam.v1.SubnetTreeNode.subnet:type_name -> ipam.v1.Subnet
+	35,  // 34: ipam.v1.SubnetTreeNode.children:type_name -> ipam.v1.SubnetTreeNode
+	35,  // 35: ipam.v1.SubnetTree.roots:type_name -> ipam.v1.SubnetTreeNode
+	14,  // 36: ipam.v1.CreateIpAddressRequest.address:type_name -> ipam.v1.IPAddress
+	1,   // 37: ipam.v1.ListIpAddressesRequest.status:type_name -> ipam.v1.IpStatus
+	2,   // 38: ipam.v1.ListIpAddressesRequest.address_type:type_name -> ipam.v1.AddressType
+	14,  // 39: ipam.v1.ListIpAddressesResponse.addresses:type_name -> ipam.v1.IPAddress
+	14,  // 40: ipam.v1.UpdateIpAddressRequest.address:type_name -> ipam.v1.IPAddress
+	14,  // 41: ipam.v1.BulkAllocateResponse.addresses:type_name -> ipam.v1.IPAddress
+	15,  // 42: ipam.v1.CreateDeviceRequest.device:type_name -> ipam.v1.Device
+	3,   // 43: ipam.v1.ListDevicesRequest.device_type:type_name -> ipam.v1.DeviceType
+	4,   // 44: ipam.v1.ListDevicesRequest.status:type_name -> ipam.v1.DeviceStatus
+	15,  // 45: ipam.v1.ListDevicesResponse.devices:type_name -> ipam.v1.Device
+	15,  // 46: ipam.v1.UpdateDeviceRequest.device:type_name -> ipam.v1.Device
+	17,  // 47: ipam.v1.ListInterfacesResponse.interfaces:type_name -> ipam.v1.DeviceInterface
+	17,  // 48: ipam.v1.CreateInterfaceRequest.iface:type_name -> ipam.v1.DeviceInterface
+	18,  // 49: ipam.v1.ListPackagesResponse.packages:type_name -> ipam.v1.DevicePackage
+	12,  // 50: ipam.v1.PowerRequest.action:type_name -> ipam.v1.PowerAction
+	19,  // 51: ipam.v1.CreateVlanRequest.vlan:type_name -> ipam.v1.Vlan
+	5,   // 52: ipam.v1.ListVlansRequest.status:type_name -> ipam.v1.VlanStatus
+	19,  // 53: ipam.v1.ListVlansResponse.vlans:type_name -> ipam.v1.Vlan
+	19,  // 54: ipam.v1.UpdateVlanRequest.vlan:type_name -> ipam.v1.Vlan
+	20,  // 55: ipam.v1.CreateLocationRequest.location:type_name -> ipam.v1.Location
+	6,   // 56: ipam.v1.ListLocationsRequest.location_type:type_name -> ipam.v1.LocationType
+	7,   // 57: ipam.v1.ListLocationsRequest.status:type_name -> ipam.v1.LocationStatus
+	20,  // 58: ipam.v1.ListLocationsResponse.locations:type_name -> ipam.v1.Location
+	20,  // 59: ipam.v1.UpdateLocationRequest.location:type_name -> ipam.v1.Location
+	20,  // 60: ipam.v1.LocationTreeNode.location:type_name -> ipam.v1.Location
+	87,  // 61: ipam.v1.LocationTreeNode.children:type_name -> ipam.v1.LocationTreeNode
+	87,  // 62: ipam.v1.LocationTree.roots:type_name -> ipam.v1.LocationTreeNode
+	21,  // 63: ipam.v1.CreateIpGroupRequest.group:type_name -> ipam.v1.IPGroup
+	21,  // 64: ipam.v1.ListIpGroupsResponse.groups:type_name -> ipam.v1.IPGroup
+	21,  // 65: ipam.v1.UpdateIpGroupRequest.group:type_name -> ipam.v1.IPGroup
+	22,  // 66: ipam.v1.AddIpGroupMemberRequest.member:type_name -> ipam.v1.IPGroupMember
+	22,  // 67: ipam.v1.UpdateIpGroupMemberRequest.member:type_name -> ipam.v1.IPGroupMember
+	22,  // 68: ipam.v1.ListIpGroupMembersResponse.members:type_name -> ipam.v1.IPGroupMember
+	21,  // 69: ipam.v1.CheckIpInGroupResponse.groups:type_name -> ipam.v1.IPGroup
+	23,  // 70: ipam.v1.CreateHostGroupRequest.group:type_name -> ipam.v1.HostGroup
+	23,  // 71: ipam.v1.ListHostGroupsResponse.groups:type_name -> ipam.v1.HostGroup
+	23,  // 72: ipam.v1.UpdateHostGroupRequest.group:type_name -> ipam.v1.HostGroup
+	24,  // 73: ipam.v1.ListHostGroupMembersResponse.members:type_name -> ipam.v1.HostGroupMember
+	10,  // 74: ipam.v1.ListScansRequest.status:type_name -> ipam.v1.ScanStatus
+	25,  // 75: ipam.v1.ListScansResponse.jobs:type_name -> ipam.v1.IPScanJob
+	26,  // 76: ipam.v1.UpdateDnsConfigRequest.config:type_name -> ipam.v1.DNSConfig
+	28,  // 77: ipam.v1.SubnetService.Create:input_type -> ipam.v1.CreateSubnetRequest
+	29,  // 78: ipam.v1.SubnetService.Get:input_type -> ipam.v1.GetSubnetRequest
+	30,  // 79: ipam.v1.SubnetService.List:input_type -> ipam.v1.ListSubnetsRequest
+	32,  // 80: ipam.v1.SubnetService.Update:input_type -> ipam.v1.UpdateSubnetRequest
+	33,  // 81: ipam.v1.SubnetService.Delete:input_type -> ipam.v1.DeleteSubnetRequest
+	34,  // 82: ipam.v1.SubnetService.GetTree:input_type -> ipam.v1.GetSubnetTreeRequest
+	37,  // 83: ipam.v1.SubnetService.GetStats:input_type -> ipam.v1.GetSubnetStatsRequest
+	38,  // 84: ipam.v1.SubnetService.Scan:input_type -> ipam.v1.ScanSubnetRequest
+	40,  // 85: ipam.v1.IpAddressService.Create:input_type -> ipam.v1.CreateIpAddressRequest
+	41,  // 86: ipam.v1.IpAddressService.Get:input_type -> ipam.v1.GetIpAddressRequest
+	42,  // 87: ipam.v1.IpAddressService.List:input_type -> ipam.v1.ListIpAddressesRequest
+	44,  // 88: ipam.v1.IpAddressService.Update:input_type -> ipam.v1.UpdateIpAddressRequest
+	45,  // 89: ipam.v1.IpAddressService.Delete:input_type -> ipam.v1.DeleteIpAddressRequest
+	46,  // 90: ipam.v1.IpAddressService.AllocateNext:input_type -> ipam.v1.AllocateNextRequest
+	47,  // 91: ipam.v1.IpAddressService.BulkAllocate:input_type -> ipam.v1.BulkAllocateRequest
+	49,  // 92: ipam.v1.IpAddressService.Find:input_type -> ipam.v1.FindIpAddressRequest
+	50,  // 93: ipam.v1.IpAddressService.Suggest:input_type -> ipam.v1.SuggestIpAddressRequest
+	52,  // 94: ipam.v1.IpAddressService.Ping:input_type -> ipam.v1.PingIpAddressRequest
+	54,  // 95: ipam.v1.DeviceService.Create:input_type -> ipam.v1.CreateDeviceRequest
+	55,  // 96: ipam.v1.DeviceService.Get:input_type -> ipam.v1.GetDeviceRequest
+	56,  // 97: ipam.v1.DeviceService.List:input_type -> ipam.v1.ListDevicesRequest
+	58,  // 98: ipam.v1.DeviceService.Update:input_type -> ipam.v1.UpdateDeviceRequest
+	59,  // 99: ipam.v1.DeviceService.Delete:input_type -> ipam.v1.DeleteDeviceRequest
+	60,  // 100: ipam.v1.DeviceService.GetAddresses:input_type -> ipam.v1.GetDeviceAddressesRequest
+	61,  // 101: ipam.v1.DeviceService.GetInterfaces:input_type -> ipam.v1.GetDeviceInterfacesRequest
+	63,  // 102: ipam.v1.DeviceService.CreateInterface:input_type -> ipam.v1.CreateInterfaceRequest
+	64,  // 103: ipam.v1.DeviceService.DeleteInterface:input_type -> ipam.v1.DeleteInterfaceRequest
+	65,  // 104: ipam.v1.DeviceService.SyncPackages:input_type -> ipam.v1.SyncPackagesRequest
+	66,  // 105: ipam.v1.DeviceService.ListPackages:input_type -> ipam.v1.ListPackagesRequest
+	68,  // 106: ipam.v1.DeviceService.PowerStatus:input_type -> ipam.v1.PowerStatusRequest
+	70,  // 107: ipam.v1.DeviceService.Power:input_type -> ipam.v1.PowerRequest
+	71,  // 108: ipam.v1.DeviceService.StartKvmSession:input_type -> ipam.v1.StartKvmSessionRequest
+	73,  // 109: ipam.v1.VlanService.Create:input_type -> ipam.v1.CreateVlanRequest
+	74,  // 110: ipam.v1.VlanService.Get:input_type -> ipam.v1.GetVlanRequest
+	75,  // 111: ipam.v1.VlanService.List:input_type -> ipam.v1.ListVlansRequest
+	77,  // 112: ipam.v1.VlanService.Update:input_type -> ipam.v1.UpdateVlanRequest
+	78,  // 113: ipam.v1.VlanService.Delete:input_type -> ipam.v1.DeleteVlanRequest
+	79,  // 114: ipam.v1.VlanService.GetSubnets:input_type -> ipam.v1.GetVlanSubnetsRequest
+	80,  // 115: ipam.v1.LocationService.Create:input_type -> ipam.v1.CreateLocationRequest
+	81,  // 116: ipam.v1.LocationService.Get:input_type -> ipam.v1.GetLocationRequest
+	82,  // 117: ipam.v1.LocationService.List:input_type -> ipam.v1.ListLocationsRequest
+	84,  // 118: ipam.v1.LocationService.Update:input_type -> ipam.v1.UpdateLocationRequest
+	85,  // 119: ipam.v1.LocationService.Delete:input_type -> ipam.v1.DeleteLocationRequest
+	86,  // 120: ipam.v1.LocationService.GetTree:input_type -> ipam.v1.GetLocationTreeRequest
+	89,  // 121: ipam.v1.IpGroupService.Create:input_type -> ipam.v1.CreateIpGroupRequest
+	90,  // 122: ipam.v1.IpGroupService.Get:input_type -> ipam.v1.GetIpGroupRequest
+	91,  // 123: ipam.v1.IpGroupService.List:input_type -> ipam.v1.ListIpGroupsRequest
+	93,  // 124: ipam.v1.IpGroupService.Update:input_type -> ipam.v1.UpdateIpGroupRequest
+	94,  // 125: ipam.v1.IpGroupService.Delete:input_type -> ipam.v1.DeleteIpGroupRequest
+	95,  // 126: ipam.v1.IpGroupService.AddMember:input_type -> ipam.v1.AddIpGroupMemberRequest
+	96,  // 127: ipam.v1.IpGroupService.UpdateMember:input_type -> ipam.v1.UpdateIpGroupMemberRequest
+	97,  // 128: ipam.v1.IpGroupService.RemoveMember:input_type -> ipam.v1.RemoveIpGroupMemberRequest
+	98,  // 129: ipam.v1.IpGroupService.ListMembers:input_type -> ipam.v1.ListIpGroupMembersRequest
+	100, // 130: ipam.v1.IpGroupService.CheckIpInGroup:input_type -> ipam.v1.CheckIpInGroupRequest
+	102, // 131: ipam.v1.HostGroupService.Create:input_type -> ipam.v1.CreateHostGroupRequest
+	103, // 132: ipam.v1.HostGroupService.Get:input_type -> ipam.v1.GetHostGroupRequest
+	104, // 133: ipam.v1.HostGroupService.List:input_type -> ipam.v1.ListHostGroupsRequest
+	106, // 134: ipam.v1.HostGroupService.Update:input_type -> ipam.v1.UpdateHostGroupRequest
+	107, // 135: ipam.v1.HostGroupService.Delete:input_type -> ipam.v1.DeleteHostGroupRequest
+	108, // 136: ipam.v1.HostGroupService.AddMember:input_type -> ipam.v1.AddHostGroupMemberRequest
+	109, // 137: ipam.v1.HostGroupService.RemoveMember:input_type -> ipam.v1.RemoveHostGroupMemberRequest
+	110, // 138: ipam.v1.HostGroupService.ListMembers:input_type -> ipam.v1.ListHostGroupMembersRequest
+	112, // 139: ipam.v1.HostGroupService.ListDeviceHostGroups:input_type -> ipam.v1.ListDeviceHostGroupsRequest
+	113, // 140: ipam.v1.IpScanService.Start:input_type -> ipam.v1.StartScanRequest
+	114, // 141: ipam.v1.IpScanService.Get:input_type -> ipam.v1.GetScanRequest
+	115, // 142: ipam.v1.IpScanService.List:input_type -> ipam.v1.ListScansRequest
+	117, // 143: ipam.v1.IpScanService.Cancel:input_type -> ipam.v1.CancelScanRequest
+	118, // 144: ipam.v1.SystemService.Health:input_type -> ipam.v1.HealthRequest
+	120, // 145: ipam.v1.SystemService.GetStats:input_type -> ipam.v1.GetStatsRequest
+	121, // 146: ipam.v1.SystemService.GetDnsConfig:input_type -> ipam.v1.GetDnsConfigRequest
+	122, // 147: ipam.v1.SystemService.UpdateDnsConfig:input_type -> ipam.v1.UpdateDnsConfigRequest
+	13,  // 148: ipam.v1.SubnetService.Create:output_type -> ipam.v1.Subnet
+	13,  // 149: ipam.v1.SubnetService.Get:output_type -> ipam.v1.Subnet
+	31,  // 150: ipam.v1.SubnetService.List:output_type -> ipam.v1.ListSubnetsResponse
+	13,  // 151: ipam.v1.SubnetService.Update:output_type -> ipam.v1.Subnet
+	39,  // 152: ipam.v1.SubnetService.Delete:output_type -> ipam.v1.DeleteResponse
+	36,  // 153: ipam.v1.SubnetService.GetTree:output_type -> ipam.v1.SubnetTree
+	13,  // 154: ipam.v1.SubnetService.GetStats:output_type -> ipam.v1.Subnet
+	25,  // 155: ipam.v1.SubnetService.Scan:output_type -> ipam.v1.IPScanJob
+	14,  // 156: ipam.v1.IpAddressService.Create:output_type -> ipam.v1.IPAddress
+	14,  // 157: ipam.v1.IpAddressService.Get:output_type -> ipam.v1.IPAddress
+	43,  // 158: ipam.v1.IpAddressService.List:output_type -> ipam.v1.ListIpAddressesResponse
+	14,  // 159: ipam.v1.IpAddressService.Update:output_type -> ipam.v1.IPAddress
+	39,  // 160: ipam.v1.IpAddressService.Delete:output_type -> ipam.v1.DeleteResponse
+	14,  // 161: ipam.v1.IpAddressService.AllocateNext:output_type -> ipam.v1.IPAddress
+	48,  // 162: ipam.v1.IpAddressService.BulkAllocate:output_type -> ipam.v1.BulkAllocateResponse
+	14,  // 163: ipam.v1.IpAddressService.Find:output_type -> ipam.v1.IPAddress
+	51,  // 164: ipam.v1.IpAddressService.Suggest:output_type -> ipam.v1.SuggestIpAddressResponse
+	53,  // 165: ipam.v1.IpAddressService.Ping:output_type -> ipam.v1.PingResponse
+	15,  // 166: ipam.v1.DeviceService.Create:output_type -> ipam.v1.Device
+	15,  // 167: ipam.v1.DeviceService.Get:output_type -> ipam.v1.Device
+	57,  // 168: ipam.v1.DeviceService.List:output_type -> ipam.v1.ListDevicesResponse
+	15,  // 169: ipam.v1.DeviceService.Update:output_type -> ipam.v1.Device
+	39,  // 170: ipam.v1.DeviceService.Delete:output_type -> ipam.v1.DeleteResponse
+	43,  // 171: ipam.v1.DeviceService.GetAddresses:output_type -> ipam.v1.ListIpAddressesResponse
+	62,  // 172: ipam.v1.DeviceService.GetInterfaces:output_type -> ipam.v1.ListInterfacesResponse
+	17,  // 173: ipam.v1.DeviceService.CreateInterface:output_type -> ipam.v1.DeviceInterface
+	39,  // 174: ipam.v1.DeviceService.DeleteInterface:output_type -> ipam.v1.DeleteResponse
+	67,  // 175: ipam.v1.DeviceService.SyncPackages:output_type -> ipam.v1.ListPackagesResponse
+	67,  // 176: ipam.v1.DeviceService.ListPackages:output_type -> ipam.v1.ListPackagesResponse
+	69,  // 177: ipam.v1.DeviceService.PowerStatus:output_type -> ipam.v1.PowerStatusResponse
+	69,  // 178: ipam.v1.DeviceService.Power:output_type -> ipam.v1.PowerStatusResponse
+	72,  // 179: ipam.v1.DeviceService.StartKvmSession:output_type -> ipam.v1.KvmSession
+	19,  // 180: ipam.v1.VlanService.Create:output_type -> ipam.v1.Vlan
+	19,  // 181: ipam.v1.VlanService.Get:output_type -> ipam.v1.Vlan
+	76,  // 182: ipam.v1.VlanService.List:output_type -> ipam.v1.ListVlansResponse
+	19,  // 183: ipam.v1.VlanService.Update:output_type -> ipam.v1.Vlan
+	39,  // 184: ipam.v1.VlanService.Delete:output_type -> ipam.v1.DeleteResponse
+	31,  // 185: ipam.v1.VlanService.GetSubnets:output_type -> ipam.v1.ListSubnetsResponse
+	20,  // 186: ipam.v1.LocationService.Create:output_type -> ipam.v1.Location
+	20,  // 187: ipam.v1.LocationService.Get:output_type -> ipam.v1.Location
+	83,  // 188: ipam.v1.LocationService.List:output_type -> ipam.v1.ListLocationsResponse
+	20,  // 189: ipam.v1.LocationService.Update:output_type -> ipam.v1.Location
+	39,  // 190: ipam.v1.LocationService.Delete:output_type -> ipam.v1.DeleteResponse
+	88,  // 191: ipam.v1.LocationService.GetTree:output_type -> ipam.v1.LocationTree
+	21,  // 192: ipam.v1.IpGroupService.Create:output_type -> ipam.v1.IPGroup
+	21,  // 193: ipam.v1.IpGroupService.Get:output_type -> ipam.v1.IPGroup
+	92,  // 194: ipam.v1.IpGroupService.List:output_type -> ipam.v1.ListIpGroupsResponse
+	21,  // 195: ipam.v1.IpGroupService.Update:output_type -> ipam.v1.IPGroup
+	39,  // 196: ipam.v1.IpGroupService.Delete:output_type -> ipam.v1.DeleteResponse
+	22,  // 197: ipam.v1.IpGroupService.AddMember:output_type -> ipam.v1.IPGroupMember
+	22,  // 198: ipam.v1.IpGroupService.UpdateMember:output_type -> ipam.v1.IPGroupMember
+	39,  // 199: ipam.v1.IpGroupService.RemoveMember:output_type -> ipam.v1.DeleteResponse
+	99,  // 200: ipam.v1.IpGroupService.ListMembers:output_type -> ipam.v1.ListIpGroupMembersResponse
+	101, // 201: ipam.v1.IpGroupService.CheckIpInGroup:output_type -> ipam.v1.CheckIpInGroupResponse
+	23,  // 202: ipam.v1.HostGroupService.Create:output_type -> ipam.v1.HostGroup
+	23,  // 203: ipam.v1.HostGroupService.Get:output_type -> ipam.v1.HostGroup
+	105, // 204: ipam.v1.HostGroupService.List:output_type -> ipam.v1.ListHostGroupsResponse
+	23,  // 205: ipam.v1.HostGroupService.Update:output_type -> ipam.v1.HostGroup
+	39,  // 206: ipam.v1.HostGroupService.Delete:output_type -> ipam.v1.DeleteResponse
+	24,  // 207: ipam.v1.HostGroupService.AddMember:output_type -> ipam.v1.HostGroupMember
+	39,  // 208: ipam.v1.HostGroupService.RemoveMember:output_type -> ipam.v1.DeleteResponse
+	111, // 209: ipam.v1.HostGroupService.ListMembers:output_type -> ipam.v1.ListHostGroupMembersResponse
+	105, // 210: ipam.v1.HostGroupService.ListDeviceHostGroups:output_type -> ipam.v1.ListHostGroupsResponse
+	25,  // 211: ipam.v1.IpScanService.Start:output_type -> ipam.v1.IPScanJob
+	25,  // 212: ipam.v1.IpScanService.Get:output_type -> ipam.v1.IPScanJob
+	116, // 213: ipam.v1.IpScanService.List:output_type -> ipam.v1.ListScansResponse
+	25,  // 214: ipam.v1.IpScanService.Cancel:output_type -> ipam.v1.IPScanJob
+	119, // 215: ipam.v1.SystemService.Health:output_type -> ipam.v1.HealthResponse
+	27,  // 216: ipam.v1.SystemService.GetStats:output_type -> ipam.v1.Stats
+	26,  // 217: ipam.v1.SystemService.GetDnsConfig:output_type -> ipam.v1.DNSConfig
+	26,  // 218: ipam.v1.SystemService.UpdateDnsConfig:output_type -> ipam.v1.DNSConfig
+	148, // [148:219] is the sub-list for method output_type
+	77,  // [77:148] is the sub-list for method input_type
+	77,  // [77:77] is the sub-list for extension type_name
+	77,  // [77:77] is the sub-list for extension extendee
+	0,   // [0:77] is the sub-list for field type_name
 }
 
 func init() { file_ipam_v1_ipam_proto_init() }
@@ -10038,7 +10195,7 @@ func file_ipam_v1_ipam_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipam_v1_ipam_proto_rawDesc), len(file_ipam_v1_ipam_proto_rawDesc)),
 			NumEnums:      13,
-			NumMessages:   120,
+			NumMessages:   121,
 			NumExtensions: 0,
 			NumServices:   9,
 		},

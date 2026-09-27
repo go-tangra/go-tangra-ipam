@@ -6,6 +6,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/go-tangra/go-tangra-inventory/sdk/v4/pkg/inventoryclient"
 )
 
 // ErrUnavailable wraps every transport or inventory failure: the host sync
@@ -151,7 +153,27 @@ type PendingUpdate struct {
 // Limits counts entries the agent or inventory dropped at a bound.
 type Limits struct {
 	Interfaces, Addresses, Guests, Packages, BMCPorts uint32
+	// Feature 023 hardware bounds.
+	Disks, MemorySlots, MemoryArrays, Processors, Filesystems uint32
 }
+
+// Hardware and its parts are the inventory SDK's plain-Go hardware profile
+// (feature 023; inventory SDK >= v4.2.0). IPAM re-validates it in
+// internal/hostreport before anything is stored.
+type (
+	Hardware             = inventoryclient.Hardware
+	BIOSInfo             = inventoryclient.BIOSInfo
+	SystemInfo           = inventoryclient.SystemInfo
+	BaseboardInfo        = inventoryclient.BaseboardInfo
+	ChassisInfo          = inventoryclient.ChassisInfo
+	Processor            = inventoryclient.Processor
+	MemoryInfo           = inventoryclient.MemoryInfo
+	MemoryArray          = inventoryclient.MemoryArray
+	MemoryModule         = inventoryclient.MemoryModule
+	Disk                 = inventoryclient.Disk
+	Filesystem           = inventoryclient.Filesystem
+	HardwareAvailability = inventoryclient.HardwareAvailability
+)
 
 // Report is inventory's projection of a host's latest snapshot for IPAM.
 type Report struct {
@@ -172,6 +194,9 @@ type Report struct {
 	Updates        UpdateState
 	PendingUpdates []PendingUpdate
 	Truncated      Limits
+	// Hardware is nil for hosts whose agent predates the corrected hardware
+	// collection and for inventory versions before 4.4.0 (feature 023).
+	Hardware *Hardware
 }
 
 // Filter selects host reports of one tenant.

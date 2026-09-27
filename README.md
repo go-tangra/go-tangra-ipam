@@ -203,7 +203,43 @@ Audit vocabulary of the sync: `device_created`, `device_updated`,
 `address_updated`, `address_moved`, `address_released`, `address_conflict`,
 `address_conflict_cleared`, `packages_updated`, `hypervisor_linked`,
 `hypervisor_unlinked`, `port_linked`, `port_unlinked`, `hostsync_run`,
-`hostsync_settings_updated`, `hostsync_resync_requested`.
+`hostsync_settings_updated`, `hostsync_resync_requested`, `hardware_reported`,
+`hardware_updated`.
+
+### Device hardware
+
+Inventory agents >= 4.4.0 (feature 023, inventory SDK >= v4.2.0) add a
+hardware section to the host report: BIOS, system/board/chassis, processors,
+memory (every slot, error correction), physical disks and filesystems with the
+disks they live on. The host sync validates it again (256 disks, 1024 memory
+slots, 256 processors, 1024 filesystems, 64 disk references per filesystem,
+cleaned strings, closed media/interface sets, 256 KiB profile bound; every
+correction is a host-sync issue) and stores it per host-reported device in
+`ipam_device_hardware` (migration 0009, RLS):
+
+- the device page gets a **Hardware** tab (cards BIOS, System / board /
+  chassis, Processors, Memory with empty slots greyed, Disks with a removable
+  badge, Filesystems with usage bars) and a summary line
+  (`2× Xeon Silver 4310 · 24 cores / 48 threads · 512 GiB DDR4 (16/16 slots) ·
+  3 disks, 11.8 TB`); the device list gains CPU and memory columns and the
+  `has_hardware=true|false` filter; a host-reported device whose agent has not
+  reported hardware yet shows an explanatory empty state, manual and scanned
+  devices show no tab;
+- `GET /api/ipam/v1/devices/{id}/hardware` (`ipam:read`) returns the profile;
+  devices carry a read-only `hardware_summary` (HTTP and gRPC). Hardware is
+  reported data: it is replaced by each report, there is no write route, and a
+  device create/update carrying `hardware_summary`/`hardware` is refused (400);
+  device columns (serial, firmware, description, …) are never written from it;
+- the first report stores it with `hardware_reported` (summary); a changed
+  report is audited as one `hardware_updated` row listing the field changes
+  (`bios.version`, `system.serial`, `memory.slot[<locator>]`,
+  `disk[<serial or name>]`, `processor[<socket>]`, … with before/after, at most
+  100 plus `changes_truncated`); filesystem usage alone is refreshed without
+  an audit row; a report without hardware (older agent or inventory) leaves the
+  stored hardware untouched.
+
+Hardware therefore appears once inventory >= 4.4.0 is deployed and the host's
+agent is >= 4.4.0; older inventories and agents keep working without it.
 
 ## SNMP credentials
 

@@ -28,6 +28,7 @@ const (
 	OpReplaceGuests   Kind = "replace_guests"
 	OpSetHypervisor   Kind = "set_hypervisor"
 	OpSetGuestDevice  Kind = "set_guest_device"
+	OpReplaceHardware Kind = "replace_hardware"
 )
 
 // Op is one planned write and the audit rows that record it. Exactly the
@@ -40,7 +41,9 @@ type Op struct {
 	Address   *store.IPAddress
 	Packages  []store.DevicePackage
 	Guests    []store.HypervisorGuest
-	// DeviceID is the device the op targets (packages, guests, hypervisor).
+	Hardware  *store.DeviceHardware
+	// DeviceID is the device the op targets (packages, guests, hypervisor,
+	// hardware).
 	DeviceID string
 	// RefID is the hypervisor (set_hypervisor, "" = unlink) or the guest
 	// device (set_guest_device); GuestRowID the guest row.
@@ -96,6 +99,8 @@ type State struct {
 	GuestDevices []store.Device
 	// GuestRows are other hosts' guest rows listing one of this host's MACs.
 	GuestRows []store.HypervisorGuest
+	// Hardware is the matched device's stored hardware (nil when none).
+	Hardware *store.DeviceHardware
 }
 
 type planner struct {
@@ -121,6 +126,7 @@ func Build(st State, r hostreport.Report, p Params) Plan {
 	pl.interfaces()
 	pl.addresses()
 	pl.packages()
+	pl.hardware()
 	pl.guests()
 	pl.ownHypervisor()
 	pl.finish()

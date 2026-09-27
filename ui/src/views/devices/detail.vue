@@ -13,6 +13,8 @@ import { useLocations } from '@/stores/locations'
 import { useDeviceFields } from './fields'
 import { statusColors } from './colors'
 import IpmiKvm from './ipmi-kvm.vue'
+import HardwarePanel from '@/components/HardwarePanel.vue'
+import { hardwareSummaryLine } from './hardware'
 import { addressLinkText, linksText, sortedLinks } from '@/views/addresses/mac'
 
 const route = useRoute()
@@ -110,6 +112,9 @@ function triggerLabel(t: string): string {
   const kind = t.split(':', 1)[0] ?? t
   return ({ poll: 'scheduled sync', reconcile: 'reconcile', resync: 'manual re-sync', resync_all: 're-sync of all hosts' } as Record<string, string>)[kind] ?? kind
 }
+// Feature 023: reported hardware at a glance (CPU, memory, disks).
+const hardwareLine = computed(() => (device.value?.hardware_summary ? hardwareSummaryLine(device.value.hardware_summary) : ''))
+const showHardware = computed(() => !!device.value?.hardware_summary || device.value?.source === 'host_report')
 const summary = computed<KeyValue[]>(() => {
   const d = device.value
   if (!d) return []
@@ -136,6 +141,7 @@ const tabs = computed<TabItem[]>(() => [
   { key: 'packages', label: 'Packages', count: packages.value.length },
   { key: 'addresses', label: 'Addresses', count: addresses.value.length },
   ...(guests.value.length ? [{ key: 'guests', label: 'Guests', count: guests.value.length }] : []),
+  ...(showHardware.value ? [{ key: 'hardware', label: 'Hardware' }] : []),
   ...(canOob.value ? [{ key: 'oob', label: 'Power / KVM' }] : []),
 ])
 // "Connected to" (US5): the switch and port a host interface is linked to, or
@@ -184,6 +190,7 @@ const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, 
     <UiAlert v-if="resyncMessage" kind="success" class="mb-3">{{ resyncMessage }}</UiAlert>
     <UiCard v-if="device" class="mb-4">
       <UiKeyValueTable :items="summary" :columns="2" />
+      <p v-if="hardwareLine" class="mt-3 text-sm" data-test="device-hardware-summary"><span class="font-medium">Hardware</span> · {{ hardwareLine }}</p>
       <div v-if="device.source === 'host_report'" class="mt-3 flex flex-wrap items-center gap-2" data-test="device-hostsync">
         <span class="text-sm">Updates</span>
         <UiStatusChip :status="device.update_status ?? 'unknown'" :label="updateLabel" :colors="updateColors" data-test="device-update-status" />
@@ -224,6 +231,7 @@ const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, 
         </template>
       </UiDataTable>
     </UiCard>
+    <HardwarePanel v-if="tab === 'hardware' && showHardware" :device-id="id" :has-hardware="!!device?.hardware_summary" />
     <IpmiKvm v-if="tab === 'oob' && canOob" :device-id="id" />
     <UiRecordDrawer v-model="editing" close-on-save :title="'Edit ' + (device?.name ?? 'device')" :schema="deviceSchema" :fields="fields" :initial="device ? { ...device } : undefined" :submit="saveDevice" size="lg" />
   </UiPage>

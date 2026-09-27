@@ -8,6 +8,7 @@ import { deviceFilterSchema, deviceSchema, DEVICE_TYPES, DEVICE_STATUSES, DEVICE
 import type { Device } from '@/api/types'
 import { statusColors } from './colors'
 import { useDeviceFields } from './fields'
+import { formatMemory } from './hardware'
 
 const router = useRouter()
 const store = useDevices()
@@ -29,6 +30,8 @@ const columns: Column<Device>[] = [
   { key: 'status', label: 'Status', width: 'sm' },
   { key: 'source', label: 'Source', width: 'sm', hideOnStack: true, format: (d) => sourceLabels[d.source ?? 'manual'] ?? '' },
   { key: 'updates', label: 'Updates', width: 'sm', format: (d) => [d.security_update_count ? d.security_update_count + ' sec' : '', d.package_update_count ? d.package_update_count + ' pkg' : ''].filter(Boolean).join(' ') },
+  { key: 'cpu', label: 'CPU', hideOnStack: true, format: (d) => (d.hardware_summary?.cpu_cores ? `${d.hardware_summary.cpu_sockets ?? 1}× ${d.hardware_summary.cpu_cores}c/${d.hardware_summary.cpu_threads ?? 0}t` : '') },
+  { key: 'memory', label: 'Memory', hideOnStack: true, format: (d) => [formatMemory(d.hardware_summary?.memory_total_bytes), d.hardware_summary?.memory_type].filter(Boolean).join(' ') },
   { key: 'interface_count', label: 'NICs', align: 'end', format: (d) => String(d.interface_count ?? 0), hideOnStack: true },
 ]
 </script>

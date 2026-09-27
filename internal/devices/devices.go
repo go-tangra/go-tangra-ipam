@@ -87,6 +87,19 @@ func (s *Service) Get(ctx context.Context, subj authz.Subjects, id string) (stor
 }
 
 // List returns the caller's devices matching f.
+// GetHardware returns the hardware reported for a device (feature 023;
+// read-only). ErrNotFound when the device has none or is another tenant's.
+func (s *Service) GetHardware(ctx context.Context, subj authz.Subjects, id string) (store.DeviceHardware, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return store.DeviceHardware{}, err
+	}
+	h, err := s.st.GetDeviceHardware(ctx, subj.TenantID, id)
+	if err != nil {
+		return store.DeviceHardware{}, mapErr(err)
+	}
+	return h, nil
+}
+
 func (s *Service) List(ctx context.Context, subj authz.Subjects, f store.DeviceFilter) ([]store.Device, error) {
 	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
 		return nil, err

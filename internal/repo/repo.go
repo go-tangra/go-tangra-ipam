@@ -72,6 +72,9 @@ type Store interface {
 	UpdateDevice(ctx context.Context, d store.Device) error
 	DeleteDevice(ctx context.Context, tenantID, id string, force bool) error
 	UpsertDeviceByName(ctx context.Context, d store.Device) (store.Device, error) // scan path
+	// GetDeviceHardware returns the reported hardware of a device
+	// (feature 023); ErrNotFound when the device has none.
+	GetDeviceHardware(ctx context.Context, tenantID, deviceID string) (store.DeviceHardware, error)
 
 	// Device interfaces + links
 	CreateInterface(ctx context.Context, i store.DeviceInterface) error
@@ -251,6 +254,8 @@ type HostTx interface {
 	DevicesByMAC(macs []string) ([]MACOwner, error)
 	GuestRowsByMAC(macs []string) ([]store.HypervisorGuest, error)
 	GuestDevicesOf(hostDeviceID string) ([]store.Device, error)
+	// GetHardware returns the device's stored hardware (nil when none).
+	GetHardware(deviceID string) (*store.DeviceHardware, error)
 
 	InsertDevice(d store.Device) error
 	UpdateDeviceReported(d store.Device) error
@@ -262,6 +267,9 @@ type HostTx interface {
 	ReplaceGuests(hostDeviceID string, guests []store.HypervisorGuest) error
 	SetHypervisor(deviceID, hypervisorID string) error
 	SetGuestDevice(guestRowID, deviceID string) error
+	// ReplaceHardware upserts the device's hardware row (profile, digest,
+	// summary and times only).
+	ReplaceHardware(h store.DeviceHardware) error
 	// MarkDeviceNotReported flags a device, its reported interfaces and its
 	// reported addresses as no longer reported (links kept).
 	MarkDeviceNotReported(deviceID string) error

@@ -153,7 +153,10 @@ type Report struct {
 	Guests       []Guest
 	Updates      Updates
 	Pending      []Package
-	Issues       []store.HostSyncIssue
+	// Hardware is the validated hardware profile (feature 023); nil when
+	// the report carries none (older agent or inventory).
+	Hardware *Hardware
+	Issues   []store.HostSyncIssue
 }
 
 var (
@@ -341,6 +344,7 @@ func Normalize(r invclient.Report, tenantID string) (Report, error) {
 	is.add("guests", "truncated", int(r.Truncated.Guests))
 	is.add("packages", "truncated", int(r.Truncated.Packages))
 	is.add("bmc_ports", "truncated", int(r.Truncated.BMCPorts))
+	out.Hardware = normalizeHardware(r.Hardware, r.Truncated, is)
 	out.Issues = is.list()
 	return out, nil
 }

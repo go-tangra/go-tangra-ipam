@@ -452,6 +452,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ipam/v1/devices/{id}/hardware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Hardware reported by the host's inventory agent (feature 023). Read-only: there is no write route; device create/update refuse hardware fields. */
+        get: operations["getDeviceHardware"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ipam/v1/devices/{id}/guests": {
         parameters: {
             query?: never;
@@ -984,6 +1001,125 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Summary of a device's reported hardware (feature 023): CPU, memory and physical, non-removable disks. */
+        HardwareSummary: {
+            cpu_model?: string;
+            cpu_sockets?: number;
+            cpu_cores?: number;
+            cpu_threads?: number;
+            /** Format: int64 */
+            memory_total_bytes?: number;
+            memory_type?: string;
+            memory_slots_total?: number;
+            memory_slots_used?: number;
+            disk_count?: number;
+            /** Format: int64 */
+            disk_total_bytes?: number;
+            /** Format: date-time */
+            reported_at?: string;
+        };
+        /** @description Normalised hardware profile reported by the inventory agent (replaced by every report; fields without a value are omitted). */
+        DeviceHardware: {
+            /** Format: uuid */
+            device_id?: string;
+            /** Format: date-time */
+            reported_at?: string;
+            schema?: number;
+            summary?: components["schemas"]["HardwareSummary"];
+            bios?: {
+                vendor?: string;
+                version?: string;
+                release_date?: string;
+            };
+            system?: {
+                manufacturer?: string;
+                product?: string;
+                version?: string;
+                serial?: string;
+                uuid?: string;
+                sku?: string;
+                family?: string;
+            };
+            board?: {
+                manufacturer?: string;
+                product?: string;
+                serial?: string;
+            };
+            chassis?: {
+                type?: string;
+                manufacturer?: string;
+                serial?: string;
+                asset_tag?: string;
+            };
+            processors?: {
+                socket?: string;
+                manufacturer?: string;
+                model?: string;
+                family?: string;
+                max_mhz?: number;
+                current_mhz?: number;
+                cores?: number;
+                threads?: number;
+                populated?: boolean;
+            }[];
+            memory?: {
+                /** Format: int64 */
+                total_bytes?: number;
+                error_correction?: string;
+                location?: string;
+                use?: string;
+                /** Format: int64 */
+                max_capacity_bytes?: number;
+                slots_total?: number;
+                slots_used?: number;
+                slots?: {
+                    locator?: string;
+                    bank?: string;
+                    populated?: boolean;
+                    /** Format: int64 */
+                    size_bytes?: number;
+                    type?: string;
+                    form_factor?: string;
+                    type_detail?: string[];
+                    speed_mts?: number;
+                    configured_mts?: number;
+                    manufacturer?: string;
+                    part_number?: string;
+                    serial?: string;
+                }[];
+            };
+            disks?: {
+                name?: string;
+                model?: string;
+                vendor?: string;
+                serial?: string;
+                /** Format: int64 */
+                size_bytes?: number;
+                /** @enum {string} */
+                media?: "ssd" | "hdd" | "nvme_ssd" | "unknown";
+                /** @enum {string} */
+                interface?: "nvme" | "sata" | "sas" | "scsi" | "usb" | "virtio" | "hyperv" | "xen" | "mmc" | "other";
+                removable?: boolean;
+            }[];
+            filesystems?: {
+                mount?: string;
+                fs?: string;
+                /** Format: int64 */
+                size_bytes?: number;
+                /** Format: int64 */
+                free_bytes?: number;
+                disks?: string[];
+            }[];
+            availability?: {
+                /** @enum {string} */
+                smbios?: "ok" | "partial" | "unavailable" | "unsupported" | "unknown";
+                /** @enum {string} */
+                disks?: "ok" | "partial" | "unavailable" | "unsupported" | "unknown";
+            };
+            truncated?: {
+                [key: string]: number;
+            };
+        };
         HostSyncSettings: {
             enabled: boolean;
             full_interval_minutes: number;
@@ -1927,6 +2063,8 @@ export interface operations {
                 limit?: components["parameters"]["limit"];
                 report_state?: components["parameters"]["reportState"];
                 source?: "manual" | "scan" | "host_report";
+                /** @description only devices with (true) or without (false) reported hardware (feature 023) */
+                has_hardware?: "true" | "false";
             };
             header?: never;
             path?: never;
@@ -1934,7 +2072,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description list */
+            /** @description list; items carry a read-only hardware_summary (HardwareSummary) when hardware is reported */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1975,7 +2113,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description device */
+            /** @description device; carries a read-only hardware_summary (HardwareSummary) when hardware is reported */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2348,6 +2486,36 @@ export interface operations {
             };
             /** @description temporarily_unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getDeviceHardware: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description reported hardware */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceHardware"];
+                };
+            };
+            /** @description not_found (no such device, another tenant's device, or no reported hardware) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

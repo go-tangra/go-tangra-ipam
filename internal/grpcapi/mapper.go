@@ -539,13 +539,28 @@ func deviceToPB(v store.Device) *ipamv1.Device {
 		Source: v.Source, InventoryHostId: v.InventoryHostID, VirtualizationKind: v.VirtualizationKind,
 		HypervisorDeviceId: v.HypervisorDeviceID, UpdateStatus: v.UpdateStatus, ReportState: v.ReportState,
 		LastReportAt: unixPtr(v.LastReportAt), GuestCount: v.GuestCount,
+		HardwareSummary: hardwareSummaryToPB(v.HardwareSummary),
+	}
+}
+
+// hardwareSummaryToPB maps the read-only device hardware summary (nil stays
+// nil). There is no inbound mapping: hardware is reported data (FR-008).
+func hardwareSummaryToPB(s *store.HardwareSummary) *ipamv1.HardwareSummary {
+	if s == nil {
+		return nil
+	}
+	return &ipamv1.HardwareSummary{
+		CpuModel: s.CPUModel, CpuSockets: int32(s.CPUSockets), CpuCores: int32(s.CPUCores), CpuThreads: int32(s.CPUThreads), // #nosec G115 -- bounded counts
+		MemoryTotalBytes: s.MemoryTotalBytes, MemoryType: s.MemoryType,
+		MemorySlotsTotal: int32(s.MemorySlotsTotal), MemorySlotsUsed: int32(s.MemorySlotsUsed), // #nosec G115 -- <= 1024
+		DiskCount: int32(s.DiskCount), DiskTotalBytes: s.DiskTotalBytes, ReportedAt: unix(s.ReportedAt), // #nosec G115 -- <= 256
 	}
 }
 
 // deviceFromPB maps a caller's device. The host-sync fields (source,
 // inventory_host_id, virtualization_kind, hypervisor_device_id,
-// update_status, report_state, last_report_at) are server-owned and are
-// never read from a caller.
+// update_status, report_state, last_report_at) and the hardware summary are
+// server-owned and are never read from a caller.
 func deviceFromPB(p *ipamv1.Device) store.Device {
 	if p == nil {
 		return store.Device{}
