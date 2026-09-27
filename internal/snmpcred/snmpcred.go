@@ -23,7 +23,7 @@ const redacted = "[REDACTED]"
 
 var (
 	authProtocols = []string{"MD5", "SHA", "SHA224", "SHA256", "SHA384", "SHA512"}
-	privProtocols = []string{"DES", "AES", "AES192", "AES256"}
+	privProtocols = []string{"DES", "AES", "AES192", "AES256", "AES192C", "AES256C"}
 	weak          = map[string]bool{"MD5": true, "SHA": true, "DES": true}
 )
 

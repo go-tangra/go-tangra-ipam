@@ -224,7 +224,7 @@ func (s *Service) effectiveCreds(ctx context.Context, tenantID, subnetID string)
 		return effective{status: store.SNMPUnreadable, source: src.SubnetID}, nil
 	}
 	return effective{status: store.SNMPRan, source: src.SubnetID, secret: sec,
-		creds: snmpcred.ToCreds(snmpcred.MetaOf(row), sec, s.cfg.TimeoutMs, 0)}, nil
+		creds: snmpcred.ToCreds(snmpcred.MetaOf(row), sec, int(s.snmpTimeout()/time.Millisecond), snmpRetries)}, nil
 }
 
 // snmpPhase records why SNMP ran or not (FR-016, SC-005) and, when it can,
@@ -249,27 +249,63 @@ func (s *Service) snmpPhase(ctx context.Context, log *slog.Logger, job *store.IP
 // hosts that did not answer or rejected the credentials. SNMP is
 // best-effort: a silent host is counted, not fatal.
 func (s *Service) discoverSNMP(ctx context.Context, log *slog.Logger, job *store.IPScanJob, cred effective, alive []string) {
+	var (
+		mu     sync.Mutex
+		wg     sync.WaitGroup
+		warned int
+		other  int
+		sem    = make(chan struct{}, snmpWorkers)
+	)
 	for _, ip := range alive {
-		job.SNMPProbed++
-		dev, err := s.snmp.Discover(ctx, ip, cred.creds)
-		if err != nil {
-			switch o := snmp.Classify(err); {
-			case o == snmp.OutcomeNoResponse:
-				job.SNMPNoAnswer++
-			case o.Rejected():
-				job.SNMPRejected++
-			default:
-				log.Debug("scan snmp host", "job", job.ID, "ip", ip, "err", snmpcred.Scrub(err.Error(), cred.secret))
+		if ctx.Err() != nil {
+			break
+		}
+		sem <- struct{}{}
+		wg.Add(1)
+		go func(ip string) {
+			defer func() { <-sem; wg.Done() }()
+			dctx, cancel := context.WithTimeout(ctx, s.snmpDeadline()+s.snmpWalkBudget())
+			dev, err := s.snmp.Discover(dctx, ip, cred.creds)
+			cancel()
+			mu.Lock()
+			defer mu.Unlock()
+			job.SNMPProbed++
+			if err != nil {
+				switch o := snmp.Classify(err); {
+				case o == snmp.OutcomeNoResponse:
+					job.SNMPNoAnswer++
+				case o.Rejected():
+					job.SNMPRejected++
+					if warned < snmpLogCap {
+						warned++
+						log.Warn("scan snmp credentials rejected", "job", job.ID, "ip", ip, "outcome", string(o))
+					}
+				default:
+					other++
+					if warned < snmpLogCap {
+						warned++
+						log.Warn("scan snmp host error", "job", job.ID, "ip", ip, "err", snmpcred.Scrub(err.Error(), cred.secret))
+					}
+				}
+				return
 			}
-			continue
-		}
-		if err := s.persistDevice(ctx, job.TenantID, ip, dev); err != nil {
-			log.Warn("scan persist device", "job", job.ID, "ip", ip, "err", err)
-			continue
-		}
-		job.SNMPDiscoveredCount++
+			if err := s.persistDevice(ctx, job.TenantID, ip, dev); err != nil {
+				log.Warn("scan persist device", "job", job.ID, "ip", ip, "err", err)
+				return
+			}
+			job.SNMPDiscoveredCount++
+		}(ip)
 	}
+	wg.Wait()
+	log.Info("scan snmp phase", "job", job.ID, "probed", job.SNMPProbed, "discovered", job.SNMPDiscoveredCount,
+		"no_answer", job.SNMPNoAnswer, "rejected", job.SNMPRejected, "other_errors", other,
+		"version", cred.creds.Version, "auth", cred.creds.AuthProtocol, "priv", cred.creds.PrivProtocol,
+		"timeout_ms", s.snmpTimeout().Milliseconds())
 }
+
+// snmpWalkBudget bounds the table walks after a host answered (interfaces,
+// FDB, LLDP) so one slow device cannot stall the phase.
+func (s *Service) snmpWalkBudget() time.Duration { return 60 * time.Second }
 
 // persistDevice upserts a discovered device, its interfaces and their links.
 func (s *Service) persistDevice(ctx context.Context, tenantID, ip string, dev snmp.DiscoveredDevice) error {
@@ -363,6 +399,28 @@ func (s *Service) observeCancel(ctx context.Context, _ *slog.Logger, job *store.
 }
 
 // timeout is the per-host probe timeout.
+// snmpRetries is the per-request SNMP retry count; snmpWorkers bounds the
+// hosts probed in parallel during the SNMP phase (v3 parity: 10).
+const (
+	snmpRetries = 1
+	snmpWorkers = 10
+	// snmpLogCap bounds the per-job warnings for unexpected SNMP errors.
+	snmpLogCap = 5
+)
+
+// snmpTimeout is the per-request SNMP timeout (scan.snmp_timeout_ms).
+func (s *Service) snmpTimeout() time.Duration {
+	if s.cfg.SNMPTimeoutMs <= 0 {
+		return 5 * time.Second
+	}
+	return time.Duration(s.cfg.SNMPTimeoutMs) * time.Millisecond
+}
+
+// snmpDeadline bounds one SNMP operation: every attempt plus a margin.
+func (s *Service) snmpDeadline() time.Duration {
+	return time.Duration(snmpRetries+1)*s.snmpTimeout() + testMargin
+}
+
 func (s *Service) timeout() time.Duration {
 	if s.cfg.TimeoutMs <= 0 {
 		return time.Second

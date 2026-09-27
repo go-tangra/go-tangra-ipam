@@ -126,7 +126,7 @@ func TestRunOnceSNMPDiscovery(t *testing.T) {
 	// T021: the subnet's own credentials reached the client and the SNMP
 	// phase is recorded.
 	seen := disc.Seen()
-	if len(seen) != 1 || seen[0].Version != 2 || seen[0].Community != "lab-community" || seen[0].TimeoutMs != testConfig().TimeoutMs {
+	if len(seen) != 1 || seen[0].Version != 2 || seen[0].Community != "lab-community" || seen[0].TimeoutMs != 5000 || seen[0].Retries != 1 {
 		t.Fatalf("creds reaching the client: %d calls", len(seen))
 	}
 	got, _ := m.GetScanJob(ctx, "t1", job.ID)

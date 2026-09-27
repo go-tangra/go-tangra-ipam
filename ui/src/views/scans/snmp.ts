@@ -15,7 +15,9 @@ export function snmpPhaseText(j: IPScanJob, subnetLabel: (id: string) => string)
       return 'skipped: credentials unreadable (re-enter them)'
     case 'ran': {
       const src = j.snmp_source_subnet_id && j.snmp_source_subnet_id !== j.subnet_id ? 'inherited from ' + subnetLabel(j.snmp_source_subnet_id) : 'own credentials'
-      return `ran (${src}) · probed ${j.snmp_probed ?? 0} · discovered ${j.snmp_discovered_count ?? 0} · no answer ${j.snmp_no_answer ?? 0} · rejected ${j.snmp_rejected ?? 0}`
+      const probed = j.snmp_probed ?? 0, found = j.snmp_discovered_count ?? 0, silent = j.snmp_no_answer ?? 0, rejected = j.snmp_rejected ?? 0
+      const other = Math.max(0, probed - found - silent - rejected)
+      return `ran (${src}) · probed ${probed} · discovered ${found} · no answer ${silent} · rejected ${rejected}` + (other ? ` · other errors ${other}` : '')
     }
     default:
       return ''

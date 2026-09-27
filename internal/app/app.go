@@ -199,7 +199,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	dnsSvc := dnscfg.New(a.Repo)
 	scanSvc := scan.New(a.Repo, pinger, pinger, snmpDisc, pub, scan.Config{
 		MaxHosts: cfg.Scan.MaxHosts, Concurrency: cfg.Scan.Concurrency, TimeoutMs: cfg.Scan.TimeoutMs,
-		Workers: cfg.Scan.Workers, MaxRetries: cfg.Scan.MaxRetries,
+		Workers: cfg.Scan.Workers, MaxRetries: cfg.Scan.MaxRetries, SNMPTimeoutMs: cfg.Scan.SNMPTimeoutMs,
 	}, nil)
 	scanSvc.SetEnvelope(a.Env)
 

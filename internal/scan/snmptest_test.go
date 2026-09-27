@@ -45,7 +45,7 @@ func TestCredentialsOutcomes(t *testing.T) {
 	disc.Fail("10.1.112.21", gosnmp.ErrWrongDigest)
 	disc.Fail("10.1.112.22", gosnmp.ErrUnknownUsername)
 	disc.Fail("10.1.112.23", gosnmp.ErrDecryption)
-	disc.Fail("10.1.112.25", errors.New("odd"))
+	disc.Fail("10.1.112.25", errors.New("odd failure echoing root-comm"))
 	svc, m := testSvc(t, disc)
 	setCreds(t, m, "t1", "root", snmpcred.Input{Version: 2, Community: "root-comm"})
 	for addr, want := range map[string]string{
@@ -58,6 +58,12 @@ func TestCredentialsOutcomes(t *testing.T) {
 		}
 		if res.Outcome != want || res.SourceSubnetID != "root" {
 			t.Errorf("%s: outcome %q source %q, want %q", addr, res.Outcome, res.SourceSubnetID, want)
+		}
+		if want == "error" && (res.Detail == "" || strings.Contains(res.Detail, "root-comm")) {
+			t.Errorf("error detail %q must be present and scrubbed", res.Detail)
+		}
+		if want != "error" && res.Detail != "" {
+			t.Errorf("%s: unexpected detail %q", addr, res.Detail)
 		}
 		if want == "ok" && (res.SysName != "sw-core-1" || len([]rune(res.SysDescr)) != 256) {
 			t.Errorf("ok result %q / %d chars", res.SysName, len(res.SysDescr))
@@ -159,8 +165,9 @@ func (b *blockingDisc) Probe(ctx context.Context, _ string, _ snmp.Creds) (strin
 	return "", "", context.DeadlineExceeded
 }
 
-// TestCredentialsDeadline (FR-020, SC-006): the probe runs under the SNMP
-// timeout plus 2 seconds and a hung agent counts as no response.
+// TestCredentialsDeadline (FR-020, SC-006): the probe runs under every SNMP
+// attempt (timeout × (retries+1)) plus 2 seconds and a hung agent counts as no
+// response. The SNMP timeout is its own setting (default 5 s), not the ICMP one.
 func TestCredentialsDeadline(t *testing.T) {
 	disc := &blockingDisc{}
 	svc, m := testSvc(t, disc)
@@ -169,7 +176,7 @@ func TestCredentialsDeadline(t *testing.T) {
 	if res, err := svc.TestCredentials(context.Background(), adminSubj("t1"), "s1", "10.1.112.9"); err != nil || res.Outcome != "no_response" {
 		t.Fatalf("timeout: %+v %v", res, err)
 	}
-	want := start.Add(time.Duration(testConfig().TimeoutMs)*time.Millisecond + 2*time.Second)
+	want := start.Add(2*5*time.Second + 2*time.Second)
 	if d := disc.deadline.Sub(want); d > 200*time.Millisecond || d < -200*time.Millisecond {
 		t.Fatalf("probe deadline off by %v", d)
 	}

@@ -209,7 +209,7 @@ func TestSubnetSNMPContract(t *testing.T) {
 	if got := in.Properties["auth_protocol"].Value.Enum; len(got) != 6 {
 		t.Errorf("auth protocols %v", got)
 	}
-	if got := in.Properties["priv_protocol"].Value.Enum; len(got) != 4 {
+	if got := in.Properties["priv_protocol"].Value.Enum; len(got) != 6 {
 		t.Errorf("priv protocols %v", got)
 	}
 	for _, name := range []string{"SubnetSNMPStatus", "SNMPSummary", "SNMPTestResult"} {

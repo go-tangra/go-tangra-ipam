@@ -33,6 +33,7 @@ type TestResult struct {
 	Outcome        string `json:"outcome"`
 	SysName        string `json:"sys_name,omitempty"`
 	SysDescr       string `json:"sys_descr,omitempty"`
+	Detail         string `json:"detail,omitempty"` // scrubbed reason when outcome is error
 	SourceSubnetID string `json:"source_subnet_id,omitempty"`
 	DurationMs     int64  `json:"duration_ms"`
 }
@@ -66,12 +67,15 @@ func (s *Service) TestCredentials(ctx context.Context, subj authz.Subjects, subn
 	case store.SNMPUnreadable:
 		res.Outcome = OutcomeUnreadable
 	default:
-		pctx, cancel := context.WithTimeout(ctx, s.timeout()+testMargin)
+		pctx, cancel := context.WithTimeout(ctx, s.snmpDeadline())
 		name, descr, perr := s.snmp.Probe(pctx, target, cred.creds)
 		cancel()
 		res.Outcome = string(snmp.Classify(perr))
 		if perr == nil {
 			res.SysName, res.SysDescr = clip(name), clip(descr)
+		} else if res.Outcome == string(snmp.OutcomeError) {
+			// Unexpected failures carry the (scrubbed) reason so operators can act.
+			res.Detail = clip(snmpcred.Scrub(perr.Error(), cred.secret))
 		}
 	}
 	res.DurationMs = s.now().Sub(start).Milliseconds()

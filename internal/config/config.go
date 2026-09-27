@@ -101,6 +101,10 @@ type Scan struct {
 	TimeoutMs   int `yaml:"timeout_ms"`  // per-host probe timeout
 	Workers     int `yaml:"workers"`     // job executor goroutines
 	MaxRetries  int `yaml:"max_retries"` // per-job retry budget
+	// SNMPTimeoutMs is the per-request SNMP timeout (discovery and credential
+	// tests). SNMPv3 engine discovery and key localisation on slow devices need
+	// far more than an ICMP probe, so it is separate from TimeoutMs.
+	SNMPTimeoutMs int `yaml:"snmp_timeout_ms"`
 }
 
 // Allocation carries the default reservation policy applied when a subnet does
@@ -160,7 +164,7 @@ func Default() Config {
 		DB:         DB{MaxConns: 16},
 		KEK:        KEK{Source: "file"},
 		Warden:     Warden{Service: "warden"},
-		Scan:       Scan{MaxHosts: 1024, Concurrency: 50, TimeoutMs: 1000, Workers: 3, MaxRetries: 3},
+		Scan:       Scan{MaxHosts: 1024, Concurrency: 50, TimeoutMs: 1000, Workers: 3, MaxRetries: 3, SNMPTimeoutMs: 5000},
 		Allocation: Allocation{SkipFirst: 0, SkipLast: 0},
 		IPMI:       IPMI{TimeoutSeconds: 15},
 		KVM:        KVM{TokenTTLSeconds: 60, SessionSeconds: 3600},
@@ -229,6 +233,9 @@ func (c Config) Validate() error {
 	}
 	if c.Scan.TimeoutMs < 10 || c.Scan.TimeoutMs > 60000 {
 		return errors.New("config: scan.timeout_ms must be within [10, 60000]")
+	}
+	if c.Scan.SNMPTimeoutMs < 500 || c.Scan.SNMPTimeoutMs > 30000 {
+		return errors.New("config: scan.snmp_timeout_ms must be 500..30000")
 	}
 	if c.Scan.Workers < 1 || c.Scan.Workers > 256 {
 		return errors.New("config: scan.workers must be within [1, 256]")
