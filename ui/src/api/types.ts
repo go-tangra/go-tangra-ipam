@@ -593,3 +593,15 @@ export interface HypervisorGuest {
   guest_device_name?: string
   last_reported_at?: string
 }
+
+// --- ARP settings (feature 022) ---
+
+// ARPSettings is GET/PUT /arp/settings: whether scans with SNMP read the ARP
+// tables, devices never used as ARP sources, and the proxy-ARP threshold.
+export interface ARPSettings {
+  enabled: boolean
+  excluded_devices: string[]
+  proxy_threshold: number
+  updated_by?: string
+  updated_at?: string
+}

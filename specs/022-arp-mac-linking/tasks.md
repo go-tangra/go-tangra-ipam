@@ -108,15 +108,15 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T029 [P] [US3] Filter tests in `internal/arpplan/filter_test.go`: multicast, broadcast, zero, VRRP v4/v6, HSRP v1/v2, network-device MAC, proxy threshold (boundary = threshold, threshold+1), excluded device; reasons counted (SC-004)
-- [ ] T030 [P] [US3] Settings HTTP tests in `internal/httpapi/arp_test.go`: GET defaults (`ipam:read`), PUT (`subnets:manage`, CSRF, 16 KiB), validation (threshold bounds, ≤ 256 devices, unknown device id → 422), audit `arp_settings_updated`
-- [ ] T031 [P] [US3] OpenAPI contract test for the settings routes in `api/openapi/openapi_test.go`
+- [x] T029 [P] [US3] Filter tests in `internal/arpplan/filter_test.go`: multicast, broadcast, zero, VRRP v4/v6, HSRP v1/v2, network-device MAC, proxy threshold (boundary = threshold, threshold+1), excluded device; reasons counted (SC-004)
+- [x] T030 [P] [US3] Settings HTTP tests in `internal/httpapi/arp_test.go`: GET defaults (`ipam:read`), PUT (`subnets:manage`, CSRF, 16 KiB), validation (threshold bounds, ≤ 256 devices, unknown device id → 422), audit `arp_settings_updated`
+- [x] T031 [P] [US3] OpenAPI contract test for the settings routes in `api/openapi/openapi_test.go`
 
 ### Implementation
 
-- [ ] T032 [US3] Complete filters in `internal/arpplan/filter.go` (T029)
-- [ ] T033 [US3] Settings service + routes in `internal/httpapi/arp.go` (service logic in a small `internal/arpcfg` package), OpenAPI schema `ARPSettings`
-- [ ] T034 [P] [US3] UI: ARP settings card (enabled, proxy threshold, excluded devices picker) on the host sync page (`ui/src/views/hostsync/index.vue`) with store `ui/src/stores/arp.ts`; vitest
+- [x] T032 [US3] Complete filters in `internal/arpplan/filter.go` (T029)
+- [x] T033 [US3] Settings service + routes in `internal/httpapi/arp.go` (service logic in a small `internal/arpcfg` package), OpenAPI schema `ARPSettings`
+- [x] T034 [P] [US3] UI: ARP settings card (enabled, proxy threshold, excluded devices picker) on the host sync page (`ui/src/views/hostsync/index.vue`) with store `ui/src/stores/arp.ts`; vitest
 
 ---
 

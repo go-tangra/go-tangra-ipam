@@ -250,6 +250,31 @@ components:
           maxItems: 256
           description: 'addresses linked to this switch port (feature 022)'
           items: { $ref: '#/components/schemas/BehindAddress' }
+    ARPSettingsInput:
+      type: object
+      additionalProperties: false
+      description: >
+        Per-tenant ARP collection (feature 022): scans with SNMP discovery read
+        the ARP/neighbour tables of the devices that answer unless disabled;
+        excluded devices are never used as ARP sources; a MAC answering for
+        more than proxy_threshold IPs in one scan is treated as proxy ARP.
+      required: [enabled, excluded_devices, proxy_threshold]
+      properties:
+        enabled: { type: boolean }
+        excluded_devices:
+          type: array
+          maxItems: 256
+          description: 'ids of existing devices of the tenant'
+          items: { type: string, format: uuid }
+        proxy_threshold: { type: integer, minimum: 2, maximum: 256 }
+    ARPSettings:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        excluded_devices: { type: array, items: { type: string } }
+        proxy_threshold: { type: integer }
+        updated_by: { type: string }
+        updated_at: { type: string, format: date-time }
     IPAddressList:
       type: object
       properties:
@@ -486,6 +511,22 @@ paths:
       x-freya-max-body-bytes: 1024
       parameters: [{ $ref: '#/components/parameters/csrf' }]
       responses: { '202': { description: 'full reconcile scheduled' }, '409': { description: host_sync_disabled } }
+
+  # ---- ARP-based MAC linking (feature 022) ----
+  /api/ipam/v1/arp/settings:
+    get:
+      operationId: getArpSettings
+      x-freya-permission: 'ipam:read'
+      responses: { '200': { description: 'settings (defaults when never saved)', content: { application/json: { schema: { $ref: '#/components/schemas/ARPSettings' } } } } }
+    put:
+      operationId: updateArpSettings
+      x-freya-permission: 'subnets:manage'
+      x-freya-max-body-bytes: 16384
+      parameters: [{ $ref: '#/components/parameters/csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ARPSettingsInput' } } } }
+      responses:
+        '200': { description: settings, content: { application/json: { schema: { $ref: '#/components/schemas/ARPSettings' } } } }
+        '422': { description: 'validation_failed (detail.field names the field)' }
 
   # ---- Warden secret references (metadata only) ----
   /api/ipam/v1/warden-secrets:

@@ -99,6 +99,9 @@ var Abilities = []gatewayclient.Ability{
 	// ipam:read sees only the status.
 	{Action: []string{"configure"}, Subject: []string{"SubnetSnmp"}, Requires: "subnets:manage"},
 	{Action: []string{"test"}, Subject: []string{"SubnetSnmp"}, Requires: "scan:run"},
+	// ARP settings (feature 022): network configuration, same holders as the
+	// SNMP credentials; everyone with ipam:read sees them.
+	{Action: []string{"configure"}, Subject: []string{"ArpSettings"}, Requires: "subnets:manage"},
 }
 
 // Nav lists the navigation contributions.

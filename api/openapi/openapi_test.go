@@ -280,3 +280,42 @@ func TestAddressLinkContract(t *testing.T) {
 		t.Fatal("behind_addresses missing")
 	}
 }
+
+// TestARPSettingsContract (022 T031): the ARP settings routes, permissions,
+// CSRF, body bound and the closed input schema.
+func TestARPSettingsContract(t *testing.T) {
+	doc := loadDoc(t)
+	item := doc.Paths.Find("/api/ipam/v1/arp/settings")
+	if item == nil || item.Get == nil || item.Put == nil {
+		t.Fatal("arp settings routes missing")
+	}
+	if perm, _ := item.Get.Extensions["x-freya-permission"].(string); perm != "ipam:read" {
+		t.Errorf("GET permission %q", perm)
+	}
+	if perm, _ := item.Put.Extensions["x-freya-permission"].(string); perm != "subnets:manage" {
+		t.Errorf("PUT permission %q", perm)
+	}
+	if n, _ := item.Put.Extensions["x-freya-max-body-bytes"].(float64); n != 16384 {
+		t.Errorf("PUT body limit %v", n)
+	}
+	csrf := false
+	for _, prm := range item.Put.Parameters {
+		csrf = csrf || (prm.Value != nil && prm.Value.Name == "X-CSRF-Token" && prm.Value.Required)
+	}
+	if !csrf {
+		t.Error("PUT must require the CSRF parameter")
+	}
+	in := doc.Components.Schemas["ARPSettingsInput"].Value
+	if in == nil || in.AdditionalProperties.Has == nil || *in.AdditionalProperties.Has {
+		t.Fatal("ARPSettingsInput must forbid additional properties")
+	}
+	if th := in.Properties["proxy_threshold"].Value; *th.Min != 2 || *th.Max != 256 {
+		t.Error("proxy threshold bounds")
+	}
+	if ex := in.Properties["excluded_devices"].Value; *ex.MaxItems != 256 || ex.Items.Value.Format != "uuid" {
+		t.Error("excluded devices bounds")
+	}
+	if doc.Components.Schemas["ARPSettings"] == nil {
+		t.Error("ARPSettings response schema missing")
+	}
+}

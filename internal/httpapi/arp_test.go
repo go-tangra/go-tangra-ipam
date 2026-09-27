@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -71,5 +72,81 @@ func TestAddressLinkRoutes(t *testing.T) {
 	w = f.req(t, "GET", p+"/devices/"+host.ID+"/addresses", "user", "")
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"switch_name":"MSW-RACK2"`) {
 		t.Fatalf("device addresses %d %s", w.Code, w.Body)
+	}
+}
+
+// TestARPSettingsRoutes (022 T030): defaults for readers, validated writes
+// with 422 detail.field, audit, CSRF, body bound and tenant scoping.
+func TestARPSettingsRoutes(t *testing.T) {
+	f := newAPI(t)
+	ctx := context.Background()
+	w := f.req(t, "GET", p+"/arp/settings", "user", "")
+	b := decodeBody(t, w)
+	if w.Code != 200 || b["enabled"] != true || b["proxy_threshold"] != float64(8) || len(b["excluded_devices"].([]any)) != 0 {
+		t.Fatalf("defaults %d %s", w.Code, w.Body)
+	}
+	dev := store.Device{ID: "0190f7c2-aaaa-7c1a-9b2e-00000000ab01", TenantID: apiTenant, Name: "fortigate", DeviceType: store.DevFirewall}
+	if err := f.mem.CreateDevice(ctx, dev); err != nil {
+		t.Fatal(err)
+	}
+	w = f.req(t, "PUT", p+"/arp/settings", "admin", `{"enabled":false,"excluded_devices":["`+dev.ID+`","`+dev.ID+`"],"proxy_threshold":20}`)
+	b = decodeBody(t, w)
+	if w.Code != 200 || b["enabled"] != false || b["proxy_threshold"] != float64(20) || len(b["excluded_devices"].([]any)) != 1 || b["updated_by"] != apiAdmin {
+		t.Fatalf("put %d %s", w.Code, w.Body)
+	}
+	found := false
+	for _, a := range f.mem.Audit() {
+		if a.Action == "arp_settings_updated" {
+			found = a.ActorKind == "user" && a.ActorID == apiAdmin && a.SubjectKind == "tenant" && a.Detail["excluded_count"] == 1 &&
+				a.Detail["proxy_threshold"] == 20 && a.Detail["enabled"] == false
+		}
+	}
+	if !found {
+		t.Fatal("arp_settings_updated audit")
+	}
+	many := make([]string, 257)
+	for i := range many {
+		many[i] = `"0190f7c2-aaaa-7c1a-9b2e-` + strings.Repeat("0", 9) + string(rune('a'+i%26)) + string(rune('a'+i/26%26)) + `0"`
+	}
+	for body, field := range map[string]string{
+		`{"enabled":true,"excluded_devices":[],"proxy_threshold":1}`:                                       "proxy_threshold",
+		`{"enabled":true,"excluded_devices":[],"proxy_threshold":257}`:                                     "proxy_threshold",
+		`{"enabled":true,"excluded_devices":["0190f7c2-aaaa-7c1a-9b2e-00000000ffff"],"proxy_threshold":8}`: "excluded_devices",
+		`{"enabled":true,"excluded_devices":["not-a-uuid"],"proxy_threshold":8}`:                           "excluded_devices",
+		`{"enabled":true,"excluded_devices":[` + strings.Join(many, ",") + `],"proxy_threshold":8}`:        "excluded_devices",
+		`{"excluded_devices":[],"proxy_threshold":8}`:                                                      "enabled",
+		`{"enabled":true,"excluded_devices":[]}`:                                                           "proxy_threshold",
+	} {
+		w := f.req(t, "PUT", p+"/arp/settings", "admin", body)
+		if w.Code != 422 {
+			t.Errorf("%.70s: %d %s", body, w.Code, w.Body)
+			continue
+		}
+		b := decodeBody(t, w)
+		d, _ := b["detail"].(map[string]any)
+		if b["reason"] != "validation_failed" || d["field"] != field {
+			t.Errorf("%.70s: %s", body, w.Body)
+		}
+	}
+	if w := f.req(t, "PUT", p+"/arp/settings", "admin", `{"enabled":true,"excluded_devices":[],"proxy_threshold":8,"surprise":1}`); w.Code/100 != 4 {
+		t.Errorf("unknown field accepted: %d", w.Code)
+	}
+	if w := f.req(t, "PUT", p+"/arp/settings", "admin", `{"enabled":true,"excluded_devices":[],"proxy_threshold":8,"x":"`+strings.Repeat("x", 17000)+`"}`); w.Code != 413 {
+		t.Errorf("oversized body: %d", w.Code)
+	}
+	r := httptest.NewRequest("PUT", "https://localhost"+p+"/arp/settings", strings.NewReader(`{}`))
+	r.Header.Set("Authorization", "Bearer admin")
+	r.Header.Set("Content-Type", "application/json")
+	rw := httptest.NewRecorder()
+	f.s.Handler().ServeHTTP(rw, r)
+	if rw.Code != 422 {
+		t.Fatalf("missing CSRF: %d", rw.Code)
+	}
+	// Another tenant still sees its defaults; unauthenticated is refused.
+	if w := f.req(t, "GET", p+"/arp/settings", "other", ""); w.Code != 200 || decodeBody(t, w)["enabled"] != true {
+		t.Fatalf("tenant isolation %d %s", w.Code, w.Body)
+	}
+	if w := f.req(t, "GET", p+"/arp/settings", "", ""); w.Code != 401 {
+		t.Fatal("unauthenticated")
 	}
 }

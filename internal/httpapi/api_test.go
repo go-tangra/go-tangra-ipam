@@ -15,6 +15,7 @@ import (
 	"github.com/go-tangra/go-tangra/v4/freyatest/testutil"
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
@@ -133,6 +134,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		Warden:    wf,
 		Hub:       hub,
 		HostSync:  hostsync.NewAdmin(mem, inv, runner, true),
+		ARP:       arpcfg.New(mem),
 	}
 
 	v := fakeVerifier{ids: map[string]authclient.Identity{

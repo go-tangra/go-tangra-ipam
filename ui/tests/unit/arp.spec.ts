@@ -7,6 +7,8 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import Addresses from '@/views/addresses/index.vue'
 import Scans from '@/views/scans/index.vue'
 import Detail from '@/views/devices/detail.vue'
+import ArpSettingsCard from '@/components/ArpSettingsCard.vue'
+import { arpSettingsSchema } from '@/schemas'
 import { arpPhaseText } from '@/views/scans/snmp'
 import { linkText, macSourceLabel, macSourceText } from '@/views/addresses/mac'
 import type { IPAddress, IPScanJob } from '@/api/types'
@@ -120,6 +122,66 @@ describe('switch-port links (US2)', () => {
     await tab.trigger('click')
     await flushPromises()
     expect(w.text()).toContain('MSW-RACK2 port 14 (VLAN 30)')
+    w.unmount()
+  })
+})
+
+describe('ARP settings (US3)', () => {
+  const routers = [
+    { id: '0190f7c2-aaaa-7c1a-9b2e-00000000ab01', name: 'fortigate', device_type: 'firewall', status: 'active' },
+    { id: '0190f7c2-aaaa-7c1a-9b2e-00000000ab02', name: 'mikrotik', device_type: 'router', status: 'active' },
+    { id: '0190f7c2-aaaa-7c1a-9b2e-00000000ab03', name: 'web-01', device_type: 'server', status: 'active' },
+  ]
+  const saved = { enabled: true, excluded_devices: [], proxy_threshold: 8, updated_by: 'u1', updated_at: '2026-09-27T10:00:00Z' }
+  const handler = (calls: { body?: unknown }[]) => (url: string, init: RequestInit) => {
+    if (url.includes('/arp/settings')) {
+      if (init.method === 'PUT') {
+        const body = JSON.parse(String(init.body))
+        calls.push({ body })
+        return { ...saved, ...body }
+      }
+      return saved
+    }
+    if (url.includes('/devices')) return { items: routers }
+    return { items: [] }
+  }
+
+  it('validates the settings', () => {
+    expect(arpSettingsSchema.safeParse({ enabled: true, proxy_threshold: '8', excluded_devices: [] }).data).toEqual({ enabled: true, proxy_threshold: 8, excluded_devices: [] })
+    expect(arpSettingsSchema.safeParse({ enabled: true, proxy_threshold: 1, excluded_devices: [] }).success).toBe(false)
+    expect(arpSettingsSchema.safeParse({ enabled: true, proxy_threshold: 257, excluded_devices: [] }).success).toBe(false)
+    expect(arpSettingsSchema.safeParse({ enabled: true, proxy_threshold: 8, excluded_devices: ['x'] }).success).toBe(false)
+  })
+
+  it('is read-only without the configure ArpSettings ability', async () => {
+    fetchMock(handler([]))
+    const w = mount(ArpSettingsCard, { global, attachTo: document.body })
+    await flushPromises()
+    expect(w.find('[data-test=arp-save]').exists()).toBe(false)
+    expect(w.find('[data-test=arp-readonly]').exists()).toBe(true)
+    expect(w.text()).toContain('fortigate')
+    expect(w.text()).not.toContain('web-01') // only network devices are ARP sources
+    w.unmount()
+  })
+
+  it('an administrator disables ARP, excludes a device and sets the threshold', async () => {
+    const calls: { body?: unknown }[] = []
+    fetchMock(handler(calls))
+    const admin = { plugins: [router, [abilitiesPlugin, createMongoAbility([{ action: 'configure', subject: 'ArpSettings' }]), { useGlobalProperties: true }]] as never }
+    const w = mount(ArpSettingsCard, { global: admin, attachTo: document.body })
+    await flushPromises()
+    await w.find('[data-test=arp-form] input[data-field=enabled]').setValue(false)
+    await w.find('[data-test=arp-exclude-0190f7c2-aaaa-7c1a-9b2e-00000000ab01] input').setValue(true)
+    const th = w.find('[data-test=arp-form] input[data-field=proxy_threshold]')
+    await th.setValue('1')
+    await w.find('[data-test=arp-save]').trigger('click')
+    await flushPromises()
+    expect(calls).toHaveLength(0)
+    await th.setValue('12')
+    await w.find('[data-test=arp-save]').trigger('click')
+    await flushPromises()
+    expect(calls[0]?.body).toEqual({ enabled: false, proxy_threshold: 12, excluded_devices: ['0190f7c2-aaaa-7c1a-9b2e-00000000ab01'] })
+    expect(w.find('[data-test=arp-message]').text()).toContain('saved')
     w.unmount()
   })
 })

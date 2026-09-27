@@ -21,9 +21,9 @@ func TestBuildInputAddressHosts(t *testing.T) {
 		HostIfaces:   []store.DeviceInterface{{ID: "hi", DeviceID: "h", Name: "eth0", MACAddress: "52:54:00:00:00:08"}},
 		Addresses: []store.IPAddress{
 			{ID: "a-printer", Hostname: "printer", MACAddress: "0A-5C-D2-F1-00-05"},
-			{ID: "a-ns1", MACAddress: "52:54:00:00:00:08"},     // covered by the reported interface
-			{ID: "a-router", MACAddress: "4c:5e:0c:00:00:01"},  // a router's own MAC
-			{ID: "a-switch", MACAddress: "00:04:96:00:00:01"},  // a switch's own MAC
+			{ID: "a-ns1", MACAddress: "52:54:00:00:00:08"},    // covered by the reported interface
+			{ID: "a-router", MACAddress: "4c:5e:0c:00:00:01"}, // a router's own MAC
+			{ID: "a-switch", MACAddress: "00:04:96:00:00:01"}, // a switch's own MAC
 			{ID: "a-junk", MACAddress: "not-a-mac"},
 			{ID: "a-none", Link: &store.AddressLink{PortID: "p1"}}, // no MAC: not a host
 		},

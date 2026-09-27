@@ -48,7 +48,7 @@ func FuzzPlan(f *testing.F) {
 			obs[len(obs)-1].Entries = append(obs[len(obs)-1].Entries, e)
 		}
 		p := Build(Input{TenantID: "t1", Observations: obs, Addresses: addrs, ProxyThreshold: int(threshold),
-			Subnets: []store.Subnet{{ID: "s1", TenantID: "t1", CIDR: "10.0.0.0/24"}, {ID: "s2", TenantID: "t2", CIDR: "10.0.1.0/24"}},
+			Subnets:     []store.Subnet{{ID: "s1", TenantID: "t1", CIDR: "10.0.0.0/24"}, {ID: "s2", TenantID: "t2", CIDR: "10.0.1.0/24"}},
 			NetworkMACs: map[string]bool{"02:00:00:00:00:05": true}})
 		existing := map[string]bool{}
 		for _, a := range addrs {

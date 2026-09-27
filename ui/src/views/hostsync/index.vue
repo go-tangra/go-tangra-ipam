@@ -6,6 +6,7 @@ import { useZodForm } from '@go-tangra/ui/forms'
 import { useHostSync } from '@/stores/hostsync'
 import { hostSyncSettingsSchema } from '@/schemas'
 import { describe } from '@/api/client'
+import ArpSettingsCard from '@/components/ArpSettingsCard.vue'
 
 const store = useHostSync()
 const ability = useAbility()
@@ -87,5 +88,6 @@ async function resyncAll(): Promise<void> {
       </div>
       <p v-else class="mt-3 text-sm text-base-content/70" data-test="hostsync-readonly">Only IPAM administrators can change these settings.</p>
     </UiCard>
+    <ArpSettingsCard class="mt-4" />
   </UiPage>
 </template>

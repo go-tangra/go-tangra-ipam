@@ -532,6 +532,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ipam/v1/arp/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getArpSettings"];
+        put: operations["updateArpSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ipam/v1/warden-secrets": {
         parameters: {
             query?: never;
@@ -1160,6 +1176,21 @@ export interface components {
             behind_device_name?: string;
             /** @description addresses linked to this switch port (feature 022) */
             behind_addresses?: components["schemas"]["BehindAddress"][];
+        };
+        /** @description Per-tenant ARP collection (feature 022): scans with SNMP discovery read the ARP/neighbour tables of the devices that answer unless disabled; excluded devices are never used as ARP sources; a MAC answering for more than proxy_threshold IPs in one scan is treated as proxy ARP. */
+        ARPSettingsInput: {
+            enabled: boolean;
+            /** @description ids of existing devices of the tenant */
+            excluded_devices: string[];
+            proxy_threshold: number;
+        };
+        ARPSettings: {
+            enabled?: boolean;
+            excluded_devices?: string[];
+            proxy_threshold?: number;
+            updated_by?: string;
+            /** Format: date-time */
+            updated_at?: string;
         };
         IPAddressList: {
             items?: components["schemas"]["IPAddress"][];
@@ -2433,6 +2464,59 @@ export interface operations {
             };
             /** @description host_sync_disabled */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getArpSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description settings (defaults when never saved) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ARPSettings"];
+                };
+            };
+        };
+    };
+    updateArpSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ARPSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ARPSettings"];
+                };
+            };
+            /** @description validation_failed (detail.field names the field) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
