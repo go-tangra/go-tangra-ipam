@@ -33,7 +33,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra/v4/authn"
 )
 
@@ -93,8 +93,7 @@ func grpcError(err error) error {
 		errors.Is(err, repo.ErrNotEmpty), errors.Is(err, addresses.ErrConflict),
 		errors.Is(err, devices.ErrConflict), errors.Is(err, repo.ErrConflict),
 		errors.Is(err, scan.ErrTooLarge), errors.Is(err, scan.ErrActiveScan),
-		errors.Is(err, scan.ErrTerminal),
-		errors.Is(err, warden.ErrEmptyRef), errors.Is(err, warden.ErrNotFound):
+		errors.Is(err, scan.ErrTerminal):
 		return status.Error(codes.FailedPrecondition, "conflict")
 	}
 	return status.Error(codes.Unavailable, "temporarily_unavailable")
@@ -102,8 +101,8 @@ func grpcError(err error) error {
 
 // Deps carries the services and out-of-band clients the ipam.v1 servers use.
 // Backup is wired for parity with the app but has no mesh RPC of its own. BMC,
-// KVM and Warden power the privileged device operations; when any is nil those
-// RPCs report Unavailable.
+// KVM and BMCRefs power the privileged device operations; when any is nil
+// those RPCs report Unavailable.
 type Deps struct {
 	Subnets   *subnets.Service
 	Addresses *addresses.Service
@@ -116,9 +115,11 @@ type Deps struct {
 	DNS       *dnscfg.Service
 	Scan      *scan.Service
 
-	BMC    ipmi.BMC
-	KVM    *kvm.Manager
-	Warden warden.Client
+	BMC ipmi.BMC
+	KVM *kvm.Manager
+	// BMCRefs decides BMC access and resolves the credentials warden
+	// releases for the forwarded user (feature 024).
+	BMCRefs *bmc.Service
 }
 
 // Register registers the nine ipam.v1 mesh servers on the gRPC server. Callers
@@ -131,7 +132,7 @@ func Register(gs grpc.ServiceRegistrar, d Deps) {
 		ipamv1.RegisterIpAddressServiceServer(gs, &IpAddressServer{addresses: d.Addresses})
 	}
 	if d.Devices != nil {
-		ipamv1.RegisterDeviceServiceServer(gs, &DeviceServer{devices: d.Devices, bmc: d.BMC, kvm: d.KVM, warden: d.Warden})
+		ipamv1.RegisterDeviceServiceServer(gs, &DeviceServer{devices: d.Devices, bmc: d.BMC, kvm: d.KVM, refs: d.BMCRefs})
 	}
 	if d.Vlans != nil {
 		ipamv1.RegisterVlanServiceServer(gs, &VlanServer{vlans: d.Vlans})

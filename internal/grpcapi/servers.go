@@ -10,6 +10,7 @@ import (
 
 	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/audit"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
@@ -309,13 +310,14 @@ func (s *IpAddressServer) Ping(ctx context.Context, req *ipamv1.PingIpAddressReq
 // ================= DeviceService =================
 
 // DeviceServer implements ipam.v1.DeviceService. The power/KVM RPCs require the
-// platform-admin role and fetch BMC credentials from warden at use time.
+// platform-admin role and use the BMC credentials warden releases, at use
+// time, for the user whose platform token the gateway forwarded (feature 024).
 type DeviceServer struct {
 	ipamv1.UnimplementedDeviceServiceServer
 	devices *devices.Service
 	bmc     ipmi.BMC
 	kvm     *kvm.Manager
-	warden  warden.Client
+	refs    *bmc.Service
 }
 
 func (s *DeviceServer) Create(ctx context.Context, req *ipamv1.CreateDeviceRequest) (*ipamv1.Device, error) {
@@ -469,32 +471,35 @@ func (s *DeviceServer) SyncPackages(ctx context.Context, req *ipamv1.SyncPackage
 }
 
 func (s *DeviceServer) PowerStatus(ctx context.Context, req *ipamv1.PowerStatusRequest) (*ipamv1.PowerStatusResponse, error) {
-	subj, host, creds, err := s.bmcContext(ctx, req.GetTenantId(), req.GetId())
+	_, tg, err := s.resolve(ctx, req.GetTenantId(), req.GetId())
 	if err != nil {
 		return nil, err
 	}
-	_ = subj
-	st, err := s.bmc.PowerStatus(ctx, host, creds)
+	st, err := s.bmc.PowerStatus(ctx, tg.Address, tg.IPMI())
 	if err != nil {
-		return nil, grpcError(err)
+		return nil, bmcCallError(err)
 	}
 	return &ipamv1.PowerStatusResponse{State: powerStateString(st.On)}, nil
 }
 
 func (s *DeviceServer) Power(ctx context.Context, req *ipamv1.PowerRequest) (*ipamv1.PowerStatusResponse, error) {
-	subj, host, creds, err := s.bmcContext(ctx, req.GetTenantId(), req.GetId())
-	if err != nil {
-		return nil, err
-	}
-	_ = subj
 	action := powerActionToStore(req.GetAction())
 	if action == "" {
 		return nil, status.Error(codes.InvalidArgument, "power action required")
 	}
-	if err := s.bmc.Power(ctx, host, creds, action); err != nil {
-		return nil, grpcError(err)
+	subj, tg, err := s.resolve(ctx, req.GetTenantId(), req.GetId())
+	if err != nil {
+		if r := bmc.Reason(err); r != "" {
+			s.refs.AuditAction(ctx, subj, audit.PowerAction, req.GetId(), tg.Address, action, r)
+		}
+		return nil, err
 	}
-	st, err := s.bmc.PowerStatus(ctx, host, creds)
+	if err := s.bmc.Power(ctx, tg.Address, tg.IPMI(), action); err != nil {
+		s.refs.AuditAction(ctx, subj, audit.PowerAction, req.GetId(), tg.Address, action, bmc.BMCReason(err))
+		return nil, bmcCallError(err)
+	}
+	s.refs.AuditAction(ctx, subj, audit.PowerAction, req.GetId(), tg.Address, action, "")
+	st, err := s.bmc.PowerStatus(ctx, tg.Address, tg.IPMI())
 	if err != nil {
 		return &ipamv1.PowerStatusResponse{State: "unknown"}, nil
 	}
@@ -502,72 +507,66 @@ func (s *DeviceServer) Power(ctx context.Context, req *ipamv1.PowerRequest) (*ip
 }
 
 func (s *DeviceServer) StartKvmSession(ctx context.Context, req *ipamv1.StartKvmSessionRequest) (*ipamv1.KvmSession, error) {
-	subj, err := caller(ctx, req.GetTenantId())
-	if err != nil {
-		return nil, err
-	}
-	if err := authz.RequirePlatformAdmin(subj); err != nil {
-		return nil, grpcError(err)
-	}
-	if s.kvm == nil || s.warden == nil {
+	if s.kvm == nil {
+		if _, err := caller(ctx, req.GetTenantId()); err != nil {
+			return nil, err
+		}
 		return nil, status.Error(codes.Unavailable, "temporarily_unavailable")
 	}
-	dev, host, secret, err := s.deviceSecret(ctx, subj, req.GetId())
+	subj, tg, err := s.resolve(ctx, req.GetTenantId(), req.GetId())
 	if err != nil {
+		if r := bmc.Reason(err); r != "" {
+			s.refs.AuditAction(ctx, subj, audit.KVMSessionStarted, req.GetId(), tg.Address, "", r)
+		}
 		return nil, err
 	}
-	token, consoleURL, err := s.kvm.StartSession(ctx, dev.ID, host, kvm.Creds{
-		Username: secret.Username, Password: secret.Password,
-	})
+	token, consoleURL, err := s.kvm.StartSession(ctx, tg.Device.ID, tg.Address, tg.KVM())
 	if err != nil {
+		s.refs.AuditAction(ctx, subj, audit.KVMSessionStarted, req.GetId(), tg.Address, "", "internal")
 		return nil, grpcError(err)
 	}
+	s.refs.AuditAction(ctx, subj, audit.KVMSessionStarted, req.GetId(), tg.Address, "", "")
 	return &ipamv1.KvmSession{Token: token, ConsoleUrl: consoleURL}, nil
 }
 
-// bmcContext performs the platform-admin check and resolves the device's BMC
-// host and IPMI credentials (fetched from warden at use time).
-func (s *DeviceServer) bmcContext(ctx context.Context, tenantID, deviceID string) (authz.Subjects, string, ipmi.Creds, error) {
+// resolve authenticates the service caller and lets bmc.Resolve decide
+// (platform-admin, device, reference, address, warden credentials for the
+// forwarded user). The subject is returned even on failure for auditing.
+func (s *DeviceServer) resolve(ctx context.Context, tenantID, deviceID string) (authz.Subjects, bmc.Target, error) {
 	subj, err := caller(ctx, tenantID)
 	if err != nil {
-		return authz.Subjects{}, "", ipmi.Creds{}, err
+		return authz.Subjects{}, bmc.Target{}, err
 	}
 	if err := authz.RequirePlatformAdmin(subj); err != nil {
-		return authz.Subjects{}, "", ipmi.Creds{}, grpcError(err)
+		return authz.Subjects{}, bmc.Target{}, grpcError(err)
 	}
-	if s.bmc == nil || s.warden == nil {
-		return authz.Subjects{}, "", ipmi.Creds{}, status.Error(codes.Unavailable, "temporarily_unavailable")
+	if s.bmc == nil || s.refs == nil {
+		return authz.Subjects{}, bmc.Target{}, status.Error(codes.Unavailable, "temporarily_unavailable")
 	}
-	_, host, secret, err := s.deviceSecret(ctx, subj, deviceID)
+	tg, err := s.refs.Resolve(userContext(ctx), subj, deviceID)
 	if err != nil {
-		return authz.Subjects{}, "", ipmi.Creds{}, err
+		return subj, tg, bmcError(bmc.Reason(err), err)
 	}
-	return subj, host, bmc.IPMICreds(secret), nil
+	return subj, tg, nil
 }
 
-// deviceSecret loads a device, requires an IPMI reference, and fetches the
-// credential material from warden. The map is used immediately and never stored.
-func (s *DeviceServer) deviceSecret(ctx context.Context, subj authz.Subjects, deviceID string) (store.Device, string, warden.Credentials, error) {
-	dev, err := s.devices.Get(ctx, subj, deviceID)
-	if err != nil {
-		return store.Device{}, "", warden.Credentials{}, grpcError(err)
+// bmcError maps a BMC reason to a gRPC status carrying the reason as message.
+func bmcError(reason string, err error) error {
+	switch reason {
+	case "":
+		return grpcError(err)
+	case bmc.ReasonNotConfigured, bmc.ReasonNoAddress, bmc.ReasonSecretNotFound:
+		return status.Error(codes.FailedPrecondition, reason)
+	case bmc.ReasonForbidden:
+		return status.Error(codes.PermissionDenied, reason)
+	case bmc.ReasonBMCUnreachable:
+		return status.Error(codes.DeadlineExceeded, reason)
 	}
-	if dev.IPMISecretRef == "" {
-		return store.Device{}, "", warden.Credentials{}, status.Error(codes.FailedPrecondition, "device has no BMC/IPMI credential reference")
-	}
-	host := dev.ManagementIP
-	if host == "" {
-		host = dev.PrimaryIP
-	}
-	if host == "" {
-		return store.Device{}, "", warden.Credentials{}, status.Error(codes.FailedPrecondition, "device has no management or primary IP")
-	}
-	secret, err := s.warden.Credentials(userContext(ctx), dev.IPMISecretRef)
-	if err != nil {
-		return store.Device{}, "", warden.Credentials{}, grpcError(err)
-	}
-	return dev, host, secret, nil
+	return status.Error(codes.Unavailable, reason)
 }
+
+// bmcCallError maps the failure of a BMC call (an unknown verb is invalid input).
+func bmcCallError(err error) error { return bmcError(bmc.BMCReason(err), err) }
 
 func powerStateString(on bool) string {
 	if on {

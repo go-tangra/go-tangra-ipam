@@ -94,7 +94,11 @@ func newAPI(t *testing.T) *apiFixture { return newAPIWith(t, nil) }
 
 // newAPIWith builds a fully wired IPAM API over a fresh memstore. When hub is
 // non-nil the SSE stream route is enabled.
-func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
+func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture { return newAPIMut(t, hub, nil) }
+
+// newAPIMut is newAPIWith with a hook that may change the dependencies
+// before the routes are registered.
+func newAPIMut(t *testing.T, hub *stream.Hub, mut func(*Deps)) *apiFixture {
 	t.Helper()
 	mem := memstore.New()
 	rt := testrt.New(t, testutil.MustCA("example.org"), "ipam")
@@ -131,7 +135,6 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		Scan:      scanSvc,
 		BMC:       bmcFake,
 		KVM:       kvm.NewManager(nil, 0),
-		Warden:    wf,
 		Hub:       hub,
 		HostSync:  hostsync.NewAdmin(mem, inv, runner, true),
 		ARP:       arpcfg.New(mem),
@@ -146,6 +149,9 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 	s, err := NewHandler(rt, WithVerifier(v))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if mut != nil {
+		mut(&deps)
 	}
 	s.Register(deps)
 	return &apiFixture{s: s, mem: mem, bmc: bmcFake, warden: wf, inv: inv, runner: runner, snmp: disc, sweeper: sweeper, scan: scanSvc, pub: pub}

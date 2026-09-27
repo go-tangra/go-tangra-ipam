@@ -8,8 +8,8 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
-// TestPowerNoBMCRef covers loadBMC's validation branch: a device with no
-// ipmi_secret_ref (or no host) is refused 422 on every OOB route.
+// TestPowerNoBMCRef: a device with no BMC reference is refused 409
+// bmc_not_configured on every OOB route (024; was a bare 422).
 func TestPowerNoBMCRef(t *testing.T) {
 	f := newAPI(t)
 	// Plain device: no management_ip, no ipmi_secret_ref.
@@ -26,9 +26,8 @@ func TestPowerNoBMCRef(t *testing.T) {
 		if route.method == "POST" && route.path[len(route.path)-5:] != "ssion" {
 			body = `{"action":"on"}`
 		}
-		if w := f.req(t, route.method, route.path, "admin", body); w.Code != 422 {
-			t.Fatalf("%s %s: want 422, got %d %s", route.method, route.path, w.Code, w.Body)
-		}
+		w := f.req(t, route.method, route.path, "admin", body)
+		checkReason(t, w.Code, w.Body.String(), 409, "bmc_not_configured")
 	}
 }
 
@@ -40,8 +39,8 @@ func TestPowerMissingDevice(t *testing.T) {
 	}
 }
 
-// TestPowerWardenMissingSecret covers loadBMC's warden-fetch failure: the
-// device references a secret ref that warden does not hold -> 404.
+// TestPowerWardenMissingSecret: the device references a secret warden does
+// not hold -> 409 bmc_secret_not_found.
 func TestPowerWardenMissingSecret(t *testing.T) {
 	f := newAPI(t)
 	w := f.req(t, "POST", p+"/devices", "admin",
@@ -50,9 +49,8 @@ func TestPowerWardenMissingSecret(t *testing.T) {
 	if _, err := f.mem.SetDeviceBMCRef(context.Background(), apiTenant, did, "01928f7e-3c1a-7b44-9d2e-00000000dead", store.AuditRow{}); err != nil {
 		t.Fatal(err)
 	}
-	if w := f.req(t, "GET", p+"/devices/"+did+"/power", "admin", ""); w.Code != 404 {
-		t.Fatalf("power missing secret: want 404, got %d %s", w.Code, w.Body)
-	}
+	w = f.req(t, "GET", p+"/devices/"+did+"/power", "admin", "")
+	checkReason(t, w.Code, w.Body.String(), 409, "bmc_secret_not_found")
 }
 
 // TestPowerUnknownAction covers ipmi.ErrUnknownAction -> 400 bad_request.
@@ -85,23 +83,23 @@ func TestCatchAllNotFound(t *testing.T) {
 	}
 }
 
-// TestPowerBMCError covers the failSvc default (500) branch when the BMC client
-// returns an unmapped error for status/sensors/sel/action.
+// TestPowerBMCError: an unclassified BMC failure is 502 bmc_error for
+// status/sensors/sel/action.
 func TestPowerBMCError(t *testing.T) {
 	f := newAPI(t)
 	did := f.newDeviceWithBMC(t)
 	f.bmc.Err = errors.New("bmc offline")
 
-	if w := f.req(t, "GET", p+"/devices/"+did+"/power", "admin", ""); w.Code != 500 {
-		t.Fatalf("power status err: want 500, got %d %s", w.Code, w.Body)
+	if w := f.req(t, "GET", p+"/devices/"+did+"/power", "admin", ""); w.Code != 502 {
+		t.Fatalf("power status err: want 502, got %d %s", w.Code, w.Body)
 	}
-	if w := f.req(t, "GET", p+"/devices/"+did+"/sensors", "admin", ""); w.Code != 500 {
-		t.Fatalf("sensors err: want 500, got %d %s", w.Code, w.Body)
+	if w := f.req(t, "GET", p+"/devices/"+did+"/sensors", "admin", ""); w.Code != 502 {
+		t.Fatalf("sensors err: want 502, got %d %s", w.Code, w.Body)
 	}
-	if w := f.req(t, "GET", p+"/devices/"+did+"/sel", "admin", ""); w.Code != 500 {
-		t.Fatalf("sel err: want 500, got %d %s", w.Code, w.Body)
+	if w := f.req(t, "GET", p+"/devices/"+did+"/sel", "admin", ""); w.Code != 502 {
+		t.Fatalf("sel err: want 502, got %d %s", w.Code, w.Body)
 	}
-	if w := f.req(t, "POST", p+"/devices/"+did+"/power", "admin", `{"action":"on"}`); w.Code != 500 {
-		t.Fatalf("power action err: want 500, got %d %s", w.Code, w.Body)
+	if w := f.req(t, "POST", p+"/devices/"+did+"/power", "admin", `{"action":"on"}`); w.Code != 502 {
+		t.Fatalf("power action err: want 502, got %d %s", w.Code, w.Body)
 	}
 }

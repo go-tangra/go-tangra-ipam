@@ -23,15 +23,14 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 // Deps wire the IPAM HTTP handlers. Every domain service is required; the
-// out-of-band surfaces (BMC, KVM, Warden) gate the privileged power/console
+// out-of-band surfaces (BMC, KVM, BMCRefs) gate the privileged power/console
 // routes; Hub is optional and, when set, enables the GET /stream SSE route
-// (otherwise that route stays 501 not_implemented). Credentials fetched from
-// Warden and passed to BMC/KVM are used at call time only and are never
-// returned to, or persisted by, this layer.
+// (otherwise that route stays 501 not_implemented). Credentials released by
+// warden for the signed-in user and passed to BMC/KVM are used at call time
+// only and are never returned to, or persisted by, this layer.
 type Deps struct {
 	Subnets   *subnets.Service
 	Addresses *addresses.Service
@@ -45,7 +44,6 @@ type Deps struct {
 	Scan      *scan.Service
 	BMC       ipmi.BMC
 	KVM       *kvm.Manager
-	Warden    warden.Client
 	Hub       *stream.Hub // optional: enables GET /stream (SSE) when set
 	// HostSync is the host-sync administrator surface (feature 020); when nil
 	// its routes answer 503 temporarily_unavailable.
@@ -94,7 +92,7 @@ func failSvc(w http.ResponseWriter, err error) {
 		errors.As(err, &grpVE), errors.Is(err, backup.ErrBadSchema):
 		WriteError(w, http.StatusUnprocessableEntity, "validation_failed")
 	case errors.Is(err, subnets.ErrNotFound), errors.Is(err, addresses.ErrNotFound),
-		errors.Is(err, devices.ErrNotFound), errors.Is(err, warden.ErrNotFound),
+		errors.Is(err, devices.ErrNotFound),
 		errors.Is(err, repo.ErrNotFound), errors.Is(err, store.ErrNotFound):
 		WriteError(w, http.StatusNotFound, "not_found")
 	case errors.Is(err, authz.ErrForbidden):

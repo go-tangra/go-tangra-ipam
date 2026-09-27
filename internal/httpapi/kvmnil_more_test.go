@@ -54,7 +54,6 @@ func newAPINoKVM(t *testing.T) *apiFixture {
 		Scan:      scan.New(mem, nil, nil, nil, pub, scan.Config{MaxHosts: 65536}, nil),
 		BMC:       bmcFake,
 		KVM:       nil, // <- exercises the KVM==nil branch
-		Warden:    wf,
 		BMCRefs:   bmc.New(mem, wf),
 	}
 

@@ -10,6 +10,7 @@ import (
 
 	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
+	bmcsvc "github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
@@ -49,18 +50,18 @@ func newKit(t *testing.T) kit {
 	scanSvc := scan.New(mem, nil, nil, nil, pub, scan.Config{
 		MaxHosts: 100000, Concurrency: 1, TimeoutMs: 1000, Workers: 1, MaxRetries: 0,
 	}, nil)
-	bmc := ipmi.NewFake()
+	bmcFake := ipmi.NewFake()
 	wf := warden.NewFake()
 	return kit{
 		subnet:   &SubnetServer{subnets: subnets.New(mem), scan: scanSvc},
 		addr:     &IpAddressServer{addresses: addresses.New(mem, pub, 0, 0)},
-		device:   &DeviceServer{devices: devices.New(mem), bmc: bmc, kvm: kvm.NewManager(nil, 0), warden: wf},
+		device:   &DeviceServer{devices: devices.New(mem), bmc: bmcFake, kvm: kvm.NewManager(nil, 0), refs: bmcsvc.New(mem, wf)},
 		vlan:     &VlanServer{vlans: vlans.New(mem)},
 		location: &LocationServer{locations: locations.New(mem)},
 		ipgroup:  &IpGroupServer{groups: groups.New(mem)},
 		scanSrv:  &IpScanServer{scan: scanSvc},
 		system:   &SystemServer{stats: stats.New(mem), dns: dnscfg.New(mem)},
-		bmc:      bmc,
+		bmc:      bmcFake,
 		warden:   wf,
 		mem:      mem,
 	}

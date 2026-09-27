@@ -326,6 +326,13 @@ func (c *Client) Power(ctx context.Context, host string, creds Creds, action str
 	return nil
 }
 
+// ValidAction reports whether action is a known power verb (checked before
+// any credential is fetched or session opened).
+func ValidAction(action string) bool {
+	_, ok := controlFor(action)
+	return ok
+}
+
 // controlFor maps an action verb to a go-ipmi ChassisControl value.
 func controlFor(action string) (goipmi.ChassisControl, bool) {
 	switch action {

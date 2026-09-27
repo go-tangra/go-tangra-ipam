@@ -102,15 +102,15 @@ research D12. `FuzzReferenceInput` joined `make fuzz`.)
 
 ### Tests first
 
-- [ ] T029 [P] [US2] HTTP tests in `internal/httpapi/power_test.go` (rewrite of the 422/404/500 expectations in `power_more_test.go`, `api_test.go`, `routes_more_test.go`, `kvmnil_more_test.go`): success passes Warden's username/password (and host_url port/protocol) to the BMC fake and the caller's token to Warden; password rotated in the fake between two calls → second call uses the new one (no cache); reported BMC address used when no management IP; **negative**: user denied in Warden → 403 `bmc_secret_forbidden` and `bmc.Fake` recorded no call for power/sensors/SEL/action/KVM; tenant admin (non platform-admin) still 403 `forbidden` without any Warden call
-- [ ] T030 [P] [US2] Audit tests in the same file: POST power ok → `power_action` row (action, outcome ok, target address); refused → outcome `refused` + reason; BMC failure → `error` + reason; KVM session → `kvm_session_started`; no row for status/sensors/SEL
-- [ ] T031 [P] [US2] gRPC tests in `internal/grpcapi/power_test.go`: `PowerStatus`/`Power`/`StartKvmSession` forward the incoming `authorization` metadata to Warden; **negative**: without it → `PermissionDenied` and no BMC call; not configured → `FailedPrecondition`
+- [x] T029 [P] [US2] HTTP tests in `internal/httpapi/power_test.go` (rewrite of the 422/404/500 expectations in `power_more_test.go`; fixtures seed the reference through the store): success passes Warden's username/password (and host_url port/protocol) to the BMC fake and the caller's token to Warden; password rotated in the fake between two calls → second call uses the new one (no cache); reported BMC address used when no management IP; **negative**: user denied in Warden → 403 `bmc_secret_forbidden` and `bmc.Fake` recorded no call for power/sensors/SEL/action/KVM; tenant admin (non platform-admin) still 403 `forbidden` without any Warden call
+- [x] T030 [P] [US2] Audit tests in the same file: POST power ok → `power_action` row (action, outcome ok, target address); refused → outcome `refused` + reason; BMC failure → `error` + reason; KVM session → `kvm_session_started`; no row for status/sensors/SEL
+- [x] T031 [P] [US2] gRPC tests in `internal/grpcapi/power_test.go`: `PowerStatus`/`Power`/`StartKvmSession` forward the incoming `authorization` metadata to Warden; **negative**: without it → `PermissionDenied` and no BMC call; not configured → `FailedPrecondition`
 
 ### Implementation
 
-- [ ] T032 [US2] Rewrite `internal/httpapi/power.go` on `bmc.Service.Resolve`: token into context, platform-admin first, audit rows via the store for actions/KVM, module log for reads, no primary-IP fallback
-- [ ] T033 [US2] `internal/grpcapi/servers.go`: power/KVM RPCs via `bmc.Service` with the forwarded token; reason → gRPC code (research D14); `grpcapi.Deps.BMCRefs`
-- [ ] T034 [US2] `internal/kvm/kvm.go`: login failures carry `ErrAuthFailed` (401/403) / `ErrUnreachable` (transport) so `bmc.Reason` classifies them (test in `internal/kvm/kvm_test.go` first)
+- [x] T032 [US2] Rewrite `internal/httpapi/power.go` on `bmc.Service.Resolve`: token into context, platform-admin first, audit rows via the store for actions/KVM, module log for reads, no primary-IP fallback
+- [x] T033 [US2] `internal/grpcapi/servers.go`: power/KVM RPCs via `bmc.Service` with the forwarded token; reason → gRPC code (research D14); `grpcapi.Deps.BMCRefs`
+- [x] T034 [US2] ~~`internal/kvm/kvm.go` login error classes~~ — not needed: `StartSession` only mints the one-time token and never contacts the BMC; the web login happens later in the token-gated `/bmc/` proxy, whose failures already answer 502 there. The session route therefore has only the Resolve reasons (warden/reference/address); `TestOOBReasons` skips the BMC-side reasons for it
 
 **Checkpoint**: the broken capability works with per-user Warden credentials.
 
@@ -124,7 +124,7 @@ research D12. `FuzzReferenceInput` joined `make fuzz`.)
 
 ### Tests first
 
-- [ ] T035 [P] [US3] Table test in `internal/httpapi/power_test.go`: for each reason (not configured, no address, forbidden, not found, Warden unavailable, BMC unreachable, BMC auth failed, BMC error) × {GET power, POST power, GET sensors, GET SEL, POST kvm-session} the documented status + reason; `detail.address` only for BMC reasons; body never contains the password
+- [x] T035 [P] [US3] Table test in `internal/httpapi/power_test.go`: for each reason (not configured, no address, forbidden, not found, Warden unavailable, BMC unreachable, BMC auth failed, BMC error) × {GET power, POST power, GET sensors, GET SEL, POST kvm-session} the documented status + reason; `detail.address` only for BMC reasons; body never contains the password
 - [ ] T036 [P] [US3] UI unit tests `ui/src/views/devices/__tests__/ipmi-kvm.spec.ts`: status not ready → explained state with corrective action and no power/sensor calls; each reason text; attach link only with `configure DeviceBmc`; power buttons only with `control Power`, KVM only with `access Kvm`; per-call failure shows the reason text (not a generic error)
 
 ### Implementation

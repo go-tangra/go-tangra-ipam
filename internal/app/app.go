@@ -247,7 +247,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	deps := httpapi.Deps{
 		Subnets: subnetsSvc, Addresses: addressesSvc, Devices: devicesSvc, Vlans: vlansSvc,
 		Locations: locationsSvc, Groups: groupsSvc, Stats: statsSvc, Backup: backupSvc,
-		DNS: dnsSvc, Scan: scanSvc, BMC: bmcClient, KVM: kvmMgr, Warden: wclient, Hub: a.Hub,
+		DNS: dnsSvc, Scan: scanSvc, BMC: bmcClient, KVM: kvmMgr, Hub: a.Hub,
 		HostSync: hostAdmin,
 		ARP:      arpcfg.New(a.Repo),
 		BMCRefs:  bmcRefs,
@@ -262,7 +262,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	grpcapi.Register(a.Freya.GRPC(), grpcapi.Deps{
 		Subnets: subnetsSvc, Addresses: addressesSvc, Devices: devicesSvc, Vlans: vlansSvc,
 		Locations: locationsSvc, Groups: groupsSvc, Stats: statsSvc, Backup: backupSvc,
-		DNS: dnsSvc, Scan: scanSvc, BMC: bmcClient, KVM: kvmMgr, Warden: wclient,
+		DNS: dnsSvc, Scan: scanSvc, BMC: bmcClient, KVM: kvmMgr, BMCRefs: bmcRefs,
 	})
 
 	// Scan executor worker pool.

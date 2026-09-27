@@ -6,11 +6,10 @@ import (
 
 	"github.com/go-tangra/go-tangra-auth/sdk/v4/pkg/authclient"
 
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/audit"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
@@ -22,27 +21,28 @@ func userContext(r *http.Request) context.Context {
 
 // registerPower mounts the privileged out-of-band routes: chassis power
 // status/control, sensor and SEL reads, and the KVM console session. Every one
-// requires platform-admin (a mere tenant admin is refused with 403), loads the
-// tenant-scoped device to resolve its BMC host and warden secret ref, fetches
-// the BMC credentials from warden at call time, and invokes the BMC/KVM client.
-// Credentials are never written to the response or logged; only the resulting
-// status, readings, or a short-lived KVM token/console URL are returned.
+// requires platform-admin (a tenant user is refused with 403), then bmc.Resolve
+// decides — device, warden reference, BMC address, and the credentials warden
+// releases for the signed-in user at this moment (feature 024). The BMC is
+// contacted only after all of that passed. Failures answer the documented
+// reasons; credentials never reach a response or a log. Power actions and KVM
+// sessions are audit rows; reads are logged.
 func (s *Server) registerPower(d Deps, p string) {
 	s.MustHandle("GET", p+"/devices/{id}/power", func(w http.ResponseWriter, r *http.Request) {
-		subj, host, creds, ok := s.bmcSetup(w, r, d)
+		subj, tg, ok := s.resolveBMC(w, r, d)
 		if !ok {
 			return
 		}
-		state, err := d.BMC.PowerStatus(r.Context(), host, creds)
+		state, err := d.BMC.PowerStatus(r.Context(), tg.Address, tg.IPMI())
 		if err != nil {
-			failSvc(w, err)
+			failBMCCall(w, err, tg.Address)
 			return
 		}
-		s.auditOOB(r, subj, "power.status", r.PathValue("id"))
+		s.logOOB(r, subj, "power.status", tg.Device.ID)
 		WriteJSON(w, http.StatusOK, state)
 	})
 	s.MustHandle("POST", p+"/devices/{id}/power", func(w http.ResponseWriter, r *http.Request) {
-		subj, host, creds, ok := s.bmcSetup(w, r, d)
+		subj, ok := s.platformAdmin(w, r, d)
 		if !ok {
 			return
 		}
@@ -53,125 +53,147 @@ func (s *Server) registerPower(d Deps, p string) {
 			Fail(w, r, nil, err)
 			return
 		}
-		if err := d.BMC.Power(r.Context(), host, creds, in.Action); err != nil {
-			failSvc(w, err)
+		id := r.PathValue("id")
+		if !ipmi.ValidAction(in.Action) {
+			d.BMCRefs.AuditAction(r.Context(), subj, audit.PowerAction, id, "", in.Action, "bad_request")
+			WriteError(w, http.StatusBadRequest, "bad_request")
 			return
 		}
-		s.auditOOB(r, subj, "power.action:"+in.Action, r.PathValue("id"))
+		tg, err := d.BMCRefs.Resolve(userContext(r), subj, id)
+		if err != nil {
+			if reason := bmc.Reason(err); reason != "" {
+				d.BMCRefs.AuditAction(r.Context(), subj, audit.PowerAction, id, tg.Address, in.Action, reason)
+			}
+			failResolve(w, err, tg.Address)
+			return
+		}
+		if err := d.BMC.Power(r.Context(), tg.Address, tg.IPMI(), in.Action); err != nil {
+			d.BMCRefs.AuditAction(r.Context(), subj, audit.PowerAction, id, tg.Address, in.Action, bmc.BMCReason(err))
+			failBMCCall(w, err, tg.Address)
+			return
+		}
+		d.BMCRefs.AuditAction(r.Context(), subj, audit.PowerAction, id, tg.Address, in.Action, "")
 		WriteJSON(w, http.StatusOK, map[string]any{"accepted": true, "action": in.Action})
 	})
 	s.MustHandle("GET", p+"/devices/{id}/sensors", func(w http.ResponseWriter, r *http.Request) {
-		subj, host, creds, ok := s.bmcSetup(w, r, d)
+		subj, tg, ok := s.resolveBMC(w, r, d)
 		if !ok {
 			return
 		}
-		readings, err := d.BMC.Sensors(r.Context(), host, creds)
+		readings, err := d.BMC.Sensors(r.Context(), tg.Address, tg.IPMI())
 		if err != nil {
-			failSvc(w, err)
+			failBMCCall(w, err, tg.Address)
 			return
 		}
 		if readings == nil {
 			readings = []ipmi.SensorReading{}
 		}
-		s.auditOOB(r, subj, "power.sensors", r.PathValue("id"))
+		s.logOOB(r, subj, "power.sensors", tg.Device.ID)
 		WriteJSON(w, http.StatusOK, map[string]any{"items": readings})
 	})
 	s.MustHandle("GET", p+"/devices/{id}/sel", func(w http.ResponseWriter, r *http.Request) {
-		subj, host, creds, ok := s.bmcSetup(w, r, d)
+		subj, tg, ok := s.resolveBMC(w, r, d)
 		if !ok {
 			return
 		}
-		entries, err := d.BMC.SEL(r.Context(), host, creds)
+		entries, err := d.BMC.SEL(r.Context(), tg.Address, tg.IPMI())
 		if err != nil {
-			failSvc(w, err)
+			failBMCCall(w, err, tg.Address)
 			return
 		}
 		if entries == nil {
 			entries = []ipmi.SELEntry{}
 		}
-		s.auditOOB(r, subj, "power.sel", r.PathValue("id"))
+		s.logOOB(r, subj, "power.sel", tg.Device.ID)
 		WriteJSON(w, http.StatusOK, map[string]any{"items": entries})
 	})
 	s.MustHandle("POST", p+"/devices/{id}/kvm-session", func(w http.ResponseWriter, r *http.Request) {
-		subj, err := subjects(r)
-		if err != nil {
-			failSvc(w, err)
-			return
-		}
-		if err := authz.RequirePlatformAdmin(subj); err != nil {
-			failSvc(w, err)
+		subj, ok := s.platformAdmin(w, r, d)
+		if !ok {
 			return
 		}
 		if d.KVM == nil {
 			WriteError(w, http.StatusNotImplemented, "not_implemented")
 			return
 		}
-		dev, host, secret, ok := s.loadBMC(w, r, d, subj)
-		if !ok {
+		id := r.PathValue("id")
+		tg, err := d.BMCRefs.Resolve(userContext(r), subj, id)
+		if err != nil {
+			if reason := bmc.Reason(err); reason != "" {
+				d.BMCRefs.AuditAction(r.Context(), subj, audit.KVMSessionStarted, id, tg.Address, "", reason)
+			}
+			failResolve(w, err, tg.Address)
 			return
 		}
-		token, consoleURL, err := d.KVM.StartSession(r.Context(), dev.ID, host, kvm.Creds{
-			Username: secret.Username,
-			Password: secret.Password,
-		})
+		// The credentials only bootstrap the BMC web login of this one-time
+		// token (held in memory until the token expires, never persisted).
+		token, consoleURL, err := d.KVM.StartSession(r.Context(), tg.Device.ID, tg.Address, tg.KVM())
 		if err != nil {
+			d.BMCRefs.AuditAction(r.Context(), subj, audit.KVMSessionStarted, id, tg.Address, "", "internal")
 			failSvc(w, err)
 			return
 		}
-		s.auditOOB(r, subj, "kvm.session", dev.ID)
+		d.BMCRefs.AuditAction(r.Context(), subj, audit.KVMSessionStarted, id, tg.Address, "", "")
 		WriteJSON(w, http.StatusCreated, map[string]any{"token": token, "console_url": consoleURL})
 	})
 }
 
-// bmcSetup authenticates the caller, enforces platform-admin, loads the device
-// and resolves its BMC host and IPMI credentials. It writes the error response
-// itself and returns ok=false when any step fails.
-func (s *Server) bmcSetup(w http.ResponseWriter, r *http.Request, d Deps) (subj authz.Subjects, host string, creds ipmi.Creds, ok bool) {
+// platformAdmin authenticates the caller and requires platform-admin before
+// anything else happens; it also refuses when the BMC service is not wired.
+func (s *Server) platformAdmin(w http.ResponseWriter, r *http.Request, d Deps) (authz.Subjects, bool) {
 	subj, err := subjects(r)
 	if err != nil {
 		failSvc(w, err)
-		return authz.Subjects{}, "", ipmi.Creds{}, false
+		return authz.Subjects{}, false
 	}
 	if err := authz.RequirePlatformAdmin(subj); err != nil {
 		failSvc(w, err)
-		return authz.Subjects{}, "", ipmi.Creds{}, false
+		return authz.Subjects{}, false
 	}
-	_, host, secret, ok := s.loadBMC(w, r, d, subj)
+	if d.BMCRefs == nil || d.BMC == nil {
+		WriteError(w, ErrUnavailable.Status, ErrUnavailable.Reason)
+		return authz.Subjects{}, false
+	}
+	return subj, true
+}
+
+// resolveBMC is platformAdmin + bmc.Resolve for the read routes.
+func (s *Server) resolveBMC(w http.ResponseWriter, r *http.Request, d Deps) (authz.Subjects, bmc.Target, bool) {
+	subj, ok := s.platformAdmin(w, r, d)
 	if !ok {
-		return authz.Subjects{}, "", ipmi.Creds{}, false
+		return authz.Subjects{}, bmc.Target{}, false
 	}
-	return subj, host, bmc.IPMICreds(secret), true
+	tg, err := d.BMCRefs.Resolve(userContext(r), subj, r.PathValue("id"))
+	if err != nil {
+		failResolve(w, err, tg.Address)
+		return authz.Subjects{}, bmc.Target{}, false
+	}
+	return subj, tg, true
 }
 
-// loadBMC loads the device and fetches its BMC secret from warden. It writes the
-// error response and returns ok=false on any failure (missing device, no
-// configured secret ref, or a warden fetch error). The returned secret map is
-// used immediately by the caller and never persisted or logged.
-func (s *Server) loadBMC(w http.ResponseWriter, r *http.Request, d Deps, subj authz.Subjects) (dev store.Device, host string, secret warden.Credentials, ok bool) {
-	dev, err := d.Devices.Get(r.Context(), subj, r.PathValue("id"))
-	if err != nil {
-		failSvc(w, err)
-		return store.Device{}, "", warden.Credentials{}, false
+// failResolve answers a refusal of bmc.Resolve: a reason, or the generic
+// mapping (forbidden, not found) for everything else.
+func failResolve(w http.ResponseWriter, err error, address string) {
+	if reason := bmc.Reason(err); reason != "" {
+		writeBMCReason(w, reason, address)
+		return
 	}
-	host = dev.ManagementIP
-	if host == "" {
-		host = dev.PrimaryIP
-	}
-	if dev.IPMISecretRef == "" || host == "" {
-		WriteError(w, http.StatusUnprocessableEntity, "validation_failed")
-		return store.Device{}, "", warden.Credentials{}, false
-	}
-	secret, err = d.Warden.Credentials(userContext(r), dev.IPMISecretRef)
-	if err != nil {
-		failSvc(w, err)
-		return store.Device{}, "", warden.Credentials{}, false
-	}
-	return dev, host, secret, true
+	failSvc(w, err)
 }
 
-// auditOOB records an out-of-band operation to the module log. It carries the
-// actor, tenant, device and action only — never any credential or secret ref.
-func (s *Server) auditOOB(r *http.Request, subj authz.Subjects, action, deviceID string) {
+// failBMCCall answers a failed BMC call with its reason (the BMC's own error
+// text never reaches the response).
+func failBMCCall(w http.ResponseWriter, err error, address string) {
+	if reason := bmc.BMCReason(err); reason != "" {
+		writeBMCReason(w, reason, address)
+		return
+	}
+	failSvc(w, err)
+}
+
+// logOOB records an out-of-band read to the module log. It carries the actor,
+// tenant, device and action only — never any credential or secret ref.
+func (s *Server) logOOB(r *http.Request, subj authz.Subjects, action, deviceID string) {
 	log := s.rt.Logger()
 	if log == nil {
 		return

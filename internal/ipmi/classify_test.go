@@ -79,3 +79,14 @@ func TestFakeCountsCallsAndInjectsClasses(t *testing.T) {
 		t.Fatalf("calls = %d", f.Calls)
 	}
 }
+
+func TestValidAction(t *testing.T) {
+	for _, a := range []string{ActionOn, ActionOff, ActionCycle, ActionReset, ActionSoft, ActionDiag} {
+		if !ValidAction(a) {
+			t.Errorf("%s must be valid", a)
+		}
+	}
+	if ValidAction("frobnicate") || ValidAction("") {
+		t.Error("unknown verbs are invalid")
+	}
+}
