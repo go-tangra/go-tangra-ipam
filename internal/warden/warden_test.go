@@ -6,79 +6,98 @@ import (
 	"testing"
 )
 
-func TestFakeGetSecret(t *testing.T) {
-	f := NewFake()
-	f.Put("ref-1", map[string]string{"username": "admin", "password": "s3cr3t"},
-		SecretMeta{Name: "bmc-a", Description: "rack A BMC", Username: "admin"})
-
-	got, err := f.GetSecret(context.Background(), "ref-1")
-	if err != nil {
-		t.Fatalf("GetSecret: %v", err)
+func TestUserTokenContext(t *testing.T) {
+	if UserToken(context.Background()) != "" {
+		t.Fatal("empty context carries a token")
 	}
-	if got["username"] != "admin" || got["password"] != "s3cr3t" {
-		t.Fatalf("unexpected secret map: %v", got)
-	}
-
-	// Mutating the returned map must not affect the stored copy.
-	got["password"] = "tampered"
-	again, _ := f.GetSecret(context.Background(), "ref-1")
-	if again["password"] != "s3cr3t" {
-		t.Fatalf("stored secret was mutated: %v", again)
+	ctx := WithUserToken(context.Background(), " tok ")
+	if UserToken(ctx) != "tok" {
+		t.Fatalf("token = %q", UserToken(ctx))
 	}
 }
 
-func TestFakeGetSecretErrors(t *testing.T) {
+func TestFake(t *testing.T) {
 	f := NewFake()
-	if _, err := f.GetSecret(context.Background(), ""); !errors.Is(err, ErrEmptyRef) {
-		t.Fatalf("empty ref: want ErrEmptyRef, got %v", err)
-	}
-	if _, err := f.GetSecret(context.Background(), "missing"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("missing ref: want ErrNotFound, got %v", err)
-	}
-}
+	f.Put(testRef, SecretMeta{Name: "bmc-a", Username: "admin", FolderPath: "/f", HostURL: "lan://h:1"}, "s3cr3t")
+	ctx := WithUserToken(context.Background(), "alice")
 
-func TestFakeListSecretsMetadataOnly(t *testing.T) {
-	f := NewFake()
-	f.Put("ref-a", map[string]string{"password": "p1"}, SecretMeta{Name: "snmp-core", Description: "core switch"})
-	f.Put("ref-b", map[string]string{"password": "p2"}, SecretMeta{Name: "bmc-edge", Description: "edge BMC"})
+	m, err := f.Meta(ctx, testRef)
+	if err != nil || m.ID != testRef || m.Name != "bmc-a" || m.Username != "admin" {
+		t.Fatalf("meta = %+v, %v", m, err)
+	}
+	cr, err := f.Credentials(ctx, testRef)
+	if err != nil || cr.Username != "admin" || cr.Password != "s3cr3t" || cr.HostURL != "lan://h:1" {
+		t.Fatalf("credentials: %v", err)
+	}
 
-	all, err := f.ListSecrets(context.Background(), "")
-	if err != nil {
-		t.Fatalf("ListSecrets: %v", err)
+	// Rotation is visible on the next fetch (no caching anywhere).
+	f.SetPassword(testRef, "rotated")
+	if cr, _ := f.Credentials(ctx, testRef); cr.Password != "rotated" {
+		t.Fatal("rotation not visible")
 	}
-	if len(all) != 2 {
-		t.Fatalf("want 2 metas, got %d", len(all))
+	f.SetPassword("01928f7e-3c1a-7b44-9d2e-111111111111", "ignored") // unknown ref: no-op
+
+	// Per-token refusal.
+	f.Deny("bob", testRef)
+	bob := WithUserToken(context.Background(), "bob")
+	if _, err := f.Meta(bob, testRef); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("bob meta: %v", err)
 	}
-	for _, m := range all {
-		// Metadata must never carry values; SecretMeta has no value field, and
-		// the id must be set to the ref.
-		if m.ID == "" {
-			t.Fatalf("meta missing id: %+v", m)
+	if _, err := f.Credentials(bob, testRef); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("bob credentials: %v", err)
+	}
+
+	// Missing token, empty ref, unknown secret.
+	if _, err := f.Meta(context.Background(), testRef); !errors.Is(err, ErrNoUserToken) {
+		t.Fatalf("no token: %v", err)
+	}
+	if _, err := f.Credentials(ctx, ""); !errors.Is(err, ErrEmptyRef) {
+		t.Fatalf("empty ref: %v", err)
+	}
+	if _, err := f.Meta(ctx, "01928f7e-3c1a-7b44-9d2e-000000000000"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown: %v", err)
+	}
+	f.Remove(testRef)
+	if _, err := f.Credentials(ctx, testRef); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("removed: %v", err)
+	}
+
+	// Availability switch.
+	f.Put(testRef, SecretMeta{Name: "bmc-a"}, "x")
+	f.SetUnavailable(true)
+	if _, err := f.Meta(ctx, testRef); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unavailable meta: %v", err)
+	}
+	if _, err := f.Credentials(ctx, testRef); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unavailable credentials: %v", err)
+	}
+	f.SetUnavailable(false)
+
+	calls := f.Calls()
+	if len(calls) == 0 || calls[0] != (Call{Op: OpMeta, Ref: testRef, Token: "alice"}) {
+		t.Fatalf("calls = %+v", calls)
+	}
+	var creds int
+	for _, c := range calls {
+		if c.Op == OpCredentials {
+			creds++
 		}
 	}
-
-	// Filtered query is case-insensitive substring over name/id/description.
-	hits, _ := f.ListSecrets(context.Background(), "BMC")
-	if len(hits) != 1 || hits[0].ID != "ref-b" {
-		t.Fatalf("filtered query mismatch: %+v", hits)
+	if creds == 0 || f.CredentialCalls() != creds {
+		t.Fatalf("credential calls = %d / %d", creds, f.CredentialCalls())
+	}
+	f.ResetCalls()
+	if len(f.Calls()) != 0 {
+		t.Fatal("reset")
 	}
 }
 
-func TestGrpcClientFailsClosed(t *testing.T) {
-	// The real client is inert until wired; it must fail closed, never fabricate.
-	c := New(nil)
-	if _, err := c.GetSecret(context.Background(), ""); !errors.Is(err, ErrEmptyRef) {
-		t.Fatalf("empty ref should be rejected first, got %v", err)
+func TestUnavailable(t *testing.T) {
+	var c Client = Unavailable{}
+	if _, err := c.Meta(context.Background(), testRef); !errors.Is(err, ErrUnavailable) {
+		t.Fatal(err)
 	}
-	if _, err := c.GetSecret(context.Background(), "ref"); err == nil {
-		t.Fatalf("GetSecret must error while unwired")
+	if _, err := c.Credentials(context.Background(), testRef); !errors.Is(err, ErrUnavailable) {
+		t.Fatal(err)
 	}
-	if _, err := c.ListSecrets(context.Background(), ""); err == nil {
-		t.Fatalf("ListSecrets must error while unwired")
-	}
-}
-
-func TestInterfaceConformance(t *testing.T) {
-	var _ Client = NewFake()
-	var _ Client = New(nil)
 }

@@ -29,8 +29,8 @@ explicit user confirmation before they are executed.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `github.com/go-tangra/go-tangra-warden/sdk/v4 v4.0.0` to `go.mod`/`go.sum` (published; same version as ticket and dns)
-- [ ] T002 [P] Add `internal/bmc` to the 100 % list in `scripts/coverage-gate.sh`
+- [x] T001 Add `github.com/go-tangra/go-tangra-warden/sdk/v4 v4.0.0` to `go.mod`/`go.sum` (published; same version as ticket and dns)
+- [x] T002 [P] Add `internal/bmc` to the 100 % list in `scripts/coverage-gate.sh`
 
 ---
 
@@ -40,24 +40,28 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T003 [P] Warden client tests in `internal/warden/client_test.go` against an in-process `warden.v1.Secrets` server (bufconn): `Meta` maps name/username/folder_path/host_url; `Credentials` combines Get + GetPassword; the outgoing `authorization` metadata is exactly `Bearer <user token>`; **negative**: no user token → `ErrNoUserToken` and zero RPCs; non-UUID ref → `ErrNotFound` and zero RPCs; `NotFound`/`InvalidArgument` → `ErrNotFound`, `PermissionDenied` "forbidden" (Warden's per-secret refusal)/`Unauthenticated` → `ErrForbidden`, `PermissionDenied` with another message (mesh policy refusal) → `ErrPolicyDenied` (is `ErrUnavailable`), `Unavailable`/deadline → `ErrUnavailable`; returned errors never contain the password or Warden's message; `Credentials` prints `[REDACTED]` via `%v`, `%+v`, `%#v` and slog
-- [ ] T004 [P] Fake/Unavailable tests in `internal/warden/warden_test.go`: per-token denial, missing secret, availability switch, call log records (token, op, ref), `Unavailable` returns `ErrUnavailable` for both calls; `WithUserToken`/`UserToken` round trip
-- [ ] T005 [P] IPMI classification tests in `internal/ipmi/classify_test.go`: timeout/deadline/refused/no route/i-o timeout → `ErrUnreachable`; rakp/authcode/integrity/unauthorized/invalid password → `ErrAuthFailed`; nil → nil; other → unchanged; `Fake.Err` with either sentinel passes through
-- [ ] T006 [P] Audit test in `internal/audit/audit_test.go`: `bmc_reference_set|changed|cleared` known; neutral keys `reference`/`previous_reference`/`reference_name` survive the guard
-- [ ] T007 [P] Store tests in `internal/memstore/bmc_test.go`: `SetDeviceBMCRef` returns previous ref, writes the audit row, other tenant → `ErrNotFound` and no row
-- [ ] T008 [P] Integration test in `internal/repo/repodb/bmc_integration_test.go` (tag `integration`): `SetDeviceBMCRef` updates only the column, appends the audit row in the same transaction, RLS hides another tenant's device (`ErrNotFound`)
-- [ ] T009 [P] `bmc` package tests in `internal/bmc/bmc_test.go`: address resolution (management IP wins; reported `bmc` then `bmc-2`; IPv4 before IPv6; `not_reported` ignored; primary IP never used; none → `ErrNoAddress`); `Status` for none / ok / forbidden / not_found / unavailable with `ready` and first `reason`; `Set` validates via Warden `Meta` as the caller and stores + audits set/changed, same ref → no write; forbidden/not found/unavailable → nothing stored; `Clear` audits only when something was removed; `Resolve` order (not configured → no address → Warden) and **negative**: Warden refusal returns before any BMC use; `Creds` maps `host_url` `lanplus://h:6230` → protocol 2.0 port 6230, `lan://` → 1.5, other → auto/623; `Reason(err)` table for every sentinel incl. KVM login errors
-- [ ] T010 [P] Fuzz target `FuzzReferenceInput` in `internal/bmc/fuzz_test.go` (strict JSON decode + `ValidReference` never panics; accepted refs are canonical UUIDs)
+- [x] T003 [P] Warden client tests in `internal/warden/client_test.go` against an in-process `warden.v1.Secrets` server (bufconn): `Meta` maps name/username/folder_path/host_url; `Credentials` combines Get + GetPassword; the outgoing `authorization` metadata is exactly `Bearer <user token>`; **negative**: no user token → `ErrNoUserToken` and zero RPCs; non-UUID ref → `ErrNotFound` and zero RPCs; `NotFound`/`InvalidArgument` → `ErrNotFound`, `PermissionDenied` "forbidden" (Warden's per-secret refusal)/`Unauthenticated` → `ErrForbidden`, `PermissionDenied` with another message (mesh policy refusal) → `ErrPolicyDenied` (is `ErrUnavailable`), `Unavailable`/deadline → `ErrUnavailable`; returned errors never contain the password or Warden's message; `Credentials` prints `[REDACTED]` via `%v`, `%+v`, `%#v` and slog
+- [x] T004 [P] Fake/Unavailable tests in `internal/warden/warden_test.go`: per-token denial, missing secret, availability switch, call log records (token, op, ref), `Unavailable` returns `ErrUnavailable` for both calls; `WithUserToken`/`UserToken` round trip
+- [x] T005 [P] IPMI classification tests in `internal/ipmi/classify_test.go`: timeout/deadline/refused/no route/i-o timeout → `ErrUnreachable`; rakp/authcode/integrity/unauthorized/invalid password → `ErrAuthFailed`; nil → nil; other → unchanged; `Fake.Err` with either sentinel passes through
+- [x] T006 [P] Audit test in `internal/audit/audit_test.go`: `bmc_reference_set|changed|cleared` known; neutral keys `reference`/`previous_reference`/`reference_name` survive the guard
+- [x] T007 [P] Store tests in `internal/memstore/bmc_test.go`: `SetDeviceBMCRef` returns previous ref, writes the audit row, other tenant → `ErrNotFound` and no row
+- [x] T008 [P] Integration test in `internal/repo/repodb/bmc_integration_test.go` (tag `integration`): `SetDeviceBMCRef` updates only the column, appends the audit row in the same transaction, RLS hides another tenant's device (`ErrNotFound`)
+- [x] T009 [P] `bmc` package tests in `internal/bmc/bmc_test.go`: address resolution (management IP wins; reported `bmc` then `bmc-2`; IPv4 before IPv6; `not_reported` ignored; primary IP never used; none → `ErrNoAddress`); `Status` for none / ok / forbidden / not_found / unavailable with `ready` and first `reason`; `Set` validates via Warden `Meta` as the caller and stores + audits set/changed, same ref → no write; forbidden/not found/unavailable → nothing stored; `Clear` audits only when something was removed; `Resolve` order (not configured → no address → Warden) and **negative**: Warden refusal returns before any BMC use; `Creds` maps `host_url` `lanplus://h:6230` → protocol 2.0 port 6230, `lan://` → 1.5, other → auto/623; `Reason(err)` table for every sentinel incl. KVM login errors
+- [x] T010 [P] Fuzz target `FuzzReferenceInput` in `internal/bmc/fuzz_test.go` (strict JSON decode + `ValidReference` never panics; accepted refs are canonical UUIDs)
 
 ### Implementation
 
-- [ ] T011 Rewrite `internal/warden/warden.go`: `Client{Meta, Credentials}`, `SecretMeta`, `Credentials` (redacting), errors (`ErrEmptyRef`, `ErrNotFound`, `ErrForbidden`, `ErrUnavailable`, `ErrNoUserToken`), `WithUserToken`/`UserToken`, gRPC client over `wardenv1.SecretsClient` with 5 s timeout and code mapping, `Fake` (per-token deny, `SetUnavailable`, `Calls`), `Unavailable` (T003, T004)
-- [ ] T012 [P] Add `ErrUnreachable`, `ErrAuthFailed`, `Classify` to `internal/ipmi` and apply it in the real client's `connect` (T005)
-- [ ] T013 [P] Add the three event types to `internal/audit/audit.go` (T006)
-- [ ] T014 Add `SetDeviceBMCRef` to `internal/repo/repo.go`, implement in `internal/repo/repodb/bmc.go` (tenant tx, update + audit insert) and `internal/memstore/bmc.go` (T007, T008)
-- [ ] T015 Implement `internal/bmc/bmc.go` (+ `address.go`, `reason.go`): `Service{Store, Warden, Now}`, `Address`, `Status`, `Set`, `Clear`, `Resolve` (device, address, `warden.Credentials`), `IPMICreds`, `Reason`/`Status code` tables, `ValidReference` (T009, T010)
+- [x] T011 Rewrite `internal/warden/warden.go`: `Client{Meta, Credentials}`, `SecretMeta`, `Credentials` (redacting), errors (`ErrEmptyRef`, `ErrNotFound`, `ErrForbidden`, `ErrUnavailable`, `ErrNoUserToken`), `WithUserToken`/`UserToken`, gRPC client over `wardenv1.SecretsClient` with 5 s timeout and code mapping, `Fake` (per-token deny, `SetUnavailable`, `Calls`), `Unavailable` (T003, T004)
+- [x] T012 [P] Add `ErrUnreachable`, `ErrAuthFailed`, `Classify` to `internal/ipmi` and apply it in the real client's `connect` (T005)
+- [x] T013 [P] Add the three event types to `internal/audit/audit.go` (T006)
+- [x] T014 Add `SetDeviceBMCRef` to `internal/repo/repo.go`, implement in `internal/repo/repodb/bmc.go` (tenant tx, update + audit insert) and `internal/memstore/bmc.go` (T007, T008)
+- [x] T015 Implement `internal/bmc/bmc.go` (+ `address.go`, `reason.go`): `Service{Store, Warden, Now}`, `Address`, `Status`, `Set`, `Clear`, `Resolve` (device, address, `warden.Credentials`), `IPMICreds`, `Reason`/`Status code` tables, `ValidReference` (T009, T010)
 
 **Checkpoint**: Warden reachable with the user's identity, decisions proven at 100 %.
+(Build kept green: `power.go`/`grpcapi` already fetch via `Credentials` with the
+forwarded token, the two `/warden-secrets` handlers answer 501 until US1
+removes them, and `app.go` wires `warden.Unavailable` instead of a Fake —
+research D12. `FuzzReferenceInput` joined `make fuzz`.)
 
 ---
 

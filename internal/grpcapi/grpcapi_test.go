@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
@@ -138,9 +139,8 @@ func TestAddressRPCs(t *testing.T) {
 func TestDevicePowerAuthz(t *testing.T) {
 	k := newKit(t)
 	ctx := context.Background()
-	k.warden.Put("ipmi-ref", map[string]string{
-		"username": "admin", "password": "pw", "protocol": "2.0", "port": "623",
-	}, warden.SecretMeta{Name: "bmc"})
+	const ipmiRef = "01928f7e-3c1a-7b44-9d2e-5a6b7c8d9e0f"
+	k.warden.Put(ipmiRef, warden.SecretMeta{Name: "bmc", Username: "admin", HostURL: "lanplus://bmc:623"}, "pw")
 
 	// Create the device as a plain service caller.
 	withCaller(t, "spiffe://example.org/svc/deployer", nil, true)
@@ -148,7 +148,7 @@ func TestDevicePowerAuthz(t *testing.T) {
 		TenantId: tenant,
 		Device: &ipamv1.Device{
 			Name: "srv-1", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER,
-			ManagementIp: "10.0.0.9", IpmiSecretRef: "ipmi-ref",
+			ManagementIp: "10.0.0.9", IpmiSecretRef: ipmiRef,
 		},
 	})
 	if err != nil {
@@ -165,8 +165,10 @@ func TestDevicePowerAuthz(t *testing.T) {
 		t.Fatalf("plain service power: want PermissionDenied, got %v", err)
 	}
 
-	// A platform-admin caller may drive power; creds are fetched at use time.
+	// A platform-admin caller may drive power; creds are fetched at use time
+	// on behalf of the user whose platform token the gateway forwarded.
 	withCaller(t, "spiffe://example.org/svc/console", []string{"platform-admin"}, true)
+	ctx = metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer user-token"))
 	ps, err := k.device.PowerStatus(ctx, &ipamv1.PowerStatusRequest{TenantId: tenant, Id: dev.GetId()})
 	if err != nil || ps.GetState() != "on" {
 		t.Fatalf("power status: %v %+v", err, ps)

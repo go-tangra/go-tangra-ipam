@@ -8,7 +8,6 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 // ipamBase is the gateway-proxied prefix every route shares.
@@ -568,40 +567,12 @@ func (s *Server) Register(d Deps) {
 	})
 
 	// --------------------------------------------------- Warden secrets (meta)
-	s.MustHandle("GET", p+"/warden-secrets", func(w http.ResponseWriter, r *http.Request) {
-		if _, err := subjects(r); err != nil {
-			failSvc(w, err)
-			return
-		}
-		metas, err := d.Warden.ListSecrets(r.Context(), r.URL.Query().Get("query"))
-		if err != nil {
-			failSvc(w, err)
-			return
-		}
-		if metas == nil {
-			metas = []warden.SecretMeta{}
-		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": metas})
-	})
-	s.MustHandle("GET", p+"/warden-secrets/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if _, err := subjects(r); err != nil {
-			failSvc(w, err)
-			return
-		}
-		id := r.PathValue("id")
-		metas, err := d.Warden.ListSecrets(r.Context(), "")
-		if err != nil {
-			failSvc(w, err)
-			return
-		}
-		for _, m := range metas {
-			if m.ID == id {
-				WriteJSON(w, http.StatusOK, m)
-				return
-			}
-		}
-		WriteError(w, http.StatusNotFound, "not_found")
-	})
+	// Retired (feature 024): secrets are listed through warden's own API.
+	for _, path := range []string{p + "/warden-secrets", p + "/warden-secrets/{id}"} {
+		s.MustHandle("GET", path, func(w http.ResponseWriter, _ *http.Request) {
+			WriteError(w, ErrNotImplemented.Status, ErrNotImplemented.Reason)
+		})
+	}
 
 	s.registerNetworking(d, p)
 	s.registerGroups(d, p)

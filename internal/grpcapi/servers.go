@@ -2,14 +2,16 @@ package grpcapi
 
 import (
 	"context"
-	"strconv"
+	"strings"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
@@ -515,7 +517,7 @@ func (s *DeviceServer) StartKvmSession(ctx context.Context, req *ipamv1.StartKvm
 		return nil, err
 	}
 	token, consoleURL, err := s.kvm.StartSession(ctx, dev.ID, host, kvm.Creds{
-		Username: secret["username"], Password: secret["password"],
+		Username: secret.Username, Password: secret.Password,
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -540,37 +542,29 @@ func (s *DeviceServer) bmcContext(ctx context.Context, tenantID, deviceID string
 	if err != nil {
 		return authz.Subjects{}, "", ipmi.Creds{}, err
 	}
-	port := 0
-	if p := secret["port"]; p != "" {
-		port, _ = strconv.Atoi(p)
-	}
-	creds := ipmi.Creds{
-		Username: secret["username"], Password: secret["password"],
-		Protocol: secret["protocol"], Port: port,
-	}
-	return subj, host, creds, nil
+	return subj, host, bmc.IPMICreds(secret), nil
 }
 
 // deviceSecret loads a device, requires an IPMI reference, and fetches the
 // credential material from warden. The map is used immediately and never stored.
-func (s *DeviceServer) deviceSecret(ctx context.Context, subj authz.Subjects, deviceID string) (store.Device, string, map[string]string, error) {
+func (s *DeviceServer) deviceSecret(ctx context.Context, subj authz.Subjects, deviceID string) (store.Device, string, warden.Credentials, error) {
 	dev, err := s.devices.Get(ctx, subj, deviceID)
 	if err != nil {
-		return store.Device{}, "", nil, grpcError(err)
+		return store.Device{}, "", warden.Credentials{}, grpcError(err)
 	}
 	if dev.IPMISecretRef == "" {
-		return store.Device{}, "", nil, status.Error(codes.FailedPrecondition, "device has no BMC/IPMI credential reference")
+		return store.Device{}, "", warden.Credentials{}, status.Error(codes.FailedPrecondition, "device has no BMC/IPMI credential reference")
 	}
 	host := dev.ManagementIP
 	if host == "" {
 		host = dev.PrimaryIP
 	}
 	if host == "" {
-		return store.Device{}, "", nil, status.Error(codes.FailedPrecondition, "device has no management or primary IP")
+		return store.Device{}, "", warden.Credentials{}, status.Error(codes.FailedPrecondition, "device has no management or primary IP")
 	}
-	secret, err := s.warden.GetSecret(ctx, dev.IPMISecretRef)
+	secret, err := s.warden.Credentials(userContext(ctx), dev.IPMISecretRef)
 	if err != nil {
-		return store.Device{}, "", nil, grpcError(err)
+		return store.Device{}, "", warden.Credentials{}, grpcError(err)
 	}
 	return dev, host, secret, nil
 }
@@ -1230,4 +1224,17 @@ func (s *SystemServer) UpdateDnsConfig(ctx context.Context, req *ipamv1.UpdateDn
 		return nil, grpcError(err)
 	}
 	return dnsConfigToPB(v), nil
+}
+
+// userContext carries the platform token the gateway forwarded in the
+// incoming "authorization" metadata, so warden acts on behalf of that user
+// (feature 024). Without one, warden is never called.
+func userContext(ctx context.Context) context.Context {
+	md, _ := metadata.FromIncomingContext(ctx)
+	for _, v := range md.Get("authorization") {
+		if tok, ok := strings.CutPrefix(v, "Bearer "); ok {
+			return warden.WithUserToken(ctx, tok)
+		}
+	}
+	return ctx
 }

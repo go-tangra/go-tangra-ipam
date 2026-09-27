@@ -1,13 +1,24 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/go-tangra/go-tangra-auth/sdk/v4/pkg/authclient"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
+
+// userContext carries the caller's platform token so warden acts on behalf
+// of the signed-in user (feature 024).
+func userContext(r *http.Request) context.Context {
+	return warden.WithUserToken(r.Context(), authclient.BearerToken(r.Header.Get("Authorization")))
+}
 
 // registerPower mounts the privileged out-of-band routes: chassis power
 // status/control, sensor and SEL reads, and the KVM console session. Every one
@@ -100,8 +111,8 @@ func (s *Server) registerPower(d Deps, p string) {
 			return
 		}
 		token, consoleURL, err := d.KVM.StartSession(r.Context(), dev.ID, host, kvm.Creds{
-			Username: secret["username"],
-			Password: secret["password"],
+			Username: secret.Username,
+			Password: secret.Password,
 		})
 		if err != nil {
 			failSvc(w, err)
@@ -129,24 +140,18 @@ func (s *Server) bmcSetup(w http.ResponseWriter, r *http.Request, d Deps) (subj 
 	if !ok {
 		return authz.Subjects{}, "", ipmi.Creds{}, false
 	}
-	creds = ipmi.Creds{
-		Username: secret["username"],
-		Password: secret["password"],
-		Protocol: secret["protocol"],
-		Port:     atoiDefault(secret["port"], 0),
-	}
-	return subj, host, creds, true
+	return subj, host, bmc.IPMICreds(secret), true
 }
 
 // loadBMC loads the device and fetches its BMC secret from warden. It writes the
 // error response and returns ok=false on any failure (missing device, no
 // configured secret ref, or a warden fetch error). The returned secret map is
 // used immediately by the caller and never persisted or logged.
-func (s *Server) loadBMC(w http.ResponseWriter, r *http.Request, d Deps, subj authz.Subjects) (dev store.Device, host string, secret map[string]string, ok bool) {
+func (s *Server) loadBMC(w http.ResponseWriter, r *http.Request, d Deps, subj authz.Subjects) (dev store.Device, host string, secret warden.Credentials, ok bool) {
 	dev, err := d.Devices.Get(r.Context(), subj, r.PathValue("id"))
 	if err != nil {
 		failSvc(w, err)
-		return store.Device{}, "", nil, false
+		return store.Device{}, "", warden.Credentials{}, false
 	}
 	host = dev.ManagementIP
 	if host == "" {
@@ -154,12 +159,12 @@ func (s *Server) loadBMC(w http.ResponseWriter, r *http.Request, d Deps, subj au
 	}
 	if dev.IPMISecretRef == "" || host == "" {
 		WriteError(w, http.StatusUnprocessableEntity, "validation_failed")
-		return store.Device{}, "", nil, false
+		return store.Device{}, "", warden.Credentials{}, false
 	}
-	secret, err = d.Warden.GetSecret(r.Context(), dev.IPMISecretRef)
+	secret, err = d.Warden.Credentials(userContext(r), dev.IPMISecretRef)
 	if err != nil {
 		failSvc(w, err)
-		return store.Device{}, "", nil, false
+		return store.Device{}, "", warden.Credentials{}, false
 	}
 	return dev, host, secret, true
 }

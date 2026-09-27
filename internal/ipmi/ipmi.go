@@ -14,7 +14,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
+	"syscall"
 	"time"
 
 	goipmi "github.com/bougou/go-ipmi"
@@ -35,6 +37,48 @@ const (
 
 // ErrUnknownAction is returned when Power is given an unrecognized verb.
 var ErrUnknownAction = errors.New("ipmi: unknown power action")
+
+// Connect failure classes (feature 024): the BMC did not answer, or it
+// answered and rejected the credentials.
+var (
+	ErrUnreachable = errors.New("ipmi: bmc unreachable")
+	ErrAuthFailed  = errors.New("ipmi: bmc rejected the credentials")
+)
+
+// authMarkers are substrings of go-ipmi session-establishment failures that
+// mean the BMC refused the login (RAKP/authcode/integrity, unauthorized name
+// or role, invalid password).
+var authMarkers = []string{"rakp", "authcode", "auth code", "integrity check", "unauthorized", "invalid password",
+	"invalid user", "invalid role", "privilege", "password"}
+
+// unreachableMarkers are transport failures: nothing answered.
+var unreachableMarkers = []string{"i/o timeout", "timeout", "connection refused", "no route to host",
+	"network is unreachable", "host is down", "deadline exceeded"}
+
+// Classify maps a connect error to ErrUnreachable or ErrAuthFailed (wrapped,
+// so the original stays inspectable); other errors are returned unchanged.
+// The error text is only matched, never exposed to callers.
+func Classify(err error) error {
+	if err == nil || errors.Is(err, ErrUnreachable) || errors.Is(err, ErrAuthFailed) {
+		return err
+	}
+	var ne net.Error
+	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &ne) && ne.Timeout()) || errors.Is(err, syscall.ECONNREFUSED) {
+		return fmt.Errorf("%w: %w", ErrUnreachable, err)
+	}
+	msg := strings.ToLower(err.Error())
+	for _, m := range authMarkers {
+		if strings.Contains(msg, m) {
+			return fmt.Errorf("%w: %w", ErrAuthFailed, err)
+		}
+	}
+	for _, m := range unreachableMarkers {
+		if strings.Contains(msg, m) {
+			return fmt.Errorf("%w: %w", ErrUnreachable, err)
+		}
+	}
+	return err
+}
 
 // Creds are the BMC login credentials. Protocol is "auto" (default), "1.5" or
 // "2.0". These come from warden at use time and must never be persisted/logged.
@@ -136,7 +180,7 @@ func (c *Client) connect(ctx context.Context, host string, creds Creds) (*goipmi
 		err = ic.ConnectAuto(ctx)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("ipmi: connect %s: %w", host, err)
+		return nil, Classify(fmt.Errorf("ipmi: connect %s: %w", host, err))
 	}
 	return ic, nil
 }
@@ -343,6 +387,8 @@ type Fake struct {
 	// LastHost / LastCreds capture the last call's inputs for assertions.
 	LastHost  string
 	LastCreds Creds
+	// Calls counts every BMC call (0 proves the BMC was never contacted).
+	Calls int
 }
 
 // NewFake builds a Fake reporting a powered-on chassis.
@@ -350,6 +396,7 @@ func NewFake() *Fake { return &Fake{State: PowerState{On: true}} }
 
 func (f *Fake) Info(_ context.Context, host string, creds Creds) (DeviceInfo, error) {
 	f.LastHost, f.LastCreds = host, creds
+	f.Calls++
 	if f.Err != nil {
 		return DeviceInfo{}, f.Err
 	}
@@ -358,6 +405,7 @@ func (f *Fake) Info(_ context.Context, host string, creds Creds) (DeviceInfo, er
 
 func (f *Fake) PowerStatus(_ context.Context, host string, creds Creds) (PowerState, error) {
 	f.LastHost, f.LastCreds = host, creds
+	f.Calls++
 	if f.Err != nil {
 		return PowerState{}, f.Err
 	}
@@ -366,6 +414,7 @@ func (f *Fake) PowerStatus(_ context.Context, host string, creds Creds) (PowerSt
 
 func (f *Fake) Sensors(_ context.Context, host string, creds Creds) ([]SensorReading, error) {
 	f.LastHost, f.LastCreds = host, creds
+	f.Calls++
 	if f.Err != nil {
 		return nil, f.Err
 	}
@@ -374,6 +423,7 @@ func (f *Fake) Sensors(_ context.Context, host string, creds Creds) ([]SensorRea
 
 func (f *Fake) SEL(_ context.Context, host string, creds Creds) ([]SELEntry, error) {
 	f.LastHost, f.LastCreds = host, creds
+	f.Calls++
 	if f.Err != nil {
 		return nil, f.Err
 	}
@@ -382,6 +432,7 @@ func (f *Fake) SEL(_ context.Context, host string, creds Creds) ([]SELEntry, err
 
 func (f *Fake) Power(_ context.Context, host string, creds Creds, action string) error {
 	f.LastHost, f.LastCreds = host, creds
+	f.Calls++
 	if f.Err != nil {
 		return f.Err
 	}

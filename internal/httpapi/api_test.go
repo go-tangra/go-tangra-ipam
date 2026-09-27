@@ -42,7 +42,7 @@ const (
 	apiAdmin  = "22222222-2222-7222-8222-222222222222"
 	apiUser   = "33333333-3333-7333-8333-333333333333"
 
-	bmcRef  = "bmc-ref-1"
+	bmcRef  = "01928f7e-3c1a-7b44-9d2e-5a6b7c8d9e0f"
 	bmcUser = "bmcuser"
 	bmcPass = "s3cr3tpw"
 )
@@ -99,9 +99,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 
 	pub := &recPub{}
 	wf := warden.NewFake()
-	wf.Put(bmcRef, map[string]string{
-		"username": bmcUser, "password": bmcPass, "protocol": "2.0", "port": "623",
-	}, warden.SecretMeta{Name: "bmc-1", Description: "test BMC creds"})
+	wf.Put(bmcRef, warden.SecretMeta{Name: "bmc-1", Username: bmcUser, HostURL: "lanplus://bmc:623"}, bmcPass)
 
 	dns := dnscfg.New(mem)
 	dns.SetLookup(func(_ context.Context, _ string) ([]string, error) {
@@ -571,18 +569,11 @@ func TestRouteSmoke(t *testing.T) {
 		t.Fatalf("address delete: %d %s", w.Code, w.Body)
 	}
 
-	// Warden secret metadata (never values).
-	w = f.req(t, "GET", p+"/warden-secrets", "admin", "")
-	if items, _ := decodeBody(t, w)["items"].([]any); w.Code != 200 || len(items) != 1 {
-		t.Fatalf("warden list: %d %s", w.Code, w.Body)
-	}
-	w = f.req(t, "GET", p+"/warden-secrets/"+bmcRef, "admin", "")
-	if w.Code != 200 {
-		t.Fatalf("warden get: %d %s", w.Code, w.Body)
-	}
-	assertNoCreds(t, w.Body.String())
-	if w := f.req(t, "GET", p+"/warden-secrets/nope", "admin", ""); w.Code != 404 {
-		t.Fatalf("warden get missing: want 404, got %d", w.Code)
+	// The retired warden-secrets routes (024) answer 501.
+	for _, path := range []string{"/warden-secrets", "/warden-secrets/" + bmcRef} {
+		if w := f.req(t, "GET", p+path, "admin", ""); w.Code != 501 {
+			t.Fatalf("%s: want 501, got %d", path, w.Code)
+		}
 	}
 
 	// VLAN get + subnets; scan get + cancel; device addresses + host-groups.

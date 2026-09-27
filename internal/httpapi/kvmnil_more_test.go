@@ -32,9 +32,7 @@ func newAPINoKVM(t *testing.T) *apiFixture {
 
 	pub := &recPub{}
 	wf := warden.NewFake()
-	wf.Put(bmcRef, map[string]string{
-		"username": bmcUser, "password": bmcPass, "protocol": "2.0", "port": "623",
-	}, warden.SecretMeta{Name: "bmc-1", Description: "test BMC creds"})
+	wf.Put(bmcRef, warden.SecretMeta{Name: "bmc-1", Username: bmcUser, HostURL: "lanplus://bmc:623"}, bmcPass)
 
 	dns := dnscfg.New(mem)
 	dns.SetLookup(func(_ context.Context, _ string) ([]string, error) {

@@ -156,11 +156,13 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 
 	// Warden secret-reference client (BMC creds fetched at use time; SNMP
 	// credentials are sealed by IPAM itself since feature 021).
-	var wclient warden.Client = warden.NewFake()
+	// Fail closed (024 D12): without a mesh connection every fetch reports
+	// warden_unavailable — never a fabricated or empty secret store.
+	var wclient warden.Client = warden.Unavailable{}
 	if wconn, werr := a.Freya.Client(ctx, cfg.Warden.Service); werr == nil {
 		wclient = warden.New(wconn)
 	} else {
-		a.Log.Warn("warden client unavailable; power/KVM credential fetch will fail", "err", werr)
+		a.Log.Warn("warden client unavailable; power/KVM/sensors will answer warden_unavailable", "err", werr)
 	}
 
 	// Event bus.

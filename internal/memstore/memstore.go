@@ -565,6 +565,9 @@ func (m *Mem) UpsertAddressByAddress(_ context.Context, a store.IPAddress) (bool
 func (m *Mem) AddressesForDevice(_ context.Context, tenantID, deviceID string) ([]store.IPAddress, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.fail("AddressesForDevice"); err != nil {
+		return nil, err
+	}
 	var out []store.IPAddress
 	for _, a := range m.addrs {
 		if a.TenantID == tenantID && a.DeviceID == deviceID {
