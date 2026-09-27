@@ -182,6 +182,10 @@ type PortLinkData struct {
 	// (with their per-switch Links), and NetworkMACs the MACs of network-device interfaces (022).
 	Addresses   []store.IPAddress
 	NetworkMACs map[string]bool
+	// Guests are the hypervisor guests reported by host-sync devices: their
+	// MACs sit on the hypervisor's own switch port and must not make that
+	// port look like an uplink.
+	Guests []store.HypervisorGuest
 }
 
 // PortLinkStore is the switch-port correlation persistence (US5).

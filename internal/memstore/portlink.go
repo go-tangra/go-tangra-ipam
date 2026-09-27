@@ -2,6 +2,7 @@ package memstore
 
 import (
 	"context"
+	"slices"
 	"sort"
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
@@ -54,6 +55,13 @@ func (m *Mem) PortLinkData(_ context.Context, tenantID string) (repo.PortLinkDat
 	}
 	sort.Slice(out.Addresses, func(i, j int) bool { return out.Addresses[i].ID < out.Addresses[j].ID })
 	out.NetworkMACs = m.networkMACsLocked(tenantID)
+	for _, g := range m.guests {
+		if g.TenantID == tenantID {
+			g.MACs = slices.Clone(g.MACs)
+			out.Guests = append(out.Guests, g)
+		}
+	}
+	sort.Slice(out.Guests, func(i, j int) bool { return out.Guests[i].ID < out.Guests[j].ID })
 	sort.Slice(out.Switches, func(i, j int) bool { return out.Switches[i].ID < out.Switches[j].ID })
 	sort.Slice(out.Hosts, func(i, j int) bool { return out.Hosts[i].ID < out.Hosts[j].ID })
 	sort.Slice(out.SwitchIfaces, func(i, j int) bool { return out.SwitchIfaces[i].ID < out.SwitchIfaces[j].ID })

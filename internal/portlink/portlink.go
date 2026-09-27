@@ -66,6 +66,25 @@ func BuildInput(d repo.PortLinkData, maxMACs int) Input {
 	for _, h := range d.Hosts {
 		names[h.ID] = h.Name
 	}
+	// related[device] = MACs of the device's reported interfaces and of its
+	// hypervisor guests (a hypervisor's port carries all of them).
+	related := map[string]map[string]bool{}
+	add := func(dev, raw string) {
+		if m, ok := hostreport.NormalizeMAC(raw); ok && dev != "" {
+			if related[dev] == nil {
+				related[dev] = map[string]bool{}
+			}
+			related[dev][m] = true
+		}
+	}
+	for _, i := range d.HostIfaces {
+		add(i.DeviceID, i.MACAddress)
+	}
+	for _, g := range d.Guests {
+		for _, mac := range g.MACs {
+			add(g.HostDeviceID, mac)
+		}
+	}
 	reported := map[string]bool{}
 	for _, i := range d.HostIfaces {
 		m, ok := hostreport.NormalizeMAC(i.MACAddress)
@@ -73,7 +92,7 @@ func BuildInput(d repo.PortLinkData, maxMACs int) Input {
 			continue
 		}
 		reported[m] = true
-		in.Hosts = append(in.Hosts, Host{DeviceID: i.DeviceID, DeviceName: names[i.DeviceID], IfaceID: i.ID, IfaceName: i.Name, MAC: m})
+		in.Hosts = append(in.Hosts, Host{DeviceID: i.DeviceID, DeviceName: names[i.DeviceID], IfaceID: i.ID, IfaceName: i.Name, MAC: m, Related: related[i.DeviceID]})
 	}
 	// 022: addresses with a MAC are hosts too, unless a reported interface
 	// already carries the MAC (its link covers the address) or the MAC is a
@@ -83,7 +102,7 @@ func BuildInput(d repo.PortLinkData, maxMACs int) Input {
 		if !ok || reported[m] || d.NetworkMACs[m] || in.SwitchMACs[m] != "" {
 			continue
 		}
-		in.Hosts = append(in.Hosts, Host{AddressID: a.ID, DeviceID: "address:" + a.ID, DeviceName: a.Hostname, MAC: m})
+		in.Hosts = append(in.Hosts, Host{AddressID: a.ID, DeviceID: "address:" + a.ID, DeviceName: a.Hostname, MAC: m, Related: related[a.DeviceID]})
 	}
 	return in
 }

@@ -72,6 +72,9 @@ func (d *DB) PortLinkData(ctx context.Context, tenantID string) (out repo.PortLi
 			WHERE tenant_id=$1 AND (mac_address <> '' OR link_port_id IS NOT NULL) ORDER BY id`, tenantID); e != nil {
 			return e
 		}
+		if out.Guests, e = queryGuests(ctx, tx, false, "SELECT "+guestCols+" FROM ipam_hypervisor_guests g WHERE g.tenant_id=$1 ORDER BY g.id", tenantID); e != nil {
+			return e
+		}
 		out.NetworkMACs, e = networkMACs(ctx, tx, tenantID)
 		return e
 	})
