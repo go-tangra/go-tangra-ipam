@@ -614,6 +614,11 @@ func scanDevice(sc scanner) (store.Device, error) {
 }
 
 func computeDevice(ctx context.Context, tx pgx.Tx, d *store.Device) error {
+	sum, err := hardwareSummary(ctx, tx, d.TenantID, d.ID)
+	if err != nil {
+		return err
+	}
+	d.HardwareSummary = sum
 	return tx.QueryRow(ctx, `SELECT
 		(SELECT count(*) FROM ipam_device_interfaces WHERE tenant_id=$1 AND device_id=$2),
 		(SELECT count(*) FROM ipam_ip_addresses WHERE tenant_id=$1 AND device_id=$2),
@@ -703,6 +708,12 @@ func (d *DB) ListDevices(ctx context.Context, tenantID string, f store.DeviceFil
 		if f.Query != "" {
 			args = append(args, "%"+f.Query+"%")
 			b.WriteString(fmt.Sprintf(" AND (name ILIKE $%d OR primary_ip ILIKE $%d)", len(args), len(args)))
+		}
+		switch f.HasHardware {
+		case "true":
+			b.WriteString(" AND EXISTS (SELECT 1 FROM ipam_device_hardware h WHERE h.device_id = ipam_devices.id)")
+		case "false":
+			b.WriteString(" AND NOT EXISTS (SELECT 1 FROM ipam_device_hardware h WHERE h.device_id = ipam_devices.id)")
 		}
 		if f.CursorID != "" {
 			add(" AND id < $%d", f.CursorID)

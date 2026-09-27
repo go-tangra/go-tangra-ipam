@@ -460,3 +460,25 @@ func TestSubnetSNMPMapping(t *testing.T) {
 		t.Fatalf("inbound snmp fields kept: %+v", in)
 	}
 }
+
+// TestDeviceHardwareSummaryMapping (023 T026/T061): the device carries the
+// read-only hardware summary outbound; a caller-supplied summary is ignored.
+func TestDeviceHardwareSummaryMapping(t *testing.T) {
+	sum := &store.HardwareSummary{CPUModel: "Xeon", CPUSockets: 2, CPUCores: 24, CPUThreads: 48, MemoryTotalBytes: 1 << 30,
+		MemoryType: "DDR4", MemorySlotsTotal: 16, MemorySlotsUsed: 16, DiskCount: 3, DiskTotalBytes: 3 << 40,
+		ReportedAt: time.Unix(1_700_000_000, 0)}
+	pb := deviceToPB(store.Device{ID: "d1", HardwareSummary: sum})
+	hs := pb.GetHardwareSummary()
+	if hs.GetCpuModel() != "Xeon" || hs.GetCpuSockets() != 2 || hs.GetCpuCores() != 24 || hs.GetCpuThreads() != 48 ||
+		hs.GetMemoryTotalBytes() != 1<<30 || hs.GetMemoryType() != "DDR4" || hs.GetMemorySlotsTotal() != 16 ||
+		hs.GetMemorySlotsUsed() != 16 || hs.GetDiskCount() != 3 || hs.GetDiskTotalBytes() != 3<<40 || hs.GetReportedAt() != 1_700_000_000 {
+		t.Fatalf("summary = %v", hs)
+	}
+	if deviceToPB(store.Device{ID: "d2"}).GetHardwareSummary() != nil {
+		t.Fatal("device without hardware carries no summary")
+	}
+	in := deviceFromPB(&ipamv1.Device{Id: "d1", HardwareSummary: &ipamv1.HardwareSummary{CpuModel: "forged"}})
+	if in.HardwareSummary != nil {
+		t.Fatalf("caller-supplied hardware summary kept: %+v", in.HardwareSummary)
+	}
+}

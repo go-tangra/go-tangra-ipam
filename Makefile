@@ -40,7 +40,9 @@ FUZZ_TARGETS := \
 	./internal/groups:FuzzMembership \
 	./internal/hostreport:FuzzNormalizeReport \
 	./internal/hostreport:FuzzExclusionPattern \
+	./internal/hostreport:FuzzNormalizeHardware \
 	./internal/hostplan:FuzzPlan \
+	./internal/hostplan:FuzzHardwareDiff \
 	./internal/portlink:FuzzRank \
 	./internal/snmpcred:FuzzDecodeValidate \
 	./internal/arpplan:FuzzPlan \

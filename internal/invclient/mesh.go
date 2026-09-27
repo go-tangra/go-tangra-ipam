@@ -171,7 +171,10 @@ func fromSDK(r inventoryclient.HostReport) Report {
 			AutomaticUpdates: r.Updates.AutomaticUpdates, SecurityClassified: r.Updates.SecurityClassified, CheckedAt: r.Updates.CheckedAt,
 			PendingCount: r.Updates.PendingCount, SecurityCount: r.Updates.SecurityCount},
 		Truncated: Limits{Interfaces: r.Truncated.Interfaces, Addresses: r.Truncated.Addresses, Guests: r.Truncated.Guests,
-			Packages: r.Truncated.Packages, BMCPorts: r.Truncated.BMCPorts},
+			Packages: r.Truncated.Packages, BMCPorts: r.Truncated.BMCPorts, Disks: r.Truncated.Disks,
+			MemorySlots: r.Truncated.MemorySlots, MemoryArrays: r.Truncated.MemoryArrays,
+			Processors: r.Truncated.Processors, Filesystems: r.Truncated.Filesystems},
+		Hardware: r.Hardware,
 	}
 	for _, i := range r.Interfaces {
 		ni := Interface{Name: i.Name, MAC: i.MAC, IPAddresses: i.IPAddresses, Gateway: i.Gateway, DHCP: i.DHCP, SpeedBps: i.SpeedBps,

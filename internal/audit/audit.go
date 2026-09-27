@@ -94,6 +94,12 @@ const (
 	MACConflict        EventType = "mac_conflict"
 	ARPRun             EventType = "arp_run"
 	ARPSettingsUpdated EventType = "arp_settings_updated"
+
+	// Device hardware (feature 023, contracts/audit-events.md). Written by
+	// the host sync in the apply transaction; details use neutral keys
+	// (summary, changes [{field, change, before, after}], changes_truncated).
+	HardwareReported EventType = "hardware_reported"
+	HardwareUpdated  EventType = "hardware_updated"
 )
 
 // HostSyncActor is the actor id of every change the host sync makes.
@@ -156,6 +162,7 @@ func init() {
 		DeviceNotReported, HostSyncSettingsUpdated, HostSyncResyncRequested, HostSyncRun,
 		SNMPCredentialsSet, SNMPCredentialsReplaced, SNMPCredentialsCleared, SNMPCredentialsTested,
 		MACLearned, MACChanged, MACConflict, ARPRun, ARPSettingsUpdated,
+		HardwareReported, HardwareUpdated,
 	} {
 		known[t] = struct{}{}
 	}

@@ -404,12 +404,12 @@ func (s *Server) Register(d Deps) {
 			failSvc(w, err)
 			return
 		}
-		var in store.Device
+		var in deviceBody
 		if err := DecodeJSON(r, &in, 0); err != nil {
 			Fail(w, r, nil, err)
 			return
 		}
-		v, err := d.Devices.Create(r.Context(), subj, in)
+		v, err := d.Devices.Create(r.Context(), subj, in.Device)
 		if err != nil {
 			failSvc(w, err)
 			return
@@ -435,13 +435,13 @@ func (s *Server) Register(d Deps) {
 			failSvc(w, err)
 			return
 		}
-		var in store.Device
+		var in deviceBody
 		if err := DecodeJSON(r, &in, 0); err != nil {
 			Fail(w, r, nil, err)
 			return
 		}
 		in.ID = r.PathValue("id")
-		v, err := d.Devices.Update(r.Context(), subj, in)
+		v, err := d.Devices.Update(r.Context(), subj, in.Device)
 		if err != nil {
 			failSvc(w, err)
 			return

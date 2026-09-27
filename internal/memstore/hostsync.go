@@ -254,6 +254,7 @@ func (m *Mem) guestsOfLocked(tenantID, hostDeviceID string) []store.HypervisorGu
 // its guest rows and device state cascade; other rows' references are nulled.
 func (m *Mem) deleteDeviceHostSyncLocked(id string) {
 	delete(m.devState, id)
+	delete(m.hardware, id)
 	for gid, g := range m.guests {
 		switch {
 		case g.HostDeviceID == id:
@@ -281,19 +282,21 @@ type memSnapshot struct {
 	pkgs     map[string][]store.DevicePackage
 	guests   map[string]store.HypervisorGuest
 	devState map[string]store.HostSyncDeviceState
+	hardware map[string]store.DeviceHardware
 	audit    int
 }
 
 func (m *Mem) snapshotLocked() memSnapshot {
 	return memSnapshot{
 		devices: clone(m.devices), ifaces: clone(m.ifaces), addrs: clone(m.addrs), subnets: clone(m.subnets),
-		pkgs: clone(m.pkgs), guests: clone(m.guests), devState: clone(m.devState), audit: len(m.audit),
+		pkgs: clone(m.pkgs), guests: clone(m.guests), devState: clone(m.devState), hardware: clone(m.hardware), audit: len(m.audit),
 	}
 }
 
 func (m *Mem) restoreLocked(s memSnapshot) {
 	m.devices, m.ifaces, m.addrs, m.subnets = s.devices, s.ifaces, s.addrs, s.subnets
 	m.pkgs, m.guests, m.devState, m.audit = s.pkgs, s.guests, s.devState, m.audit[:s.audit]
+	m.hardware = s.hardware
 }
 
 func clone[K comparable, V any](in map[K]V) map[K]V {
@@ -701,6 +704,45 @@ func (t *memTx) AppendAudit(row store.AuditRow) error {
 	row.TenantID = t.tid
 	t.m.appendAuditLocked(row)
 	return nil
+}
+
+// GetHardware implements repo.HostTx.
+func (t *memTx) GetHardware(deviceID string) (*store.DeviceHardware, error) {
+	if err := t.fail("GetHardware"); err != nil {
+		return nil, err
+	}
+	h, ok := t.m.hardware[deviceID]
+	if !ok || h.TenantID != t.tid {
+		return nil, nil
+	}
+	return &h, nil
+}
+
+// ReplaceHardware implements repo.HostTx.
+func (t *memTx) ReplaceHardware(h store.DeviceHardware) error {
+	if err := t.fail("ReplaceHardware"); err != nil {
+		return err
+	}
+	if d, ok := t.m.devices[h.DeviceID]; !ok || d.TenantID != t.tid {
+		return repo.ErrNotFound
+	}
+	h.TenantID, h.UpdatedAt = t.tid, now(t.m)
+	t.m.hardware[h.DeviceID] = h
+	return nil
+}
+
+// GetDeviceHardware implements repo.Store.
+func (m *Mem) GetDeviceHardware(_ context.Context, tenantID, deviceID string) (store.DeviceHardware, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.fail("GetDeviceHardware"); err != nil {
+		return store.DeviceHardware{}, err
+	}
+	h, ok := m.hardware[deviceID]
+	if !ok || h.TenantID != tenantID {
+		return store.DeviceHardware{}, repo.ErrNotFound
+	}
+	return h, nil
 }
 
 var _ repo.HostTx = (*memTx)(nil)
