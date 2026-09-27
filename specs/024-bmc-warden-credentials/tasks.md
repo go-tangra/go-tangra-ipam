@@ -140,13 +140,13 @@ research D12. `FuzzReferenceInput` joined `make fuzz`.)
 
 ### Tests first
 
-- [ ] T039 [P] `warden:internal/app/policy_test.go`: the default `deploy/policy.yaml` has rule `ipam-bmc-secrets` from `spiffe://example.org/svc/ipam` with exactly `/warden.v1.Secrets/Get` and `/warden.v1.Secrets/GetPassword`, and no other rule names ipam
+- [x] T039 [P] `warden:internal/app/policy_test.go`: the default `deploy/policy.yaml` has rule `ipam-bmc-secrets` from `spiffe://example.org/svc/ipam` with exactly `/warden.v1.Secrets/Get` and `/warden.v1.Secrets/GetPassword`, and no other rule names ipam
 
 ### Implementation
 
-- [ ] T040 `warden:deploy/policy.yaml`: add rule `ipam-bmc-secrets` (commit on branch `024-ipam-secret-access`)
-- [ ] T041 [P] `docker:policies/warden.yaml`: same rule (local commit on `v4`, not pushed)
-- [ ] T042 [P] `deploy/policy.yaml` (ipam) header comment: ipam calls warden `Secrets/Get` + `GetPassword` with the user's token; the allowing rule `ipam-bmc-secrets` lives in warden's policy; verify `warden: ["warden:9843"]` in `docker:configs/ipam.yaml` and go-tangra `deploy/stack/configs/ipam.yaml` (no change expected)
+- [x] T040 `warden:deploy/policy.yaml`: add rule `ipam-bmc-secrets` (commit on branch `024-ipam-secret-access`)
+- [x] T041 [P] `docker:policies/warden.yaml`: same rule (local commit on `v4`, not pushed)
+- [x] T042 [P] `deploy/policy.yaml` (ipam) header comment: ipam calls warden `Secrets/Get` + `GetPassword` with the user's token; the allowing rule `ipam-bmc-secrets` lives in warden's policy; verify `warden: ["warden:9843"]` in `docker:configs/ipam.yaml` and go-tangra `deploy/stack/configs/ipam.yaml` (no change expected)
 
 ---
 
