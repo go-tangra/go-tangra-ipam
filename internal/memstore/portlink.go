@@ -46,6 +46,13 @@ func (m *Mem) PortLinkData(_ context.Context, tenantID string) (repo.PortLinkDat
 			out.HostIfaces = append(out.HostIfaces, i)
 		}
 	}
+	for _, a := range m.addrs {
+		if a.TenantID == tenantID && a.MACAddress != "" {
+			out.Addresses = append(out.Addresses, m.decorateAddrLocked(a))
+		}
+	}
+	sort.Slice(out.Addresses, func(i, j int) bool { return out.Addresses[i].ID < out.Addresses[j].ID })
+	out.NetworkMACs = m.networkMACsLocked(tenantID)
 	sort.Slice(out.Switches, func(i, j int) bool { return out.Switches[i].ID < out.Switches[j].ID })
 	sort.Slice(out.Hosts, func(i, j int) bool { return out.Hosts[i].ID < out.Hosts[j].ID })
 	sort.Slice(out.SwitchIfaces, func(i, j int) bool { return out.SwitchIfaces[i].ID < out.SwitchIfaces[j].ID })

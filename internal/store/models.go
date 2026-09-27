@@ -143,6 +143,106 @@ type IPAddress struct {
 	MoveCount        int        `json:"-"`
 	MoveWindowStart  *time.Time `json:"-"`
 	Conflict         bool       `json:"conflict,omitempty"`
+	// MAC provenance (feature 022, server-owned): where the MAC came from
+	// (manual, agent or arp), the device whose ARP table reported it, when it
+	// was last confirmed, and an ARP-observed MAC disagreeing with an agent
+	// or manual one. Origin is "arp" for an address created from ARP data.
+	MACSource         string     `json:"mac_source,omitempty"`
+	MACSourceDeviceID string     `json:"mac_source_device_id,omitempty"`
+	MACSeenAt         *time.Time `json:"mac_seen_at,omitempty"`
+	MACConflict       string     `json:"mac_conflict,omitempty"`
+	Origin            string     `json:"origin,omitempty"`
+	// Link is the switch port the address is connected to (server-owned).
+	Link *AddressLink `json:"link,omitempty"`
+}
+
+// AddressLink is an address's switch port (the address-level counterpart of
+// the interface link columns). SwitchName is computed on read.
+type AddressLink struct {
+	SwitchID   string     `json:"switch_id"`
+	SwitchName string     `json:"switch_name,omitempty"`
+	PortID     string     `json:"port_id"`
+	PortName   string     `json:"port_name,omitempty"`
+	VLAN       int        `json:"vlan,omitempty"`
+	Source     string     `json:"source"`
+	LastSeen   *time.Time `json:"last_seen,omitempty"`
+}
+
+// BehindAddress is an address linked to a switch port (computed on read).
+type BehindAddress struct {
+	AddressID string `json:"address_id"`
+	Address   string `json:"address"`
+	Hostname  string `json:"hostname,omitempty"`
+}
+
+// MAC sources, the ARP origin, ARP op kinds, ARP ignore reasons, ARP phase
+// statuses and the ARP settings bounds (feature 022).
+const (
+	MACSourceManual, MACSourceAgent, MACSourceARP = "manual", "agent", "arp"
+	OriginARP                                     = "arp"
+
+	ARPFill, ARPUpdate, ARPConflict, ARPClearConflict, ARPCreate, ARPTouch = "fill", "update", "conflict", "clear_conflict", "create", "touch"
+
+	ARPIgnoredInvalid, ARPIgnoredMulticast, ARPIgnoredVirtualRouter, ARPIgnoredNetworkDevice = "invalid", "multicast", "virtual_router", "network_device"
+	ARPIgnoredProxy, ARPIgnoredOutside, ARPIgnoredExcluded                                   = "proxy_arp", "outside_subnets", "excluded_device"
+
+	ARPRan, ARPDisabled, ARPFailed = "ran", "disabled", "failed"
+
+	ARPDefaultProxyThreshold, ARPMinProxyThreshold, ARPMaxProxyThreshold, ARPMaxExcludedDevices = 8, 2, 256, 256
+)
+
+// ARPSettings is a tenant's ARP collection settings (absent row = defaults).
+type ARPSettings struct {
+	TenantID        string    `json:"-"`
+	Enabled         bool      `json:"enabled"`
+	ExcludedDevices []string  `json:"excluded_devices"`
+	ProxyThreshold  int       `json:"proxy_threshold"`
+	UpdatedBy       string    `json:"updated_by,omitempty"`
+	UpdatedAt       time.Time `json:"updated_at,omitzero"`
+}
+
+// DefaultARPSettings are the settings of a tenant that never saved any.
+func DefaultARPSettings(tenantID string) ARPSettings {
+	return ARPSettings{TenantID: tenantID, Enabled: true, ExcludedDevices: []string{}, ProxyThreshold: ARPDefaultProxyThreshold}
+}
+
+// IsNetworkDevice reports whether a device type forwards or routes other
+// hosts' traffic: its interface MACs are never a host's MAC (022).
+func IsNetworkDevice(deviceType string) bool {
+	switch deviceType {
+	case DevRouter, DevSwitch, DevFirewall, DevLoadBalancer:
+		return true
+	}
+	return false
+}
+
+// MACHex returns the lower-case hex digits of a MAC in any notation (the
+// MAC search form).
+func MACHex(s string) string {
+	b := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= '0' && c <= '9', c >= 'a' && c <= 'f':
+			b = append(b, c)
+		case c >= 'A' && c <= 'F':
+			b = append(b, c+('a'-'A'))
+		}
+	}
+	return string(b)
+}
+
+// ARPOp is one planned change of an address from ARP data, with the audit
+// rows that are written only when the change is applied.
+type ARPOp struct {
+	Kind           string
+	AddressID      string
+	Address        string
+	SubnetID       string // create
+	MAC            string
+	SourceDeviceID string
+	At             time.Time
+	Audit          []AuditRow
 }
 
 // Device is a managed network device/host. Unique (tenant_id,name).
@@ -220,6 +320,8 @@ type DeviceInterface struct {
 	RemoteDeviceName string `json:"remote_device_name,omitempty"`
 	BehindDeviceID   string `json:"behind_device_id,omitempty"`
 	BehindDeviceName string `json:"behind_device_name,omitempty"`
+	// BehindAddresses are the addresses linked to this switch port (022).
+	BehindAddresses []BehindAddress `json:"behind_addresses,omitempty"`
 }
 
 // DeviceInterfaceLink is an L2 neighbor link. Unique (interface_id,remote_device_id,link_source).
@@ -417,38 +519,47 @@ type HostGroupMember struct {
 
 // IPScanJob is an async discovery job (work queue).
 type IPScanJob struct {
-	ID                  string     `json:"id"`
-	TenantID            string     `json:"tenant_id"`
-	SubnetID            string     `json:"subnet_id"`
-	Status              string     `json:"status"`
-	Progress            int        `json:"progress"`
-	StatusMessage       string     `json:"status_message,omitempty"`
-	TotalAddresses      int64      `json:"total_addresses"`
-	ScannedCount        int64      `json:"scanned_count"`
-	AliveCount          int64      `json:"alive_count"`
-	NewCount            int64      `json:"new_count"`
-	UpdatedCount        int64      `json:"updated_count"`
-	SNMPDiscoveredCount int64      `json:"snmp_discovered_count"`
-	SNMPStatus          string     `json:"snmp_status,omitempty"`
-	SNMPSourceSubnetID  string     `json:"snmp_source_subnet_id,omitempty"`
-	SNMPProbed          int64      `json:"snmp_probed"`
-	SNMPNoAnswer        int64      `json:"snmp_no_answer"`
-	SNMPRejected        int64      `json:"snmp_rejected"`
-	TriggeredBy         string     `json:"triggered_by"`
-	RetryCount          int        `json:"retry_count"`
-	MaxRetries          int        `json:"max_retries"`
-	NextRetryAt         *time.Time `json:"next_retry_at,omitempty"`
-	TimeoutMs           int        `json:"timeout_ms"`
-	Concurrency         int        `json:"concurrency"`
-	SkipReverseDNS      bool       `json:"skip_reverse_dns,omitempty"`
-	TCPProbePorts       string     `json:"tcp_probe_ports,omitempty"`
-	EnableSNMP          bool       `json:"enable_snmp,omitempty"`
-	EnableDNSUpdate     bool       `json:"enable_dns_update,omitempty"`
-	StartedAt           *time.Time `json:"started_at,omitempty"`
-	CompletedAt         *time.Time `json:"completed_at,omitempty"`
-	CreatedBy           string     `json:"created_by,omitempty"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  string `json:"id"`
+	TenantID            string `json:"tenant_id"`
+	SubnetID            string `json:"subnet_id"`
+	Status              string `json:"status"`
+	Progress            int    `json:"progress"`
+	StatusMessage       string `json:"status_message,omitempty"`
+	TotalAddresses      int64  `json:"total_addresses"`
+	ScannedCount        int64  `json:"scanned_count"`
+	AliveCount          int64  `json:"alive_count"`
+	NewCount            int64  `json:"new_count"`
+	UpdatedCount        int64  `json:"updated_count"`
+	SNMPDiscoveredCount int64  `json:"snmp_discovered_count"`
+	SNMPStatus          string `json:"snmp_status,omitempty"`
+	SNMPSourceSubnetID  string `json:"snmp_source_subnet_id,omitempty"`
+	SNMPProbed          int64  `json:"snmp_probed"`
+	SNMPNoAnswer        int64  `json:"snmp_no_answer"`
+	SNMPRejected        int64  `json:"snmp_rejected"`
+	// ARP phase (feature 022).
+	ARPStatus       string         `json:"arp_status,omitempty"`
+	ARPDevices      int            `json:"arp_devices"`
+	ARPPartial      int            `json:"arp_partial"`
+	ARPEntries      int64          `json:"arp_entries"`
+	ARPApplied      int64          `json:"arp_applied"`
+	ARPCreated      int64          `json:"arp_created"`
+	ARPConflicts    int64          `json:"arp_conflicts"`
+	ARPIgnored      map[string]int `json:"arp_ignored,omitempty"`
+	TriggeredBy     string         `json:"triggered_by"`
+	RetryCount      int            `json:"retry_count"`
+	MaxRetries      int            `json:"max_retries"`
+	NextRetryAt     *time.Time     `json:"next_retry_at,omitempty"`
+	TimeoutMs       int            `json:"timeout_ms"`
+	Concurrency     int            `json:"concurrency"`
+	SkipReverseDNS  bool           `json:"skip_reverse_dns,omitempty"`
+	TCPProbePorts   string         `json:"tcp_probe_ports,omitempty"`
+	EnableSNMP      bool           `json:"enable_snmp,omitempty"`
+	EnableDNSUpdate bool           `json:"enable_dns_update,omitempty"`
+	StartedAt       *time.Time     `json:"started_at,omitempty"`
+	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
+	CreatedBy       string         `json:"created_by,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 // DNSConfig is one per tenant.
@@ -493,8 +604,10 @@ type AddressFilter struct {
 	SubnetID, DeviceID, Status, AddressType, AddressPrefix, HostnamePattern string
 	ReportState                                                             string
 	Conflict                                                                *bool
-	Limit                                                                   int
-	CursorID                                                                string
+	// MAC is 2..12 lower-case hex digits matched anywhere in the address MAC.
+	MAC      string
+	Limit    int
+	CursorID string
 }
 
 type DeviceFilter struct {

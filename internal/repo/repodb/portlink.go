@@ -60,9 +60,16 @@ func (d *DB) PortLinkData(ctx context.Context, tenantID string) (out repo.PortLi
 		if out.Hosts, e = queryDevices(ctx, tx, "SELECT "+deviceCols+" FROM ipam_devices WHERE tenant_id=$1 AND source='host_report' ORDER BY id", tenantID); e != nil {
 			return e
 		}
-		out.HostIfaces, e = queryIfaces(ctx, tx, "SELECT "+ifaceCols+` FROM ipam_device_interfaces
+		if out.HostIfaces, e = queryIfaces(ctx, tx, "SELECT "+ifaceCols+` FROM ipam_device_interfaces
 			WHERE tenant_id=$1 AND report_state='reported' AND mac_address <> ''
-			AND device_id IN (SELECT id FROM ipam_devices WHERE tenant_id=$1 AND source='host_report') ORDER BY id`, tenantID)
+			AND device_id IN (SELECT id FROM ipam_devices WHERE tenant_id=$1 AND source='host_report') ORDER BY id`, tenantID); e != nil {
+			return e
+		}
+		if out.Addresses, e = queryAddresses(ctx, tx, "SELECT "+addrCols+` FROM ipam_ip_addresses
+			WHERE tenant_id=$1 AND mac_address <> '' ORDER BY id`, tenantID); e != nil {
+			return e
+		}
+		out.NetworkMACs, e = networkMACs(ctx, tx, tenantID)
 		return e
 	})
 	return

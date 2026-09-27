@@ -84,10 +84,23 @@ const (
 	SNMPCredentialsReplaced EventType = "snmp_credentials_replaced"
 	SNMPCredentialsCleared  EventType = "snmp_credentials_cleared"
 	SNMPCredentialsTested   EventType = "snmp_credentials_tested"
+
+	// ARP-based MAC linking (feature 022, contracts/ipam-http.md). Written
+	// with actor system/scan (settings: the user); details use neutral keys
+	// (address, mac, previous_mac, observed_mac, source_device_id, job_id).
+	// An address created from ARP is address_created with origin "arp".
+	MACLearned         EventType = "mac_learned"
+	MACChanged         EventType = "mac_changed"
+	MACConflict        EventType = "mac_conflict"
+	ARPRun             EventType = "arp_run"
+	ARPSettingsUpdated EventType = "arp_settings_updated"
 )
 
 // HostSyncActor is the actor id of every change the host sync makes.
 const HostSyncActor = "hostsync"
+
+// ScanActor is the actor id of every change a scan's ARP phase makes.
+const ScanActor = "scan"
 
 // Subject kinds (closed set).
 const (
@@ -106,6 +119,7 @@ const (
 	SubjectSystem    = "system"
 	SubjectPackage   = "package"
 	SubjectHostSync  = "hostsync"
+	SubjectTenant    = "tenant"
 )
 
 // Outcomes (closed set).
@@ -141,6 +155,7 @@ func init() {
 		PackagesUpdated, HypervisorLinked, HypervisorUnlinked, PortLinked, PortUnlinked,
 		DeviceNotReported, HostSyncSettingsUpdated, HostSyncResyncRequested, HostSyncRun,
 		SNMPCredentialsSet, SNMPCredentialsReplaced, SNMPCredentialsCleared, SNMPCredentialsTested,
+		MACLearned, MACChanged, MACConflict, ARPRun, ARPSettingsUpdated,
 	} {
 		known[t] = struct{}{}
 	}
@@ -186,7 +201,7 @@ func Validate(e Event) error {
 	case SubjectSubnet, SubjectAddress, SubjectDevice, SubjectInterface,
 		SubjectVlan, SubjectLocation, SubjectGroup, SubjectScan,
 		SubjectPower, SubjectKVM, SubjectDNS, SubjectBackup, SubjectSystem,
-		SubjectPackage, SubjectHostSync:
+		SubjectPackage, SubjectHostSync, SubjectTenant:
 	default:
 		return fmt.Errorf("audit: subject_kind %q", e.SubjectKind)
 	}

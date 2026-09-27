@@ -146,6 +146,26 @@ type Store interface {
 
 	HostSyncStore
 	PortLinkStore
+	ARPStore
+}
+
+// ARPStore is the ARP-based MAC linking persistence (feature 022).
+type ARPStore interface {
+	// GetARPSettings returns the tenant's settings, or the defaults when it
+	// never saved any.
+	GetARPSettings(ctx context.Context, tenantID string) (store.ARPSettings, error)
+	// PutARPSettings writes the settings and their audit row in one tenant
+	// transaction.
+	PutARPSettings(ctx context.Context, s store.ARPSettings, audit store.AuditRow) error
+	// NetworkMACs returns the MACs of every interface of the tenant's
+	// network devices (routers, switches, firewalls, load balancers).
+	NetworkMACs(ctx context.Context, tenantID string) (map[string]bool, error)
+	// ApplyARP executes the planned ops and the summary audit rows in one
+	// tenant transaction. Each op is guarded by the provenance it was
+	// planned against (an agent/manual MAC is never overwritten, a create
+	// never replaces a row, rows of other tenants are never touched); an op
+	// the guard skips writes no audit row.
+	ApplyARP(ctx context.Context, tenantID string, ops []store.ARPOp, summary []store.AuditRow) error
 }
 
 // PortLinkData is what switch-port correlation reads for one tenant.
@@ -155,6 +175,10 @@ type PortLinkData struct {
 	Links        []store.DeviceInterfaceLink // snmp_fdb / lldp rows on switch interfaces
 	Hosts        []store.Device              // host-reported devices
 	HostIfaces   []store.DeviceInterface     // their reported interfaces (with the flat link columns)
+	// Addresses are the tenant's addresses with a MAC (any source, with their
+	// link) and NetworkMACs the MACs of network-device interfaces (022).
+	Addresses   []store.IPAddress
+	NetworkMACs map[string]bool
 }
 
 // PortLinkStore is the switch-port correlation persistence (US5).
@@ -163,6 +187,9 @@ type PortLinkStore interface {
 	// SetInterfaceLinks writes the flat link columns of host interfaces and
 	// their audit rows in one tenant transaction.
 	SetInterfaceLinks(ctx context.Context, tenantID string, ifaces []store.DeviceInterface, audit []store.AuditRow) error
+	// SetAddressLinks writes the link columns of addresses (Link nil clears
+	// them) and their audit rows in one tenant transaction.
+	SetAddressLinks(ctx context.Context, tenantID string, addrs []store.IPAddress, audit []store.AuditRow) error
 }
 
 // MACOwner is a device interface carrying a MAC (hypervisor guest matching).

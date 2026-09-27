@@ -27,7 +27,7 @@ explicit user confirmation before they are executed.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `internal/arpplan` to the 100 % coverage list in `scripts/coverage-gate.sh` and its fuzz target to the Makefile fuzz list
+- [x] T001 Add `internal/arpplan` to the 100 % coverage list in `scripts/coverage-gate.sh` and its fuzz target to the Makefile fuzz list
 
 ---
 
@@ -35,21 +35,21 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T002 [P] OID index decoder tests in `internal/scan/snmp/arp_test.go`: ipNetToPhysical IPv4 (`ifIndex.1.4.a.b.c.d`) and IPv6 (`ifIndex.2.16.<16 octets>`), legacy ipNetToMedia (`ifIndex.a.b.c.d`), malformed/short/oversized indexes dropped, MAC octet decoding (6 bytes only), cap at 65,536 sets partial
-- [ ] T003 [P] Fuzz target `FuzzARPIndex` in `internal/scan/snmp/arp_fuzz_test.go` (decoder never panics; accepted rows have canonical IP and valid MAC)
-- [ ] T004 [P] SNMP Fake ARP support test in `internal/scan/snmp/snmp_test.go`: `Fake.SetARP(ip, entries)`; `Discover` returns ARP only when `Creds.CollectARP`
-- [ ] T005 [P] Repo tests in `internal/memstore/arp_test.go`: ARP settings get/put defaults; `ApplyARP` executes fill/update/conflict/clear_conflict/create/touch with audit rows in one call; tenant isolation; address list `mac` filter (partial, notations)
-- [ ] T006 [P] Audit test in `internal/audit/audit_test.go`: new event types accepted; `mac`/`previous_mac`/`observed_mac` keys survive the guard
+- [x] T002 [P] OID index decoder tests in `internal/scan/snmp/arp_test.go`: ipNetToPhysical IPv4 (`ifIndex.1.4.a.b.c.d`) and IPv6 (`ifIndex.2.16.<16 octets>`), legacy ipNetToMedia (`ifIndex.a.b.c.d`), malformed/short/oversized indexes dropped, MAC octet decoding (6 bytes only), cap at 65,536 sets partial
+- [x] T003 [P] Fuzz target `FuzzARPIndex` in `internal/scan/snmp/arp_fuzz_test.go` (decoder never panics; accepted rows have canonical IP and valid MAC)
+- [x] T004 [P] SNMP Fake ARP support test in `internal/scan/snmp/snmp_test.go`: `Fake.SetARP(ip, entries)`; `Discover` returns ARP only when `Creds.CollectARP`
+- [x] T005 [P] Repo tests in `internal/memstore/arp_test.go`: ARP settings get/put defaults; `ApplyARP` executes fill/update/conflict/clear_conflict/create/touch with audit rows in one call; tenant isolation; address list `mac` filter (partial, notations)
+- [x] T006 [P] Audit test in `internal/audit/audit_test.go`: new event types accepted; `mac`/`previous_mac`/`observed_mac` keys survive the guard
 
 ### Implementation
 
-- [ ] T007 Write migration `internal/store/migrations/0008_arp_mac_linking.sql` (data-model §1–3): address columns + CHECKs + backfill (`report_state <> ''` → agent, else manual), MAC search expression index, `ipam_arp_settings` with RLS/grants like 0004, scan job ARP columns; Down section
-- [ ] T008 Extend `internal/store/models.go`: `IPAddress` provenance + `Link *AddressLink`, `ARPSettings`, scan job ARP counters and `ARPIgnored map[string]int`, constants for sources/origins/reasons
-- [ ] T009 Extend `internal/repo/repo.go`: `GetARPSettings`, `PutARPSettings`, `ApplyARP(ctx, tenant, ops, audit)`, `AddressFilter.MAC`, `PortLinkData.Addresses`, `SetAddressLinks`
-- [ ] T010 [P] Implement in `internal/repo/repodb/arp.go` (+ address columns/filters in `db.go`, scan job columns incl. jsonb)
-- [ ] T011 [P] Implement in `internal/memstore/arp.go` (+ `memstore.go` parity)
-- [ ] T012 Implement `internal/scan/snmp/arp.go` (walk ipNetToPhysicalPhysAddress, fallback ipNetToMediaPhysAddress, decoder, cap/partial) and wire `CollectARP` into `Discover`; `Fake.SetARP` (T002–T004)
-- [ ] T013 Add event types to `internal/audit/audit.go` (T006)
+- [x] T007 Write migration `internal/store/migrations/0008_arp_mac_linking.sql` (data-model §1–3): address columns + CHECKs + backfill (`report_state <> ''` → agent, else manual), MAC search expression index, `ipam_arp_settings` with RLS/grants like 0004, scan job ARP columns; Down section
+- [x] T008 Extend `internal/store/models.go`: `IPAddress` provenance + `Link *AddressLink`, `ARPSettings`, scan job ARP counters and `ARPIgnored map[string]int`, constants for sources/origins/reasons
+- [x] T009 Extend `internal/repo/repo.go`: `GetARPSettings`, `PutARPSettings`, `ApplyARP(ctx, tenant, ops, audit)`, `AddressFilter.MAC`, `PortLinkData.Addresses`, `SetAddressLinks`
+- [x] T010 [P] Implement in `internal/repo/repodb/arp.go` (+ address columns/filters in `db.go`, scan job columns incl. jsonb)
+- [x] T011 [P] Implement in `internal/memstore/arp.go` (+ `memstore.go` parity)
+- [x] T012 Implement `internal/scan/snmp/arp.go` (walk ipNetToPhysicalPhysAddress, fallback ipNetToMediaPhysAddress, decoder, cap/partial) and wire `CollectARP` into `Discover`; `Fake.SetARP` (T002–T004)
+- [x] T013 Add event types to `internal/audit/audit.go` (T006)
 
 **Checkpoint**: storage, ARP collection and audit vocabulary ready.
 

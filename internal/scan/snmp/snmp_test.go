@@ -27,6 +27,24 @@ func TestFakeDiscover(t *testing.T) {
 	}
 }
 
+func TestFakeARPOnlyWhenCollected(t *testing.T) {
+	f := NewFake()
+	f.Set("10.0.0.254", DiscoveredDevice{SysName: "gw", DeviceType: devRouter})
+	f.SetARP("10.0.0.254", []ARPEntry{{IP: "10.0.0.5", MAC: "0a:5c:d2:f1:00:01", IfIndex: 2}})
+	f.SetARPPartial("10.0.0.254")
+	dev, err := f.Discover(context.Background(), "10.0.0.254", Creds{Version: 2, Community: "c"})
+	if err != nil || len(dev.ARP) != 0 || dev.ARPPartial {
+		t.Fatalf("ARP returned without CollectARP: %+v %v", dev, err)
+	}
+	dev, err = f.Discover(context.Background(), "10.0.0.254", Creds{Version: 2, Community: "c", CollectARP: true})
+	if err != nil || len(dev.ARP) != 1 || dev.ARP[0].IP != "10.0.0.5" || !dev.ARPPartial {
+		t.Fatalf("ARP missing with CollectARP: %+v %v", dev, err)
+	}
+	if seen := f.Seen(); len(seen) != 2 || seen[0].CollectARP || !seen[1].CollectARP {
+		t.Fatalf("seen %d", len(seen))
+	}
+}
+
 func TestParseDeviceType(t *testing.T) {
 	cases := []struct {
 		oid, descr, want string
