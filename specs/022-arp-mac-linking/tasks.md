@@ -124,12 +124,12 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T035 [P] [US4] Address list `mac` query tests (memstore + HTTP; repodb in T038): notations `aa:bb`, `AA-BB`, `aabb.cc`, 2–12 hex, invalid → 422
+- [x] T035 [P] [US4] Address list `mac` query tests (memstore + HTTP; repodb in T038): notations `aa:bb`, `AA-BB`, `aabb.cc`, 2–12 hex, invalid → 422
 
 ### Implementation
 
-- [ ] T036 [US4] MAC query parsing in `internal/httpapi/handlers.go`, filter in repodb (expression index) and memstore; OpenAPI param
-- [ ] T037 [P] [US4] UI: MAC search box on the address list, source badge tooltip (device, last seen); vitest
+- [x] T036 [US4] MAC query parsing in `internal/httpapi/handlers.go`, filter in repodb (expression index) and memstore; OpenAPI param
+- [x] T037 [P] [US4] UI: MAC search box on the address list, source badge tooltip (device, last seen); vitest
 
 ---
 

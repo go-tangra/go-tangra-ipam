@@ -141,7 +141,7 @@ func TestHostSyncContract(t *testing.T) {
 			}
 		}
 	}
-	for path, params := range map[string][]string{"/api/ipam/v1/devices": {"source", "report_state"}, "/api/ipam/v1/ip-addresses": {"conflict", "report_state"}} {
+	for path, params := range map[string][]string{"/api/ipam/v1/devices": {"source", "report_state"}, "/api/ipam/v1/ip-addresses": {"conflict", "report_state", "mac"}} {
 		op := doc.Paths.Find(path).Get
 		for _, want := range params {
 			found := false

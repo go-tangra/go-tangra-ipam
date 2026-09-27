@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 )
@@ -67,4 +68,27 @@ func (s *Server) registerARP(d Deps) {
 		}
 		WriteJSON(w, http.StatusOK, v)
 	}))
+}
+
+// parseMACQuery turns the address list's mac parameter into the lower-case
+// hex search form (022 D9): separators ":-." and spaces are dropped and 2-12
+// hex digits must remain. An empty parameter means no filter.
+func parseMACQuery(s string) (string, bool) {
+	if s == "" {
+		return "", true
+	}
+	var b strings.Builder
+	for _, c := range s {
+		switch {
+		case c == ':' || c == '-' || c == '.' || c == ' ':
+		case c >= '0' && c <= '9', c >= 'a' && c <= 'f':
+			b.WriteRune(c)
+		case c >= 'A' && c <= 'F':
+			b.WriteRune(c + ('a' - 'A'))
+		default:
+			return "", false
+		}
+	}
+	q := b.String()
+	return q, len(q) >= 2 && len(q) <= 12
 }

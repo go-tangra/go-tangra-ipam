@@ -200,7 +200,13 @@ func (s *Server) Register(d Deps) {
 			return
 		}
 		q := r.URL.Query()
+		mac, ok := parseMACQuery(q.Get("mac"))
+		if !ok {
+			WriteDetail(w, ErrValidation, map[string]any{"field": "mac", "message": "2 to 12 hex digits", "fields": map[string]string{"mac": "2 to 12 hex digits"}})
+			return
+		}
 		items, err := d.Addresses.List(r.Context(), subj, store.AddressFilter{
+			MAC:         mac,
 			SubnetID:    q.Get("subnet_id"),
 			DeviceID:    q.Get("device_id"),
 			Status:      q.Get("status"),

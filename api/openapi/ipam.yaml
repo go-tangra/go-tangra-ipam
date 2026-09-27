@@ -389,7 +389,10 @@ paths:
         - { $ref: '#/components/parameters/limit' }
         - { $ref: '#/components/parameters/reportState' }
         - { name: conflict, in: query, required: false, schema: { type: boolean } }
-      responses: { '200': { description: list, content: { application/json: { schema: { $ref: '#/components/schemas/IPAddressList' } } } } }
+        - { name: mac, in: query, required: false, description: 'full or partial MAC in any notation (colon, dash, dot, none): 2-12 hex digits after separators are dropped; invalid is 422 validation_failed with detail.field = mac', schema: { type: string, maxLength: 64 } }
+      responses:
+        '200': { description: list, content: { application/json: { schema: { $ref: '#/components/schemas/IPAddressList' } } } }
+        '422': { description: 'validation_failed (detail.field = mac)' }
     post: { operationId: createIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
   /api/ipam/v1/ip-addresses/allocate:
     post: { operationId: allocateIpAddress, x-freya-permission: 'addresses:allocate', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: 'next-free allocated' } } }

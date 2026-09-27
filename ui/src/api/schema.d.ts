@@ -1639,6 +1639,8 @@ export interface operations {
                 limit?: components["parameters"]["limit"];
                 report_state?: components["parameters"]["reportState"];
                 conflict?: boolean;
+                /** @description full or partial MAC in any notation (colon, dash, dot, none): 2-12 hex digits after separators are dropped; invalid is 422 validation_failed with detail.field = mac */
+                mac?: string;
             };
             header?: never;
             path?: never;
@@ -1654,6 +1656,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["IPAddressList"];
                 };
+            };
+            /** @description validation_failed (detail.field = mac) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

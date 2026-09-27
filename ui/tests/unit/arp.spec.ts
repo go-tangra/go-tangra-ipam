@@ -8,7 +8,7 @@ import Addresses from '@/views/addresses/index.vue'
 import Scans from '@/views/scans/index.vue'
 import Detail from '@/views/devices/detail.vue'
 import ArpSettingsCard from '@/components/ArpSettingsCard.vue'
-import { arpSettingsSchema } from '@/schemas'
+import { addressFilterSchema, arpSettingsSchema } from '@/schemas'
 import { arpPhaseText } from '@/views/scans/snmp'
 import { linkText, macSourceLabel, macSourceText } from '@/views/addresses/mac'
 import type { IPAddress, IPScanJob } from '@/api/types'
@@ -182,6 +182,29 @@ describe('ARP settings (US3)', () => {
     await flushPromises()
     expect(calls[0]?.body).toEqual({ enabled: false, proxy_threshold: 12, excluded_devices: ['0190f7c2-aaaa-7c1a-9b2e-00000000ab01'] })
     expect(w.find('[data-test=arp-message]').text()).toContain('saved')
+    w.unmount()
+  })
+})
+
+describe('MAC search (US4)', () => {
+  it('accepts common notations and rejects anything else', () => {
+    for (const ok of ['', '0a5c', 'D2-F1', '0a5c.d2f1.0005', '0A:5C:D2:F1:00:06']) expect(addressFilterSchema.safeParse({ mac: ok }).success, ok).toBe(true)
+    for (const bad of ['a', 'zz', '0a5cd2f1000500', '0a_5c']) expect(addressFilterSchema.safeParse({ mac: bad }).success, bad).toBe(false)
+  })
+
+  it('the address list searches by MAC', async () => {
+    const calls = fetchMock((url) => (url.includes('/ip-addresses') ? { items: [arpAddr] } : { items: [] }))
+    const w = mount(Addresses, { global, attachTo: document.body })
+    await flushPromises()
+    const input = w.find('input[data-field=mac]')
+    await input.setValue('zz')
+    await input.trigger('keyup', { key: 'Enter' })
+    await flushPromises()
+    expect(calls.filter((c) => c.url.includes('mac=')).length).toBe(0)
+    await input.setValue('0A-5C')
+    await input.trigger('keyup', { key: 'Enter' })
+    await flushPromises()
+    expect(calls.some((c) => c.url.includes('/ip-addresses') && c.url.includes('mac=0A-5C'))).toBe(true)
     w.unmount()
   })
 })

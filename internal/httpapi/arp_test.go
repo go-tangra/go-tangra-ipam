@@ -150,3 +150,30 @@ func TestARPSettingsRoutes(t *testing.T) {
 		t.Fatal("unauthenticated")
 	}
 }
+
+// TestAddressMACSearch (022 T035): full or partial MACs in any common
+// notation; anything else is 422 with detail.field = mac.
+func TestAddressMACSearch(t *testing.T) {
+	f := newAPI(t)
+	sid := f.createSubnet(t, "srv", "10.22.0.0/24")
+	for ip, mac := range map[string]string{"10.22.0.5": "0a:5c:d2:f1:00:05", "10.22.0.6": "0a:5c:d2:f1:00:06", "10.22.0.7": ""} {
+		if w := f.req(t, "POST", p+"/ip-addresses", "admin", `{"subnet_id":"`+sid+`","address":"`+ip+`","mac_address":"`+mac+`"}`); w.Code != 201 {
+			t.Fatalf("seed %s %d", ip, w.Code)
+		}
+	}
+	for q, want := range map[string]int{"0a5c": 2, "D2-F1": 2, "0a5c.d2f1.0005": 1, "0A:5C:D2:F1:00:06": 1, "f1%2000": 2, "ffff": 0} {
+		w := f.req(t, "GET", p+"/ip-addresses?mac="+q, "user", "")
+		items, _ := decodeBody(t, w)["items"].([]any)
+		if w.Code != 200 || len(items) != want {
+			t.Errorf("mac=%s: %d rows (want %d) %d", q, len(items), want, w.Code)
+		}
+	}
+	for _, q := range []string{"a", "0a5cd2f1000500", "zz", "0a_5c", "%27"} {
+		w := f.req(t, "GET", p+"/ip-addresses?mac="+q, "user", "")
+		b := decodeBody(t, w)
+		d, _ := b["detail"].(map[string]any)
+		if w.Code != 422 || b["reason"] != "validation_failed" || d["field"] != "mac" {
+			t.Errorf("mac=%s: %d %s", q, w.Code, w.Body)
+		}
+	}
+}

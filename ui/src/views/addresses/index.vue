@@ -48,9 +48,9 @@ onMounted(() => {
 onUnmounted(() => release?.())
 
 const filter = useZodForm(addressFilterSchema, {
-  initial: { hostname: '' },
+  initial: { hostname: '', mac: '' },
   onSubmit: (f) => store.list({
-    subnet_id: f.subnet_id || undefined, status: f.status, address_type: f.address_type, hostname: f.hostname || undefined,
+    subnet_id: f.subnet_id || undefined, status: f.status, address_type: f.address_type, hostname: f.hostname || undefined, mac: f.mac || undefined,
     report_state: reportFilter.value === 'conflict' ? undefined : reportFilter.value, conflict: reportFilter.value === 'conflict' ? true : undefined,
   }),
 })
@@ -135,11 +135,12 @@ const columns: Column<IPAddress>[] = [
     <template #filters>
       <UiForm :form="filter" class="w-full">
         <div class="grid grid-cols-2 gap-2 md:grid-cols-12 md:items-end">
-          <div class="col-span-2 md:col-span-3"><UiSelect v-bind="filter.field('subnet_id')" label="Subnet" :options="subnetOptions" size="sm" @update:model-value="reload" /></div>
+          <div class="col-span-2 md:col-span-2"><UiSelect v-bind="filter.field('subnet_id')" label="Subnet" :options="subnetOptions" size="sm" @update:model-value="reload" /></div>
           <div class="md:col-span-2"><UiSelect v-bind="filter.field('status')" label="Status" :options="statusOptions" size="sm" @update:model-value="reload" /></div>
           <div class="md:col-span-2"><UiSelect v-bind="filter.field('address_type')" label="Type" :options="typeOptions" size="sm" @update:model-value="reload" /></div>
-          <div class="md:col-span-3"><UiSelect id="address-report-filter" v-model="reportFilter" label="Host report" :options="reportOptions" size="sm" data-test="address-report-filter" @update:model-value="reload" /></div>
-          <div class="col-span-2 md:col-span-2"><UiInput v-bind="filter.field('hostname')" label="Hostname" size="sm" @enter="reload" /></div>
+          <div class="md:col-span-2"><UiSelect id="address-report-filter" v-model="reportFilter" label="Host report" :options="reportOptions" size="sm" data-test="address-report-filter" @update:model-value="reload" /></div>
+          <div class="md:col-span-2"><UiInput v-bind="filter.field('hostname')" label="Hostname" size="sm" @enter="reload" /></div>
+          <div class="md:col-span-2"><UiInput v-bind="filter.field('mac')" label="MAC (full or partial)" size="sm" placeholder="0a5c or d2-f1" @enter="reload" /></div>
         </div>
       </UiForm>
     </template>
