@@ -29,6 +29,11 @@ type Host struct {
 	IfaceName  string
 	MAC        string
 	AddressID  string
+	// Related are MACs that belong to the host itself: its other interfaces
+	// and, for a hypervisor, its guests. A switch port full of them is the
+	// host's own access port, not an uplink, so they never count against
+	// MaxMACs when that port is judged for this host.
+	Related map[string]bool
 }
 
 // Input is everything the ranking needs for one tenant.
@@ -96,9 +101,6 @@ func Rank(in Input) []Link {
 			continue
 		}
 		access = append(access, p) // LLDP may name a host on a busy (hypervisor) port
-		if len(p.MACs) > in.MaxMACs {
-			continue // many MACs: never inferred from the forwarding table
-		}
 		for mac, vlan := range p.MACs {
 			byMAC[mac] = append(byMAC[mac], cand{port: p, count: len(p.MACs), vlan: vlan})
 		}
@@ -108,9 +110,16 @@ func Rank(in Input) []Link {
 		per := lldpLinks(h, in.Hosts, access)
 		bySwitch := map[string][]cand{}
 		for _, c := range byMAC[h.MAC] {
-			if _, ok := per[c.port.SwitchID]; !ok {
-				bySwitch[c.port.SwitchID] = append(bySwitch[c.port.SwitchID], c)
+			if _, ok := per[c.port.SwitchID]; ok {
+				continue
 			}
+			// Only foreign MACs count: the host's own and its guests' MACs
+			// on the port make it the host's access port, not an uplink.
+			c.count = foreignMACs(c.port, h)
+			if c.count > in.MaxMACs {
+				continue // many foreign MACs: never inferred from the forwarding table
+			}
+			bySwitch[c.port.SwitchID] = append(bySwitch[c.port.SwitchID], c)
 		}
 		for sw, cs := range bySwitch {
 			sort.Slice(cs, func(i, j int) bool {
@@ -150,6 +159,19 @@ func Rank(in Input) []Link {
 		return a.SwitchID < b.SwitchID
 	})
 	return out
+}
+
+// foreignMACs counts the MACs learned on p, leaving out those related to the
+// host (its other interfaces, its guests); the host's own MAC still counts,
+// so without related MACs this is simply the port's MAC count.
+func foreignMACs(p Port, h Host) int {
+	n := 0
+	for mac := range p.MACs {
+		if mac == h.MAC || !h.Related[mac] {
+			n++
+		}
+	}
+	return n
 }
 
 // primaryBefore orders a host's per-switch links for picking the primary:

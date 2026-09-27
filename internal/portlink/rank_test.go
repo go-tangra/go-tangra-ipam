@@ -170,3 +170,26 @@ func TestParseLLDP(t *testing.T) {
 		t.Fatal(s, p)
 	}
 }
+
+// TestRankHypervisorPort: a hypervisor's access ports (an MLAG pair) carry the
+// host MAC plus its 19 guests' MACs (20 > MaxMACs). The guests belong to the
+// host, so the ports are its access ports and both are linked; a port with as
+// many foreign MACs is still treated as an uplink.
+func TestRankHypervisorPort(t *testing.T) {
+	h := host()
+	h.Related = map[string]bool{hMAC: true}
+	p1, p2 := port("s1", "p18", hMAC), port("s2", "p18", hMAC)
+	for i := 0; i < 19; i++ {
+		g := "bc:24:11:00:00:" + string(rune('a'+i/10)) + string(rune('0'+i%10))
+		h.Related[g] = true
+		p1.MACs[g], p2.MACs[g] = 10, 10
+	}
+	l := Rank(Input{Ports: []Port{p1, p2}, Hosts: []Host{h}, SwitchMACs: map[string]string{}, SwitchNames: map[string]bool{}, MaxMACs: 16})
+	if len(l) != 2 || l[0].SwitchID == l[1].SwitchID || l[0].Count != 1 || !(l[0].Primary != l[1].Primary) {
+		t.Fatalf("hypervisor MLAG ports: %+v", l)
+	}
+	// Same ports, but the 19 MACs are not the host's: never inferred.
+	if l := Rank(in(p1, p2)); len(l) != 0 {
+		t.Fatalf("foreign-MAC ports linked: %+v", l)
+	}
+}

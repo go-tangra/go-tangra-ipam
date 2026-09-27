@@ -177,3 +177,27 @@ func TestInterfaceReadsShowBothEnds(t *testing.T) {
 		t.Fatalf("switch side %+v", sl)
 	}
 }
+
+// TestBuildInputRelatedMACs: a host-reported device's interface MACs and its
+// hypervisor guests' MACs are related to each of its interfaces and to
+// addresses bound to it.
+func TestBuildInputRelatedMACs(t *testing.T) {
+	d := repo.PortLinkData{
+		Switches:     []store.Device{{ID: "sw", Name: "cs1", DeviceType: store.DevSwitch}},
+		SwitchIfaces: []store.DeviceInterface{{ID: "p18", DeviceID: "sw", Name: "Port 18"}},
+		Hosts:        []store.Device{{ID: "hv", Name: "node-1"}},
+		HostIfaces: []store.DeviceInterface{{ID: "i1", DeviceID: "hv", Name: "vlan33", MACAddress: "12:BD:71:C4:5F:65"},
+			{ID: "i2", DeviceID: "hv", Name: "nic3", MACAddress: "3c:ec:ef:61:5c:24"}},
+		Guests:    []store.HypervisorGuest{{HostDeviceID: "hv", MACs: []string{"BC:24:11:00:00:01", "bogus"}}},
+		Addresses: []store.IPAddress{{ID: "a1", DeviceID: "hv", MACAddress: "02:00:00:00:00:99"}},
+	}
+	in := BuildInput(d, 16)
+	if len(in.Hosts) != 3 {
+		t.Fatalf("hosts %+v", in.Hosts)
+	}
+	for _, h := range in.Hosts {
+		if !h.Related["12:bd:71:c4:5f:65"] || !h.Related["3c:ec:ef:61:5c:24"] || !h.Related["bc:24:11:00:00:01"] || len(h.Related) != 3 {
+			t.Fatalf("%s related %v", h.MAC, h.Related)
+		}
+	}
+}
