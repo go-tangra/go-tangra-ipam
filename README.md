@@ -12,12 +12,10 @@ and KVM are platform-admin only; every active operation is tenant-scoped,
 bounded and audited.
 
 **SNMP credentials** live on subnets, sealed by ipam itself and write-only;
-child subnets inherit them (see [SNMP credentials](#snmp-credentials)). BMC
-credentials are not stored by ipam: devices hold only a warden secret reference
-(`ipmi_secret_ref`), resolved at use time and never logged, audited or
-exported. The gRPC binding to warden's `warden.v1.Secrets` is not wired yet
-(`internal/warden`): until it is, secret resolution fails closed and IPMI/KVM
-operations that need a credential are refused.
+child subnets inherit them (see [SNMP credentials](#snmp-credentials)). **BMC
+credentials** are not stored by ipam: a device holds only a Warden secret
+reference, and the password is fetched from Warden for the signed-in user at
+each power, sensor or KVM action (see [BMC credentials](#bmc-credentials)).
 
 **Host sync**: hosts running the inventory agent keep their devices,
 interfaces, addresses (in auto-created subnets when needed), BMC management
@@ -77,7 +75,8 @@ SDK's published `sdk/vX.Y.Z` tag.
 | `internal/scan` | scan executor, ICMP/SNMP/TCP probes and the SNMP credentials test |
 | `internal/snmpcred` | pure SNMP credential rules: validation, sealing binding, inheritance, error scrubbing |
 | `internal/ipmi`, `internal/kvm` | BMC power/inventory and the KVM console proxy |
-| `internal/warden` | secret-reference client (plus an in-memory fake) |
+| `internal/warden` | Warden secrets client acting for the signed-in user (plus an in-memory fake) |
+| `internal/bmc` | BMC access decisions: reference, BMC address, credentials, reasons (feature 024) |
 | `internal/{invclient,hostreport,hostplan,hostsync}` | host sync: inventory client, report validation, pure planner, poller/reconcile/apply and admin service |
 | `internal/portlink` | links reported host interfaces and addresses with a MAC to switch ports from SNMP FDB/LLDP data |
 | `internal/{arpplan,arpcfg}` | ARP-based MAC linking: pure planner (filters, MAC provenance) and per-tenant settings |
@@ -283,6 +282,41 @@ and password; MD5, SHA-1 and DES are labelled weak). v3 passwords need at least
 - **Legacy**: the never-functional warden reference `snmp_secret_ref` is no
   longer written or returned; at start ipam logs how many subnets still carry
   one so their credentials can be entered again.
+
+## BMC credentials
+
+Power status and actions, sensors, the SEL and KVM sessions use a Warden secret
+(username + password) attached to the device (feature 024).
+
+- **Attach**: `PUT /api/ipam/v1/devices/{id}/bmc` `{"reference": "<warden secret id>"}`
+  (`devices:manage`) — ipam asks Warden (`Secrets/Get`) *as the acting user*
+  whether they may read it and stores only the id; audited
+  `bmc_reference_set` / `bmc_reference_changed`; `DELETE` clears it
+  (`bmc_reference_cleared`). The device body cannot set or change the
+  reference. The UI lists the secrets through Warden's own API
+  (`/api/warden/v1/secrets/search`), never requesting a password.
+- **Status**: `GET /api/ipam/v1/devices/{id}/bmc` (`ipam:read`) — the secret's
+  name/username/folder as the viewer may see it in Warden, the access state
+  and the BMC address: the management IP, else the address the inventory agent
+  reported on the `bmc` interface (never the host's primary IP).
+- **Use**: each out-of-band call (platform-admin) fetches the password with
+  `Secrets/Get` + `Secrets/GetPassword`, forwarding the caller's platform token
+  over the mesh, so Warden applies its own per-secret check and audit. Nothing
+  is cached; a rotated password is used on the next call. The BMC is contacted
+  only after Warden released the credentials.
+- **Reasons**: `bmc_not_configured`, `bmc_no_address` (409),
+  `bmc_secret_forbidden` (403), `bmc_secret_not_found` (409),
+  `warden_unavailable` (503), `bmc_unreachable` (504), `bmc_auth_failed`,
+  `bmc_error` (502, with `detail.address`). The Power / KVM tab explains each.
+- **Audit**: power actions (`power_action`) and KVM sessions
+  (`kvm_session_started`) with outcome and reason; reads go to the module log.
+- **Policy**: Warden must allow `spiffe://<trust>/svc/ipam` exactly
+  `/warden.v1.Secrets/Get` and `/warden.v1.Secrets/GetPassword` (rule
+  `ipam-bmc-secrets` in Warden's policy); without it every call reads as
+  `warden_unavailable`. The host URL of the secret may select the IPMI session
+  (`lanplus://host:port` for 2.0, `lan://` for 1.5); otherwise auto on 623.
+- **Backup**: references are not exported and never imported; overwriting an
+  existing device keeps its reference.
 
 ## ARP-based MAC linking
 

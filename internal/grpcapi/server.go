@@ -22,6 +22,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
@@ -33,7 +34,6 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra/v4/authn"
 )
 

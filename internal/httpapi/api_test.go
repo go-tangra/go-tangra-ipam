@@ -145,6 +145,8 @@ func newAPIMut(t *testing.T, hub *stream.Hub, mut func(*Deps)) *apiFixture {
 		"admin": {UserID: apiAdmin, TenantID: apiTenant, Roles: []string{"admin"}},
 		"user":  {UserID: apiUser, TenantID: apiTenant, Roles: []string{"user"}},
 		"other": {UserID: apiUser, TenantID: "44444444-4444-7444-8444-444444444444", Roles: []string{"admin"}},
+		// A distinctive admin token the BMC leak test searches for (024).
+		leakToken: {UserID: apiAdmin, TenantID: apiTenant, Roles: []string{"admin"}},
 	}}
 	s, err := NewHandler(rt, WithVerifier(v))
 	if err != nil {

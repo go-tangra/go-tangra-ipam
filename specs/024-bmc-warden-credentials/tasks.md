@@ -152,10 +152,10 @@ research D12. `FuzzReferenceInput` joined `make fuzz`.)
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T043 [P] Leak test `internal/httpapi/bmc_leak_test.go` (SR-002, SC-003): attach, status, power status/action/sensors/SEL/KVM with success and every failure (BMC errors echoing the password), backup export, events, audit rows and a JSON log handler — none contains the password or the user token
-- [ ] T044 [P] README: BMC credentials section (Warden secret, policy rule, reasons)
-- [ ] T045 Gates: `go vet ./...`, `go test -race ./...`, `make test-integration`, `make cover` (100 % packages incl. `internal/bmc`), `make vuln`; UI `npm run lint`, `npm run test:unit`, `npm run build`; warden `go test -race ./internal/app/`
-- [ ] T046 Update memory/spec status (tasks ticked, deviations recorded in research.md D13)
+- [x] T043 [P] Leak test `internal/httpapi/bmc_leak_test.go` (SR-002, SC-003): attach, status, power status/action/sensors/SEL/KVM with success and every failure (BMC errors echoing the password), backup export, events, audit rows and a JSON log handler — none contains the password or the user token
+- [x] T044 [P] README: BMC credentials section (Warden secret, policy rule, reasons)
+- [x] T045 Gates (all green; total coverage 93.1 %, `internal/bmc` 100 %, govulncheck clean, gosec at its 23 pre-existing findings, `TestHostSync1000Hosts` flaked under load once and passed alone): `go vet ./...`, `go test -race ./...`, `make test-integration`, `make cover` (100 % packages incl. `internal/bmc`), `make vuln`; UI `npm run lint`, `npm run test:unit`, `npm run build`; warden `go test -race ./internal/app/`
+- [x] T046 Spec status updated (tasks ticked, deviations recorded in research.md D13 and T034); the auto-memory note is left to the caller
 
 ---
 

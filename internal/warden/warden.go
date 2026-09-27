@@ -207,7 +207,9 @@ func mapErr(err error) error {
 type Unavailable struct{}
 
 // Meta implements Client.
-func (Unavailable) Meta(context.Context, string) (SecretMeta, error) { return SecretMeta{}, ErrUnavailable }
+func (Unavailable) Meta(context.Context, string) (SecretMeta, error) {
+	return SecretMeta{}, ErrUnavailable
+}
 
 // Credentials implements Client.
 func (Unavailable) Credentials(context.Context, string) (Credentials, error) {

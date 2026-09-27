@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-27
 
-**Status**: Draft
+**Status**: Implemented (46/51 tasks; release tasks T047–T051 pending user confirmation)
 
 **Spans**: go-tangra-ipam-v4 (device BMC credentials, power/KVM/sensors), go-tangra-warden-v4 (mesh policy; secret listing if needed), go-tangra-docker (policy)
 

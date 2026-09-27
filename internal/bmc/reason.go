@@ -14,7 +14,7 @@ const (
 	ReasonNotConfigured     = "bmc_not_configured"
 	ReasonNoAddress         = "bmc_no_address"
 	ReasonForbidden         = "bmc_secret_forbidden"
-	ReasonSecretNotFound    = "bmc_secret_not_found"
+	ReasonSecretNotFound    = "bmc_secret_not_found" // #nosec G101 -- a reason code, not a credential
 	ReasonWardenUnavailable = "warden_unavailable"
 	ReasonBMCUnreachable    = "bmc_unreachable"
 	ReasonBMCAuthFailed     = "bmc_auth_failed"
