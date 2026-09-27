@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/hostreport"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
@@ -113,6 +114,7 @@ func (s *Service) Create(ctx context.Context, subj authz.Subjects, in store.IPAd
 	if in.CreatedAt.IsZero() {
 		in.CreatedAt = s.now()
 	}
+	s.manualMAC(&in, nil)
 	if err := s.st.CreateAddress(ctx, in); err != nil {
 		return store.IPAddress{}, mapErr(err)
 	}
@@ -177,6 +179,7 @@ func (s *Service) Update(ctx context.Context, subj authz.Subjects, in store.IPAd
 	}
 	in.CreatedBy = ex.CreatedBy
 	in.CreatedAt = ex.CreatedAt
+	s.manualMAC(&in, &ex)
 	if err := s.st.UpdateAddress(ctx, in); err != nil {
 		return store.IPAddress{}, mapErr(err)
 	}
@@ -455,6 +458,37 @@ func (s *Service) publish(ctx context.Context, tenantID, eventType, action strin
 		return
 	}
 	s.pub.Publish(ctx, tenantID, eventType, events.IPAddressPayload(action, a.ID, a.Address, a.SubnetID, a.Hostname, a.DeviceID))
+}
+
+// manualMAC sets the MAC provenance of an address written through the API
+// (feature 022, research D4): a new non-empty MAC is "manual" (confirmed now,
+// any ARP conflict cleared), an unchanged one keeps its provenance, an empty
+// one clears the MAC and its source. A parseable MAC is stored in lower-case
+// colon notation. Provenance, origin and links in the request are ignored.
+func (s *Service) manualMAC(in, ex *store.IPAddress) {
+	in.Origin, in.Link, in.Links = "", nil, nil
+	if m, ok := hostreport.NormalizeMAC(in.MACAddress); ok {
+		in.MACAddress = m
+	}
+	in.MACSource, in.MACSourceDeviceID, in.MACSeenAt, in.MACConflict = "", "", nil, ""
+	switch {
+	case in.MACAddress == "":
+	case ex != nil && sameMAC(in.MACAddress, ex.MACAddress):
+		in.MACSource, in.MACSourceDeviceID, in.MACSeenAt, in.MACConflict = ex.MACSource, ex.MACSourceDeviceID, ex.MACSeenAt, ex.MACConflict
+	default:
+		now := s.now().UTC()
+		in.MACSource, in.MACSeenAt = store.MACSourceManual, &now
+	}
+}
+
+// sameMAC compares two MACs in any notation (raw text when unparsable).
+func sameMAC(a, b string) bool {
+	na, oka := hostreport.NormalizeMAC(a)
+	nb, okb := hostreport.NormalizeMAC(b)
+	if oka && okb {
+		return na == nb
+	}
+	return a == b
 }
 
 // redact clears the sealed owner field so it never leaves the service.

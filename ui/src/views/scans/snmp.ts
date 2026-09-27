@@ -23,3 +23,25 @@ export function snmpPhaseText(j: IPScanJob, subnetLabel: (id: string) => string)
       return ''
   }
 }
+
+// arpPhaseText explains a scan's ARP phase (feature 022, FR-013): disabled,
+// failed, or what the devices' ARP tables contributed. Empty when SNMP did
+// not run (there is no ARP phase then).
+export function arpPhaseText(j: IPScanJob): string {
+  switch (j.arp_status) {
+    case 'disabled':
+      return 'disabled'
+    case 'failed':
+      return 'failed (see the service log)'
+    case 'ran': {
+      const ignored = Object.entries(j.arp_ignored ?? {}).filter(([, n]) => n > 0).sort(([a], [b]) => a.localeCompare(b))
+      const total = ignored.reduce((sum, [, n]) => sum + n, 0)
+      const parts = [`${j.arp_devices ?? 0} devices`, `${j.arp_entries ?? 0} entries`, `applied ${j.arp_applied ?? 0}`, `created ${j.arp_created ?? 0}`, `conflicts ${j.arp_conflicts ?? 0}`]
+      if (total) parts.push(`ignored ${total} (${ignored.map(([r, n]) => `${r} ${n}`).join(', ')})`)
+      if (j.arp_partial) parts.push(`${j.arp_partial} partial`)
+      return parts.join(' · ')
+    }
+    default:
+      return ''
+  }
+}

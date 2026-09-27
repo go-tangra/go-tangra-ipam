@@ -12,6 +12,7 @@ export interface AddressFilter {
   hostname?: string | undefined
   report_state?: string | undefined
   conflict?: boolean | undefined
+  mac?: string | undefined
   cursor?: string | undefined
   limit?: number | undefined
 }

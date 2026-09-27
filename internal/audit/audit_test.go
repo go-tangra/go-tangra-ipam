@@ -363,3 +363,35 @@ func TestSNMPCredentialEvents(t *testing.T) {
 		}
 	}
 }
+
+// TestARPEvents (022, contracts/ipam-http.md): the ARP event types are known,
+// the tenant subject validates and the neutral MAC keys survive the guard.
+func TestARPEvents(t *testing.T) {
+	for _, et := range []EventType{MACLearned, MACChanged, MACConflict, ARPRun, ARPSettingsUpdated, AddressCreated} {
+		if !Known(string(et)) {
+			t.Fatalf("%s unknown", et)
+		}
+	}
+	row, err := Row(Event{TenantID: "t1", EventType: MACChanged, ActorKind: ActorSystem, ActorID: ScanActor,
+		SubjectKind: SubjectAddress, SubjectID: "a1", Outcome: OutcomeOK,
+		Details: map[string]any{"address": "10.0.0.5", "mac": "0a:5c:d2:f1:00:01", "previous_mac": "0a:5c:d2:f1:00:02",
+			"observed_mac": "0a:5c:d2:f1:00:03", "source_device_id": "r1", "job_id": "j1", "snmp_community": "x"}}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"address", "mac", "previous_mac", "observed_mac", "source_device_id", "job_id"} {
+		if _, ok := row.Detail[k]; !ok {
+			t.Errorf("neutral key %s dropped", k)
+		}
+	}
+	if _, ok := row.Detail["snmp_community"]; ok {
+		t.Error("guarded key kept")
+	}
+	if err := Validate(Event{TenantID: "t1", EventType: ARPSettingsUpdated, ActorKind: ActorUser, ActorID: "u1",
+		SubjectKind: SubjectTenant, SubjectID: "t1", Outcome: OutcomeOK}); err != nil {
+		t.Fatalf("tenant subject: %v", err)
+	}
+	if ScanActor != "scan" {
+		t.Fatalf("scan actor %q", ScanActor)
+	}
+}

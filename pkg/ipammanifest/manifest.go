@@ -74,16 +74,21 @@ var Grants = map[string][]string{
 // KVM proxy is token-gated on its own path).
 var Methods []gatewayclient.Method
 
-// Abilities are the CASL rules bound to the permissions.
+// Abilities are the CASL rules bound to the permissions. Reading follows
+// ipam:read; writing follows the matching manage permission (the same one the
+// API route requires), so the UI shows edit controls only to callers the
+// server would let through.
 var Abilities = []gatewayclient.Ability{
-	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"Subnet"}, Requires: "ipam:read"},
-	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"IpAddress"}, Requires: "ipam:read"},
-	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"Device"}, Requires: "ipam:read"},
-	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"Vlan"}, Requires: "ipam:read"},
-	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"Location"}, Requires: "ipam:read"},
-	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"IpGroup"}, Requires: "ipam:read"},
-	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"HostGroup"}, Requires: "ipam:read"},
-	{Action: []string{"read", "create", "update", "delete"}, Subject: []string{"IpScan"}, Requires: "ipam:read"},
+	{Action: []string{"read"}, Subject: []string{"Subnet", "IpAddress", "Device", "Vlan", "Location", "IpGroup", "HostGroup", "IpScan"}, Requires: "ipam:read"},
+	{Action: writeActions, Subject: []string{"Subnet"}, Requires: "subnets:manage"},
+	{Action: writeActions, Subject: []string{"IpAddress"}, Requires: "addresses:manage"},
+	{Action: writeActions, Subject: []string{"Device"}, Requires: "devices:manage"},
+	{Action: writeActions, Subject: []string{"Vlan"}, Requires: "vlans:manage"},
+	{Action: writeActions, Subject: []string{"Location"}, Requires: "locations:manage"},
+	{Action: writeActions, Subject: []string{"IpGroup", "HostGroup"}, Requires: "groups:manage"},
+	// Starting (create) and cancelling (update/delete) a scan follow scan:run,
+	// the permission of POST /ip-scans and POST /ip-scans/{id}/cancel.
+	{Action: writeActions, Subject: []string{"IpScan"}, Requires: "scan:run"},
 	// Out-of-band controls: the UI hides them unless the caller holds the platform-admin permissions.
 	{Action: []string{"control"}, Subject: []string{"Power"}, Requires: "power:control"},
 	{Action: []string{"access"}, Subject: []string{"Kvm"}, Requires: "kvm:access"},
@@ -99,7 +104,13 @@ var Abilities = []gatewayclient.Ability{
 	// ipam:read sees only the status.
 	{Action: []string{"configure"}, Subject: []string{"SubnetSnmp"}, Requires: "subnets:manage"},
 	{Action: []string{"test"}, Subject: []string{"SubnetSnmp"}, Requires: "scan:run"},
+	// ARP settings (feature 022): network configuration, same holders as the
+	// SNMP credentials; everyone with ipam:read sees them.
+	{Action: []string{"configure"}, Subject: []string{"ArpSettings"}, Requires: "subnets:manage"},
 }
+
+// writeActions are the CASL write verbs of a record type.
+var writeActions = []string{"create", "update", "delete"}
 
 // Nav lists the navigation contributions.
 var Nav = []gatewayclient.NavEntry{

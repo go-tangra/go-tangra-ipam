@@ -251,7 +251,7 @@ func TestHostSyncPermission(t *testing.T) {
 	if !ability {
 		t.Fatal("CASL {manage, HostSync}")
 	}
-	for _, want := range [][3]string{{"resync", "HostSync", "devices:manage"}, {"clear", "AddressConflict", "addresses:manage"}} {
+	for _, want := range [][3]string{{"resync", "HostSync", "devices:manage"}, {"clear", "AddressConflict", "addresses:manage"}, {"configure", "ArpSettings", "subnets:manage"}} {
 		ok := false
 		for _, a := range Abilities {
 			ok = ok || (reflect.DeepEqual(a.Action, []string{want[0]}) && reflect.DeepEqual(a.Subject, []string{want[1]}) && a.Requires == want[2])
@@ -317,5 +317,54 @@ func TestSNMPCredentialPermissions(t *testing.T) {
 	}
 	if !has("operator", "subnets:manage") || !has("operator", "scan:run") {
 		t.Error("operator manages and tests SNMP credentials")
+	}
+}
+
+// TestAbilitiesFollowRoutePermissions: ipam:read grants only "read" on the
+// record types; create/update/delete follow the manage permission of the
+// matching API routes, so read-only callers see no edit controls. Every
+// ability names a declared permission.
+func TestAbilitiesFollowRoutePermissions(t *testing.T) {
+	known := map[string]bool{}
+	for _, p := range PermissionRefs() {
+		known[p] = true
+	}
+	// grants[subject][action] = permissions granting it.
+	grants := map[string]map[string][]string{}
+	for _, a := range Abilities {
+		if !known[a.Requires] {
+			t.Errorf("ability %v %v requires undeclared permission %q", a.Action, a.Subject, a.Requires)
+		}
+		for _, s := range a.Subject {
+			if grants[s] == nil {
+				grants[s] = map[string][]string{}
+			}
+			for _, act := range a.Action {
+				grants[s][act] = append(grants[s][act], a.Requires)
+			}
+		}
+	}
+	write := map[string]string{
+		"Subnet": "subnets:manage", "IpAddress": "addresses:manage", "Device": "devices:manage",
+		"Vlan": "vlans:manage", "Location": "locations:manage", "IpGroup": "groups:manage",
+		"HostGroup": "groups:manage", "IpScan": "scan:run",
+	}
+	for subject, perm := range write {
+		if got := grants[subject]["read"]; !reflect.DeepEqual(got, []string{"ipam:read"}) {
+			t.Errorf("read %s = %v, want [ipam:read]", subject, got)
+		}
+		for _, act := range []string{"create", "update", "delete"} {
+			if got := grants[subject][act]; !reflect.DeepEqual(got, []string{perm}) {
+				t.Errorf("%s %s = %v, want [%s]", act, subject, got, perm)
+			}
+		}
+	}
+	for _, a := range Abilities {
+		if a.Requires != "ipam:read" {
+			continue
+		}
+		if !reflect.DeepEqual(a.Action, []string{"read"}) {
+			t.Errorf("ipam:read grants %v on %v; it must grant read only", a.Action, a.Subject)
+		}
 	}
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/go-tangra/go-tangra-portal/sdk/v4/pkg/gatewayclient"
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/config"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
@@ -242,6 +243,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 		Locations: locationsSvc, Groups: groupsSvc, Stats: statsSvc, Backup: backupSvc,
 		DNS: dnsSvc, Scan: scanSvc, BMC: bmc, KVM: kvmMgr, Warden: wclient, Hub: a.Hub,
 		HostSync: hostAdmin,
+		ARP:      arpcfg.New(a.Repo),
 	}
 	a.HTTP.Register(deps)
 	mux := http.NewServeMux()

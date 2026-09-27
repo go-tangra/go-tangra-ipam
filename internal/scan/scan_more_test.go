@@ -327,7 +327,7 @@ func TestPersistDeviceNamingFallbacks(t *testing.T) {
 		Interfaces: []snmp.Interface{{IfIndex: 7 /* Name empty -> "if-7" */}},
 		Links:      []snmp.Link{{RemotePort: "aa:bb", Source: snmp.SourceSNMPFDB, IfIndex: 7}},
 	}
-	if err := s.persistDevice(ctx, "t1", "10.0.0.9", dev); err != nil {
+	if _, err := s.persistDevice(ctx, "t1", "10.0.0.9", dev); err != nil {
 		t.Fatalf("persistDevice: %v", err)
 	}
 	devs, _ := m.ListDevices(ctx, "t1", store.DeviceFilter{})
@@ -354,19 +354,19 @@ func TestPersistDeviceErrors(t *testing.T) {
 
 	// Device upsert failure.
 	m.FailNext("UpsertDeviceByName")
-	if err := s.persistDevice(ctx, "t1", "10.0.0.1", dev); err == nil {
+	if _, err := s.persistDevice(ctx, "t1", "10.0.0.1", dev); err == nil {
 		t.Fatal("expected device upsert error")
 	}
 
 	// Interface upsert failure (device succeeds first).
 	m.FailNext("UpsertInterfaceByName")
-	if err := s.persistDevice(ctx, "t1", "10.0.0.1", dev); err == nil {
+	if _, err := s.persistDevice(ctx, "t1", "10.0.0.1", dev); err == nil {
 		t.Fatal("expected interface upsert error")
 	}
 
 	// Link replace failure (device + interface succeed first).
 	m.FailNext("ReplaceInterfaceLinks")
-	if err := s.persistDevice(ctx, "t1", "10.0.0.1", dev); err == nil {
+	if _, err := s.persistDevice(ctx, "t1", "10.0.0.1", dev); err == nil {
 		t.Fatal("expected link replace error")
 	}
 }

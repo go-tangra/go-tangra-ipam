@@ -60,29 +60,41 @@ func (d *DB) PortLinkData(ctx context.Context, tenantID string) (out repo.PortLi
 		if out.Hosts, e = queryDevices(ctx, tx, "SELECT "+deviceCols+" FROM ipam_devices WHERE tenant_id=$1 AND source='host_report' ORDER BY id", tenantID); e != nil {
 			return e
 		}
-		out.HostIfaces, e = queryIfaces(ctx, tx, "SELECT "+ifaceCols+` FROM ipam_device_interfaces
+		if out.HostIfaces, e = queryIfaces(ctx, tx, "SELECT "+ifaceCols+` FROM ipam_device_interfaces
 			WHERE tenant_id=$1 AND report_state='reported' AND mac_address <> ''
-			AND device_id IN (SELECT id FROM ipam_devices WHERE tenant_id=$1 AND source='host_report') ORDER BY id`, tenantID)
+			AND device_id IN (SELECT id FROM ipam_devices WHERE tenant_id=$1 AND source='host_report') ORDER BY id`, tenantID); e != nil {
+			return e
+		}
+		if e = attachIfaceLinks(ctx, tx, tenantID, out.HostIfaces); e != nil {
+			return e
+		}
+		if out.Addresses, e = queryAddresses(ctx, tx, "SELECT "+addrCols+` FROM ipam_ip_addresses
+			WHERE tenant_id=$1 AND (mac_address <> '' OR link_port_id IS NOT NULL) ORDER BY id`, tenantID); e != nil {
+			return e
+		}
+		out.NetworkMACs, e = networkMACs(ctx, tx, tenantID)
 		return e
 	})
 	return
 }
 
 // SetInterfaceLinks implements repo.PortLinkStore: only the flat link columns
-// of the given interfaces are written.
+// and the per-switch link sets (Links, complete) of the given interfaces are
+// written, with the audit rows, in one tenant transaction.
 func (d *DB) SetInterfaceLinks(ctx context.Context, tenantID string, ifaces []store.DeviceInterface, audit []store.AuditRow) error {
 	return d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
+		b := &pgx.Batch{}
+		sizes := make([]int, 0, len(ifaces))
 		for _, i := range ifaces {
-			ct, e := tx.Exec(ctx, `UPDATE ipam_device_interfaces SET remote_device_id=$3, remote_interface_id=$4,
+			b.Queue(`UPDATE ipam_device_interfaces SET remote_device_id=$3, remote_interface_id=$4,
 				remote_port_name=$5, link_source=$6, link_vlan=$7, link_last_seen=$8, updated_at=now()
 				WHERE tenant_id=$1 AND id=$2`, tenantID, i.ID, i.RemoteDeviceID, i.RemoteInterfaceID, i.RemotePortName,
 				i.LinkSource, i.LinkVlan, i.LinkLastSeen)
-			if e != nil {
-				return mapErr(e)
-			}
-			if ct.RowsAffected() == 0 {
-				return repo.ErrNotFound
-			}
+			queueHostLinks(b, tenantID, store.HostKindInterface, i.ID, i.Links)
+			sizes = append(sizes, 1+len(i.Links))
+		}
+		if err := execLinkBatch(ctx, tx, b, sizes); err != nil {
+			return err
 		}
 		for _, row := range audit {
 			row.TenantID = tenantID

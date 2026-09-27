@@ -94,10 +94,18 @@ func (s *Service) processJob(ctx context.Context, log *slog.Logger, job store.IP
 	// Credentials are resolved and opened once, when the job starts: the scan
 	// keeps them even if they change meanwhile (FR-013, FR-018).
 	var cred effective
+	var arpCfg store.ARPSettings
+	var arpErr error
 	if job.EnableSNMP {
 		if cred, err = s.effectiveCreds(ctx, job.TenantID, job.SubnetID); err != nil {
 			s.retryOrFail(ctx, log, job, fmt.Errorf("resolve snmp credentials: %w", err))
 			return
+		}
+		if cred.status == store.SNMPRan {
+			// 022: the tenant's ARP settings decide whether the SNMP phase
+			// also reads the devices' ARP/neighbour tables.
+			arpCfg, arpErr = s.st.GetARPSettings(ctx, job.TenantID)
+			cred.creds.CollectARP = arpErr == nil && arpCfg.Enabled
 		}
 	}
 
@@ -171,7 +179,10 @@ func (s *Service) processJob(ctx context.Context, log *slog.Logger, job store.IP
 	job.NewCount = newC
 	job.UpdatedCount = updC
 
-	s.snmpPhase(ctx, log, &job, cred, aliveList)
+	read := s.snmpPhase(ctx, log, &job, cred, aliveList)
+	if job.SNMPStatus == store.SNMPRan {
+		s.arpPhase(ctx, log, &job, arpCfg, arpErr, read)
+	}
 
 	if s.observeCancel(ctx, log, &job) {
 		return
@@ -228,8 +239,8 @@ func (s *Service) effectiveCreds(ctx context.Context, tenantID, subnetID string)
 }
 
 // snmpPhase records why SNMP ran or not (FR-016, SC-005) and, when it can,
-// probes every live host.
-func (s *Service) snmpPhase(ctx context.Context, log *slog.Logger, job *store.IPScanJob, cred effective, alive []string) {
+// probes every live host. It returns the ARP tables the devices returned.
+func (s *Service) snmpPhase(ctx context.Context, log *slog.Logger, job *store.IPScanJob, cred effective, alive []string) arpRead {
 	job.SNMPSourceSubnetID = cred.source
 	switch {
 	case !job.EnableSNMP:
@@ -240,21 +251,23 @@ func (s *Service) snmpPhase(ctx context.Context, log *slog.Logger, job *store.IP
 		job.SNMPStatus = store.SNMPNoLiveHosts
 	default:
 		job.SNMPStatus = store.SNMPRan
-		s.discoverSNMP(ctx, log, job, cred, alive)
+		return s.discoverSNMP(ctx, log, job, cred, alive)
 	}
+	return arpRead{}
 }
 
 // discoverSNMP probes the live hosts with the opened credentials, persisting
 // each discovered device with its interfaces and L2 links and counting the
 // hosts that did not answer or rejected the credentials. SNMP is
 // best-effort: a silent host is counted, not fatal.
-func (s *Service) discoverSNMP(ctx context.Context, log *slog.Logger, job *store.IPScanJob, cred effective, alive []string) {
+func (s *Service) discoverSNMP(ctx context.Context, log *slog.Logger, job *store.IPScanJob, cred effective, alive []string) arpRead {
 	var (
 		mu     sync.Mutex
 		wg     sync.WaitGroup
 		warned int
 		other  int
 		sem    = make(chan struct{}, snmpWorkers)
+		read   arpRead
 	)
 	for _, ip := range alive {
 		if ctx.Err() != nil {
@@ -289,11 +302,13 @@ func (s *Service) discoverSNMP(ctx context.Context, log *slog.Logger, job *store
 				}
 				return
 			}
-			if err := s.persistDevice(ctx, job.TenantID, ip, dev); err != nil {
+			id, err := s.persistDevice(ctx, job.TenantID, ip, dev)
+			if err != nil {
 				log.Warn("scan persist device", "job", job.ID, "ip", ip, "err", err)
 				return
 			}
 			job.SNMPDiscoveredCount++
+			read.add(id, dev)
 		}(ip)
 	}
 	wg.Wait()
@@ -301,14 +316,16 @@ func (s *Service) discoverSNMP(ctx context.Context, log *slog.Logger, job *store
 		"no_answer", job.SNMPNoAnswer, "rejected", job.SNMPRejected, "other_errors", other,
 		"version", cred.creds.Version, "auth", cred.creds.AuthProtocol, "priv", cred.creds.PrivProtocol,
 		"timeout_ms", s.snmpTimeout().Milliseconds())
+	return read
 }
 
 // snmpWalkBudget bounds the table walks after a host answered (interfaces,
 // FDB, LLDP) so one slow device cannot stall the phase.
 func (s *Service) snmpWalkBudget() time.Duration { return 60 * time.Second }
 
-// persistDevice upserts a discovered device, its interfaces and their links.
-func (s *Service) persistDevice(ctx context.Context, tenantID, ip string, dev snmp.DiscoveredDevice) error {
+// persistDevice upserts a discovered device, its interfaces and their links,
+// and returns the device id.
+func (s *Service) persistDevice(ctx context.Context, tenantID, ip string, dev snmp.DiscoveredDevice) (string, error) {
 	d, err := s.st.UpsertDeviceByName(ctx, store.Device{
 		TenantID:     tenantID,
 		Name:         deviceName(dev, ip),
@@ -321,7 +338,7 @@ func (s *Service) persistDevice(ctx context.Context, tenantID, ip string, dev sn
 		LastSeen:     ptrTime(s.now()),
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	for _, iface := range dev.Interfaces {
 		si, err := s.st.UpsertInterfaceByName(ctx, store.DeviceInterface{
@@ -335,7 +352,7 @@ func (s *Service) persistDevice(ctx context.Context, tenantID, ip string, dev sn
 			Enabled:       true,
 		})
 		if err != nil {
-			return err
+			return "", err
 		}
 		var links []store.DeviceInterfaceLink
 		for _, l := range dev.Links {
@@ -352,11 +369,11 @@ func (s *Service) persistDevice(ctx context.Context, tenantID, ip string, dev sn
 		}
 		if len(links) > 0 {
 			if err := s.st.ReplaceInterfaceLinks(ctx, tenantID, si.ID, links); err != nil {
-				return err
+				return "", err
 			}
 		}
 	}
-	return nil
+	return d.ID, nil
 }
 
 // retryOrFail records a job failure: it schedules a backed-off retry (status

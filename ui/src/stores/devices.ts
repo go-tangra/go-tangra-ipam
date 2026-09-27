@@ -44,6 +44,13 @@ export const useDevices = defineStore('ipam-devices', () => {
     }
   }
 
+  // lookup lists devices without replacing `items` (names for references
+  // such as the device that reported an ARP-learned MAC).
+  async function lookup(filter: DeviceFilter = {}): Promise<Device[]> {
+    const res = await api<{ items: Device[] }>('GET', 'devices', undefined, { query: { limit: 500, ...filter } })
+    return res.items ?? []
+  }
+
   // inRack lists the devices mounted in a rack without replacing `items`, so a
   // rack elevation can load alongside the device list.
   async function inRack(rackId: string): Promise<Device[]> {
@@ -125,7 +132,7 @@ export const useDevices = defineStore('ipam-devices', () => {
 
   return {
     items, loading, error,
-    list, inRack, get, create, update, remove,
+    list, lookup, inRack, get, create, update, remove,
     interfaces, addInterface, removeInterface,
     packages, addresses,
     power, setPower, sensors, sel, kvmSession,

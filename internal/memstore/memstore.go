@@ -47,6 +47,8 @@ type Mem struct {
 	hsSettings  map[string]store.HostSyncSettings    // keyed by tenant id
 	devState    map[string]store.HostSyncDeviceState // keyed by device id
 	snmp        map[string]store.SubnetSNMP          // keyed by subnet id
+	arp         map[string]store.ARPSettings         // keyed by tenant id
+	hostLinks   map[hostKey][]store.HostSwitchLink   // per-switch links (022)
 
 	failNext map[string]bool
 	Now      func() time.Time
@@ -73,6 +75,8 @@ func New() *Mem {
 		hsSettings:  map[string]store.HostSyncSettings{},
 		devState:    map[string]store.HostSyncDeviceState{},
 		snmp:        map[string]store.SubnetSNMP{},
+		arp:         map[string]store.ARPSettings{},
+		hostLinks:   map[hostKey][]store.HostSwitchLink{},
 		failNext:    map[string]bool{},
 		Now:         func() time.Time { return time.Now().UTC() },
 	}
@@ -286,6 +290,7 @@ func (m *Mem) DeleteSubnet(_ context.Context, tenantID, id string, force bool) e
 	}
 	for _, aid := range addrIDs {
 		delete(m.addrs, aid)
+		delete(m.hostLinks, hostKey{tenantID, store.HostKindAddress, aid})
 	}
 	for jid, j := range m.scans {
 		if j.TenantID == tenantID && j.SubnetID == id {
@@ -401,6 +406,7 @@ func (m *Mem) CreateAddress(_ context.Context, a store.IPAddress) error {
 // SQL insert never writes through the API path.
 func clearAddrServerFields(a *store.IPAddress) {
 	a.ReportState, a.PreviousDeviceID, a.MovedAt, a.MoveCount, a.MoveWindowStart, a.Conflict = "", "", nil, 0, nil, false
+	a.Origin, a.Link = "", nil
 }
 
 // keepAddrServerFields copies the host-sync-owned columns of ex onto a (the SQL
@@ -408,6 +414,7 @@ func clearAddrServerFields(a *store.IPAddress) {
 func keepAddrServerFields(a *store.IPAddress, ex store.IPAddress) {
 	a.ReportState, a.PreviousDeviceID, a.MovedAt = ex.ReportState, ex.PreviousDeviceID, ex.MovedAt
 	a.MoveCount, a.MoveWindowStart, a.Conflict = ex.MoveCount, ex.MoveWindowStart, ex.Conflict
+	a.Origin, a.Link = ex.Origin, ex.Link
 }
 
 func (m *Mem) GetAddress(_ context.Context, tenantID, id string) (store.IPAddress, error) {
@@ -417,7 +424,7 @@ func (m *Mem) GetAddress(_ context.Context, tenantID, id string) (store.IPAddres
 	if !ok || a.TenantID != tenantID {
 		return store.IPAddress{}, repo.ErrNotFound
 	}
-	return a, nil
+	return m.decorateAddrLocked(a), nil
 }
 
 func (m *Mem) FindAddress(_ context.Context, tenantID, address string) (store.IPAddress, error) {
@@ -427,12 +434,15 @@ func (m *Mem) FindAddress(_ context.Context, tenantID, address string) (store.IP
 	if !ok {
 		return store.IPAddress{}, repo.ErrNotFound
 	}
-	return a, nil
+	return m.decorateAddrLocked(a), nil
 }
 
 func (m *Mem) ListAddresses(_ context.Context, tenantID string, f store.AddressFilter) ([]store.IPAddress, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.fail("ListAddresses"); err != nil {
+		return nil, err
+	}
 	var out []store.IPAddress
 	for _, a := range m.addrs {
 		if a.TenantID != tenantID {
@@ -462,7 +472,10 @@ func (m *Mem) ListAddresses(_ context.Context, tenantID string, f store.AddressF
 		if f.Conflict != nil && a.Conflict != *f.Conflict {
 			continue
 		}
-		out = append(out, a)
+		if f.MAC != "" && !strings.Contains(store.MACHex(a.MACAddress), f.MAC) {
+			continue
+		}
+		out = append(out, m.decorateAddrLocked(a))
 	}
 	out = paginate(out, func(a store.IPAddress) string { return a.ID }, f.CursorID, f.Limit)
 	return out, nil
@@ -501,6 +514,7 @@ func (m *Mem) DeleteAddress(_ context.Context, tenantID, id string) error {
 		return repo.ErrNotFound
 	}
 	delete(m.addrs, id)
+	delete(m.hostLinks, hostKey{tenantID, store.HostKindAddress, id})
 	return nil
 }
 
@@ -512,19 +526,20 @@ func (m *Mem) UpsertAddressByAddress(_ context.Context, a store.IPAddress) (bool
 	}
 	t := now(m)
 	if ex, id, ok := m.findAddrLocked(a.TenantID, a.Address); ok {
-		a.ID = id
-		a.CreatedAt = ex.CreatedAt
-		keepAddrServerFields(&a, ex)
-		if ex.ReportState == store.RepReported {
-			// D9: a scan never unlinks a host-reported address.
-			a.DeviceID, a.InterfaceName, a.MACAddress, a.Hostname, a.IsPrimary = ex.DeviceID, ex.InterfaceName, ex.MACAddress, ex.Hostname, ex.IsPrimary
+		// A scan only records what it observed (liveness, a found reverse-DNS
+		// name, a MAC); every administrator field of the existing row is kept.
+		obs := a
+		a = ex
+		if obs.Hostname != "" && ex.ReportState != store.RepReported {
+			a.Hostname, a.HasReverseDNS = obs.Hostname, obs.HasReverseDNS
 		}
-		if a.Status == "" {
-			a.Status = ex.Status
+		if obs.MACAddress != "" && ex.ReportState != store.RepReported {
+			a.MACAddress = obs.MACAddress
 		}
-		if a.AddressType == "" {
-			a.AddressType = ex.AddressType
+		if ex.Status == store.IPOffline && obs.Status != "" {
+			a.Status = obs.Status
 		}
+		a.LastSeen = obs.LastSeen
 		a.UpdatedAt = t
 		m.addrs[id] = a
 		return false, nil
@@ -551,7 +566,7 @@ func (m *Mem) AddressesForDevice(_ context.Context, tenantID, deviceID string) (
 	var out []store.IPAddress
 	for _, a := range m.addrs {
 		if a.TenantID == tenantID && a.DeviceID == deviceID {
-			out = append(out, a)
+			out = append(out, m.decorateAddrLocked(a))
 		}
 	}
 	out = paginate(out, func(a store.IPAddress) string { return a.ID }, "", 0)
@@ -783,6 +798,7 @@ func (m *Mem) DeleteDevice(_ context.Context, tenantID, id string, force bool) e
 	for _, iid := range ifaceIDs {
 		delete(m.ifaces, iid)
 		delete(m.links, iid)
+		delete(m.hostLinks, hostKey{tenantID, store.HostKindInterface, iid})
 	}
 	delete(m.pkgs, id)
 	m.deleteDeviceHostSyncLocked(id)
@@ -889,10 +905,12 @@ func (m *Mem) ListInterfaces(_ context.Context, tenantID, deviceID string) ([]st
 				i.RemoteDeviceName = d.Name
 			}
 			for _, h := range m.ifaces {
-				if h.TenantID == tenantID && h.RemoteInterfaceID == i.ID {
+				if h.TenantID == tenantID && (h.RemoteInterfaceID == i.ID || m.linkedToLocked(tenantID, store.HostKindInterface, h.ID, i.ID)) {
 					i.BehindDeviceID, i.BehindDeviceName = h.DeviceID, m.devices[h.DeviceID].Name
 				}
 			}
+			i.BehindAddresses = m.behindAddressesLocked(tenantID, i.ID)
+			i.Links = m.hostLinksLocked(tenantID, store.HostKindInterface, i.ID, i.RemoteInterfaceID)
 			out = append(out, i)
 		}
 	}
@@ -938,6 +956,7 @@ func (m *Mem) DeleteInterface(_ context.Context, tenantID, id string) error {
 	}
 	delete(m.ifaces, id)
 	delete(m.links, id)
+	delete(m.hostLinks, hostKey{tenantID, store.HostKindInterface, id})
 	return nil
 }
 

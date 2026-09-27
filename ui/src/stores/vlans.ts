@@ -47,8 +47,10 @@ export const useVlans = defineStore('ipam-vlans', () => {
     return v
   }
 
-  async function remove(id: string): Promise<void> {
-    await api('DELETE', 'vlans/' + id)
+  // force deletes a VLAN that still has subnets bound (they keep existing,
+  // without a VLAN); without it the server refuses with a conflict.
+  async function remove(id: string, force = false): Promise<void> {
+    await api('DELETE', 'vlans/' + id, undefined, { query: { force } })
     items.value = items.value.filter((x) => x.id !== id)
   }
 

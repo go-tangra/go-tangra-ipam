@@ -182,6 +182,170 @@ components:
         own: { oneOf: [{ $ref: '#/components/schemas/SubnetSNMPOwn' }, { type: 'null' }] }
         effective: { $ref: '#/components/schemas/SNMPSummary' }
 
+    # ---- ARP-based MAC linking (feature 022) ----
+    IPAddress:
+      type: object
+      description: >
+        An IP address. mac_source, mac_source_device_id, mac_seen_at,
+        mac_conflict, origin and link are server-owned (ignored in request
+        bodies): a MAC set through the API is "manual", the host sync writes
+        "agent", scans with SNMP learn "arp" from router ARP tables and never
+        overwrite an agent or manual MAC (a disagreement is mac_conflict).
+      properties:
+        id: { type: string }
+        address: { type: string }
+        subnet_id: { type: string }
+        hostname: { type: string }
+        mac_address: { type: string }
+        description: { type: string }
+        device_id: { type: string }
+        interface_name: { type: string }
+        status: { type: string, enum: [active, reserved, dhcp, deprecated, offline] }
+        address_type: { type: string }
+        last_seen: { type: string, format: date-time }
+        report_state: { type: string, enum: ['', reported, not_reported] }
+        conflict: { type: boolean }
+        mac_source: { type: string, enum: ['', manual, agent, arp], readOnly: true }
+        mac_source_device_id: { type: string, readOnly: true, description: 'device whose ARP table reported the MAC (arp)' }
+        mac_seen_at: { type: string, format: date-time, readOnly: true }
+        mac_conflict: { type: string, readOnly: true, description: 'ARP-observed MAC disagreeing with an agent/manual MAC' }
+        origin: { type: string, enum: ['', arp], readOnly: true }
+        link: { $ref: '#/components/schemas/AddressLink' }
+        links:
+          type: array
+          readOnly: true
+          maxItems: 256
+          description: 'per-switch links, primary first: a host bonded across a switch pair (MLAG / LACP) has one per switch; link is the primary'
+          items: { $ref: '#/components/schemas/HostSwitchLink' }
+    HostSwitchLink:
+      type: object
+      readOnly: true
+      description: >
+        One per-switch link of a host interface or an address: on that switch
+        the most direct port that learned the MAC (fewest MACs) or whose LLDP
+        neighbour names the host. primary marks the link mirrored into the
+        flat link fields.
+      required: [switch_id, port_id, source, primary]
+      properties:
+        switch_id: { type: string }
+        switch_name: { type: string }
+        port_id: { type: string }
+        port_name: { type: string }
+        vlan: { type: integer }
+        source: { type: string, enum: [snmp_fdb, lldp] }
+        last_seen: { type: string, format: date-time }
+        primary: { type: boolean }
+    AddressLink:
+      type: object
+      readOnly: true
+      description: 'switch port the address is connected to (inferred from switch forwarding tables / LLDP)'
+      properties:
+        switch_id: { type: string }
+        switch_name: { type: string }
+        port_id: { type: string }
+        port_name: { type: string }
+        vlan: { type: integer }
+        source: { type: string, enum: [snmp_fdb, lldp] }
+        last_seen: { type: string, format: date-time }
+    BehindAddress:
+      type: object
+      properties:
+        address_id: { type: string }
+        address: { type: string }
+        hostname: { type: string }
+    DeviceInterface:
+      type: object
+      properties:
+        id: { type: string }
+        device_id: { type: string }
+        name: { type: string }
+        mac_address: { type: string }
+        remote_device_id: { type: string }
+        remote_device_name: { type: string }
+        remote_interface_id: { type: string }
+        remote_port_name: { type: string }
+        link_source: { type: string }
+        link_vlan: { type: integer }
+        link_last_seen: { type: string, format: date-time }
+        behind_device_id: { type: string }
+        behind_device_name: { type: string }
+        behind_addresses:
+          type: array
+          maxItems: 256
+          description: 'addresses linked to this switch port as primary or per-switch link (feature 022)'
+          items: { $ref: '#/components/schemas/BehindAddress' }
+        links:
+          type: array
+          readOnly: true
+          maxItems: 256
+          description: 'per-switch links of a host interface, primary first (the flat remote_* / link_* fields are the primary)'
+          items: { $ref: '#/components/schemas/HostSwitchLink' }
+    ARPSettingsInput:
+      type: object
+      additionalProperties: false
+      description: >
+        Per-tenant ARP collection (feature 022): scans with SNMP discovery read
+        the ARP/neighbour tables of the devices that answer unless disabled;
+        excluded devices are never used as ARP sources; a MAC answering for
+        more than proxy_threshold IPs in one scan is treated as proxy ARP.
+      required: [enabled, excluded_devices, proxy_threshold]
+      properties:
+        enabled: { type: boolean }
+        excluded_devices:
+          type: array
+          maxItems: 256
+          description: 'ids of existing devices of the tenant'
+          items: { type: string, format: uuid }
+        proxy_threshold: { type: integer, minimum: 2, maximum: 256 }
+    ARPSettings:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        excluded_devices: { type: array, items: { type: string } }
+        proxy_threshold: { type: integer }
+        updated_by: { type: string }
+        updated_at: { type: string, format: date-time }
+    IPAddressList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/IPAddress' } }
+    IPScanJob:
+      type: object
+      properties:
+        id: { type: string }
+        subnet_id: { type: string }
+        status: { type: string, enum: [pending, scanning, completed, failed, cancelled] }
+        progress: { type: integer }
+        status_message: { type: string }
+        alive_count: { type: integer }
+        new_count: { type: integer }
+        updated_count: { type: integer }
+        snmp_status: { type: string, enum: ['', not_requested, no_live_hosts, no_credentials, credentials_unreadable, ran] }
+        snmp_discovered_count: { type: integer }
+        arp_status: { type: string, enum: ['', ran, disabled, failed], description: 'ARP phase of a scan with SNMP discovery' }
+        arp_devices: { type: integer, description: 'devices whose ARP table returned entries' }
+        arp_partial: { type: integer, description: 'devices whose ARP read was capped or interrupted' }
+        arp_entries: { type: integer }
+        arp_applied: { type: integer, description: 'addresses whose MAC was set or changed' }
+        arp_created: { type: integer, description: 'addresses created from ARP (origin arp)' }
+        arp_conflicts: { type: integer }
+        arp_ignored:
+          type: object
+          description: 'ignored entries by reason'
+          additionalProperties: { type: integer }
+          properties:
+            invalid: { type: integer }
+            multicast: { type: integer }
+            virtual_router: { type: integer }
+            network_device: { type: integer }
+            proxy_arp: { type: integer }
+            outside_subnets: { type: integer }
+            excluded_device: { type: integer }
+    IPScanJobList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/IPScanJob' } }
+
     Error:
       type: object
       properties:
@@ -255,7 +419,10 @@ paths:
         - { $ref: '#/components/parameters/limit' }
         - { $ref: '#/components/parameters/reportState' }
         - { name: conflict, in: query, required: false, schema: { type: boolean } }
-      responses: { '200': { description: list } }
+        - { name: mac, in: query, required: false, description: 'full or partial MAC in any notation (colon, dash, dot, none): 2-12 hex digits after separators are dropped; invalid is 422 validation_failed with detail.field = mac', schema: { type: string, maxLength: 64 } }
+      responses:
+        '200': { description: list, content: { application/json: { schema: { $ref: '#/components/schemas/IPAddressList' } } } }
+        '422': { description: 'validation_failed (detail.field = mac)' }
     post: { operationId: createIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
   /api/ipam/v1/ip-addresses/allocate:
     post: { operationId: allocateIpAddress, x-freya-permission: 'addresses:allocate', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: 'next-free allocated' } } }
@@ -277,7 +444,7 @@ paths:
         - { name: count, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 256 } }
       responses: { '200': { description: 'ICMP+TCP verified free addresses' } }
   /api/ipam/v1/ip-addresses/{id}:
-    get: { operationId: getIpAddress, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: address }, '404': { description: not_found } } }
+    get: { operationId: getIpAddress, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: address, content: { application/json: { schema: { $ref: '#/components/schemas/IPAddress' } } } }, '404': { description: not_found } } }
     put: { operationId: updateIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
     delete: { operationId: deleteIpAddress, x-freya-permission: 'addresses:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '204': { description: deleted } } }
   /api/ipam/v1/ip-addresses/{id}/clear-conflict:
@@ -307,9 +474,9 @@ paths:
     put: { operationId: updateDevice, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
     delete: { operationId: deleteDevice, x-freya-permission: 'devices:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/force' }], responses: { '204': { description: deleted } } }
   /api/ipam/v1/devices/{id}/addresses:
-    get: { operationId: getDeviceAddresses, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: addresses } } }
+    get: { operationId: getDeviceAddresses, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'addresses (with their links)', content: { application/json: { schema: { $ref: '#/components/schemas/IPAddressList' } } } } } }
   /api/ipam/v1/devices/{id}/interfaces:
-    get: { operationId: getDeviceInterfaces, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: interfaces } } }
+    get: { operationId: getDeviceInterfaces, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'interfaces (switch ports list the addresses behind them)', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/DeviceInterface' } } } } } } } } }
     post: { operationId: createDeviceInterface, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: created } } }
   /api/ipam/v1/devices/{id}/interfaces/{ifid}:
     delete: { operationId: deleteDeviceInterface, x-freya-permission: 'devices:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/ifid' }], responses: { '204': { description: deleted } } }
@@ -378,6 +545,22 @@ paths:
       parameters: [{ $ref: '#/components/parameters/csrf' }]
       responses: { '202': { description: 'full reconcile scheduled' }, '409': { description: host_sync_disabled } }
 
+  # ---- ARP-based MAC linking (feature 022) ----
+  /api/ipam/v1/arp/settings:
+    get:
+      operationId: getArpSettings
+      x-freya-permission: 'ipam:read'
+      responses: { '200': { description: 'settings (defaults when never saved)', content: { application/json: { schema: { $ref: '#/components/schemas/ARPSettings' } } } } }
+    put:
+      operationId: updateArpSettings
+      x-freya-permission: 'subnets:manage'
+      x-freya-max-body-bytes: 16384
+      parameters: [{ $ref: '#/components/parameters/csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ARPSettingsInput' } } } }
+      responses:
+        '200': { description: settings, content: { application/json: { schema: { $ref: '#/components/schemas/ARPSettings' } } } }
+        '422': { description: 'validation_failed (detail.field names the field)' }
+
   # ---- Warden secret references (metadata only) ----
   /api/ipam/v1/warden-secrets:
     get: { operationId: listWardenSecrets, x-freya-permission: 'ipam:read', responses: { '200': { description: 'secret metadata (no values)' } } }
@@ -445,10 +628,10 @@ paths:
 
   # ---- Scans ----
   /api/ipam/v1/ip-scans:
-    get: { operationId: listIpScans, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    get: { operationId: listIpScans, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list, content: { application/json: { schema: { $ref: '#/components/schemas/IPScanJobList' } } } } } }
     post: { operationId: startIpScan, x-freya-permission: 'scan:run', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '202': { description: 'scan started' } } }
   /api/ipam/v1/ip-scans/{id}:
-    get: { operationId: getIpScan, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: job }, '404': { description: not_found } } }
+    get: { operationId: getIpScan, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: job, content: { application/json: { schema: { $ref: '#/components/schemas/IPScanJob' } } } }, '404': { description: not_found } } }
   /api/ipam/v1/ip-scans/{id}/cancel:
     post: { operationId: cancelIpScan, x-freya-permission: 'scan:run', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: cancelled } } }
 

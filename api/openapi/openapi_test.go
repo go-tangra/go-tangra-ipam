@@ -141,7 +141,7 @@ func TestHostSyncContract(t *testing.T) {
 			}
 		}
 	}
-	for path, params := range map[string][]string{"/api/ipam/v1/devices": {"source", "report_state"}, "/api/ipam/v1/ip-addresses": {"conflict", "report_state"}} {
+	for path, params := range map[string][]string{"/api/ipam/v1/devices": {"source", "report_state"}, "/api/ipam/v1/ip-addresses": {"conflict", "report_state", "mac"}} {
 		op := doc.Paths.Find(path).Get
 		for _, want := range params {
 			found := false
@@ -223,5 +223,116 @@ func TestSubnetSNMPContract(t *testing.T) {
 				t.Errorf("response schema %s exposes %s", name, f)
 			}
 		}
+	}
+}
+
+// TestARPResponseContract (022 T021): address provenance and scan ARP fields.
+func TestARPResponseContract(t *testing.T) {
+	doc := loadDoc(t)
+	addr := doc.Components.Schemas["IPAddress"]
+	if addr == nil {
+		t.Fatal("IPAddress schema missing")
+	}
+	for _, f := range []string{"mac_source", "mac_source_device_id", "mac_seen_at", "mac_conflict", "origin"} {
+		p := addr.Value.Properties[f]
+		if p == nil || !p.Value.ReadOnly {
+			t.Errorf("address %s must be a read-only property", f)
+		}
+	}
+	if got := addr.Value.Properties["mac_source"].Value.Enum; len(got) != 4 {
+		t.Errorf("mac_source enum %v", got)
+	}
+	job := doc.Components.Schemas["IPScanJob"]
+	if job == nil {
+		t.Fatal("IPScanJob schema missing")
+	}
+	for _, f := range []string{"arp_status", "arp_devices", "arp_partial", "arp_entries", "arp_applied", "arp_created", "arp_conflicts", "arp_ignored"} {
+		if job.Value.Properties[f] == nil {
+			t.Errorf("scan job %s missing", f)
+		}
+	}
+	if n := len(job.Value.Properties["arp_ignored"].Value.Properties); n != 7 {
+		t.Errorf("arp_ignored reasons %d", n)
+	}
+	for path, schema := range map[string]string{"/api/ipam/v1/ip-addresses/{id}": "IPAddress", "/api/ipam/v1/ip-scans/{id}": "IPScanJob"} {
+		ref := doc.Paths.Find(path).Get.Responses.Value("200").Value.Content.Get("application/json").Schema.Ref
+		if ref != "#/components/schemas/"+schema {
+			t.Errorf("%s response %q", path, ref)
+		}
+	}
+}
+
+// TestAddressLinkContract (022 T027): the address link and the addresses
+// behind a switch port.
+func TestAddressLinkContract(t *testing.T) {
+	doc := loadDoc(t)
+	link := doc.Components.Schemas["IPAddress"].Value.Properties["link"]
+	if link == nil || link.Ref != "#/components/schemas/AddressLink" {
+		t.Fatal("address link missing")
+	}
+	for _, f := range []string{"switch_id", "switch_name", "port_id", "port_name", "vlan", "source", "last_seen"} {
+		if doc.Components.Schemas["AddressLink"].Value.Properties[f] == nil {
+			t.Errorf("link %s missing", f)
+		}
+	}
+	behind := doc.Components.Schemas["DeviceInterface"].Value.Properties["behind_addresses"]
+	if behind == nil || behind.Value.Items.Ref != "#/components/schemas/BehindAddress" {
+		t.Fatal("behind_addresses missing")
+	}
+}
+
+// TestHostSwitchLinksContract (022 per-switch links): addresses and
+// interfaces list every switch link of a host bonded across switches.
+func TestHostSwitchLinksContract(t *testing.T) {
+	doc := loadDoc(t)
+	for _, schema := range []string{"IPAddress", "DeviceInterface"} {
+		links := doc.Components.Schemas[schema].Value.Properties["links"]
+		if links == nil || !links.Value.ReadOnly || links.Value.Items.Ref != "#/components/schemas/HostSwitchLink" {
+			t.Fatalf("%s links missing", schema)
+		}
+	}
+	for _, f := range []string{"switch_id", "switch_name", "port_id", "port_name", "vlan", "source", "last_seen", "primary"} {
+		if doc.Components.Schemas["HostSwitchLink"].Value.Properties[f] == nil {
+			t.Errorf("host switch link %s missing", f)
+		}
+	}
+}
+
+// TestARPSettingsContract (022 T031): the ARP settings routes, permissions,
+// CSRF, body bound and the closed input schema.
+func TestARPSettingsContract(t *testing.T) {
+	doc := loadDoc(t)
+	item := doc.Paths.Find("/api/ipam/v1/arp/settings")
+	if item == nil || item.Get == nil || item.Put == nil {
+		t.Fatal("arp settings routes missing")
+	}
+	if perm, _ := item.Get.Extensions["x-freya-permission"].(string); perm != "ipam:read" {
+		t.Errorf("GET permission %q", perm)
+	}
+	if perm, _ := item.Put.Extensions["x-freya-permission"].(string); perm != "subnets:manage" {
+		t.Errorf("PUT permission %q", perm)
+	}
+	if n, _ := item.Put.Extensions["x-freya-max-body-bytes"].(float64); n != 16384 {
+		t.Errorf("PUT body limit %v", n)
+	}
+	csrf := false
+	for _, prm := range item.Put.Parameters {
+		csrf = csrf || (prm.Value != nil && prm.Value.Name == "X-CSRF-Token" && prm.Value.Required)
+	}
+	if !csrf {
+		t.Error("PUT must require the CSRF parameter")
+	}
+	in := doc.Components.Schemas["ARPSettingsInput"].Value
+	if in == nil || in.AdditionalProperties.Has == nil || *in.AdditionalProperties.Has {
+		t.Fatal("ARPSettingsInput must forbid additional properties")
+	}
+	if th := in.Properties["proxy_threshold"].Value; *th.Min != 2 || *th.Max != 256 {
+		t.Error("proxy threshold bounds")
+	}
+	if ex := in.Properties["excluded_devices"].Value; *ex.MaxItems != 256 || ex.Items.Value.Format != "uuid" {
+		t.Error("excluded devices bounds")
+	}
+	if doc.Components.Schemas["ARPSettings"] == nil {
+		t.Error("ARPSettings response schema missing")
 	}
 }

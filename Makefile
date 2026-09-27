@@ -42,7 +42,9 @@ FUZZ_TARGETS := \
 	./internal/hostreport:FuzzExclusionPattern \
 	./internal/hostplan:FuzzPlan \
 	./internal/portlink:FuzzRank \
-	./internal/snmpcred:FuzzDecodeValidate
+	./internal/snmpcred:FuzzDecodeValidate \
+	./internal/arpplan:FuzzPlan \
+	./internal/scan/snmp:FuzzARPIndex
 
 fuzz:
 	@set -e; for t in $(FUZZ_TARGETS); do \

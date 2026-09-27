@@ -532,6 +532,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ipam/v1/arp/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getArpSettings"];
+        put: operations["updateArpSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ipam/v1/warden-secrets": {
         parameters: {
             query?: never;
@@ -1096,6 +1112,150 @@ export interface components {
             own?: components["schemas"]["SubnetSNMPOwn"] | null;
             effective?: components["schemas"]["SNMPSummary"];
         };
+        /** @description An IP address. mac_source, mac_source_device_id, mac_seen_at, mac_conflict, origin and link are server-owned (ignored in request bodies): a MAC set through the API is "manual", the host sync writes "agent", scans with SNMP learn "arp" from router ARP tables and never overwrite an agent or manual MAC (a disagreement is mac_conflict). */
+        IPAddress: {
+            id?: string;
+            address?: string;
+            subnet_id?: string;
+            hostname?: string;
+            mac_address?: string;
+            description?: string;
+            device_id?: string;
+            interface_name?: string;
+            /** @enum {string} */
+            status?: "active" | "reserved" | "dhcp" | "deprecated" | "offline";
+            address_type?: string;
+            /** Format: date-time */
+            last_seen?: string;
+            /** @enum {string} */
+            report_state?: "" | "reported" | "not_reported";
+            conflict?: boolean;
+            /** @enum {string} */
+            readonly mac_source?: "" | "manual" | "agent" | "arp";
+            /** @description device whose ARP table reported the MAC (arp) */
+            readonly mac_source_device_id?: string;
+            /** Format: date-time */
+            readonly mac_seen_at?: string;
+            /** @description ARP-observed MAC disagreeing with an agent/manual MAC */
+            readonly mac_conflict?: string;
+            /** @enum {string} */
+            readonly origin?: "" | "arp";
+            link?: components["schemas"]["AddressLink"];
+            /** @description per-switch links, primary first: a host bonded across a switch pair (MLAG / LACP) has one per switch; link is the primary */
+            readonly links?: components["schemas"]["HostSwitchLink"][];
+        };
+        /** @description One per-switch link of a host interface or an address: on that switch the most direct port that learned the MAC (fewest MACs) or whose LLDP neighbour names the host. primary marks the link mirrored into the flat link fields. */
+        HostSwitchLink: {
+            switch_id: string;
+            switch_name?: string;
+            port_id: string;
+            port_name?: string;
+            vlan?: number;
+            /** @enum {string} */
+            source: "snmp_fdb" | "lldp";
+            /** Format: date-time */
+            last_seen?: string;
+            primary: boolean;
+        };
+        /** @description switch port the address is connected to (inferred from switch forwarding tables / LLDP) */
+        AddressLink: {
+            switch_id?: string;
+            switch_name?: string;
+            port_id?: string;
+            port_name?: string;
+            vlan?: number;
+            /** @enum {string} */
+            source?: "snmp_fdb" | "lldp";
+            /** Format: date-time */
+            last_seen?: string;
+        };
+        BehindAddress: {
+            address_id?: string;
+            address?: string;
+            hostname?: string;
+        };
+        DeviceInterface: {
+            id?: string;
+            device_id?: string;
+            name?: string;
+            mac_address?: string;
+            remote_device_id?: string;
+            remote_device_name?: string;
+            remote_interface_id?: string;
+            remote_port_name?: string;
+            link_source?: string;
+            link_vlan?: number;
+            /** Format: date-time */
+            link_last_seen?: string;
+            behind_device_id?: string;
+            behind_device_name?: string;
+            /** @description addresses linked to this switch port as primary or per-switch link (feature 022) */
+            behind_addresses?: components["schemas"]["BehindAddress"][];
+            /** @description per-switch links of a host interface, primary first (the flat remote_* / link_* fields are the primary) */
+            readonly links?: components["schemas"]["HostSwitchLink"][];
+        };
+        /** @description Per-tenant ARP collection (feature 022): scans with SNMP discovery read the ARP/neighbour tables of the devices that answer unless disabled; excluded devices are never used as ARP sources; a MAC answering for more than proxy_threshold IPs in one scan is treated as proxy ARP. */
+        ARPSettingsInput: {
+            enabled: boolean;
+            /** @description ids of existing devices of the tenant */
+            excluded_devices: string[];
+            proxy_threshold: number;
+        };
+        ARPSettings: {
+            enabled?: boolean;
+            excluded_devices?: string[];
+            proxy_threshold?: number;
+            updated_by?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        IPAddressList: {
+            items?: components["schemas"]["IPAddress"][];
+        };
+        IPScanJob: {
+            id?: string;
+            subnet_id?: string;
+            /** @enum {string} */
+            status?: "pending" | "scanning" | "completed" | "failed" | "cancelled";
+            progress?: number;
+            status_message?: string;
+            alive_count?: number;
+            new_count?: number;
+            updated_count?: number;
+            /** @enum {string} */
+            snmp_status?: "" | "not_requested" | "no_live_hosts" | "no_credentials" | "credentials_unreadable" | "ran";
+            snmp_discovered_count?: number;
+            /**
+             * @description ARP phase of a scan with SNMP discovery
+             * @enum {string}
+             */
+            arp_status?: "" | "ran" | "disabled" | "failed";
+            /** @description devices whose ARP table returned entries */
+            arp_devices?: number;
+            /** @description devices whose ARP read was capped or interrupted */
+            arp_partial?: number;
+            arp_entries?: number;
+            /** @description addresses whose MAC was set or changed */
+            arp_applied?: number;
+            /** @description addresses created from ARP (origin arp) */
+            arp_created?: number;
+            arp_conflicts?: number;
+            /** @description ignored entries by reason */
+            arp_ignored?: {
+                invalid?: number;
+                multicast?: number;
+                virtual_router?: number;
+                network_device?: number;
+                proxy_arp?: number;
+                outside_subnets?: number;
+                excluded_device?: number;
+            } & {
+                [key: string]: number;
+            };
+        };
+        IPScanJobList: {
+            items?: components["schemas"]["IPScanJob"][];
+        };
         /**
          * @example {
          *       "reason": "not_found",
@@ -1496,6 +1656,8 @@ export interface operations {
                 limit?: components["parameters"]["limit"];
                 report_state?: components["parameters"]["reportState"];
                 conflict?: boolean;
+                /** @description full or partial MAC in any notation (colon, dash, dot, none): 2-12 hex digits after separators are dropped; invalid is 422 validation_failed with detail.field = mac */
+                mac?: string;
             };
             header?: never;
             path?: never;
@@ -1505,6 +1667,15 @@ export interface operations {
         responses: {
             /** @description list */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IPAddressList"];
+                };
+            };
+            /** @description validation_failed (detail.field = mac) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1637,7 +1808,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPAddress"];
+                };
             };
             /** @description not_found */
             404: {
@@ -1878,12 +2051,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description addresses */
+            /** @description addresses (with their links) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPAddressList"];
+                };
             };
         };
     };
@@ -1899,12 +2074,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description interfaces */
+            /** @description interfaces (switch ports list the addresses behind them) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["DeviceInterface"][];
+                    };
+                };
             };
         };
     };
@@ -2311,6 +2490,59 @@ export interface operations {
             };
             /** @description host_sync_disabled */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getArpSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description settings (defaults when never saved) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ARPSettings"];
+                };
+            };
+        };
+    };
+    updateArpSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ARPSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ARPSettings"];
+                };
+            };
+            /** @description validation_failed (detail.field names the field) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3090,7 +3322,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPScanJobList"];
+                };
             };
         };
     };
@@ -3131,7 +3365,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPScanJob"];
+                };
             };
             /** @description not_found */
             404: {

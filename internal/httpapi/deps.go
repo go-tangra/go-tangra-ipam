@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
@@ -48,6 +49,9 @@ type Deps struct {
 	// HostSync is the host-sync administrator surface (feature 020); when nil
 	// its routes answer 503 temporarily_unavailable.
 	HostSync *hostsync.Admin
+	// ARP is the per-tenant ARP settings service (feature 022); when nil its
+	// routes answer 503 temporarily_unavailable.
+	ARP *arpcfg.Service
 }
 
 // subjects derives the authz subject from the verified platform identity. The
@@ -89,7 +93,8 @@ func failSvc(w http.ResponseWriter, err error) {
 	case errors.Is(err, subnets.ErrNotEmpty), errors.Is(err, devices.ErrNotEmpty),
 		errors.Is(err, devices.ErrConflict), errors.Is(err, addresses.ErrConflict),
 		errors.Is(err, scan.ErrActiveScan), errors.Is(err, scan.ErrTerminal),
-		errors.Is(err, repo.ErrConflict), errors.Is(err, store.ErrConflict):
+		errors.Is(err, repo.ErrConflict), errors.Is(err, store.ErrConflict),
+		errors.Is(err, repo.ErrNotEmpty):
 		WriteError(w, http.StatusConflict, "conflict")
 	case errors.Is(err, addresses.ErrNoAvailable):
 		WriteError(w, http.StatusInsufficientStorage, "no_available_address")

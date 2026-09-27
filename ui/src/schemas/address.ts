@@ -35,4 +35,11 @@ export const addressFilterSchema = z.object({
   hostname: z.string().trim().max(253).optional(),
   report_state: z.enum(REPORT_STATES).optional(),
   conflict: z.boolean().optional(),
+  // 022: full or partial MAC in any notation (the server strips : - . and spaces).
+  mac: z
+    .string()
+    .trim()
+    .max(64)
+    .refine((v) => v === '' || /^[0-9A-Fa-f]{2,12}$/.test(v.replace(/[:.\s-]/g, '')), '2 to 12 hex digits (separators : - . allowed)')
+    .optional(),
 })

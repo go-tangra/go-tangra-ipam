@@ -365,19 +365,31 @@ func (d *DB) AllSubnetCIDRs(ctx context.Context, tenantID string) (out []store.S
 const addrCols = `id, tenant_id, address, subnet_id, hostname, mac_address, description,
 	coalesce(device_id::text,''), interface_name, status, address_type, is_primary, ptr_record,
 	dns_name, owner, last_seen, lease_expiry, has_reverse_dns, note, tags, created_by, created_at, updated_at,
-	report_state, coalesce(previous_device_id::text,''), moved_at, move_count, move_window_start, conflict`
+	report_state, coalesce(previous_device_id::text,''), moved_at, move_count, move_window_start, conflict,
+	mac_source, coalesce(mac_source_device_id::text,''), mac_seen_at, mac_conflict, origin,
+	coalesce(link_switch_id::text,''), coalesce(link_port_id::text,''), link_port_name, link_vlan, link_source,
+	link_last_seen, coalesce((SELECT sw.name FROM ipam_devices sw WHERE sw.id = ipam_ip_addresses.link_switch_id), ''),
+	` + addrLinksCol
 
 func scanAddress(sc scanner) (store.IPAddress, error) {
 	var a store.IPAddress
 	var tags []byte
+	var l store.AddressLink
+	var links []byte
 	if err := sc.Scan(&a.ID, &a.TenantID, &a.Address, &a.SubnetID, &a.Hostname, &a.MACAddress, &a.Description,
 		&a.DeviceID, &a.InterfaceName, &a.Status, &a.AddressType, &a.IsPrimary, &a.PTRRecord, &a.DNSName,
 		&a.Owner, &a.LastSeen, &a.LeaseExpiry, &a.HasReverseDNS, &a.Note, &tags, &a.CreatedBy,
 		&a.CreatedAt, &a.UpdatedAt, &a.ReportState, &a.PreviousDeviceID, &a.MovedAt, &a.MoveCount,
-		&a.MoveWindowStart, &a.Conflict); err != nil {
+		&a.MoveWindowStart, &a.Conflict,
+		&a.MACSource, &a.MACSourceDeviceID, &a.MACSeenAt, &a.MACConflict, &a.Origin,
+		&l.SwitchID, &l.PortID, &l.PortName, &l.VLAN, &l.Source, &l.LastSeen, &l.SwitchName, &links); err != nil {
 		return store.IPAddress{}, err
 	}
 	a.Tags = unmarshalTags(tags)
+	if l.PortID != "" {
+		a.Link = &l
+	}
+	a.Links = decodeLinks(links, l.PortID)
 	return a, nil
 }
 
@@ -396,11 +408,14 @@ func (d *DB) CreateAddress(ctx context.Context, a store.IPAddress) error {
 		_, e := tx.Exec(ctx, `INSERT INTO ipam_ip_addresses
 			(id, tenant_id, address, subnet_id, hostname, mac_address, description, device_id, interface_name,
 			 status, address_type, is_primary, ptr_record, dns_name, owner, last_seen, lease_expiry,
-			 has_reverse_dns, note, tags, created_by, created_at, updated_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$22)`,
+			 has_reverse_dns, note, tags, created_by, created_at, updated_at,
+			 mac_source, mac_source_device_id, mac_seen_at, mac_conflict)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$22,
+			 $23,$24,$25,$26)`,
 			a.ID, a.TenantID, a.Address, a.SubnetID, a.Hostname, a.MACAddress, a.Description, np(a.DeviceID),
 			a.InterfaceName, a.Status, a.AddressType, a.IsPrimary, a.PTRRecord, a.DNSName, a.Owner, a.LastSeen,
-			a.LeaseExpiry, a.HasReverseDNS, a.Note, mustJSON(nzTags(a.Tags)), a.CreatedBy, now)
+			a.LeaseExpiry, a.HasReverseDNS, a.Note, mustJSON(nzTags(a.Tags)), a.CreatedBy, now,
+			a.MACSource, np(a.MACSourceDeviceID), a.MACSeenAt, a.MACConflict)
 		return mapErr(e) // 23505 -> ErrConflict (duplicate-IP / allocation guard)
 	})
 }
@@ -456,6 +471,10 @@ func (d *DB) ListAddresses(ctx context.Context, tenantID string, f store.Address
 		if f.Conflict != nil {
 			add(" AND conflict = $%d", *f.Conflict)
 		}
+		if f.MAC != "" {
+			// Matches the addresses_mac_hex expression index.
+			add(" AND regexp_replace(lower(mac_address), '[^0-9a-f]', '', 'g') LIKE $%d", "%"+f.MAC+"%")
+		}
 		if f.CursorID != "" {
 			add(" AND id < $%d", f.CursorID)
 		}
@@ -487,11 +506,12 @@ func (d *DB) UpdateAddress(ctx context.Context, a store.IPAddress) error {
 			address=$3, subnet_id=$4, hostname=$5, mac_address=$6, description=$7, device_id=$8,
 			interface_name=$9, status=$10, address_type=$11, is_primary=$12, ptr_record=$13, dns_name=$14,
 			owner=$15, last_seen=$16, lease_expiry=$17, has_reverse_dns=$18, note=$19, tags=$20::jsonb,
-			created_by=$21, updated_at=$22
+			created_by=$21, updated_at=$22, mac_source=$23, mac_source_device_id=$24, mac_seen_at=$25, mac_conflict=$26
 			WHERE tenant_id=$1 AND id=$2`,
 			a.TenantID, a.ID, a.Address, a.SubnetID, a.Hostname, a.MACAddress, a.Description, np(a.DeviceID),
 			a.InterfaceName, a.Status, a.AddressType, a.IsPrimary, a.PTRRecord, a.DNSName, a.Owner, a.LastSeen,
-			a.LeaseExpiry, a.HasReverseDNS, a.Note, mustJSON(nzTags(a.Tags)), a.CreatedBy, now)
+			a.LeaseExpiry, a.HasReverseDNS, a.Note, mustJSON(nzTags(a.Tags)), a.CreatedBy, now,
+			a.MACSource, np(a.MACSourceDeviceID), a.MACSeenAt, a.MACConflict)
 		if e != nil {
 			return mapErr(e)
 		}
@@ -533,17 +553,15 @@ func (d *DB) UpsertAddressByAddress(ctx context.Context, a store.IPAddress) (cre
 			 has_reverse_dns, note, tags, created_by, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$22)
 			ON CONFLICT (tenant_id, address) DO UPDATE SET
-				subnet_id=EXCLUDED.subnet_id,
-				hostname=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.hostname ELSE EXCLUDED.hostname END,
-				mac_address=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.mac_address ELSE EXCLUDED.mac_address END,
-				description=EXCLUDED.description,
-				device_id=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.device_id ELSE EXCLUDED.device_id END,
-				interface_name=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.interface_name ELSE EXCLUDED.interface_name END,
-				status=EXCLUDED.status, address_type=EXCLUDED.address_type,
-				is_primary=CASE WHEN ipam_ip_addresses.report_state='reported' THEN ipam_ip_addresses.is_primary ELSE EXCLUDED.is_primary END,
-				ptr_record=EXCLUDED.ptr_record, dns_name=EXCLUDED.dns_name, owner=EXCLUDED.owner,
-				last_seen=EXCLUDED.last_seen, lease_expiry=EXCLUDED.lease_expiry, has_reverse_dns=EXCLUDED.has_reverse_dns,
-				note=EXCLUDED.note, tags=EXCLUDED.tags, updated_at=EXCLUDED.updated_at
+				-- A scan only records what it observed: liveness, and the reverse-DNS
+				-- name when it found one. Administrator fields (description, owner,
+				-- note, tags, device binding, status, type, subnet, DNS/PTR, lease)
+				-- are never touched; an offline address that answers becomes active.
+				hostname=CASE WHEN ipam_ip_addresses.report_state='reported' OR EXCLUDED.hostname='' THEN ipam_ip_addresses.hostname ELSE EXCLUDED.hostname END,
+				has_reverse_dns=CASE WHEN EXCLUDED.hostname='' THEN ipam_ip_addresses.has_reverse_dns ELSE EXCLUDED.has_reverse_dns END,
+				mac_address=CASE WHEN ipam_ip_addresses.report_state='reported' OR EXCLUDED.mac_address='' THEN ipam_ip_addresses.mac_address ELSE EXCLUDED.mac_address END,
+				status=CASE WHEN ipam_ip_addresses.status='offline' THEN EXCLUDED.status ELSE ipam_ip_addresses.status END,
+				last_seen=EXCLUDED.last_seen, updated_at=EXCLUDED.updated_at
 			RETURNING (xmax = 0)`,
 			a.ID, a.TenantID, a.Address, a.SubnetID, a.Hostname, a.MACAddress, a.Description, np(a.DeviceID),
 			a.InterfaceName, a.Status, a.AddressType, a.IsPrimary, a.PTRRecord, a.DNSName, a.Owner, a.LastSeen,
@@ -937,11 +955,20 @@ func (d *DB) ListInterfaces(ctx context.Context, tenantID, deviceID string) (out
 			if i.RemoteDeviceID != "" {
 				_ = tx.QueryRow(ctx, "SELECT name FROM ipam_devices WHERE tenant_id=$1 AND id::text=$2", tenantID, i.RemoteDeviceID).Scan(&i.RemoteDeviceName)
 			}
-			_ = tx.QueryRow(ctx, `SELECT d.id::text, d.name FROM ipam_device_interfaces h JOIN ipam_devices d ON d.id = h.device_id
-				WHERE h.tenant_id=$1 AND h.remote_interface_id=$2 ORDER BY h.link_last_seen DESC NULLS LAST LIMIT 1`,
+			// Device behind: a host interface linked here as primary or as a
+			// per-switch link (bonded across a switch pair).
+			_ = tx.QueryRow(ctx, `SELECT d.id::text, d.name FROM (
+					SELECT id, link_last_seen AS seen FROM ipam_device_interfaces WHERE tenant_id=$1 AND remote_interface_id=$2
+					UNION ALL
+					SELECT host_id, last_seen FROM ipam_host_switch_links WHERE tenant_id=$1 AND host_kind='interface' AND port_id=$2::uuid
+				) x JOIN ipam_device_interfaces h ON h.id = x.id JOIN ipam_devices d ON d.id = h.device_id
+				WHERE h.tenant_id=$1 ORDER BY x.seen DESC NULLS LAST, d.id LIMIT 1`,
 				tenantID, i.ID).Scan(&i.BehindDeviceID, &i.BehindDeviceName)
+			if i.BehindAddresses, e = behindAddresses(ctx, tx, tenantID, i.ID); e != nil {
+				return e
+			}
 		}
-		return nil
+		return attachIfaceLinks(ctx, tx, tenantID, out)
 	})
 	return
 }
@@ -1848,17 +1875,24 @@ const scanJobCols = `id, tenant_id, subnet_id, status, progress, status_message,
 	scanned_count, alive_count, new_count, updated_count, snmp_discovered_count, triggered_by, retry_count,
 	max_retries, next_retry_at, timeout_ms, concurrency, skip_reverse_dns, tcp_probe_ports, enable_snmp,
 	enable_dns_update, started_at, completed_at, created_by, created_at, updated_at,
-	snmp_status, snmp_source_subnet_id, snmp_probed, snmp_no_answer, snmp_rejected`
+	snmp_status, snmp_source_subnet_id, snmp_probed, snmp_no_answer, snmp_rejected,
+	arp_status, arp_devices, arp_partial, arp_entries, arp_applied, arp_created, arp_conflicts, arp_ignored`
 
 func scanScanJob(sc scanner) (store.IPScanJob, error) {
 	var j store.IPScanJob
+	var ignored []byte
 	if err := sc.Scan(&j.ID, &j.TenantID, &j.SubnetID, &j.Status, &j.Progress, &j.StatusMessage,
 		&j.TotalAddresses, &j.ScannedCount, &j.AliveCount, &j.NewCount, &j.UpdatedCount, &j.SNMPDiscoveredCount,
 		&j.TriggeredBy, &j.RetryCount, &j.MaxRetries, &j.NextRetryAt, &j.TimeoutMs, &j.Concurrency,
 		&j.SkipReverseDNS, &j.TCPProbePorts, &j.EnableSNMP, &j.EnableDNSUpdate, &j.StartedAt, &j.CompletedAt,
 		&j.CreatedBy, &j.CreatedAt, &j.UpdatedAt,
-		&j.SNMPStatus, &j.SNMPSourceSubnetID, &j.SNMPProbed, &j.SNMPNoAnswer, &j.SNMPRejected); err != nil {
+		&j.SNMPStatus, &j.SNMPSourceSubnetID, &j.SNMPProbed, &j.SNMPNoAnswer, &j.SNMPRejected,
+		&j.ARPStatus, &j.ARPDevices, &j.ARPPartial, &j.ARPEntries, &j.ARPApplied, &j.ARPCreated, &j.ARPConflicts,
+		&ignored); err != nil {
 		return store.IPScanJob{}, err
+	}
+	if len(ignored) > 0 {
+		_ = json.Unmarshal(ignored, &j.ARPIgnored)
 	}
 	return j, nil
 }
@@ -1889,14 +1923,17 @@ func (d *DB) CreateScanJob(ctx context.Context, j store.IPScanJob) error {
 			 alive_count, new_count, updated_count, snmp_discovered_count, triggered_by, retry_count, max_retries,
 			 next_retry_at, timeout_ms, concurrency, skip_reverse_dns, tcp_probe_ports, enable_snmp,
 			 enable_dns_update, started_at, completed_at, created_by, created_at, updated_at,
-			 snmp_status, snmp_source_subnet_id, snmp_probed, snmp_no_answer, snmp_rejected)
+			 snmp_status, snmp_source_subnet_id, snmp_probed, snmp_no_answer, snmp_rejected,
+			 arp_status, arp_devices, arp_partial, arp_entries, arp_applied, arp_created, arp_conflicts, arp_ignored)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$26,
-			 $27,$28,$29,$30,$31)`,
+			 $27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39::jsonb)`,
 			j.ID, j.TenantID, j.SubnetID, j.Status, j.Progress, j.StatusMessage, j.TotalAddresses, j.ScannedCount,
 			j.AliveCount, j.NewCount, j.UpdatedCount, j.SNMPDiscoveredCount, j.TriggeredBy, j.RetryCount, j.MaxRetries,
 			j.NextRetryAt, j.TimeoutMs, j.Concurrency, j.SkipReverseDNS, j.TCPProbePorts, j.EnableSNMP,
 			j.EnableDNSUpdate, j.StartedAt, j.CompletedAt, j.CreatedBy, now,
-			j.SNMPStatus, j.SNMPSourceSubnetID, j.SNMPProbed, j.SNMPNoAnswer, j.SNMPRejected)
+			j.SNMPStatus, j.SNMPSourceSubnetID, j.SNMPProbed, j.SNMPNoAnswer, j.SNMPRejected,
+			j.ARPStatus, j.ARPDevices, j.ARPPartial, j.ARPEntries, j.ARPApplied, j.ARPCreated, j.ARPConflicts,
+			ignoredJSON(j.ARPIgnored))
 		return mapErr(e)
 	})
 }
@@ -1958,13 +1995,16 @@ func (d *DB) UpdateScanJob(ctx context.Context, j store.IPScanJob) error {
 			retry_count=$14, max_retries=$15, next_retry_at=$16, timeout_ms=$17, concurrency=$18,
 			skip_reverse_dns=$19, tcp_probe_ports=$20, enable_snmp=$21, enable_dns_update=$22, started_at=$23,
 			completed_at=$24, created_by=$25, updated_at=$26, snmp_status=$27, snmp_source_subnet_id=$28,
-			snmp_probed=$29, snmp_no_answer=$30, snmp_rejected=$31
+			snmp_probed=$29, snmp_no_answer=$30, snmp_rejected=$31, arp_status=$32, arp_devices=$33,
+			arp_partial=$34, arp_entries=$35, arp_applied=$36, arp_created=$37, arp_conflicts=$38, arp_ignored=$39::jsonb
 			WHERE tenant_id=$1 AND id=$2`,
 			j.TenantID, j.ID, j.SubnetID, j.Status, j.Progress, j.StatusMessage, j.TotalAddresses, j.ScannedCount,
 			j.AliveCount, j.NewCount, j.UpdatedCount, j.SNMPDiscoveredCount, j.TriggeredBy, j.RetryCount, j.MaxRetries,
 			j.NextRetryAt, j.TimeoutMs, j.Concurrency, j.SkipReverseDNS, j.TCPProbePorts, j.EnableSNMP,
 			j.EnableDNSUpdate, j.StartedAt, j.CompletedAt, j.CreatedBy, now,
-			j.SNMPStatus, j.SNMPSourceSubnetID, j.SNMPProbed, j.SNMPNoAnswer, j.SNMPRejected)
+			j.SNMPStatus, j.SNMPSourceSubnetID, j.SNMPProbed, j.SNMPNoAnswer, j.SNMPRejected,
+			j.ARPStatus, j.ARPDevices, j.ARPPartial, j.ARPEntries, j.ARPApplied, j.ARPCreated, j.ARPConflicts,
+			ignoredJSON(j.ARPIgnored))
 		if e != nil {
 			return mapErr(e)
 		}

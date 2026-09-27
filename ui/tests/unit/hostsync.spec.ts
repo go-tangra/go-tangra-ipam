@@ -171,6 +171,39 @@ describe('device view (host sync)', () => {
     w.unmount()
   })
 
+  it('description: shown in the summary when set; editing a host-reported device PUTs it with the reported fields kept', async () => {
+    await router.push('/ipam/devices/d1')
+    const calls = fetchMock((url, init) => (init.method === 'PUT' ? JSON.parse(String(init.body)) : deviceHandler({ description: 'rack 2, <b>spare PSU</b>' })(url, init)))
+    const w = mount(Detail, { global: withAbility([]), attachTo: document.body })
+    await flushPromises()
+    expect(w.text()).toContain('Description')
+    expect(w.text()).toContain('rack 2, <b>spare PSU</b>')
+    expect(w.find('b').exists()).toBe(false)
+    await w.find('[data-test=device-edit]').trigger('click')
+    await flushPromises()
+    const area = document.body.querySelector<HTMLTextAreaElement>('[role=dialog] textarea[data-field=description]')!
+    expect(area.value).toBe('rack 2, <b>spare PSU</b>')
+    area.value = 'hypervisor for the lab'
+    area.dispatchEvent(new Event('input'))
+    const save = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role=dialog] button')).find((b) => b.textContent?.trim() === 'Save')!
+    save.click()
+    await flushPromises()
+    const put = calls.find((c) => c.init.method === 'PUT')!
+    expect(put.url).toBe('/api/ipam/v1/devices/d1')
+    expect(JSON.parse(String(put.init.body))).toMatchObject({ id: 'd1', name: 'hv-01', source: 'host_report', inventory_host_id: 'inv-1', description: 'hypervisor for the lab' })
+    expect(w.text()).toContain('hypervisor for the lab')
+    w.unmount()
+  })
+
+  it('description: hidden from the summary when empty', async () => {
+    await router.push('/ipam/devices/d1')
+    fetchMock(deviceHandler())
+    const w = mount(Detail, { global: withAbility([]) })
+    await flushPromises()
+    expect(w.text()).not.toContain('Description')
+    w.unmount()
+  })
+
   it('devices list: source column and filter', async () => {
     const calls = fetchMock(() => ({ items: [reported, { id: 'd2', name: 'sw', device_type: 'switch', status: 'active', source: 'scan' }] }))
     const w = mount(Devices, { global: withAbility([]), attachTo: document.body })

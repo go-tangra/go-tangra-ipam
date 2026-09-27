@@ -43,9 +43,17 @@ func (m *Mem) PortLinkData(_ context.Context, tenantID string) (repo.PortLinkDat
 			}
 		}
 		if hosts[i.DeviceID] && i.ReportState == store.RepReported && i.MACAddress != "" {
+			i.Links = m.hostLinksLocked(tenantID, store.HostKindInterface, i.ID, i.RemoteInterfaceID)
 			out.HostIfaces = append(out.HostIfaces, i)
 		}
 	}
+	for _, a := range m.addrs {
+		if a.TenantID == tenantID && (a.MACAddress != "" || a.Link != nil) {
+			out.Addresses = append(out.Addresses, m.decorateAddrLocked(a))
+		}
+	}
+	sort.Slice(out.Addresses, func(i, j int) bool { return out.Addresses[i].ID < out.Addresses[j].ID })
+	out.NetworkMACs = m.networkMACsLocked(tenantID)
 	sort.Slice(out.Switches, func(i, j int) bool { return out.Switches[i].ID < out.Switches[j].ID })
 	sort.Slice(out.Hosts, func(i, j int) bool { return out.Hosts[i].ID < out.Hosts[j].ID })
 	sort.Slice(out.SwitchIfaces, func(i, j int) bool { return out.SwitchIfaces[i].ID < out.SwitchIfaces[j].ID })
@@ -67,6 +75,7 @@ func (m *Mem) SetInterfaceLinks(_ context.Context, tenantID string, ifaces []sto
 		}
 	}
 	for _, i := range ifaces {
+		m.setHostLinksLocked(tenantID, store.HostKindInterface, i.ID, i.Links)
 		cur := m.ifaces[i.ID]
 		cur.RemoteDeviceID, cur.RemoteInterfaceID, cur.RemotePortName = i.RemoteDeviceID, i.RemoteInterfaceID, i.RemotePortName
 		cur.LinkSource, cur.LinkVlan, cur.LinkLastSeen = i.LinkSource, i.LinkVlan, i.LinkLastSeen
@@ -78,4 +87,56 @@ func (m *Mem) SetInterfaceLinks(_ context.Context, tenantID string, ifaces []sto
 		m.appendAuditLocked(row)
 	}
 	return nil
+}
+
+// hostKey identifies a host's per-switch link set.
+type hostKey struct{ tenant, kind, id string }
+
+// setHostLinksLocked replaces a host's per-switch link set (computed fields
+// dropped).
+func (m *Mem) setHostLinksLocked(tenantID, kind, id string, links []store.HostSwitchLink) {
+	k := hostKey{tenantID, kind, id}
+	if len(links) == 0 {
+		delete(m.hostLinks, k)
+		return
+	}
+	cp := make([]store.HostSwitchLink, len(links))
+	for n, l := range links {
+		l.SwitchName, l.Primary = "", false
+		if l.LastSeen == nil {
+			t := now(m)
+			l.LastSeen = &t
+		}
+		cp[n] = l
+	}
+	m.hostLinks[k] = cp
+}
+
+// hostLinksLocked returns a host's per-switch links whose switch port still
+// exists (the ON DELETE CASCADE of the table), with switch names, primary
+// (the port of the flat link columns) first.
+func (m *Mem) hostLinksLocked(tenantID, kind, id, primaryPort string) []store.HostSwitchLink {
+	var out []store.HostSwitchLink
+	for _, l := range m.hostLinks[hostKey{tenantID, kind, id}] {
+		p, ok := m.ifaces[l.PortID]
+		if !ok || p.TenantID != tenantID || p.DeviceID != l.SwitchID {
+			continue
+		}
+		l.SwitchName = m.devices[l.SwitchID].Name
+		out = append(out, l)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return store.MarkPrimary(out, primaryPort)
+}
+
+// linkedToLocked reports whether a host has a per-switch link to a port.
+func (m *Mem) linkedToLocked(tenantID, kind, id, portID string) bool {
+	for _, l := range m.hostLinksLocked(tenantID, kind, id, "") {
+		if l.PortID == portID {
+			return true
+		}
+	}
+	return false
 }

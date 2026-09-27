@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 )
 
 // TestFailSvcUnauthenticated covers failSvc's ErrUnauthenticated branch via a
@@ -25,6 +27,17 @@ func TestFailSvcInternal(t *testing.T) {
 	failSvc(w, errors.New("unexpected"))
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("failSvc default: want 500, got %d", w.Code)
+	}
+}
+
+// TestFailSvcNotEmpty: a non-forced delete of a VLAN or location that still
+// has subnets / children returns repo.ErrNotEmpty, which is a 409 conflict
+// (not a 500), like the subnet and device guards.
+func TestFailSvcNotEmpty(t *testing.T) {
+	w := httptest.NewRecorder()
+	failSvc(w, repo.ErrNotEmpty)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("failSvc repo.ErrNotEmpty: want 409, got %d", w.Code)
 	}
 }
 

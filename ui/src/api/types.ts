@@ -168,7 +168,45 @@ export interface IPAddress {
   previous_device_id?: string
   moved_at?: string
   conflict?: boolean
+  // MAC provenance (feature 022, server-owned): agent (host sync), manual
+  // (entered by a user) or arp (a router's ARP table, reporting device and
+  // last seen); mac_conflict is an ARP MAC disagreeing with an agent/manual
+  // one; origin "arp" marks an address created from ARP data.
+  mac_source?: MACSource
+  mac_source_device_id?: string
+  mac_seen_at?: string
+  mac_conflict?: string
+  origin?: '' | 'arp'
+  // Switch port the address is connected to (inferred, server-owned).
+  link?: AddressLink
+  // Per-switch links, primary first (a host bonded across a switch pair has
+  // one per switch; link is the primary).
+  links?: HostSwitchLink[]
 }
+
+// HostSwitchLink is one per-switch link of a host interface or an address.
+export interface HostSwitchLink extends AddressLink {
+  primary: boolean
+}
+
+export interface AddressLink {
+  switch_id: string
+  switch_name?: string
+  port_id: string
+  port_name?: string
+  vlan?: number
+  source: 'snmp_fdb' | 'lldp'
+  last_seen?: string
+}
+
+// BehindAddress is an address linked to a switch port.
+export interface BehindAddress {
+  address_id: string
+  address: string
+  hostname?: string
+}
+
+export type MACSource = '' | 'manual' | 'agent' | 'arp'
 
 // PingResult is the /ip-addresses/{id}/ping response.
 export interface PingResult {
@@ -249,6 +287,10 @@ export interface DeviceInterface {
   remote_device_name?: string
   behind_device_id?: string
   behind_device_name?: string
+  // Addresses linked to this switch port (feature 022).
+  behind_addresses?: BehindAddress[]
+  // Per-switch links of a host interface, primary first.
+  links?: HostSwitchLink[]
 }
 
 export interface DevicePackage {
@@ -444,6 +486,15 @@ export interface IPScanJob {
   snmp_probed?: number
   snmp_no_answer?: number
   snmp_rejected?: number
+  // ARP phase (feature 022).
+  arp_status?: '' | 'ran' | 'disabled' | 'failed'
+  arp_devices?: number
+  arp_partial?: number
+  arp_entries?: number
+  arp_applied?: number
+  arp_created?: number
+  arp_conflicts?: number
+  arp_ignored?: Record<string, number>
   triggered_by?: string
   retry_count?: number
   max_retries?: number
@@ -551,4 +602,16 @@ export interface HypervisorGuest {
   guest_device_id?: string
   guest_device_name?: string
   last_reported_at?: string
+}
+
+// --- ARP settings (feature 022) ---
+
+// ARPSettings is GET/PUT /arp/settings: whether scans with SNMP read the ARP
+// tables, devices never used as ARP sources, and the proxy-ARP threshold.
+export interface ARPSettings {
+  enabled: boolean
+  excluded_devices: string[]
+  proxy_threshold: number
+  updated_by?: string
+  updated_at?: string
 }

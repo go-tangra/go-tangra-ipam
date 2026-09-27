@@ -76,6 +76,9 @@ type Creds struct {
 	PrivProtocol  string // v3 authPriv: DES | AES | AES192 | AES256
 	TimeoutMs     int
 	Retries       int
+	// CollectARP also walks the device's ARP/neighbour table (feature 022).
+	// It is an option of the probe, not a credential.
+	CollectARP bool
 }
 
 // String never prints a credential value.
@@ -164,6 +167,10 @@ type DiscoveredDevice struct {
 	OSVersion    string
 	Interfaces   []Interface
 	Links        []Link
+	// ARP is the device's ARP/neighbour table when Creds.CollectARP was set;
+	// ARPPartial reports a capped or interrupted read.
+	ARP        []ARPEntry
+	ARPPartial bool
 }
 
 // Discoverer probes one host via SNMP and returns what it learned.
@@ -215,6 +222,9 @@ func (c *Client) Discover(ctx context.Context, ip string, creds Creds) (Discover
 	}
 	if lldp := walkLLDP(client); len(lldp) > 0 {
 		dev.Links = append(dev.Links, lldp...)
+	}
+	if creds.CollectARP {
+		dev.ARP, dev.ARPPartial = walkARP(client, MaxARPEntries)
 	}
 
 	return dev, nil
@@ -724,12 +734,24 @@ type Fake struct {
 	Errs    map[string]error // per-IP failure (e.g. gosnmp.ErrWrongDigest)
 	Err     error
 
+	arp        map[string][]ARPEntry
+	arpPartial map[string]bool
+
 	mu   sync.Mutex
 	seen []Creds
 }
 
 // NewFake builds an empty Fake.
-func NewFake() *Fake { return &Fake{Devices: map[string]DiscoveredDevice{}, Errs: map[string]error{}} }
+func NewFake() *Fake {
+	return &Fake{Devices: map[string]DiscoveredDevice{}, Errs: map[string]error{},
+		arp: map[string][]ARPEntry{}, arpPartial: map[string]bool{}}
+}
+
+// SetARP records the ARP table an IP returns when CollectARP is set.
+func (f *Fake) SetARP(ip string, entries []ARPEntry) { f.arp[ip] = entries }
+
+// SetARPPartial marks the IP's ARP read as partial.
+func (f *Fake) SetARPPartial(ip string) { f.arpPartial[ip] = true }
 
 // Set records the device an IP should resolve to.
 func (f *Fake) Set(ip string, dev DiscoveredDevice) {
@@ -761,6 +783,13 @@ func (f *Fake) answer(ip string, creds Creds) (DiscoveredDevice, error) {
 	if !ok {
 		return DiscoveredDevice{Address: ip}, fmt.Errorf("snmp: no response from %s", ip)
 	}
+	switch e, ok := f.arp[ip]; {
+	case !creds.CollectARP:
+		dev.ARP, dev.ARPPartial = nil, false
+	case ok:
+		dev.ARP = append([]ARPEntry(nil), e...)
+	}
+	dev.ARPPartial = dev.ARPPartial || (creds.CollectARP && f.arpPartial[ip])
 	return dev, nil
 }
 
