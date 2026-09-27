@@ -19,13 +19,16 @@ type Port struct {
 	LLDP [][2]string
 }
 
-// Host is a host-reported interface.
+// Host is a host-reported interface, or (AddressID set, feature 022) an
+// address with a MAC: DeviceID is then unique per address and DeviceName the
+// address's host name.
 type Host struct {
 	DeviceID   string
 	DeviceName string
 	IfaceID    string
 	IfaceName  string
 	MAC        string
+	AddressID  string
 }
 
 // Input is everything the ranking needs for one tenant.
@@ -39,9 +42,10 @@ type Input struct {
 	MaxMACs     int
 }
 
-// Link is one inferred host interface ↔ switch port connection.
+// Link is one inferred host interface (or address) ↔ switch port connection.
 type Link struct {
 	HostIfaceID string
+	AddressID   string
 	SwitchID    string
 	PortID      string
 	PortName    string
@@ -109,10 +113,15 @@ func Rank(in Input) []Link {
 		if len(cs) > 1 && cs[0].count == cs[1].count {
 			continue // tie: no link
 		}
-		out = append(out, Link{HostIfaceID: h.IfaceID, SwitchID: cs[0].port.SwitchID, PortID: cs[0].port.PortID,
+		out = append(out, Link{HostIfaceID: h.IfaceID, AddressID: h.AddressID, SwitchID: cs[0].port.SwitchID, PortID: cs[0].port.PortID,
 			PortName: cs[0].port.Name, VLAN: cs[0].vlan, Source: store.LinkSNMPFDB})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].HostIfaceID < out[j].HostIfaceID })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].HostIfaceID != out[j].HostIfaceID {
+			return out[i].HostIfaceID < out[j].HostIfaceID
+		}
+		return out[i].AddressID < out[j].AddressID
+	})
 	return out
 }
 
@@ -136,7 +145,7 @@ func lldpLink(h Host, hosts []Host, ports []Port) (Link, bool) {
 			byPort := (pm != "" && pm == h.MAC) || (port != "" && strings.EqualFold(port, h.IfaceName) && strings.EqualFold(sys, h.DeviceName))
 			bySys := sys != "" && strings.EqualFold(sys, h.DeviceName)
 			if byPort || (bySys && (single || hasMAC(p, h.MAC))) {
-				return Link{HostIfaceID: h.IfaceID, SwitchID: p.SwitchID, PortID: p.PortID, PortName: p.Name,
+				return Link{HostIfaceID: h.IfaceID, AddressID: h.AddressID, SwitchID: p.SwitchID, PortID: p.PortID, PortName: p.Name,
 					VLAN: p.MACs[h.MAC], Source: store.LinkLLDP}, true
 			}
 		}

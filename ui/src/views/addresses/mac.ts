@@ -1,4 +1,4 @@
-import type { IPAddress } from '@/api/types'
+import type { AddressLink, IPAddress } from '@/api/types'
 
 // MAC provenance of an address (feature 022, FR-005 / US4).
 
@@ -21,4 +21,16 @@ export function macSourceText(a: IPAddress, deviceName: (id: string) => string):
   if (a.mac_seen_at) parts.push('last seen ' + new Date(a.mac_seen_at).toLocaleString())
   if (a.mac_conflict) parts.push('ARP reports ' + a.mac_conflict)
   return parts.join(' · ')
+}
+
+// linkText is "Connected to": the switch (name, else id), its port and VLAN.
+export function linkText(l: AddressLink | undefined): string {
+  if (!l) return ''
+  return `${l.switch_name || l.switch_id} port ${l.port_name || l.port_id}` + (l.vlan ? ` (VLAN ${l.vlan})` : '')
+}
+
+// linkTitle is the link's tooltip: how it was inferred and when confirmed.
+export function linkTitle(l: AddressLink): string {
+  const how = l.source === 'lldp' ? 'LLDP' : 'switch MAC table'
+  return l.last_seen ? `${how} · last confirmed ${new Date(l.last_seen).toLocaleString()}` : how
 }

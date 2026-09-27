@@ -175,8 +175,8 @@ type PortLinkData struct {
 	Links        []store.DeviceInterfaceLink // snmp_fdb / lldp rows on switch interfaces
 	Hosts        []store.Device              // host-reported devices
 	HostIfaces   []store.DeviceInterface     // their reported interfaces (with the flat link columns)
-	// Addresses are the tenant's addresses with a MAC (any source, with their
-	// link) and NetworkMACs the MACs of network-device interfaces (022).
+	// Addresses are the tenant's addresses with a MAC (any source) or a link,
+	// and NetworkMACs the MACs of network-device interfaces (022).
 	Addresses   []store.IPAddress
 	NetworkMACs map[string]bool
 }

@@ -210,6 +210,46 @@ components:
         mac_seen_at: { type: string, format: date-time, readOnly: true }
         mac_conflict: { type: string, readOnly: true, description: 'ARP-observed MAC disagreeing with an agent/manual MAC' }
         origin: { type: string, enum: ['', arp], readOnly: true }
+        link: { $ref: '#/components/schemas/AddressLink' }
+    AddressLink:
+      type: object
+      readOnly: true
+      description: 'switch port the address is connected to (inferred from switch forwarding tables / LLDP)'
+      properties:
+        switch_id: { type: string }
+        switch_name: { type: string }
+        port_id: { type: string }
+        port_name: { type: string }
+        vlan: { type: integer }
+        source: { type: string, enum: [snmp_fdb, lldp] }
+        last_seen: { type: string, format: date-time }
+    BehindAddress:
+      type: object
+      properties:
+        address_id: { type: string }
+        address: { type: string }
+        hostname: { type: string }
+    DeviceInterface:
+      type: object
+      properties:
+        id: { type: string }
+        device_id: { type: string }
+        name: { type: string }
+        mac_address: { type: string }
+        remote_device_id: { type: string }
+        remote_device_name: { type: string }
+        remote_interface_id: { type: string }
+        remote_port_name: { type: string }
+        link_source: { type: string }
+        link_vlan: { type: integer }
+        link_last_seen: { type: string, format: date-time }
+        behind_device_id: { type: string }
+        behind_device_name: { type: string }
+        behind_addresses:
+          type: array
+          maxItems: 256
+          description: 'addresses linked to this switch port (feature 022)'
+          items: { $ref: '#/components/schemas/BehindAddress' }
     IPAddressList:
       type: object
       properties:
@@ -376,9 +416,9 @@ paths:
     put: { operationId: updateDevice, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
     delete: { operationId: deleteDevice, x-freya-permission: 'devices:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/force' }], responses: { '204': { description: deleted } } }
   /api/ipam/v1/devices/{id}/addresses:
-    get: { operationId: getDeviceAddresses, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: addresses } } }
+    get: { operationId: getDeviceAddresses, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'addresses (with their links)', content: { application/json: { schema: { $ref: '#/components/schemas/IPAddressList' } } } } } }
   /api/ipam/v1/devices/{id}/interfaces:
-    get: { operationId: getDeviceInterfaces, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: interfaces } } }
+    get: { operationId: getDeviceInterfaces, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'interfaces (switch ports list the addresses behind them)', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/DeviceInterface' } } } } } } } } }
     post: { operationId: createDeviceInterface, x-freya-permission: 'devices:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: created } } }
   /api/ipam/v1/devices/{id}/interfaces/{ifid}:
     delete: { operationId: deleteDeviceInterface, x-freya-permission: 'devices:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/ifid' }], responses: { '204': { description: deleted } } }

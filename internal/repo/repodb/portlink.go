@@ -66,7 +66,7 @@ func (d *DB) PortLinkData(ctx context.Context, tenantID string) (out repo.PortLi
 			return e
 		}
 		if out.Addresses, e = queryAddresses(ctx, tx, "SELECT "+addrCols+` FROM ipam_ip_addresses
-			WHERE tenant_id=$1 AND mac_address <> '' ORDER BY id`, tenantID); e != nil {
+			WHERE tenant_id=$1 AND (mac_address <> '' OR link_port_id IS NOT NULL) ORDER BY id`, tenantID); e != nil {
 			return e
 		}
 		out.NetworkMACs, e = networkMACs(ctx, tx, tenantID)

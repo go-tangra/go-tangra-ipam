@@ -6,8 +6,9 @@ import { createMongoAbility } from '@casl/ability'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import Addresses from '@/views/addresses/index.vue'
 import Scans from '@/views/scans/index.vue'
+import Detail from '@/views/devices/detail.vue'
 import { arpPhaseText } from '@/views/scans/snmp'
-import { macSourceLabel, macSourceText } from '@/views/addresses/mac'
+import { linkText, macSourceLabel, macSourceText } from '@/views/addresses/mac'
 import type { IPAddress, IPScanJob } from '@/api/types'
 
 // Feature 022: MAC provenance on addresses and the ARP phase of scans.
@@ -83,6 +84,42 @@ describe('MAC provenance', () => {
     const w = mount(Scans, { global, attachTo: document.body })
     await flushPromises()
     expect(w.find('[data-test=scan-row-j1] [data-test=arp-phase]').text()).toBe('disabled')
+    w.unmount()
+  })
+})
+
+describe('switch-port links (US2)', () => {
+  const link = { switch_id: 'sw', switch_name: 'MSW-RACK2', port_id: 'p14', port_name: '14', vlan: 30, source: 'snmp_fdb' as const, last_seen: '2026-09-27T10:00:00Z' }
+
+  it('describes a link', () => {
+    expect(linkText(link)).toBe('MSW-RACK2 port 14 (VLAN 30)')
+    expect(linkText({ ...link, switch_name: '', vlan: 0 })).toBe('sw port 14')
+    expect(linkText(undefined)).toBe('')
+  })
+
+  it('the address list shows where each address is connected', async () => {
+    fetchMock((url) => (url.includes('/ip-addresses') ? { items: [{ ...arpAddr, link }, agentAddr] } : { items: [] }))
+    const w = mount(Addresses, { global, attachTo: document.body })
+    await flushPromises()
+    expect(w.find('[data-test=address-link-a1]').text()).toBe('MSW-RACK2 port 14 (VLAN 30)')
+    expect(w.find('[data-test=address-link-a2]').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('a switch port lists the addresses behind it; bound addresses show their link', async () => {
+    fetchMock((url) => {
+      if (url.includes('/interfaces')) return { items: [{ id: 'p14', device_id: 'sw', name: '14', behind_addresses: [{ address_id: 'a1', address: '10.1.0.5', hostname: 'printer' }, { address_id: 'a3', address: '10.1.0.9' }] }] }
+      if (url.includes('/addresses')) return { items: [{ ...arpAddr, link }] }
+      if (url.includes('/packages')) return { items: [] }
+      return { id: 'sw', name: 'MSW-RACK2', device_type: 'switch', status: 'active' }
+    })
+    const w = mount(Detail, { global, attachTo: document.body })
+    await flushPromises()
+    expect(w.text()).toContain('10.1.0.5 (printer), 10.1.0.9')
+    const tab = w.findAll('[role=tab]').find((t) => t.text().includes('Addresses'))!
+    await tab.trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('MSW-RACK2 port 14 (VLAN 30)')
     w.unmount()
   })
 })

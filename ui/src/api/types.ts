@@ -177,6 +177,25 @@ export interface IPAddress {
   mac_seen_at?: string
   mac_conflict?: string
   origin?: '' | 'arp'
+  // Switch port the address is connected to (inferred, server-owned).
+  link?: AddressLink
+}
+
+export interface AddressLink {
+  switch_id: string
+  switch_name?: string
+  port_id: string
+  port_name?: string
+  vlan?: number
+  source: 'snmp_fdb' | 'lldp'
+  last_seen?: string
+}
+
+// BehindAddress is an address linked to a switch port.
+export interface BehindAddress {
+  address_id: string
+  address: string
+  hostname?: string
 }
 
 export type MACSource = '' | 'manual' | 'agent' | 'arp'
@@ -260,6 +279,8 @@ export interface DeviceInterface {
   remote_device_name?: string
   behind_device_id?: string
   behind_device_name?: string
+  // Addresses linked to this switch port (feature 022).
+  behind_addresses?: BehindAddress[]
 }
 
 export interface DevicePackage {

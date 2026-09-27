@@ -88,15 +88,15 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T023 [P] [US2] Rank/Correlate tests in `internal/portlink/portlink_test.go`: address hosts linked with the same rules; address whose MAC equals a host-reported interface MAC skipped (interface covers it); switch/router own MACs never linked; re-confirm/supersede/stale for address links with `port_linked`/`port_unlinked` (subject address)
-- [ ] T024 [P] [US2] HTTP tests: address `link` object; switch interfaces `behind_addresses`; device detail bound addresses show links
+- [x] T023 [P] [US2] Rank/Correlate tests in `internal/portlink/portlink_test.go`: address hosts linked with the same rules; address whose MAC equals a host-reported interface MAC skipped (interface covers it); switch/router own MACs never linked; re-confirm/supersede/stale for address links with `port_linked`/`port_unlinked` (subject address)
+- [x] T024 [P] [US2] HTTP tests: address `link` object; switch interfaces `behind_addresses`; device detail bound addresses show links
 
 ### Implementation
 
-- [ ] T025 [US2] Extend `internal/portlink/{rank.go,portlink.go}` (Host/Link `AddressID`, BuildInput adds addresses, Correlate writes `SetAddressLinks`)
-- [ ] T026 [US2] Repo: `PortLinkData.Addresses` + `SetAddressLinks` in repodb/memstore; `behind_addresses` query for switch interfaces
-- [ ] T027 [US2] OpenAPI + handlers for `link` and `behind_addresses` (`internal/httpapi/handlers.go`, `api/openapi/ipam.yaml`)
-- [ ] T028 [P] [US2] UI: "Connected to" column/section on addresses, behind-addresses on switch ports in `ui/src/views/devices/detail.vue`, device addresses tab links; vitest
+- [x] T025 [US2] Extend `internal/portlink/{rank.go,portlink.go}` (Host/Link `AddressID`, BuildInput adds addresses, Correlate writes `SetAddressLinks`)
+- [x] T026 [US2] Repo: `PortLinkData.Addresses` + `SetAddressLinks` in repodb/memstore; `behind_addresses` query for switch interfaces
+- [x] T027 [US2] OpenAPI + handlers for `link` and `behind_addresses` (`internal/httpapi/handlers.go`, `api/openapi/ipam.yaml`)
+- [x] T028 [P] [US2] UI: "Connected to" column/section on addresses, behind-addresses on switch ports in `ui/src/views/devices/detail.vue`, device addresses tab links; vitest
 
 ---
 

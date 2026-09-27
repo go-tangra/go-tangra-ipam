@@ -1124,6 +1124,42 @@ export interface components {
             readonly mac_conflict?: string;
             /** @enum {string} */
             readonly origin?: "" | "arp";
+            link?: components["schemas"]["AddressLink"];
+        };
+        /** @description switch port the address is connected to (inferred from switch forwarding tables / LLDP) */
+        AddressLink: {
+            switch_id?: string;
+            switch_name?: string;
+            port_id?: string;
+            port_name?: string;
+            vlan?: number;
+            /** @enum {string} */
+            source?: "snmp_fdb" | "lldp";
+            /** Format: date-time */
+            last_seen?: string;
+        };
+        BehindAddress: {
+            address_id?: string;
+            address?: string;
+            hostname?: string;
+        };
+        DeviceInterface: {
+            id?: string;
+            device_id?: string;
+            name?: string;
+            mac_address?: string;
+            remote_device_id?: string;
+            remote_device_name?: string;
+            remote_interface_id?: string;
+            remote_port_name?: string;
+            link_source?: string;
+            link_vlan?: number;
+            /** Format: date-time */
+            link_last_seen?: string;
+            behind_device_id?: string;
+            behind_device_name?: string;
+            /** @description addresses linked to this switch port (feature 022) */
+            behind_addresses?: components["schemas"]["BehindAddress"][];
         };
         IPAddressList: {
             items?: components["schemas"]["IPAddress"][];
@@ -1958,12 +1994,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description addresses */
+            /** @description addresses (with their links) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPAddressList"];
+                };
             };
         };
     };
@@ -1979,12 +2017,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description interfaces */
+            /** @description interfaces (switch ports list the addresses behind them) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["DeviceInterface"][];
+                    };
+                };
             };
         };
     };

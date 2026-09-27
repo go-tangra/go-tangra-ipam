@@ -47,7 +47,7 @@ func (m *Mem) PortLinkData(_ context.Context, tenantID string) (repo.PortLinkDat
 		}
 	}
 	for _, a := range m.addrs {
-		if a.TenantID == tenantID && a.MACAddress != "" {
+		if a.TenantID == tenantID && (a.MACAddress != "" || a.Link != nil) {
 			out.Addresses = append(out.Addresses, m.decorateAddrLocked(a))
 		}
 	}

@@ -261,3 +261,22 @@ func TestARPResponseContract(t *testing.T) {
 		}
 	}
 }
+
+// TestAddressLinkContract (022 T027): the address link and the addresses
+// behind a switch port.
+func TestAddressLinkContract(t *testing.T) {
+	doc := loadDoc(t)
+	link := doc.Components.Schemas["IPAddress"].Value.Properties["link"]
+	if link == nil || link.Ref != "#/components/schemas/AddressLink" {
+		t.Fatal("address link missing")
+	}
+	for _, f := range []string{"switch_id", "switch_name", "port_id", "port_name", "vlan", "source", "last_seen"} {
+		if doc.Components.Schemas["AddressLink"].Value.Properties[f] == nil {
+			t.Errorf("link %s missing", f)
+		}
+	}
+	behind := doc.Components.Schemas["DeviceInterface"].Value.Properties["behind_addresses"]
+	if behind == nil || behind.Value.Items.Ref != "#/components/schemas/BehindAddress" {
+		t.Fatal("behind_addresses missing")
+	}
+}

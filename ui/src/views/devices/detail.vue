@@ -13,6 +13,7 @@ import { useLocations } from '@/stores/locations'
 import { useDeviceFields } from './fields'
 import { statusColors } from './colors'
 import IpmiKvm from './ipmi-kvm.vue'
+import { linkText } from '@/views/addresses/mac'
 
 const route = useRoute()
 const router = useRouter()
@@ -139,7 +140,10 @@ const tabs = computed<TabItem[]>(() => [
 // "Connected to" (US5): the switch and port a host interface is linked to, or
 // on a switch port the device behind it; otherwise the raw neighbour.
 function connectedTo(i: DeviceInterface): string {
-  if (i.behind_device_name) return i.behind_device_name
+  // 022: the addresses (agentless hosts) behind a switch port.
+  const behind = (i.behind_addresses ?? []).map((a) => (a.hostname ? `${a.address} (${a.hostname})` : a.address)).join(', ')
+  if (i.behind_device_name) return behind ? `${i.behind_device_name}, ${behind}` : i.behind_device_name
+  if (behind) return behind
   if (i.remote_device_name || i.remote_interface_id) {
     return [i.remote_device_name, i.remote_port_name].filter(Boolean).join(' ') + (i.link_vlan ? ` (VLAN ${i.link_vlan})` : '') + (i.link_source ? ` · ${i.link_source === 'lldp' ? 'LLDP' : 'MAC table'}` : '')
   }
@@ -159,7 +163,7 @@ const pkgColumns: Column<DevicePackage & { id: string }>[] = [
   { key: 'name', label: 'Package', sortable: true }, { key: 'current_version', label: 'Current' }, { key: 'available_version', label: 'Available', hideOnStack: true },
   { key: 'state', label: 'Status', width: 'sm', format: (p) => (p.is_security_update ? 'security' : p.needs_update ? 'update' : 'current') },
 ]
-const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, { key: 'hostname', label: 'Hostname' }, { key: 'address_type', label: 'Type', hideOnStack: true }, { key: 'status', label: 'Status', width: 'sm' }]
+const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, { key: 'hostname', label: 'Hostname' }, { key: 'link', label: 'Connected to', hideOnStack: true, format: (a) => linkText(a.link) }, { key: 'address_type', label: 'Type', hideOnStack: true }, { key: 'status', label: 'Status', width: 'sm' }]
 </script>
 
 <template>
