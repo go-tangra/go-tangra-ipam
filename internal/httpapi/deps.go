@@ -93,7 +93,8 @@ func failSvc(w http.ResponseWriter, err error) {
 	case errors.Is(err, subnets.ErrNotEmpty), errors.Is(err, devices.ErrNotEmpty),
 		errors.Is(err, devices.ErrConflict), errors.Is(err, addresses.ErrConflict),
 		errors.Is(err, scan.ErrActiveScan), errors.Is(err, scan.ErrTerminal),
-		errors.Is(err, repo.ErrConflict), errors.Is(err, store.ErrConflict):
+		errors.Is(err, repo.ErrConflict), errors.Is(err, store.ErrConflict),
+		errors.Is(err, repo.ErrNotEmpty):
 		WriteError(w, http.StatusConflict, "conflict")
 	case errors.Is(err, addresses.ErrNoAvailable):
 		WriteError(w, http.StatusInsufficientStorage, "no_available_address")
