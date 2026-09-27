@@ -98,7 +98,8 @@ const testText = computed(() => {
   const r = testResult.value
   if (!r) return ''
   if (r.outcome === 'ok') return `Answered: ${r.sys_name || '(no sysName)'}${r.sys_descr ? ' — ' + r.sys_descr : ''} (${r.duration_ms} ms)`
-  return OUTCOMES[r.outcome] ?? r.outcome
+  const label = OUTCOMES[r.outcome] ?? r.outcome
+  return r.detail ? `${label}: ${r.detail}` : label
 })
 
 const versionOptions = [{ title: 'SNMP v2c (community)', value: '2' }, { title: 'SNMP v3 (user)', value: '3' }]

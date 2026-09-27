@@ -1047,10 +1047,10 @@ export interface components {
             auth_protocol?: "MD5" | "SHA" | "SHA224" | "SHA256" | "SHA384" | "SHA512";
             auth_password?: string;
             /**
-             * @description DES is weak; AES is AES-128
+             * @description DES is weak; AES is AES-128; the C variants use Cisco (Reeder) key localisation
              * @enum {string}
              */
-            priv_protocol?: "DES" | "AES" | "AES192" | "AES256";
+            priv_protocol?: "DES" | "AES" | "AES192" | "AES256" | "AES192C" | "AES256C";
             priv_password?: string;
         };
         /** @description Effective SNMP state of a subnet (own, inherited from the nearest ancestor, or none). Never a credential value. */
@@ -1087,6 +1087,8 @@ export interface components {
             outcome?: "ok" | "no_response" | "auth_failed" | "unknown_user" | "privacy_failed" | "no_credentials" | "credentials_unreadable" | "error";
             sys_name?: string;
             sys_descr?: string;
+            /** @description scrubbed reason when outcome is error */
+            detail?: string;
             source_subnet_id?: string;
             duration_ms?: number;
         };

@@ -138,7 +138,7 @@ components:
         security_level: { type: string, enum: [authNoPriv, authPriv] }
         auth_protocol: { type: string, enum: [MD5, SHA, SHA224, SHA256, SHA384, SHA512], description: 'MD5 and SHA (SHA-1) are weak' }
         auth_password: { type: string, minLength: 8, maxLength: 256, writeOnly: true }
-        priv_protocol: { type: string, enum: [DES, AES, AES192, AES256], description: 'DES is weak; AES is AES-128' }
+        priv_protocol: { type: string, enum: [DES, AES, AES192, AES256, AES192C, AES256C], description: 'DES is weak; AES is AES-128; the C variants use Cisco (Reeder) key localisation' }
         priv_password: { type: string, minLength: 8, maxLength: 256, writeOnly: true }
     SNMPSummary:
       type: object
@@ -173,6 +173,7 @@ components:
         outcome: { type: string, enum: [ok, no_response, auth_failed, unknown_user, privacy_failed, no_credentials, credentials_unreadable, error] }
         sys_name: { type: string, maxLength: 1024 }
         sys_descr: { type: string, maxLength: 1024 }
+        detail: { type: string, maxLength: 1024, description: 'scrubbed reason when outcome is error' }
         source_subnet_id: { type: string }
         duration_ms: { type: integer }
     SubnetSNMPStatus:

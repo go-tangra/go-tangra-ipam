@@ -10,11 +10,11 @@ export const SNMP_MIN_PASSWORD = 8
 export const SNMP_LEVELS = ['authNoPriv', 'authPriv'] as const
 // Strongest first; MD5, SHA-1 and DES stay for old devices but are weak.
 export const SNMP_AUTH_PROTOCOLS = ['SHA512', 'SHA384', 'SHA256', 'SHA224', 'SHA', 'MD5'] as const
-export const SNMP_PRIV_PROTOCOLS = ['AES256', 'AES192', 'AES', 'DES'] as const
+export const SNMP_PRIV_PROTOCOLS = ['AES256', 'AES256C', 'AES192', 'AES192C', 'AES', 'DES'] as const
 export const SNMP_WEAK = new Set<string>(['MD5', 'SHA', 'DES'])
 const PROTOCOL_NAMES: Record<string, string> = {
   SHA512: 'SHA-512', SHA384: 'SHA-384', SHA256: 'SHA-256', SHA224: 'SHA-224', SHA: 'SHA-1', MD5: 'MD5',
-  AES256: 'AES-256', AES192: 'AES-192', AES: 'AES-128', DES: 'DES',
+  AES256: 'AES-256', AES256C: 'AES-256 (Cisco)', AES192: 'AES-192', AES192C: 'AES-192 (Cisco)', AES: 'AES-128', DES: 'DES',
 }
 /** Human label of a protocol, flagged when weak. */
 export const protocolLabel = (p: string) => (PROTOCOL_NAMES[p] ?? p) + (SNMP_WEAK.has(p) ? ' (weak)' : '')

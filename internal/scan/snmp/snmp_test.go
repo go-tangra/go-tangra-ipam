@@ -97,7 +97,8 @@ func TestMacFromOctets(t *testing.T) {
 func TestNewClientProtocols(t *testing.T) {
 	auth := map[string]gosnmp.SnmpV3AuthProtocol{"MD5": gosnmp.MD5, "SHA": gosnmp.SHA, "SHA224": gosnmp.SHA224,
 		"SHA256": gosnmp.SHA256, "SHA384": gosnmp.SHA384, "SHA512": gosnmp.SHA512}
-	priv := map[string]gosnmp.SnmpV3PrivProtocol{"DES": gosnmp.DES, "AES": gosnmp.AES, "AES192": gosnmp.AES192, "AES256": gosnmp.AES256}
+	priv := map[string]gosnmp.SnmpV3PrivProtocol{"DES": gosnmp.DES, "AES": gosnmp.AES, "AES192": gosnmp.AES192, "AES256": gosnmp.AES256,
+		"AES192C": gosnmp.AES192C, "AES256C": gosnmp.AES256C}
 	for name, want := range auth {
 		c, err := newClient("10.0.0.1", Creds{Version: 3, SecurityLevel: "authNoPriv", User: "u", AuthProtocol: name, AuthPassword: "authpass1"})
 		if err != nil {

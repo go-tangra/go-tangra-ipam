@@ -126,6 +126,10 @@ func Classify(err error) Outcome {
 		return OutcomeNoResponse
 	case strings.Contains(msg, "decrypt"):
 		return OutcomePrivacyFailed
+	case strings.Contains(msg, "not authentic"):
+		// gosnmp reports a response whose HMAC does not verify as a plain
+		// error (wrong auth protocol/password for this engine).
+		return OutcomeAuthFailed
 	}
 	return OutcomeError
 }
@@ -269,7 +273,8 @@ func systemOIDs(client *gosnmp.GoSNMP, ip string) (name, descr, objectID string,
 var (
 	authProtocols = map[string]gosnmp.SnmpV3AuthProtocol{"MD5": gosnmp.MD5, "SHA": gosnmp.SHA, "SHA224": gosnmp.SHA224,
 		"SHA256": gosnmp.SHA256, "SHA384": gosnmp.SHA384, "SHA512": gosnmp.SHA512}
-	privProtocols = map[string]gosnmp.SnmpV3PrivProtocol{"DES": gosnmp.DES, "AES": gosnmp.AES, "AES192": gosnmp.AES192, "AES256": gosnmp.AES256}
+	privProtocols = map[string]gosnmp.SnmpV3PrivProtocol{"DES": gosnmp.DES, "AES": gosnmp.AES, "AES192": gosnmp.AES192, "AES256": gosnmp.AES256,
+		"AES192C": gosnmp.AES192C, "AES256C": gosnmp.AES256C}
 )
 
 // newClient builds a configured gosnmp client for the address and

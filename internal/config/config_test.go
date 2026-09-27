@@ -91,6 +91,8 @@ func TestValidateRejects(t *testing.T) {
 		{"scan max_hosts", func(c *Config) { c.Scan.MaxHosts = 0 }, "scan.max_hosts"},
 		{"scan concurrency", func(c *Config) { c.Scan.Concurrency = 0 }, "scan.concurrency"},
 		{"scan timeout", func(c *Config) { c.Scan.TimeoutMs = 1 }, "scan.timeout_ms"},
+		{"scan snmp timeout low", func(c *Config) { c.Scan.SNMPTimeoutMs = 100 }, "scan.snmp_timeout_ms"},
+		{"scan snmp timeout high", func(c *Config) { c.Scan.SNMPTimeoutMs = 60000 }, "scan.snmp_timeout_ms"},
 		{"scan workers", func(c *Config) { c.Scan.Workers = 0 }, "scan.workers"},
 		{"scan retries", func(c *Config) { c.Scan.MaxRetries = -1 }, "scan.max_retries"},
 		{"alloc skip_first", func(c *Config) { c.Allocation.SkipFirst = -1 }, "allocation.skip_first"},

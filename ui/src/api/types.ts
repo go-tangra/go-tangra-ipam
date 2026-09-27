@@ -109,6 +109,7 @@ export interface SNMPTestResult {
   outcome: SNMPTestOutcome
   sys_name?: string
   sys_descr?: string
+  detail?: string // scrubbed reason when outcome is error
   source_subnet_id?: string
   duration_ms: number
 }

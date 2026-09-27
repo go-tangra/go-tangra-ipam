@@ -46,6 +46,8 @@ type Config struct {
 	TimeoutMs   int
 	Workers     int
 	MaxRetries  int
+	// SNMPTimeoutMs is the per-request SNMP timeout (default 5000).
+	SNMPTimeoutMs int
 }
 
 // Options are the per-scan toggles chosen at StartScan time.

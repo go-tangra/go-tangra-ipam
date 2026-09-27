@@ -31,6 +31,7 @@ func TestClassify(t *testing.T) {
 		{wrap(errors.New("read udp 10.0.0.9:1->10.0.0.1:161: connection refused")), OutcomeNoResponse},
 		{fmt.Errorf("snmp: no response from 10.0.0.1"), OutcomeNoResponse},
 		{wrap(gosnmp.ErrUnknownUsername), OutcomeUnknownUser},
+		{wrap(errors.New("incoming packet is not authentic, discarding")), OutcomeAuthFailed},
 		{wrap(gosnmp.ErrWrongDigest), OutcomeAuthFailed},
 		{wrap(gosnmp.ErrUnknownSecurityLevel), OutcomeAuthFailed},
 		{wrap(gosnmp.ErrDecryption), OutcomePrivacyFailed},
