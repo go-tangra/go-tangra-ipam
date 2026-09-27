@@ -217,8 +217,13 @@ func TestDecodeScanOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("empty: %v", err)
 	}
-	if opts.EnableSNMP || opts.EnableDNSUpdate || opts.SkipReverseDNS {
-		t.Fatalf("empty opts: %+v", opts)
+	if opts.EnableSNMP || !opts.SNMPAuto || opts.EnableDNSUpdate || opts.SkipReverseDNS {
+		t.Fatalf("empty opts: %+v (SNMP must be auto)", opts)
+	}
+	// Explicit false is not auto.
+	r = httptest.NewRequest("POST", "https://localhost/x", strings.NewReader(`{"enable_snmp":false}`))
+	if opts, err = decodeScanOptions(r); err != nil || opts.EnableSNMP || opts.SNMPAuto {
+		t.Fatalf("explicit false: %+v %v", opts, err)
 	}
 
 	// Populated body.
@@ -228,7 +233,7 @@ func TestDecodeScanOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("body: %v", err)
 	}
-	if !opts.EnableSNMP || !opts.EnableDNSUpdate || !opts.SkipReverseDNS {
+	if !opts.EnableSNMP || opts.SNMPAuto || !opts.EnableDNSUpdate || !opts.SkipReverseDNS {
 		t.Fatalf("body opts: %+v", opts)
 	}
 
