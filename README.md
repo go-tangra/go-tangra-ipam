@@ -281,7 +281,12 @@ inventory agent) get their MAC and switch port from the network (feature 022).
   port, maximum MACs per access port, uplinks and network-device MACs
   excluded, stale links cleared). Addresses carry `link` (switch, port, VLAN,
   source, last seen); an address whose MAC a reported interface carries shows
-  that interface's link; switch ports list `behind_addresses`.
+  that interface's link; switch ports list `behind_addresses`. A host
+  learned on several switches (MLAG / LACP bond across a switch pair) gets
+  one link per switch (fewest-MAC port on each; a tie between two ports of
+  the same switch links nothing there): interfaces and addresses list them
+  in `links` (primary first; `link` and the flat columns are the primary),
+  and the host shows behind both switches' ports.
 - **Scan result**: `arp_status` (`ran`, `disabled`, `failed`), `arp_devices`,
   `arp_partial`, `arp_entries`, `arp_applied`, `arp_created`, `arp_conflicts`
   and `arp_ignored` (reason to count).

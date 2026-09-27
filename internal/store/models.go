@@ -1,7 +1,10 @@
 // Package store holds the IPAM domain types and the SQL-backed store.
 package store
 
-import "time"
+import (
+	"sort"
+	"time"
+)
 
 // --- enums (stored as text) ---
 
@@ -154,6 +157,31 @@ type IPAddress struct {
 	Origin            string     `json:"origin,omitempty"`
 	// Link is the switch port the address is connected to (server-owned).
 	Link *AddressLink `json:"link,omitempty"`
+	// Links are the per-switch links (one per switch, primary first) of an
+	// address learned on several switches (MLAG / LACP bond). Server-owned;
+	// written as the address's complete per-switch set by SetAddressLinks.
+	Links []HostSwitchLink `json:"links,omitempty"`
+}
+
+// Host kinds of a per-switch link.
+const (
+	HostKindInterface = "interface"
+	HostKindAddress   = "address"
+)
+
+// HostSwitchLink is one per-switch link of a host interface or an address:
+// on that switch, the most direct port that learned the MAC (or the port
+// whose LLDP neighbour names the host). Primary (computed on read) marks the
+// link mirrored into the flat link columns; SwitchName is computed on read.
+type HostSwitchLink struct {
+	SwitchID   string     `json:"switch_id"`
+	SwitchName string     `json:"switch_name,omitempty"`
+	PortID     string     `json:"port_id"`
+	PortName   string     `json:"port_name,omitempty"`
+	VLAN       int        `json:"vlan,omitempty"`
+	Source     string     `json:"source"`
+	LastSeen   *time.Time `json:"last_seen,omitempty"`
+	Primary    bool       `json:"primary"`
 }
 
 // AddressLink is an address's switch port (the address-level counterpart of
@@ -322,6 +350,10 @@ type DeviceInterface struct {
 	BehindDeviceName string `json:"behind_device_name,omitempty"`
 	// BehindAddresses are the addresses linked to this switch port (022).
 	BehindAddresses []BehindAddress `json:"behind_addresses,omitempty"`
+	// Links are the per-switch links of a host interface (one per switch,
+	// primary first). Server-owned; written as the interface's complete
+	// per-switch set by SetInterfaceLinks.
+	Links []HostSwitchLink `json:"links,omitempty"`
 }
 
 // DeviceInterfaceLink is an L2 neighbor link. Unique (interface_id,remote_device_id,link_source).
@@ -661,4 +693,23 @@ func FillEmptyDevice(dst, src Device) Device {
 		dst.LastSeen = src.LastSeen
 	}
 	return dst
+}
+
+// MarkPrimary flags the link on primaryPort (the flat link columns' port) as
+// primary and orders the links primary first, then by switch name and id.
+func MarkPrimary(links []HostSwitchLink, primaryPort string) []HostSwitchLink {
+	for k := range links {
+		links[k].Primary = primaryPort != "" && links[k].PortID == primaryPort
+	}
+	sort.SliceStable(links, func(i, j int) bool {
+		a, b := links[i], links[j]
+		if a.Primary != b.Primary {
+			return a.Primary
+		}
+		if a.SwitchName != b.SwitchName {
+			return a.SwitchName < b.SwitchName
+		}
+		return a.SwitchID < b.SwitchID
+	})
+	return links
 }

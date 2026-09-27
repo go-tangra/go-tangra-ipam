@@ -23,15 +23,21 @@ Request (`additionalProperties: false`): `enabled` (bool), `excluded_devices`
   addresses): new read-only fields `mac_source` (`manual|agent|arp|""`),
   `mac_source_device_id`, `mac_seen_at`, `mac_conflict`, `origin` (`arp|""`),
   `link` `{switch_id, switch_name, port_id, port_name, vlan, source,
-  last_seen}` or absent.
+  last_seen}` or absent, and `links` — every per-switch link `{switch_id,
+  switch_name, port_id, port_name, vlan, source, last_seen, primary}`,
+  primary first (a host bonded across a switch pair has one per switch;
+  `link` is the primary), absent when none.
 - **Address list** gains query `mac` (2–12 hex digits after stripping
   `:-.` and spaces; partial match). Invalid → 422 `validation_failed`
   (`detail.field = mac`).
 - **Address create/update**: a non-empty `mac_address` sets
   `mac_source=manual` and clears `mac_conflict`; an empty one clears the MAC
-  and its source. `mac_source`, `origin`, `link` in the body are ignored.
+  and its source. `mac_source`, `origin`, `link`, `links` in the body are ignored.
 - **Device interfaces** (`GET /devices/{id}/interfaces`) of switches gain
-  `behind_addresses` `[{address_id, address, hostname}]`.
+  `behind_addresses` `[{address_id, address, hostname}]` (addresses linked
+  as primary or per-switch link; `behind_device_*` likewise), and host
+  interfaces gain `links` (as for addresses; the flat `remote_*`/`link_*`
+  fields are the primary).
 - **Scan jobs**: `arp_devices`, `arp_partial`, `arp_entries`, `arp_applied`,
   `arp_created`, `arp_conflicts`, `arp_ignored` (object reason → count).
 
@@ -45,4 +51,5 @@ Request (`additionalProperties: false`): `enabled` (bool), `excluded_devices`
 | `address_created` | address | `address`, `origin: arp`, `mac`, `subnet_id`, `source_device_id` |
 | `arp_run` | scan job | counters as in the scan job, `ignored` map |
 | `port_linked` / `port_unlinked` | address | as for interfaces (`switch_device_id`, `switch_interface_id`, `vlan`, `source`, `reason`) |
+| `port_linked` / `port_unlinked` | interface, address | a secondary per-switch link added / removed: same keys plus `secondary: true` |
 | `arp_settings_updated` (actor user) | tenant | `enabled`, `excluded_count`, `proxy_threshold` |

@@ -281,6 +281,23 @@ func TestAddressLinkContract(t *testing.T) {
 	}
 }
 
+// TestHostSwitchLinksContract (022 per-switch links): addresses and
+// interfaces list every switch link of a host bonded across switches.
+func TestHostSwitchLinksContract(t *testing.T) {
+	doc := loadDoc(t)
+	for _, schema := range []string{"IPAddress", "DeviceInterface"} {
+		links := doc.Components.Schemas[schema].Value.Properties["links"]
+		if links == nil || !links.Value.ReadOnly || links.Value.Items.Ref != "#/components/schemas/HostSwitchLink" {
+			t.Fatalf("%s links missing", schema)
+		}
+	}
+	for _, f := range []string{"switch_id", "switch_name", "port_id", "port_name", "vlan", "source", "last_seen", "primary"} {
+		if doc.Components.Schemas["HostSwitchLink"].Value.Properties[f] == nil {
+			t.Errorf("host switch link %s missing", f)
+		}
+	}
+}
+
 // TestARPSettingsContract (022 T031): the ARP settings routes, permissions,
 // CSRF, body bound and the closed input schema.
 func TestARPSettingsContract(t *testing.T) {

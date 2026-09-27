@@ -62,7 +62,51 @@ CREATE POLICY tenant_isolation ON ipam_arp_settings
   WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::uuid OR current_setting('app.system', true) = 'on');
 GRANT SELECT, INSERT, UPDATE, DELETE ON ipam_arp_settings TO ipam_app;
 
+-- Per-switch links (research D6): a host bonded across a switch pair (MLAG /
+-- LACP) is learned on a port of each switch; every switch keeps its most
+-- direct port here. The flat link columns on interfaces and addresses stay
+-- the primary link.
+CREATE TABLE ipam_host_switch_links (
+  tenant_id  uuid NOT NULL,
+  host_kind  text NOT NULL CHECK (host_kind IN ('interface', 'address')),
+  host_id    uuid NOT NULL,
+  switch_id  uuid NOT NULL REFERENCES ipam_devices(id) ON DELETE CASCADE,
+  port_id    uuid NOT NULL REFERENCES ipam_device_interfaces(id) ON DELETE CASCADE,
+  port_name  text NOT NULL DEFAULT '' CHECK (char_length(port_name) <= 255),
+  vlan       int  NOT NULL DEFAULT 0,
+  source     text NOT NULL CHECK (source IN ('snmp_fdb', 'lldp')),
+  last_seen  timestamptz NOT NULL,
+  PRIMARY KEY (tenant_id, host_kind, host_id, switch_id)
+);
+CREATE INDEX host_switch_links_port ON ipam_host_switch_links (tenant_id, port_id);
+
+-- host_id points at an interface or an address: their deletion removes the
+-- host's links (the polymorphic counterpart of ON DELETE CASCADE).
+-- +goose StatementBegin
+CREATE FUNCTION ipam_host_switch_links_gc() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM ipam_host_switch_links
+    WHERE tenant_id = OLD.tenant_id AND host_kind = TG_ARGV[0] AND host_id = OLD.id;
+  RETURN OLD;
+END $$;
+-- +goose StatementEnd
+CREATE TRIGGER host_switch_links_gc AFTER DELETE ON ipam_device_interfaces
+  FOR EACH ROW EXECUTE FUNCTION ipam_host_switch_links_gc('interface');
+CREATE TRIGGER host_switch_links_gc AFTER DELETE ON ipam_ip_addresses
+  FOR EACH ROW EXECUTE FUNCTION ipam_host_switch_links_gc('address');
+
+ALTER TABLE ipam_host_switch_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ipam_host_switch_links FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON ipam_host_switch_links
+  USING (tenant_id = current_setting('app.tenant_id', true)::uuid OR current_setting('app.system', true) = 'on')
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::uuid OR current_setting('app.system', true) = 'on');
+GRANT SELECT, INSERT, UPDATE, DELETE ON ipam_host_switch_links TO ipam_app;
+
 -- +goose Down
+DROP TRIGGER IF EXISTS host_switch_links_gc ON ipam_ip_addresses;
+DROP TRIGGER IF EXISTS host_switch_links_gc ON ipam_device_interfaces;
+DROP FUNCTION IF EXISTS ipam_host_switch_links_gc();
+DROP TABLE IF EXISTS ipam_host_switch_links;
 DROP TABLE IF EXISTS ipam_arp_settings;
 ALTER TABLE ipam_ip_scan_jobs DROP COLUMN IF EXISTS arp_ignored, DROP COLUMN IF EXISTS arp_conflicts,
   DROP COLUMN IF EXISTS arp_created, DROP COLUMN IF EXISTS arp_applied, DROP COLUMN IF EXISTS arp_entries,

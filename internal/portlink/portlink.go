@@ -101,44 +101,53 @@ func subjectRow(tenantID string, t audit.EventType, kind, id string, detail map[
 // Correlate ranks and writes the tenant's host interface links: new or
 // changed links (port_linked, superseded ones port_unlinked), re-confirmed
 // links refreshed, links not re-confirmed within the stale age cleared
-// (port_unlinked). Only host-reported devices are linked; everything runs in
-// the tenant's scope.
+// (port_unlinked). The primary link is written to the flat link columns and
+// every per-switch link (MLAG / LACP bond across switches) to the host's
+// per-switch set in the same transaction; secondary links are audited with
+// "secondary": true. Only host-reported devices are linked; everything runs
+// in the tenant's scope.
 func (c *Correlator) Correlate(ctx context.Context, tenantID string) error {
 	d, err := c.st.PortLinkData(ctx, tenantID)
 	if err != nil || len(d.Switches) == 0 {
 		return err
 	}
-	links := Rank(BuildInput(d, c.maxMACs))
-	byIface, byAddr := map[string]Link{}, map[string]Link{}
-	for _, l := range links {
+	byIface, byAddr := map[string][]Link{}, map[string][]Link{}
+	for _, l := range Rank(BuildInput(d, c.maxMACs)) { // primary first per host
 		if l.AddressID != "" {
-			byAddr[l.AddressID] = l
+			byAddr[l.AddressID] = append(byAddr[l.AddressID], l)
 		} else {
-			byIface[l.HostIfaceID] = l
+			byIface[l.HostIfaceID] = append(byIface[l.HostIfaceID], l)
 		}
 	}
 	now := c.now()
 	var changed []store.DeviceInterface
 	var rows []store.AuditRow
 	for _, i := range d.HostIfaces {
-		l, ok := byIface[i.ID]
+		ls := byIface[i.ID]
+		oldPrimary, flat := i.RemoteInterfaceID, true
 		switch {
-		case ok && i.RemoteInterfaceID == l.PortID && i.LinkSource == l.Source && i.LinkVlan == l.VLAN:
+		case len(ls) > 0 && i.RemoteInterfaceID == ls[0].PortID && i.LinkSource == ls[0].Source && i.LinkVlan == ls[0].VLAN:
 			i.LinkLastSeen = &now // re-confirmed
-			changed = append(changed, i)
-		case ok:
+		case len(ls) > 0:
+			l := ls[0]
 			if i.RemoteInterfaceID != "" {
 				rows = append(rows, auditRow(tenantID, audit.PortUnlinked, i.ID, map[string]any{"reason": "superseded", "switch_interface_id": i.RemoteInterfaceID}, now))
 			}
 			i.RemoteDeviceID, i.RemoteInterfaceID, i.RemotePortName = l.SwitchID, l.PortID, l.PortName
 			i.LinkSource, i.LinkVlan, i.LinkLastSeen = l.Source, l.VLAN, &now
-			changed = append(changed, i)
 			rows = append(rows, auditRow(tenantID, audit.PortLinked, i.ID, map[string]any{"switch_device_id": l.SwitchID,
 				"switch_interface_id": l.PortID, "vlan": l.VLAN, "source": l.Source}, now))
 		case i.RemoteInterfaceID != "" && (i.LinkSource == store.LinkSNMPFDB || i.LinkSource == store.LinkLLDP) &&
 			(i.LinkLastSeen == nil || now.Sub(*i.LinkLastSeen) > c.staleAge):
 			rows = append(rows, auditRow(tenantID, audit.PortUnlinked, i.ID, map[string]any{"reason": "stale", "switch_interface_id": i.RemoteInterfaceID}, now))
 			i.RemoteDeviceID, i.RemoteInterfaceID, i.RemotePortName, i.LinkSource, i.LinkVlan, i.LinkLastSeen = "", "", "", "", 0, nil
+		default:
+			flat = false
+		}
+		set, setRows, setChanged := c.mergeSet(tenantID, audit.SubjectInterface, i.ID, i.Links, ls, oldPrimary, i.RemoteInterfaceID, now)
+		rows = append(rows, setRows...)
+		if flat || setChanged {
+			i.Links = set
 			changed = append(changed, i)
 		}
 	}
@@ -150,33 +159,86 @@ func (c *Correlator) Correlate(ctx context.Context, tenantID string) error {
 	return c.correlateAddresses(ctx, tenantID, d, byIface, byAddr, now)
 }
 
+// mergeSet computes a host's new per-switch link set: every ranked link
+// (confirmed now; a different port on a switch supersedes the old one), plus
+// the existing links of switches not ranked this time until they are older
+// than the stale age. Links other than the primary are audited as secondary
+// port_linked / port_unlinked. changed reports whether the set must be
+// written (a ranked link refreshes last_seen, a removal deletes a row).
+func (c *Correlator) mergeSet(tenantID, kind, id string, cur []store.HostSwitchLink, ranked []Link, oldPrimary, newPrimary string,
+	now time.Time) (set []store.HostSwitchLink, rows []store.AuditRow, changed bool) {
+	existing := map[string]store.HostSwitchLink{}
+	for _, e := range cur {
+		existing[e.SwitchID] = e
+	}
+	unlink := func(e store.HostSwitchLink, reason string) {
+		changed = true
+		if e.PortID != oldPrimary {
+			rows = append(rows, subjectRow(tenantID, audit.PortUnlinked, kind, id, map[string]any{"reason": reason,
+				"switch_interface_id": e.PortID, "secondary": true}, now))
+		}
+	}
+	for _, l := range ranked {
+		changed = true
+		e, had := existing[l.SwitchID]
+		delete(existing, l.SwitchID)
+		if had && e.PortID != l.PortID {
+			unlink(e, "superseded")
+		}
+		if (!had || e.PortID != l.PortID) && l.PortID != newPrimary {
+			rows = append(rows, subjectRow(tenantID, audit.PortLinked, kind, id, map[string]any{"switch_device_id": l.SwitchID,
+				"switch_interface_id": l.PortID, "vlan": l.VLAN, "source": l.Source, "secondary": true}, now))
+		}
+		set = append(set, store.HostSwitchLink{SwitchID: l.SwitchID, PortID: l.PortID, PortName: l.PortName, VLAN: l.VLAN,
+			Source: l.Source, LastSeen: &now})
+	}
+	for _, e := range cur {
+		if _, left := existing[e.SwitchID]; !left {
+			continue
+		}
+		if e.LastSeen == nil || now.Sub(*e.LastSeen) > c.staleAge {
+			unlink(e, "stale")
+			continue
+		}
+		e.Primary = false
+		set = append(set, e)
+	}
+	return set, rows, changed
+}
+
 // correlateAddresses writes the address links (feature 022) with the same
 // re-confirm / supersede / stale rules as interfaces. An address whose MAC a
-// reported interface carries shows that interface's link.
-func (c *Correlator) correlateAddresses(ctx context.Context, tenantID string, d repo.PortLinkData, byIface, byAddr map[string]Link, now time.Time) error {
-	byMAC := map[string]Link{}
+// reported interface carries shows that interface's links.
+func (c *Correlator) correlateAddresses(ctx context.Context, tenantID string, d repo.PortLinkData, byIface, byAddr map[string][]Link, now time.Time) error {
+	byMAC := map[string][]Link{}
 	for _, i := range d.HostIfaces {
-		if l, ok := byIface[i.ID]; ok {
+		if ls, ok := byIface[i.ID]; ok {
 			if m, ok := hostreport.NormalizeMAC(i.MACAddress); ok {
-				byMAC[m] = l
+				byMAC[m] = ls
 			}
 		}
 	}
 	var changed []store.IPAddress
 	var rows []store.AuditRow
 	for _, a := range d.Addresses {
-		l, ok := byAddr[a.ID]
+		ls, ok := byAddr[a.ID]
 		if !ok {
 			m, _ := hostreport.NormalizeMAC(a.MACAddress)
-			l, ok = byMAC[m]
+			ls = byMAC[m]
 		}
 		cur := a.Link
+		var oldPrimary string
+		if cur != nil {
+			oldPrimary = cur.PortID
+		}
+		flat := true
 		switch {
-		case ok && cur != nil && cur.PortID == l.PortID && cur.Source == l.Source && cur.VLAN == l.VLAN:
+		case len(ls) > 0 && cur != nil && cur.PortID == ls[0].PortID && cur.Source == ls[0].Source && cur.VLAN == ls[0].VLAN:
 			nl := *cur
 			nl.LastSeen = &now // re-confirmed
 			a.Link = &nl
-		case ok:
+		case len(ls) > 0:
+			l := ls[0]
 			if cur != nil {
 				rows = append(rows, subjectRow(tenantID, audit.PortUnlinked, audit.SubjectAddress, a.ID, map[string]any{"reason": "superseded", "switch_interface_id": cur.PortID}, now))
 			}
@@ -187,9 +249,18 @@ func (c *Correlator) correlateAddresses(ctx context.Context, tenantID string, d 
 			rows = append(rows, subjectRow(tenantID, audit.PortUnlinked, audit.SubjectAddress, a.ID, map[string]any{"reason": "stale", "switch_interface_id": cur.PortID}, now))
 			a.Link = nil
 		default:
-			continue
+			flat = false
 		}
-		changed = append(changed, a)
+		var newPrimary string
+		if a.Link != nil {
+			newPrimary = a.Link.PortID
+		}
+		set, setRows, setChanged := c.mergeSet(tenantID, audit.SubjectAddress, a.ID, a.Links, ls, oldPrimary, newPrimary, now)
+		rows = append(rows, setRows...)
+		if flat || setChanged {
+			a.Links = set
+			changed = append(changed, a)
+		}
 	}
 	if len(changed) == 0 {
 		return nil

@@ -464,9 +464,9 @@ func (s *Service) publish(ctx context.Context, tenantID, eventType, action strin
 // (feature 022, research D4): a new non-empty MAC is "manual" (confirmed now,
 // any ARP conflict cleared), an unchanged one keeps its provenance, an empty
 // one clears the MAC and its source. A parseable MAC is stored in lower-case
-// colon notation. Provenance, origin and link in the request are ignored.
+// colon notation. Provenance, origin and links in the request are ignored.
 func (s *Service) manualMAC(in, ex *store.IPAddress) {
-	in.Origin, in.Link = "", nil
+	in.Origin, in.Link, in.Links = "", nil, nil
 	if m, ok := hostreport.NormalizeMAC(in.MACAddress); ok {
 		in.MACAddress = m
 	}

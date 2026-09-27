@@ -368,25 +368,28 @@ const addrCols = `id, tenant_id, address, subnet_id, hostname, mac_address, desc
 	report_state, coalesce(previous_device_id::text,''), moved_at, move_count, move_window_start, conflict,
 	mac_source, coalesce(mac_source_device_id::text,''), mac_seen_at, mac_conflict, origin,
 	coalesce(link_switch_id::text,''), coalesce(link_port_id::text,''), link_port_name, link_vlan, link_source,
-	link_last_seen, coalesce((SELECT sw.name FROM ipam_devices sw WHERE sw.id = ipam_ip_addresses.link_switch_id), '')`
+	link_last_seen, coalesce((SELECT sw.name FROM ipam_devices sw WHERE sw.id = ipam_ip_addresses.link_switch_id), ''),
+	` + addrLinksCol
 
 func scanAddress(sc scanner) (store.IPAddress, error) {
 	var a store.IPAddress
 	var tags []byte
 	var l store.AddressLink
+	var links []byte
 	if err := sc.Scan(&a.ID, &a.TenantID, &a.Address, &a.SubnetID, &a.Hostname, &a.MACAddress, &a.Description,
 		&a.DeviceID, &a.InterfaceName, &a.Status, &a.AddressType, &a.IsPrimary, &a.PTRRecord, &a.DNSName,
 		&a.Owner, &a.LastSeen, &a.LeaseExpiry, &a.HasReverseDNS, &a.Note, &tags, &a.CreatedBy,
 		&a.CreatedAt, &a.UpdatedAt, &a.ReportState, &a.PreviousDeviceID, &a.MovedAt, &a.MoveCount,
 		&a.MoveWindowStart, &a.Conflict,
 		&a.MACSource, &a.MACSourceDeviceID, &a.MACSeenAt, &a.MACConflict, &a.Origin,
-		&l.SwitchID, &l.PortID, &l.PortName, &l.VLAN, &l.Source, &l.LastSeen, &l.SwitchName); err != nil {
+		&l.SwitchID, &l.PortID, &l.PortName, &l.VLAN, &l.Source, &l.LastSeen, &l.SwitchName, &links); err != nil {
 		return store.IPAddress{}, err
 	}
 	a.Tags = unmarshalTags(tags)
 	if l.PortID != "" {
 		a.Link = &l
 	}
+	a.Links = decodeLinks(links, l.PortID)
 	return a, nil
 }
 
@@ -952,14 +955,20 @@ func (d *DB) ListInterfaces(ctx context.Context, tenantID, deviceID string) (out
 			if i.RemoteDeviceID != "" {
 				_ = tx.QueryRow(ctx, "SELECT name FROM ipam_devices WHERE tenant_id=$1 AND id::text=$2", tenantID, i.RemoteDeviceID).Scan(&i.RemoteDeviceName)
 			}
-			_ = tx.QueryRow(ctx, `SELECT d.id::text, d.name FROM ipam_device_interfaces h JOIN ipam_devices d ON d.id = h.device_id
-				WHERE h.tenant_id=$1 AND h.remote_interface_id=$2 ORDER BY h.link_last_seen DESC NULLS LAST LIMIT 1`,
+			// Device behind: a host interface linked here as primary or as a
+			// per-switch link (bonded across a switch pair).
+			_ = tx.QueryRow(ctx, `SELECT d.id::text, d.name FROM (
+					SELECT id, link_last_seen AS seen FROM ipam_device_interfaces WHERE tenant_id=$1 AND remote_interface_id=$2
+					UNION ALL
+					SELECT host_id, last_seen FROM ipam_host_switch_links WHERE tenant_id=$1 AND host_kind='interface' AND port_id=$2::uuid
+				) x JOIN ipam_device_interfaces h ON h.id = x.id JOIN ipam_devices d ON d.id = h.device_id
+				WHERE h.tenant_id=$1 ORDER BY x.seen DESC NULLS LAST, d.id LIMIT 1`,
 				tenantID, i.ID).Scan(&i.BehindDeviceID, &i.BehindDeviceName)
 			if i.BehindAddresses, e = behindAddresses(ctx, tx, tenantID, i.ID); e != nil {
 				return e
 			}
 		}
-		return nil
+		return attachIfaceLinks(ctx, tx, tenantID, out)
 	})
 	return
 }

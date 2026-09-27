@@ -102,6 +102,28 @@ writes address link columns via `SetAddressLinks` with the same
 re-confirm/supersede/stale logic and `port_linked`/`port_unlinked` audit rows
 (subject kind `address`). Correlation runs after ARP apply.
 
+**Per-switch links (hosts bonded across a switch pair).** A host with an MLAG /
+LACP bond across two switches (prod: ns1 on cs1 port 17 and cs2 port 17, 21
+MACs each) is learned on a port of each switch with equal MAC counts; a single
+global winner would be a tie and link nothing. Like v3 (`correlateLinks`),
+`Rank` now works per switch: on each switch the LLDP neighbour naming the host
+wins, else the non-uplink port (≤ `max_macs_per_port`) with the fewest MACs
+that learned the MAC — a tie between two ports *of the same switch* links
+nothing on that switch. All per-switch links are returned; one is `Primary`
+(an LLDP link if any, else the fewest MACs, ties by lowest switch id, then
+port id), so two switches tying never means "no link". The primary stays in
+the flat link columns (backward compatible); every per-switch link is kept in
+`ipam_host_switch_links` (one row per host × switch), replaced in the same
+tenant transaction by `SetInterfaceLinks` / `SetAddressLinks` (the host's
+complete `Links` set). Links of switches not re-confirmed are kept until the
+stale age. Added / removed secondary links are audited as
+`port_linked` / `port_unlinked` with `"secondary": true`. Reads: interfaces
+and addresses return `links` (primary first); `behind_addresses` and the
+"device behind" also come from the per-switch table, so a bonded host shows
+under both switches' ports. A daisy-chained access switch keeps the primary;
+the upstream switch's port (not detected as an uplink) becomes a secondary
+link, as in v3.
+
 ### D7 — Visibility
 
 - Address JSON gains `mac_source`, `mac_source_device_id`, `mac_seen_at`,

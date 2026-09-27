@@ -174,9 +174,9 @@ type PortLinkData struct {
 	SwitchIfaces []store.DeviceInterface     // their interfaces
 	Links        []store.DeviceInterfaceLink // snmp_fdb / lldp rows on switch interfaces
 	Hosts        []store.Device              // host-reported devices
-	HostIfaces   []store.DeviceInterface     // their reported interfaces (with the flat link columns)
-	// Addresses are the tenant's addresses with a MAC (any source) or a link,
-	// and NetworkMACs the MACs of network-device interfaces (022).
+	HostIfaces   []store.DeviceInterface     // their reported interfaces (with the flat link columns and per-switch Links)
+	// Addresses are the tenant's addresses with a MAC (any source) or a link
+	// (with their per-switch Links), and NetworkMACs the MACs of network-device interfaces (022).
 	Addresses   []store.IPAddress
 	NetworkMACs map[string]bool
 }
@@ -184,11 +184,14 @@ type PortLinkData struct {
 // PortLinkStore is the switch-port correlation persistence (US5).
 type PortLinkStore interface {
 	PortLinkData(ctx context.Context, tenantID string) (PortLinkData, error)
-	// SetInterfaceLinks writes the flat link columns of host interfaces and
-	// their audit rows in one tenant transaction.
+	// SetInterfaceLinks writes the flat link columns (the primary link) of
+	// host interfaces, replaces each one's per-switch link set with its Links
+	// (a host bonded across switches has one link per switch; an empty Links
+	// clears the set) and appends the audit rows, in one tenant transaction.
 	SetInterfaceLinks(ctx context.Context, tenantID string, ifaces []store.DeviceInterface, audit []store.AuditRow) error
 	// SetAddressLinks writes the link columns of addresses (Link nil clears
-	// them) and their audit rows in one tenant transaction.
+	// them), replaces each one's per-switch link set with its Links and
+	// appends the audit rows, in one tenant transaction.
 	SetAddressLinks(ctx context.Context, tenantID string, addrs []store.IPAddress, audit []store.AuditRow) error
 }
 

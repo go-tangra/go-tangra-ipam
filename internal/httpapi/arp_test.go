@@ -75,6 +75,61 @@ func TestAddressLinkRoutes(t *testing.T) {
 	}
 }
 
+// TestHostSwitchLinkRoutes (022 per-switch links): an address bonded across
+// two switches lists both links (primary first), shows under both switches'
+// ports, and links in a request body are ignored.
+func TestHostSwitchLinkRoutes(t *testing.T) {
+	f := newAPI(t)
+	ctx := context.Background()
+	sid := f.createSubnet(t, "srv", "10.22.0.0/24")
+	var ports []store.DeviceInterface
+	for n, name := range []string{"cs1", "cs2"} {
+		sw := store.Device{ID: "0190f7c2-aaaa-7c1a-9b2e-00000000ac0" + string(rune('1'+n)), TenantID: apiTenant, Name: name, DeviceType: store.DevSwitch}
+		if err := f.mem.CreateDevice(ctx, sw); err != nil {
+			t.Fatal(err)
+		}
+		port := store.DeviceInterface{ID: "0190f7c2-aaaa-7c1a-9b2e-00000000ac1" + string(rune('1'+n)), TenantID: apiTenant, DeviceID: sw.ID, Name: "Port 17"}
+		if err := f.mem.CreateInterface(ctx, port); err != nil {
+			t.Fatal(err)
+		}
+		ports = append(ports, port)
+	}
+	a := store.IPAddress{ID: "0190f7c2-aaaa-7c1a-9b2e-00000000ac21", TenantID: apiTenant, SubnetID: sid, Address: "10.22.0.53",
+		Hostname: "ns1", MACAddress: "d2:f1:15:7f:0a:5c", MACSource: store.MACSourceARP}
+	if err := f.mem.CreateAddress(ctx, a); err != nil {
+		t.Fatal(err)
+	}
+	seen := time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
+	link := func(p store.DeviceInterface) store.HostSwitchLink {
+		return store.HostSwitchLink{SwitchID: p.DeviceID, PortID: p.ID, PortName: p.Name, VLAN: 30, Source: store.LinkSNMPFDB, LastSeen: &seen}
+	}
+	if err := f.mem.SetAddressLinks(ctx, apiTenant, []store.IPAddress{{ID: a.ID,
+		Link:  &store.AddressLink{SwitchID: ports[1].DeviceID, PortID: ports[1].ID, PortName: "Port 17", VLAN: 30, Source: store.LinkSNMPFDB, LastSeen: &seen},
+		Links: []store.HostSwitchLink{link(ports[0]), link(ports[1])}}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	w := f.req(t, "GET", p+"/ip-addresses/"+a.ID, "user", "")
+	links, _ := decodeBody(t, w)["links"].([]any)
+	if w.Code != 200 || len(links) != 2 {
+		t.Fatalf("links %d %s", w.Code, w.Body)
+	}
+	first, second := links[0].(map[string]any), links[1].(map[string]any)
+	if first["switch_name"] != "cs2" || first["primary"] != true || second["switch_name"] != "cs1" || second["primary"] != false ||
+		second["port_name"] != "Port 17" || second["vlan"] != float64(30) || second["source"] != "snmp_fdb" || second["last_seen"] == nil {
+		t.Fatalf("links %s", w.Body)
+	}
+	for _, port := range ports {
+		w = f.req(t, "GET", p+"/devices/"+port.DeviceID+"/interfaces", "user", "")
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `"behind_addresses":[{"address_id":"`+a.ID+`","address":"10.22.0.53","hostname":"ns1"}]`) {
+			t.Fatalf("behind %s %d %s", port.DeviceID, w.Code, w.Body)
+		}
+	}
+	w = f.req(t, "POST", p+"/ip-addresses", "admin", `{"subnet_id":"`+sid+`","address":"10.22.0.9","links":[{"switch_id":"s","port_id":"p","source":"lldp","primary":true}]}`)
+	if b := decodeBody(t, w); w.Code != 201 || b["links"] != nil {
+		t.Fatalf("links in body %d %v", w.Code, b)
+	}
+}
+
 // TestARPSettingsRoutes (022 T030): defaults for readers, validated writes
 // with 422 detail.field, audit, CSRF, body bound and tenant scoping.
 func TestARPSettingsRoutes(t *testing.T) {

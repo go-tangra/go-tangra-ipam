@@ -41,6 +41,25 @@ bigint, `arp_created` bigint, `arp_conflicts` bigint (all NOT NULL DEFAULT 0),
 `invalid`, `multicast`, `virtual_router`, `network_device`, `proxy_arp`,
 `outside_subnets`, `excluded_device`.
 
+## 3a. `ipam_host_switch_links` (migration 0008, RLS like 0004)
+
+Per-switch links of hosts learned on several switches (MLAG / LACP bond); the
+flat link columns stay the primary link.
+
+| Column | Type | Notes |
+|---|---|---|
+| `tenant_id` | uuid NOT NULL | PK part |
+| `host_kind` | text NOT NULL | `interface` \| `address` — CHECK; PK part |
+| `host_id` | uuid NOT NULL | interface or address id; PK part (deleting the host deletes its rows — trigger) |
+| `switch_id` | uuid NOT NULL | → `ipam_devices` ON DELETE CASCADE; PK part |
+| `port_id` | uuid NOT NULL | → `ipam_device_interfaces` ON DELETE CASCADE |
+| `port_name` | text NOT NULL DEFAULT '' | |
+| `vlan` | int NOT NULL DEFAULT 0 | |
+| `source` | text NOT NULL | `snmp_fdb` \| `lldp` — CHECK |
+| `last_seen` | timestamptz NOT NULL | |
+
+PK `(tenant_id, host_kind, host_id, switch_id)`; index `(tenant_id, port_id)`.
+
 ## 4. Go types
 
 - `snmp.ARPEntry {IP, MAC string; IfIndex int}`; `DiscoveredDevice.ARP
@@ -54,7 +73,12 @@ bigint, `arp_created` bigint, `arp_conflicts` bigint (all NOT NULL DEFAULT 0),
   Entries, Conflicts int}`.
 - `store.IPAddress` gains the §1 fields (`Link *AddressLink` in JSON).
 - `store.ARPSettings`, `store.IPScanJob` ARP counters.
-- `portlink.Host` gains `AddressID`; `portlink.Link` gains `AddressID`.
+- `portlink.Host` gains `AddressID`; `portlink.Link` gains `AddressID`,
+  `Count` (MACs on the port) and `Primary` (one per host; one link per switch).
+- `store.HostSwitchLink {SwitchID, SwitchName, PortID, PortName, VLAN, Source,
+  LastSeen, Primary}`; `store.IPAddress.Links` and
+  `store.DeviceInterface.Links` (JSON `links`, primary first; written as the
+  host's complete set by `SetAddressLinks` / `SetInterfaceLinks`).
 
 ## 5. Provenance rules (FR-005/006/009)
 

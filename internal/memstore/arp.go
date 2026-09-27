@@ -154,6 +154,7 @@ func (m *Mem) SetAddressLinks(_ context.Context, tenantID string, addrs []store.
 		}
 	}
 	for _, a := range addrs {
+		m.setHostLinksLocked(tenantID, store.HostKindAddress, a.ID, a.Links)
 		cur := m.addrs[a.ID]
 		cur.Link = cloneLink(a.Link)
 		if cur.Link != nil {
@@ -177,14 +178,18 @@ func cloneLink(l *store.AddressLink) *store.AddressLink {
 	return &c
 }
 
-// decorateAddrLocked returns a copy of a whose link carries the switch name.
+// decorateAddrLocked returns a copy of a whose link carries the switch name,
+// with its per-switch links.
 func (m *Mem) decorateAddrLocked(a store.IPAddress) store.IPAddress {
 	a.Link = cloneLink(a.Link)
+	primary := ""
 	if a.Link != nil {
+		primary = a.Link.PortID
 		if d, ok := m.devices[a.Link.SwitchID]; ok && d.TenantID == a.TenantID {
 			a.Link.SwitchName = d.Name
 		}
 	}
+	a.Links = m.hostLinksLocked(a.TenantID, store.HostKindAddress, a.ID, primary)
 	return a
 }
 
@@ -192,7 +197,7 @@ func (m *Mem) decorateAddrLocked(a store.IPAddress) store.IPAddress {
 func (m *Mem) behindAddressesLocked(tenantID, portID string) []store.BehindAddress {
 	var out []store.BehindAddress
 	for _, a := range m.addrs {
-		if a.TenantID == tenantID && a.Link != nil && a.Link.PortID == portID {
+		if a.TenantID == tenantID && ((a.Link != nil && a.Link.PortID == portID) || m.linkedToLocked(tenantID, store.HostKindAddress, a.ID, portID)) {
 			out = append(out, store.BehindAddress{AddressID: a.ID, Address: a.Address, Hostname: a.Hostname})
 		}
 	}

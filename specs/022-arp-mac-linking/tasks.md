@@ -140,6 +140,7 @@ explicit user confirmation before they are executed.
 - [x] T040 [P] README section "ARP-based MAC linking" (sources, provenance, filters, settings, permissions, audit)
 - [x] T041 Run `go vet ./...`, `go test -race ./...`, `sg docker -c 'make test-integration'`, `make cover` (arpplan 100 %), `make vuln`, UI lint/unit/build
 - [x] T042 Update quickstart results and tick tasks in `specs/022-arp-mac-linking/tasks.md`
+- [x] T044 Per-switch links for hosts bonded across switches (MLAG / LACP; prod ns1 on cs1+cs2 port 17 tied → no link): `Rank` one link per switch with a `Primary` (rank + FuzzRank tests incl. MLAG and same-switch ties), `ipam_host_switch_links` in migration 0008 (RLS, cascades), correlator writes flat primary + per-switch set in one transaction with `secondary` audit, `links` on interfaces/addresses and per-switch `behind_*` (OpenAPI, contract tests, memstore parity), UI "Connected to" lists every switch port, integration test `TestHostSwitchLinks`
 - [ ] T043 Release (user-confirmed): PR → merge → tag `v4.5.0`; bump `IPAM_IMAGE` in go-tangra-docker `.env.example`; production deploy on explicit request
 
 ---

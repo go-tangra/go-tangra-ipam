@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/hostreport"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
@@ -172,24 +171,26 @@ func appendAuditBatch(ctx context.Context, tx pgx.Tx, tenantID string, rows []st
 	return tx.SendBatch(ctx, b).Close()
 }
 
-// SetAddressLinks implements repo.PortLinkStore: only the link columns of
-// the given addresses are written.
+// SetAddressLinks implements repo.PortLinkStore: only the link columns and
+// the per-switch link sets (Links, complete) of the given addresses are
+// written, with the audit rows, in one tenant transaction.
 func (d *DB) SetAddressLinks(ctx context.Context, tenantID string, addrs []store.IPAddress, audit []store.AuditRow) error {
 	return d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
+		b := &pgx.Batch{}
+		sizes := make([]int, 0, len(addrs))
 		for _, a := range addrs {
 			var l store.AddressLink
 			if a.Link != nil {
 				l = *a.Link
 			}
-			ct, e := tx.Exec(ctx, `UPDATE ipam_ip_addresses SET link_switch_id=$3, link_port_id=$4, link_port_name=$5,
+			b.Queue(`UPDATE ipam_ip_addresses SET link_switch_id=$3, link_port_id=$4, link_port_name=$5,
 				link_vlan=$6, link_source=$7, link_last_seen=$8, updated_at=now() WHERE tenant_id=$1 AND id=$2`,
 				tenantID, a.ID, np(l.SwitchID), np(l.PortID), l.PortName, l.VLAN, l.Source, l.LastSeen)
-			if e != nil {
-				return mapErr(e)
-			}
-			if ct.RowsAffected() == 0 {
-				return repo.ErrNotFound
-			}
+			queueHostLinks(b, tenantID, store.HostKindAddress, a.ID, a.Links)
+			sizes = append(sizes, 1+len(a.Links))
+		}
+		if err := execLinkBatch(ctx, tx, b, sizes); err != nil {
+			return err
 		}
 		for _, row := range audit {
 			row.TenantID = tenantID
@@ -201,10 +202,13 @@ func (d *DB) SetAddressLinks(ctx context.Context, tenantID string, addrs []store
 	})
 }
 
-// behindAddresses lists the addresses linked to a switch port.
+// behindAddresses lists the addresses linked to a switch port: as primary or
+// as a per-switch link (a bonded host shows under both switches' ports).
 func behindAddresses(ctx context.Context, tx pgx.Tx, tenantID, portID string) ([]store.BehindAddress, error) {
 	rows, err := tx.Query(ctx, `SELECT id::text, address, hostname FROM ipam_ip_addresses
-		WHERE tenant_id=$1 AND link_port_id=$2::uuid ORDER BY address LIMIT 256`, tenantID, portID)
+		WHERE tenant_id=$1 AND (link_port_id=$2::uuid OR id IN (SELECT host_id FROM ipam_host_switch_links
+			WHERE tenant_id=$1 AND host_kind='address' AND port_id=$2::uuid))
+		ORDER BY address LIMIT 256`, tenantID, portID)
 	if err != nil {
 		return nil, err
 	}

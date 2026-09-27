@@ -48,6 +48,7 @@ type Mem struct {
 	devState    map[string]store.HostSyncDeviceState // keyed by device id
 	snmp        map[string]store.SubnetSNMP          // keyed by subnet id
 	arp         map[string]store.ARPSettings         // keyed by tenant id
+	hostLinks   map[hostKey][]store.HostSwitchLink   // per-switch links (022)
 
 	failNext map[string]bool
 	Now      func() time.Time
@@ -75,6 +76,7 @@ func New() *Mem {
 		devState:    map[string]store.HostSyncDeviceState{},
 		snmp:        map[string]store.SubnetSNMP{},
 		arp:         map[string]store.ARPSettings{},
+		hostLinks:   map[hostKey][]store.HostSwitchLink{},
 		failNext:    map[string]bool{},
 		Now:         func() time.Time { return time.Now().UTC() },
 	}
@@ -288,6 +290,7 @@ func (m *Mem) DeleteSubnet(_ context.Context, tenantID, id string, force bool) e
 	}
 	for _, aid := range addrIDs {
 		delete(m.addrs, aid)
+		delete(m.hostLinks, hostKey{tenantID, store.HostKindAddress, aid})
 	}
 	for jid, j := range m.scans {
 		if j.TenantID == tenantID && j.SubnetID == id {
@@ -511,6 +514,7 @@ func (m *Mem) DeleteAddress(_ context.Context, tenantID, id string) error {
 		return repo.ErrNotFound
 	}
 	delete(m.addrs, id)
+	delete(m.hostLinks, hostKey{tenantID, store.HostKindAddress, id})
 	return nil
 }
 
@@ -794,6 +798,7 @@ func (m *Mem) DeleteDevice(_ context.Context, tenantID, id string, force bool) e
 	for _, iid := range ifaceIDs {
 		delete(m.ifaces, iid)
 		delete(m.links, iid)
+		delete(m.hostLinks, hostKey{tenantID, store.HostKindInterface, iid})
 	}
 	delete(m.pkgs, id)
 	m.deleteDeviceHostSyncLocked(id)
@@ -900,11 +905,12 @@ func (m *Mem) ListInterfaces(_ context.Context, tenantID, deviceID string) ([]st
 				i.RemoteDeviceName = d.Name
 			}
 			for _, h := range m.ifaces {
-				if h.TenantID == tenantID && h.RemoteInterfaceID == i.ID {
+				if h.TenantID == tenantID && (h.RemoteInterfaceID == i.ID || m.linkedToLocked(tenantID, store.HostKindInterface, h.ID, i.ID)) {
 					i.BehindDeviceID, i.BehindDeviceName = h.DeviceID, m.devices[h.DeviceID].Name
 				}
 			}
 			i.BehindAddresses = m.behindAddressesLocked(tenantID, i.ID)
+			i.Links = m.hostLinksLocked(tenantID, store.HostKindInterface, i.ID, i.RemoteInterfaceID)
 			out = append(out, i)
 		}
 	}
@@ -950,6 +956,7 @@ func (m *Mem) DeleteInterface(_ context.Context, tenantID, id string) error {
 	}
 	delete(m.ifaces, id)
 	delete(m.links, id)
+	delete(m.hostLinks, hostKey{tenantID, store.HostKindInterface, id})
 	return nil
 }
 

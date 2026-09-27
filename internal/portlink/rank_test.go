@@ -67,16 +67,54 @@ func TestRankUplinks(t *testing.T) {
 }
 
 func TestRankDaisyChainAndTie(t *testing.T) {
-	// Access switch s2 port (1 MAC) behind s1's port (3 MACs): globally fewest wins.
+	// Access switch s2 port (1 MAC) behind s1's port (3 MACs): the globally
+	// fewest is primary, s1 keeps its most direct port as a secondary link.
 	l := Rank(in(port("s1", "p1", hMAC, "02:00:00:00:00:01", "02:00:00:00:00:02"), port("s2", "p2", hMAC)))
-	if len(l) != 1 || l[0].PortID != "p2" {
+	if len(l) != 2 || l[0].PortID != "p2" || !l[0].Primary || l[1].PortID != "p1" || l[1].Primary || l[1].Count != 3 {
 		t.Fatalf("daisy chain %+v", l)
-	}
-	if l := Rank(in(port("s1", "p1", hMAC), port("s2", "p2", hMAC))); len(l) != 0 {
-		t.Fatal("tie must not link")
 	}
 	if l := Rank(in(port("s1", "p1", h2MAC))); len(l) != 0 {
 		t.Fatal("unknown MAC")
+	}
+}
+
+// TestRankMLAG: a host bonded across a switch pair is learned on a port of
+// each switch with the same MAC count — one link per switch, the lowest
+// switch id primary (never "no link" because two switches tie).
+func TestRankMLAG(t *testing.T) {
+	busy := func(sw, id string) Port {
+		p := port(sw, id, hMAC)
+		for n := 0; n < 5; n++ {
+			p.MACs["02:00:00:00:01:0"+string(rune('0'+n))] = 30
+		}
+		return p
+	}
+	l := Rank(in(busy("cs2", "p17b"), busy("cs1", "p17a"), busy("cs1", "p3")))
+	// cs1 has two ports with 6 MACs each (same-switch tie): no link on cs1.
+	if len(l) != 1 || l[0].SwitchID != "cs2" || !l[0].Primary {
+		t.Fatalf("same-switch tie %+v", l)
+	}
+	l = Rank(in(busy("cs2", "p17b"), busy("cs1", "p17a")))
+	if len(l) != 2 || l[0].SwitchID != "cs1" || !l[0].Primary || l[1].SwitchID != "cs2" || l[1].Primary ||
+		l[0].PortID != "p17a" || l[1].PortID != "p17b" || l[0].VLAN != 10 {
+		t.Fatalf("mlag pair %+v", l)
+	}
+	// Per switch the fewest-MAC port wins; the primary is the fewest overall.
+	l = Rank(in(busy("cs1", "p17a"), port("cs1", "p9", hMAC, "02:00:00:00:00:09"), busy("cs2", "p17b")))
+	if len(l) != 2 || l[0].PortID != "p9" || !l[0].Primary || l[1].PortID != "p17b" {
+		t.Fatalf("per-switch fewest %+v", l)
+	}
+	// Equal counts on both switches and equal switch ids are impossible; a
+	// port id breaks the order when the switch ids tie in primaryBefore.
+	if !primaryBefore(Link{SwitchID: "s", PortID: "a"}, Link{SwitchID: "s", PortID: "b"}) {
+		t.Fatal("port id tie-break")
+	}
+	// LLDP on one switch wins that switch (and the primary), FDB on the other.
+	named := port("cs2", "p1", "02:00:00:00:00:01", "02:00:00:00:00:02")
+	named.LLDP = [][2]string{{"web-01", "enp1s0"}}
+	l = Rank(in(port("cs1", "p5", hMAC), named))
+	if len(l) != 2 || l[0].SwitchID != "cs2" || l[0].Source != store.LinkLLDP || !l[0].Primary || l[1].PortID != "p5" {
+		t.Fatalf("lldp + fdb %+v", l)
 	}
 }
 
@@ -91,7 +129,7 @@ func TestRankLLDPOverridesFDB(t *testing.T) {
 	// Port id = the interface MAC.
 	byMAC := port("s1", "p3")
 	byMAC.LLDP = [][2]string{{"", "AA-BB-CC-00-00-01"}}
-	if l := Rank(in(fdb, byMAC)); l[0].PortID != "p3" {
+	if l := Rank(in(fdb, byMAC)); len(l) != 1 || l[0].PortID != "p3" {
 		t.Fatalf("lldp by MAC %+v", l)
 	}
 	// Port id = interface name with the host's system name.
