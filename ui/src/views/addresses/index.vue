@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiNumberInput, UiButton, UiDataTable, UiStatusChip, UiBadge, UiLiveIndicator, UiDrawer, useConfirm, type Column, type SelectOption } from '@go-tangra/ui'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiNumberInput, UiButton, UiDataTable, UiStatusChip, UiBadge, UiLiveIndicator, UiDrawer, UiTooltip, useConfirm, type Column, type SelectOption } from '@go-tangra/ui'
 import { useZodForm } from '@go-tangra/ui/forms'
 import { useAddresses } from '@/stores/addresses'
 import { useSubnets } from '@/stores/subnets'
 import { useLive } from '@/stores/live'
 import { addressFilterSchema, allocateSchema, bulkAllocateSchema, suggestSchema, ADDRESS_STATUSES, ADDRESS_TYPES } from '@/schemas'
 import { useHostSync } from '@/stores/hostsync'
+import { useDevices } from '@/stores/devices'
+import { macSourceLabel, macSourceText } from './mac'
 import { useAbility } from '@casl/vue'
 import type { IPAddress, PingResult } from '@/api/types'
 import { describe } from '@/api/client'
@@ -25,9 +27,22 @@ const typeOptions: SelectOption[] = ADDRESS_TYPES.map((s) => ({ title: s, value:
 const subnetOptions = computed<SelectOption[]>(() => subnets.items.map((s) => ({ title: s.name + ' (' + s.cidr + ')', value: s.id })))
 
 let release: (() => void) | null = null
+// Names of the devices that reported ARP-learned MACs (feature 022).
+const devices = useDevices()
+const deviceNames = ref<Record<string, string>>({})
+const deviceName = (id: string): string => deviceNames.value[id] ?? ''
+const macColors = { ARP: 'info', Agent: 'success', Manual: 'neutral' } as const
+async function loadDeviceNames(): Promise<void> {
+  try {
+    deviceNames.value = Object.fromEntries((await devices.lookup()).map((d) => [d.id, d.name]))
+  } catch {
+    // names are a convenience: the tooltip falls back to the id
+  }
+}
 onMounted(() => {
   void store.list()
   void subnets.list()
+  void loadDeviceNames()
   release = live.connect()
 })
 onUnmounted(() => release?.())
@@ -131,7 +146,15 @@ const columns: Column<IPAddress>[] = [
     <UiAlert v-if="actionError" kind="error" class="mb-3">{{ actionError }}</UiAlert>
     <UiCard :padded="false">
       <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="IP addresses" empty-title="No addresses match" :row-attrs="(a) => ({ 'data-test': 'address-row-' + a.id })" data-test="addresses-table">
-        <template #cell-address="{ row }">{{ row.address }} <UiBadge v-if="row.is_primary" color="primary" size="xs">primary</UiBadge> <UiBadge v-if="row.report_state === 'not_reported'" color="neutral" size="xs">not reported</UiBadge> <UiBadge v-if="row.conflict" color="error" size="xs">conflict</UiBadge></template>
+        <template #cell-address="{ row }">{{ row.address }} <UiBadge v-if="row.is_primary" color="primary" size="xs">primary</UiBadge> <UiBadge v-if="row.report_state === 'not_reported'" color="neutral" size="xs">not reported</UiBadge> <UiBadge v-if="row.conflict" color="error" size="xs">conflict</UiBadge> <UiBadge v-if="row.origin === 'arp'" color="info" size="xs">from ARP</UiBadge></template>
+        <template #cell-mac_address="{ row }">
+          <span v-if="row.mac_address" class="inline-flex items-center gap-1">
+            <span class="font-mono text-xs">{{ row.mac_address }}</span>
+            <UiTooltip v-if="macSourceLabel(row)" :text="macSourceText(row, deviceName)"><UiBadge :color="macColors[macSourceLabel(row) as keyof typeof macColors]" size="xs" :data-test="'mac-source-' + row.id">{{ macSourceLabel(row) }}</UiBadge></UiTooltip>
+            <UiTooltip v-if="row.mac_conflict" :text="'ARP reports ' + row.mac_conflict"><UiBadge color="warning" size="xs" :data-test="'mac-conflict-' + row.id">MAC conflict</UiBadge></UiTooltip>
+          </span>
+          <span v-else class="text-base-content/70">—</span>
+        </template>
         <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', dhcp: 'accent', deprecated: 'warning', offline: 'neutral' }" /></template>
         <template #cell-ping="{ row }"><UiStatusChip v-if="pingResult[row.id]" :status="pingResult[row.id]!.alive ? 'alive' : 'down'" :label="pingResult[row.id]!.alive ? (pingResult[row.id]!.rtt_ms ?? 0) + ' ms' : 'down'" :colors="{ alive: 'success', down: 'neutral' }" /><span v-else class="text-base-content/70">—</span></template>
         <template #actions="{ row }">

@@ -480,8 +480,9 @@ func (t *hostTx) InsertAddressReported(a store.IPAddress) error {
 	_, err := t.tx.Exec(t.ctx, `INSERT INTO ipam_ip_addresses
 		(id, tenant_id, address, subnet_id, hostname, mac_address, device_id, interface_name, status, address_type,
 		 is_primary, last_seen, created_by, report_state, previous_device_id, moved_at, move_count, move_window_start,
-		 conflict, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$20)`,
+		 conflict, created_at, updated_at, mac_source, mac_seen_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$20,
+		 CASE WHEN $6 <> '' THEN 'agent' ELSE '' END, CASE WHEN $6 <> '' THEN $20::timestamptz END)`,
 		a.ID, t.tid, a.Address, a.SubnetID, a.Hostname, a.MACAddress, np(a.DeviceID), a.InterfaceName, a.Status,
 		a.AddressType, a.IsPrimary, a.LastSeen, a.CreatedBy, a.ReportState, np(a.PreviousDeviceID), a.MovedAt,
 		a.MoveCount, a.MoveWindowStart, a.Conflict, now)
@@ -494,7 +495,11 @@ func (t *hostTx) InsertAddressReported(a store.IPAddress) error {
 func (t *hostTx) UpdateAddressReported(a store.IPAddress) error {
 	ct, err := t.tx.Exec(t.ctx, `UPDATE ipam_ip_addresses SET device_id=$3, interface_name=$4, mac_address=$5,
 		hostname=$6, is_primary=$7, last_seen=$8, report_state=$9, previous_device_id=$10, moved_at=$11,
-		move_count=$12, move_window_start=$13, conflict=$14, updated_at=now() WHERE tenant_id=$1 AND id=$2`,
+		move_count=$12, move_window_start=$13, conflict=$14, updated_at=now(),
+		mac_source=CASE WHEN $9 <> 'reported' THEN mac_source WHEN $5 <> '' THEN 'agent' ELSE '' END,
+		mac_source_device_id=CASE WHEN $9 <> 'reported' THEN mac_source_device_id END,
+		mac_seen_at=CASE WHEN $9 <> 'reported' THEN mac_seen_at WHEN $5 <> '' THEN now() END
+		WHERE tenant_id=$1 AND id=$2`,
 		t.tid, a.ID, np(a.DeviceID), a.InterfaceName, a.MACAddress, a.Hostname, a.IsPrimary, a.LastSeen,
 		a.ReportState, np(a.PreviousDeviceID), a.MovedAt, a.MoveCount, a.MoveWindowStart, a.Conflict)
 	if err != nil {

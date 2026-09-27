@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
@@ -228,5 +229,42 @@ func TestScanUpsertKeepsMACProvenance(t *testing.T) {
 	a, _ := m.GetAddress(ctx, "t1", "a-manual")
 	if a.MACAddress != "00:11:22:33:44:03" || a.MACSource != store.MACSourceManual {
 		t.Fatalf("scan upsert dropped the MAC %+v", a)
+	}
+}
+
+// TestHostSyncWritesAgentProvenance (022 D4): MACs the host sync writes are
+// "agent"; a reported address without a MAC has no source.
+func TestHostSyncWritesAgentProvenance(t *testing.T) {
+	ctx := context.Background()
+	m := New()
+	seedARPAddresses(t, m)
+	err := m.ApplyHostReport(ctx, "t1", func(tx repo.HostTx) error {
+		if err := tx.InsertAddressReported(store.IPAddress{ID: "h1", Address: "10.0.0.20", SubnetID: "s1", MACAddress: "52:54:00:00:00:20",
+			ReportState: store.RepReported, Status: store.IPActive}); err != nil {
+			return err
+		}
+		if err := tx.InsertAddressReported(store.IPAddress{ID: "h2", Address: "10.0.0.21", SubnetID: "s1", ReportState: store.RepReported}); err != nil {
+			return err
+		}
+		// Claims an ARP-learned address: the agent MAC replaces it.
+		return tx.UpdateAddressReported(store.IPAddress{ID: "a-arp", MACAddress: "52:54:00:00:00:02", ReportState: store.RepReported})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{"h1": store.MACSourceAgent, "h2": "", "a-arp": store.MACSourceAgent} {
+		a, _ := m.GetAddress(ctx, "t1", id)
+		if a.MACSource != want || (want != "" && (a.MACSeenAt == nil || a.MACSourceDeviceID != "")) {
+			t.Errorf("%s: %+v", id, a)
+		}
+	}
+	// A released address keeps its MAC and source.
+	if err := m.ApplyHostReport(ctx, "t1", func(tx repo.HostTx) error {
+		return tx.UpdateAddressReported(store.IPAddress{ID: "h1", MACAddress: "52:54:00:00:00:20", ReportState: store.RepNotReported})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ := m.GetAddress(ctx, "t1", "h1"); a.MACSource != store.MACSourceAgent {
+		t.Fatalf("released %+v", a)
 	}
 }

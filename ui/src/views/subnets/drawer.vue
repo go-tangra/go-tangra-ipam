@@ -16,7 +16,7 @@ import type { IPScanJob, SplitResult, Subnet } from '@/api/types'
 import { describe } from '@/api/client'
 import { mergeEdit } from '@/api/merge'
 import SubnetSnmpCard from '@/components/SubnetSnmpCard.vue'
-import { snmpPhaseText } from '@/views/scans/snmp'
+import { arpPhaseText, snmpPhaseText } from '@/views/scans/snmp'
 
 export type SubnetDrawerMode = 'view' | 'create' | 'edit' | 'split'
 
@@ -195,7 +195,8 @@ const scanText = computed(() => {
   if (!j) return ''
   if (j.status === 'completed') {
     const snmp = j.enable_snmp ? ` SNMP: ${snmpPhaseText(j, (id) => byId(id)?.cidr ?? id)}.` : ''
-    return `Scan complete: ${j.alive_count ?? 0} alive, ${j.new_count ?? 0} new, ${j.updated_count ?? 0} updated.${snmp}`
+    const arp = j.arp_status ? ` ARP: ${arpPhaseText(j)}.` : ''
+    return `Scan complete: ${j.alive_count ?? 0} alive, ${j.new_count ?? 0} new, ${j.updated_count ?? 0} updated.${snmp}${arp}`
   }
   if (j.status === 'failed') return `Scan failed: ${j.status_message || 'unknown error'}.`
   if (j.status === 'cancelled') return 'Scan cancelled.'

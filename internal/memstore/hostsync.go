@@ -568,6 +568,10 @@ func (t *memTx) InsertAddressReported(a store.IPAddress) error {
 	}
 	ts := now(t.m)
 	a.TenantID, a.CreatedAt, a.UpdatedAt = t.tid, ts, ts
+	a.MACSource, a.MACSourceDeviceID, a.MACSeenAt, a.MACConflict, a.Origin, a.Link = "", "", nil, "", "", nil
+	if a.MACAddress != "" {
+		a.MACSource, a.MACSeenAt = store.MACSourceAgent, &ts
+	}
 	t.m.addrs[a.ID] = a
 	return nil
 }
@@ -584,6 +588,14 @@ func (t *memTx) UpdateAddressReported(a store.IPAddress) error {
 	cur.LastSeen, cur.ReportState, cur.PreviousDeviceID, cur.MovedAt = a.LastSeen, a.ReportState, a.PreviousDeviceID, a.MovedAt
 	cur.MoveCount, cur.MoveWindowStart, cur.Conflict = a.MoveCount, a.MoveWindowStart, a.Conflict
 	cur.UpdatedAt = now(t.m)
+	if a.ReportState == store.RepReported {
+		// 022: a reported MAC is the agent's (none: no source).
+		cur.MACSource, cur.MACSourceDeviceID, cur.MACSeenAt = "", "", nil
+		if a.MACAddress != "" {
+			ts := cur.UpdatedAt
+			cur.MACSource, cur.MACSeenAt = store.MACSourceAgent, &ts
+		}
+	}
 	t.m.addrs[a.ID] = cur
 	return nil
 }

@@ -437,6 +437,9 @@ func (m *Mem) FindAddress(_ context.Context, tenantID, address string) (store.IP
 func (m *Mem) ListAddresses(_ context.Context, tenantID string, f store.AddressFilter) ([]store.IPAddress, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.fail("ListAddresses"); err != nil {
+		return nil, err
+	}
 	var out []store.IPAddress
 	for _, a := range m.addrs {
 		if a.TenantID != tenantID {

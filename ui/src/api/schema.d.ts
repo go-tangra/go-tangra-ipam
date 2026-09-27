@@ -1096,6 +1096,82 @@ export interface components {
             own?: components["schemas"]["SubnetSNMPOwn"] | null;
             effective?: components["schemas"]["SNMPSummary"];
         };
+        /** @description An IP address. mac_source, mac_source_device_id, mac_seen_at, mac_conflict, origin and link are server-owned (ignored in request bodies): a MAC set through the API is "manual", the host sync writes "agent", scans with SNMP learn "arp" from router ARP tables and never overwrite an agent or manual MAC (a disagreement is mac_conflict). */
+        IPAddress: {
+            id?: string;
+            address?: string;
+            subnet_id?: string;
+            hostname?: string;
+            mac_address?: string;
+            description?: string;
+            device_id?: string;
+            interface_name?: string;
+            /** @enum {string} */
+            status?: "active" | "reserved" | "dhcp" | "deprecated" | "offline";
+            address_type?: string;
+            /** Format: date-time */
+            last_seen?: string;
+            /** @enum {string} */
+            report_state?: "" | "reported" | "not_reported";
+            conflict?: boolean;
+            /** @enum {string} */
+            readonly mac_source?: "" | "manual" | "agent" | "arp";
+            /** @description device whose ARP table reported the MAC (arp) */
+            readonly mac_source_device_id?: string;
+            /** Format: date-time */
+            readonly mac_seen_at?: string;
+            /** @description ARP-observed MAC disagreeing with an agent/manual MAC */
+            readonly mac_conflict?: string;
+            /** @enum {string} */
+            readonly origin?: "" | "arp";
+        };
+        IPAddressList: {
+            items?: components["schemas"]["IPAddress"][];
+        };
+        IPScanJob: {
+            id?: string;
+            subnet_id?: string;
+            /** @enum {string} */
+            status?: "pending" | "scanning" | "completed" | "failed" | "cancelled";
+            progress?: number;
+            status_message?: string;
+            alive_count?: number;
+            new_count?: number;
+            updated_count?: number;
+            /** @enum {string} */
+            snmp_status?: "" | "not_requested" | "no_live_hosts" | "no_credentials" | "credentials_unreadable" | "ran";
+            snmp_discovered_count?: number;
+            /**
+             * @description ARP phase of a scan with SNMP discovery
+             * @enum {string}
+             */
+            arp_status?: "" | "ran" | "disabled" | "failed";
+            /** @description devices whose ARP table returned entries */
+            arp_devices?: number;
+            /** @description devices whose ARP read was capped or interrupted */
+            arp_partial?: number;
+            arp_entries?: number;
+            /** @description addresses whose MAC was set or changed */
+            arp_applied?: number;
+            /** @description addresses created from ARP (origin arp) */
+            arp_created?: number;
+            arp_conflicts?: number;
+            /** @description ignored entries by reason */
+            arp_ignored?: {
+                invalid?: number;
+                multicast?: number;
+                virtual_router?: number;
+                network_device?: number;
+                proxy_arp?: number;
+                outside_subnets?: number;
+                excluded_device?: number;
+            } & {
+                [key: string]: number;
+            };
+        };
+        IPScanJobList: {
+            items?: components["schemas"]["IPScanJob"][];
+        };
         /**
          * @example {
          *       "reason": "not_found",
@@ -1508,7 +1584,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPAddressList"];
+                };
             };
         };
     };
@@ -1637,7 +1715,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPAddress"];
+                };
             };
             /** @description not_found */
             404: {
@@ -3090,7 +3170,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPScanJobList"];
+                };
             };
         };
     };
@@ -3131,7 +3213,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IPScanJob"];
+                };
             };
             /** @description not_found */
             404: {

@@ -182,6 +182,75 @@ components:
         own: { oneOf: [{ $ref: '#/components/schemas/SubnetSNMPOwn' }, { type: 'null' }] }
         effective: { $ref: '#/components/schemas/SNMPSummary' }
 
+    # ---- ARP-based MAC linking (feature 022) ----
+    IPAddress:
+      type: object
+      description: >
+        An IP address. mac_source, mac_source_device_id, mac_seen_at,
+        mac_conflict, origin and link are server-owned (ignored in request
+        bodies): a MAC set through the API is "manual", the host sync writes
+        "agent", scans with SNMP learn "arp" from router ARP tables and never
+        overwrite an agent or manual MAC (a disagreement is mac_conflict).
+      properties:
+        id: { type: string }
+        address: { type: string }
+        subnet_id: { type: string }
+        hostname: { type: string }
+        mac_address: { type: string }
+        description: { type: string }
+        device_id: { type: string }
+        interface_name: { type: string }
+        status: { type: string, enum: [active, reserved, dhcp, deprecated, offline] }
+        address_type: { type: string }
+        last_seen: { type: string, format: date-time }
+        report_state: { type: string, enum: ['', reported, not_reported] }
+        conflict: { type: boolean }
+        mac_source: { type: string, enum: ['', manual, agent, arp], readOnly: true }
+        mac_source_device_id: { type: string, readOnly: true, description: 'device whose ARP table reported the MAC (arp)' }
+        mac_seen_at: { type: string, format: date-time, readOnly: true }
+        mac_conflict: { type: string, readOnly: true, description: 'ARP-observed MAC disagreeing with an agent/manual MAC' }
+        origin: { type: string, enum: ['', arp], readOnly: true }
+    IPAddressList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/IPAddress' } }
+    IPScanJob:
+      type: object
+      properties:
+        id: { type: string }
+        subnet_id: { type: string }
+        status: { type: string, enum: [pending, scanning, completed, failed, cancelled] }
+        progress: { type: integer }
+        status_message: { type: string }
+        alive_count: { type: integer }
+        new_count: { type: integer }
+        updated_count: { type: integer }
+        snmp_status: { type: string, enum: ['', not_requested, no_live_hosts, no_credentials, credentials_unreadable, ran] }
+        snmp_discovered_count: { type: integer }
+        arp_status: { type: string, enum: ['', ran, disabled, failed], description: 'ARP phase of a scan with SNMP discovery' }
+        arp_devices: { type: integer, description: 'devices whose ARP table returned entries' }
+        arp_partial: { type: integer, description: 'devices whose ARP read was capped or interrupted' }
+        arp_entries: { type: integer }
+        arp_applied: { type: integer, description: 'addresses whose MAC was set or changed' }
+        arp_created: { type: integer, description: 'addresses created from ARP (origin arp)' }
+        arp_conflicts: { type: integer }
+        arp_ignored:
+          type: object
+          description: 'ignored entries by reason'
+          additionalProperties: { type: integer }
+          properties:
+            invalid: { type: integer }
+            multicast: { type: integer }
+            virtual_router: { type: integer }
+            network_device: { type: integer }
+            proxy_arp: { type: integer }
+            outside_subnets: { type: integer }
+            excluded_device: { type: integer }
+    IPScanJobList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/IPScanJob' } }
+
     Error:
       type: object
       properties:
@@ -255,7 +324,7 @@ paths:
         - { $ref: '#/components/parameters/limit' }
         - { $ref: '#/components/parameters/reportState' }
         - { name: conflict, in: query, required: false, schema: { type: boolean } }
-      responses: { '200': { description: list } }
+      responses: { '200': { description: list, content: { application/json: { schema: { $ref: '#/components/schemas/IPAddressList' } } } } }
     post: { operationId: createIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: created } } }
   /api/ipam/v1/ip-addresses/allocate:
     post: { operationId: allocateIpAddress, x-freya-permission: 'addresses:allocate', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '201': { description: 'next-free allocated' } } }
@@ -277,7 +346,7 @@ paths:
         - { name: count, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 256 } }
       responses: { '200': { description: 'ICMP+TCP verified free addresses' } }
   /api/ipam/v1/ip-addresses/{id}:
-    get: { operationId: getIpAddress, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: address }, '404': { description: not_found } } }
+    get: { operationId: getIpAddress, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: address, content: { application/json: { schema: { $ref: '#/components/schemas/IPAddress' } } } }, '404': { description: not_found } } }
     put: { operationId: updateIpAddress, x-freya-permission: 'addresses:manage', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: updated } } }
     delete: { operationId: deleteIpAddress, x-freya-permission: 'addresses:manage', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '204': { description: deleted } } }
   /api/ipam/v1/ip-addresses/{id}/clear-conflict:
@@ -445,10 +514,10 @@ paths:
 
   # ---- Scans ----
   /api/ipam/v1/ip-scans:
-    get: { operationId: listIpScans, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }
+    get: { operationId: listIpScans, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list, content: { application/json: { schema: { $ref: '#/components/schemas/IPScanJobList' } } } } } }
     post: { operationId: startIpScan, x-freya-permission: 'scan:run', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }], responses: { '202': { description: 'scan started' } } }
   /api/ipam/v1/ip-scans/{id}:
-    get: { operationId: getIpScan, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: job }, '404': { description: not_found } } }
+    get: { operationId: getIpScan, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: job, content: { application/json: { schema: { $ref: '#/components/schemas/IPScanJob' } } } }, '404': { description: not_found } } }
   /api/ipam/v1/ip-scans/{id}/cancel:
     post: { operationId: cancelIpScan, x-freya-permission: 'scan:run', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: cancelled } } }
 

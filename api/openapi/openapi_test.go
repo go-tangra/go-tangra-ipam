@@ -225,3 +225,39 @@ func TestSubnetSNMPContract(t *testing.T) {
 		}
 	}
 }
+
+// TestARPResponseContract (022 T021): address provenance and scan ARP fields.
+func TestARPResponseContract(t *testing.T) {
+	doc := loadDoc(t)
+	addr := doc.Components.Schemas["IPAddress"]
+	if addr == nil {
+		t.Fatal("IPAddress schema missing")
+	}
+	for _, f := range []string{"mac_source", "mac_source_device_id", "mac_seen_at", "mac_conflict", "origin"} {
+		p := addr.Value.Properties[f]
+		if p == nil || !p.Value.ReadOnly {
+			t.Errorf("address %s must be a read-only property", f)
+		}
+	}
+	if got := addr.Value.Properties["mac_source"].Value.Enum; len(got) != 4 {
+		t.Errorf("mac_source enum %v", got)
+	}
+	job := doc.Components.Schemas["IPScanJob"]
+	if job == nil {
+		t.Fatal("IPScanJob schema missing")
+	}
+	for _, f := range []string{"arp_status", "arp_devices", "arp_partial", "arp_entries", "arp_applied", "arp_created", "arp_conflicts", "arp_ignored"} {
+		if job.Value.Properties[f] == nil {
+			t.Errorf("scan job %s missing", f)
+		}
+	}
+	if n := len(job.Value.Properties["arp_ignored"].Value.Properties); n != 7 {
+		t.Errorf("arp_ignored reasons %d", n)
+	}
+	for path, schema := range map[string]string{"/api/ipam/v1/ip-addresses/{id}": "IPAddress", "/api/ipam/v1/ip-scans/{id}": "IPScanJob"} {
+		ref := doc.Paths.Find(path).Get.Responses.Value("200").Value.Content.Get("application/json").Schema.Ref
+		if ref != "#/components/schemas/"+schema {
+			t.Errorf("%s response %q", path, ref)
+		}
+	}
+}

@@ -168,7 +168,18 @@ export interface IPAddress {
   previous_device_id?: string
   moved_at?: string
   conflict?: boolean
+  // MAC provenance (feature 022, server-owned): agent (host sync), manual
+  // (entered by a user) or arp (a router's ARP table, reporting device and
+  // last seen); mac_conflict is an ARP MAC disagreeing with an agent/manual
+  // one; origin "arp" marks an address created from ARP data.
+  mac_source?: MACSource
+  mac_source_device_id?: string
+  mac_seen_at?: string
+  mac_conflict?: string
+  origin?: '' | 'arp'
 }
+
+export type MACSource = '' | 'manual' | 'agent' | 'arp'
 
 // PingResult is the /ip-addresses/{id}/ping response.
 export interface PingResult {
@@ -444,6 +455,15 @@ export interface IPScanJob {
   snmp_probed?: number
   snmp_no_answer?: number
   snmp_rejected?: number
+  // ARP phase (feature 022).
+  arp_status?: '' | 'ran' | 'disabled' | 'failed'
+  arp_devices?: number
+  arp_partial?: number
+  arp_entries?: number
+  arp_applied?: number
+  arp_created?: number
+  arp_conflicts?: number
+  arp_ignored?: Record<string, number>
   triggered_by?: string
   retry_count?: number
   max_retries?: number

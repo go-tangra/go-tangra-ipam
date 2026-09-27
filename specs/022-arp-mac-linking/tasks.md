@@ -63,18 +63,18 @@ explicit user confirmation before they are executed.
 
 ### Tests first
 
-- [ ] T014 [P] [US1] Planner tests in `internal/arpplan/plan_test.go`: provenance table (data-model §5) — fill, update, touch, conflict, clear_conflict, create; outside-subnet ignored; same IP from two devices (deterministic winner + conflict count); audit rows per op with neutral keys
-- [ ] T015 [P] [US1] Planner fuzz `FuzzPlan` in `internal/arpplan/fuzz_test.go` (random entries/addresses: never panics, never emits an op changing an `agent`/`manual` MAC — SC-003)
-- [ ] T016 [P] [US1] Executor tests in `internal/scan/executor_test.go`: scan with SNMP collects ARP from answering devices (CollectARP set only when settings enabled), applies the plan, records scan counters and `arp_run`; disabled settings → no ARP, status visible; partial device counted
-- [ ] T017 [P] [US1] Address API tests in `internal/addresses/addresses_test.go` and `internal/httpapi`: user MAC sets `manual` and clears conflict; empty clears source; `mac_source`/`origin`/`link` in body ignored; host sync writes `agent` (hostsync test)
+- [x] T014 [P] [US1] Planner tests in `internal/arpplan/plan_test.go`: provenance table (data-model §5) — fill, update, touch, conflict, clear_conflict, create; outside-subnet ignored; same IP from two devices (deterministic winner + conflict count); audit rows per op with neutral keys
+- [x] T015 [P] [US1] Planner fuzz `FuzzPlan` in `internal/arpplan/fuzz_test.go` (random entries/addresses: never panics, never emits an op changing an `agent`/`manual` MAC — SC-003)
+- [x] T016 [P] [US1] Executor tests in `internal/scan/executor_test.go`: scan with SNMP collects ARP from answering devices (CollectARP set only when settings enabled), applies the plan, records scan counters and `arp_run`; disabled settings → no ARP, status visible; partial device counted
+- [x] T017 [P] [US1] Address API tests in `internal/addresses/addresses_test.go` and `internal/httpapi`: user MAC sets `manual` and clears conflict; empty clears source; `mac_source`/`origin`/`link` in body ignored; host sync writes `agent` (hostsync test)
 
 ### Implementation
 
-- [ ] T018 [US1] Implement `internal/arpplan/{arpplan.go,filter.go,plan.go}` (normalise, provenance planning, audit rows, counters) to pass T014–T015 (filters for US3 may land here but are tested in Phase 5)
-- [ ] T019 [US1] ARP phase in `internal/scan/executor.go`: after SNMP discovery collect observations from discovered devices, load settings/subnets/addresses/network MACs, plan, `ApplyARP`, set scan counters, then correlation
-- [ ] T020 [US1] Provenance writers: `internal/addresses/addresses.go` (manual) and the host-sync apply path (agent) in `internal/repo/repodb/hostsync.go` + `internal/memstore/hostsync.go`
-- [ ] T021 [US1] OpenAPI: address fields, scan job ARP fields in `api/openapi/ipam.yaml`; regenerate `ui/src/api/schema.d.ts`
-- [ ] T022 [P] [US1] UI: MAC source/last seen/conflict on the address list and detail (`ui/src/views/addresses/*`, `ui/src/api/types.ts`); ARP line in the scan views (`ui/src/views/scans/snmp.ts`, `ui/src/views/scans/index.vue`, subnet drawer scan message); vitest in `ui/tests/unit/arp.spec.ts`
+- [x] T018 [US1] Implement `internal/arpplan/{arpplan.go,filter.go,plan.go}` (normalise, provenance planning, audit rows, counters) to pass T014–T015 (filters for US3 may land here but are tested in Phase 5)
+- [x] T019 [US1] ARP phase in `internal/scan/executor.go`: after SNMP discovery collect observations from discovered devices, load settings/subnets/addresses/network MACs, plan, `ApplyARP`, set scan counters, then correlation
+- [x] T020 [US1] Provenance writers: `internal/addresses/addresses.go` (manual) and the host-sync apply path (agent) in `internal/repo/repodb/hostsync.go` + `internal/memstore/hostsync.go`
+- [x] T021 [US1] OpenAPI: address fields, scan job ARP fields in `api/openapi/ipam.yaml`; regenerate `ui/src/api/schema.d.ts`
+- [x] T022 [P] [US1] UI: MAC source/last seen/conflict on the address list and detail (`ui/src/views/addresses/*`, `ui/src/api/types.ts`); ARP line in the scan views (`ui/src/views/scans/snmp.ts`, `ui/src/views/scans/index.vue`, subnet drawer scan message); vitest in `ui/tests/unit/arp.spec.ts`
 
 **Checkpoint**: MVP — agentless addresses carry MACs.
 
