@@ -1136,7 +1136,7 @@ func (s *Server) registerScans(d Deps, p string) {
 		}
 		var in struct {
 			SubnetID        string `json:"subnet_id"`
-			EnableSNMP      bool   `json:"enable_snmp"`
+			EnableSNMP      *bool  `json:"enable_snmp"`
 			EnableDNSUpdate bool   `json:"enable_dns_update"`
 			SkipReverseDNS  bool   `json:"skip_reverse_dns"`
 		}
@@ -1145,7 +1145,8 @@ func (s *Server) registerScans(d Deps, p string) {
 			return
 		}
 		job, err := d.Scan.StartScan(r.Context(), subj, in.SubnetID, scan.Options{
-			EnableSNMP:      in.EnableSNMP,
+			EnableSNMP:      in.EnableSNMP != nil && *in.EnableSNMP,
+			SNMPAuto:        in.EnableSNMP == nil,
 			EnableDNSUpdate: in.EnableDNSUpdate,
 			SkipReverseDNS:  in.SkipReverseDNS,
 		})
@@ -1305,9 +1306,9 @@ func (s *Server) registerSystem(d Deps, p string) {
 // decodeScanOptions reads the optional scan toggles from a request body.
 func decodeScanOptions(r *http.Request) (scan.Options, error) {
 	var in struct {
-		EnableSNMP      bool `json:"enable_snmp"`
-		EnableDNSUpdate bool `json:"enable_dns_update"`
-		SkipReverseDNS  bool `json:"skip_reverse_dns"`
+		EnableSNMP      *bool `json:"enable_snmp"`
+		EnableDNSUpdate bool  `json:"enable_dns_update"`
+		SkipReverseDNS  bool  `json:"skip_reverse_dns"`
 	}
 	if r.ContentLength != 0 {
 		if err := DecodeJSON(r, &in, 0); err != nil {
@@ -1315,7 +1316,8 @@ func decodeScanOptions(r *http.Request) (scan.Options, error) {
 		}
 	}
 	return scan.Options{
-		EnableSNMP:      in.EnableSNMP,
+		EnableSNMP:      in.EnableSNMP != nil && *in.EnableSNMP,
+		SNMPAuto:        in.EnableSNMP == nil,
 		EnableDNSUpdate: in.EnableDNSUpdate,
 		SkipReverseDNS:  in.SkipReverseDNS,
 	}, nil

@@ -189,3 +189,27 @@ func TestCredentialsDeadline(t *testing.T) {
 		t.Fatalf("hung agent: %+v %v after %v", res, err, time.Since(start))
 	}
 }
+
+// TestStartScanSNMPAuto: a scan request that does not choose SNMP (the subnet
+// drawer's quick scan) runs SNMP discovery exactly when the subnet has
+// effective credentials, own or inherited; an explicit false stays off.
+func TestStartScanSNMPAuto(t *testing.T) {
+	ctx := context.Background()
+	svc, m := testSvc(t, snmp.NewFake())
+	setCreds(t, m, "t1", "root", snmpcred.Input{Version: 2, Community: "root-comm"})
+	inherited, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SNMPAuto: true})
+	if err != nil || !inherited.EnableSNMP {
+		t.Fatalf("auto with inherited credentials: %+v %v", inherited.EnableSNMP, err)
+	}
+	bare, err := svc.StartScan(ctx, adminSubj("t1"), "bare", Options{SNMPAuto: true})
+	if err != nil || bare.EnableSNMP {
+		t.Fatalf("auto without credentials: %+v %v", bare.EnableSNMP, err)
+	}
+	if _, err := svc.CancelScan(ctx, adminSubj("t1"), inherited.ID); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	off, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{})
+	if err != nil || off.EnableSNMP {
+		t.Fatalf("explicit off: %+v %v", off.EnableSNMP, err)
+	}
+}

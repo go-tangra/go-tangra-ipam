@@ -24,6 +24,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/snmpcred"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 )
 
 // Sentinel errors surfaced to callers.
@@ -52,7 +53,11 @@ type Config struct {
 
 // Options are the per-scan toggles chosen at StartScan time.
 type Options struct {
-	EnableSNMP      bool
+	EnableSNMP bool
+	// SNMPAuto means the caller did not choose: SNMP discovery runs when the
+	// subnet has effective credentials (own or inherited), so a quick scan of
+	// a subnet with credentials never silently skips SNMP.
+	SNMPAuto        bool
 	EnableDNSUpdate bool
 	SkipReverseDNS  bool
 }
@@ -143,6 +148,14 @@ func (s *Service) StartScan(ctx context.Context, subj authz.Subjects, subnetID s
 	}
 	if active {
 		return store.IPScanJob{}, ErrActiveScan
+	}
+
+	if opts.SNMPAuto {
+		idx, err := subnets.SNMPIndex(ctx, s.st, tenantID)
+		if err != nil {
+			return store.IPScanJob{}, err
+		}
+		_, _, opts.EnableSNMP = idx.Effective(subnetID)
 	}
 
 	now := s.now()
