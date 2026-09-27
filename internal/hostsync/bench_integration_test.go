@@ -101,7 +101,7 @@ func TestHostSync1000Hosts(t *testing.T) {
 	listP95 := p95(listLat)
 	lmu.Unlock()
 	applyP95 := p95(applyLat)
-	t.Logf("%d hosts in %s (p95 apply %s); %d concurrent device listings, p95 %s", hosts, total, applyP95, lists, listP95)
+	t.Logf("%d hosts in %s (p95 apply %s); %d concurrent device listings, p95 %s", hosts, total, applyP95, atomic.LoadInt32(&lists), listP95)
 	if total > 15*time.Minute {
 		t.Fatalf("SC-006: %s > 15 min", total)
 	}
