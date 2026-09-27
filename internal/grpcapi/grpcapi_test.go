@@ -20,6 +20,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
@@ -38,6 +39,7 @@ type kit struct {
 	system   *SystemServer
 	bmc      *ipmi.Fake
 	warden   *warden.Fake
+	mem      *memstore.Mem
 }
 
 func newKit(t *testing.T) kit {
@@ -60,6 +62,7 @@ func newKit(t *testing.T) kit {
 		system:   &SystemServer{stats: stats.New(mem), dns: dnscfg.New(mem)},
 		bmc:      bmc,
 		warden:   wf,
+		mem:      mem,
 	}
 }
 
@@ -148,11 +151,15 @@ func TestDevicePowerAuthz(t *testing.T) {
 		TenantId: tenant,
 		Device: &ipamv1.Device{
 			Name: "srv-1", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER,
-			ManagementIp: "10.0.0.9", IpmiSecretRef: ipmiRef,
+			ManagementIp: "10.0.0.9",
 		},
 	})
 	if err != nil {
 		t.Fatalf("create device: %v", err)
+	}
+	// The reference is set through the validated HTTP route (024); seed it.
+	if _, err := k.mem.SetDeviceBMCRef(ctx, tenant, dev.GetId(), ipmiRef, store.AuditRow{}); err != nil {
+		t.Fatal(err)
 	}
 
 	got, err := k.device.Get(ctx, &ipamv1.GetDeviceRequest{TenantId: tenant, Id: dev.GetId()})
@@ -284,5 +291,25 @@ func TestInvalidArgument(t *testing.T) {
 		TenantId: tenant, Subnet: &ipamv1.Subnet{Name: "bad", Cidr: "not-a-cidr"},
 	}); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("bad cidr: want InvalidArgument, got %v", err)
+	}
+}
+
+// TestDeviceBMCReferenceReadOnlyOnMesh (024 T017): mesh callers cannot set or
+// change a device's BMC reference through Create/Update.
+func TestDeviceBMCReferenceReadOnlyOnMesh(t *testing.T) {
+	k := newKit(t)
+	ctx := context.Background()
+	withCaller(t, "spiffe://example.org/svc/deployer", nil, true)
+	if _, err := k.device.Create(ctx, &ipamv1.CreateDeviceRequest{TenantId: tenant, Device: &ipamv1.Device{
+		Name: "srv-x", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER, IpmiSecretRef: "01928f7e-3c1a-7b44-9d2e-5a6b7c8d9e0f"}}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("create with ref: %v", err)
+	}
+	dev, err := k.device.Create(ctx, &ipamv1.CreateDeviceRequest{TenantId: tenant, Device: &ipamv1.Device{Name: "srv-y", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := k.device.Update(ctx, &ipamv1.UpdateDeviceRequest{TenantId: tenant, Id: dev.GetId(), Device: &ipamv1.Device{
+		Name: "srv-y", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER, IpmiSecretRef: "01928f7e-3c1a-7b44-9d2e-5a6b7c8d9e0f"}}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("update with ref: %v", err)
 	}
 }

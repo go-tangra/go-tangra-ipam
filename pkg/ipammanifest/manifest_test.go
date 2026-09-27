@@ -368,3 +368,48 @@ func TestAbilitiesFollowRoutePermissions(t *testing.T) {
 		}
 	}
 }
+
+// TestBMCReferencePermissions (024 T019/T020): viewers read the BMC status,
+// device managers set and clear the reference (CASL configure DeviceBmc), and
+// the retired warden-secrets routes are gone.
+func TestBMCReferencePermissions(t *testing.T) {
+	doc, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	routes, err := Routes(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"GET /api/ipam/v1/devices/{id}/bmc":    "ipam:read",
+		"PUT /api/ipam/v1/devices/{id}/bmc":    "devices:manage",
+		"DELETE /api/ipam/v1/devices/{id}/bmc": "devices:manage",
+	}
+	got := map[string]bool{}
+	for _, r := range routes {
+		k := r.Method + " " + r.Path
+		if regexp.MustCompile(`warden-secrets`).MatchString(r.Path) {
+			t.Errorf("retired route still declared: %s", k)
+		}
+		if p, ok := want[k]; ok {
+			got[k] = true
+			if r.Permission != p {
+				t.Errorf("%s permission %s want %s", k, r.Permission, p)
+			}
+			if r.Method == "PUT" && r.MaxBodyBytes != 1024 {
+				t.Errorf("%s body limit %d want 1024", k, r.MaxBodyBytes)
+			}
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("routes %v", got)
+	}
+	ok := false
+	for _, a := range Abilities {
+		ok = ok || (reflect.DeepEqual(a.Action, []string{"configure"}) && reflect.DeepEqual(a.Subject, []string{"DeviceBmc"}) && a.Requires == "devices:manage")
+	}
+	if !ok {
+		t.Fatal("CASL {configure, DeviceBmc} -> devices:manage")
+	}
+}

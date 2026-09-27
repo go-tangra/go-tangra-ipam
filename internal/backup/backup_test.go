@@ -365,3 +365,29 @@ func TestBackupSNMPSummaryOnly(t *testing.T) {
 		t.Fatal("export must fail when the SNMP summary cannot be read")
 	}
 }
+
+// TestImportNeverInjectsBMCReference (024 T018): a backup file carrying a
+// device BMC reference cannot set it (that would bypass warden's check on
+// the acting user), and overwriting an existing device keeps its reference.
+func TestImportNeverInjectsBMCReference(t *testing.T) {
+	ctx := context.Background()
+	tenant := store.NewID()
+	existing, fresh := store.NewID(), store.NewID()
+	b := backup.Backup{SchemaVersion: backup.SchemaVersion, Devices: []store.Device{
+		{ID: existing, Name: "kept", DeviceType: store.DevServer, IPMISecretRef: "injected-1"},
+		{ID: fresh, Name: "new", DeviceType: store.DevServer, IPMISecretRef: "injected-2"},
+	}}
+	dst := memstore.New()
+	if err := dst.CreateDevice(ctx, store.Device{ID: existing, TenantID: tenant, Name: "kept", DeviceType: store.DevServer, IPMISecretRef: "validated-ref"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := backup.New(dst).Import(ctx, subj(tenant), b, backup.ModeOverwrite); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := dst.GetDevice(ctx, tenant, existing); d.IPMISecretRef != "validated-ref" {
+		t.Fatalf("overwrite lost or replaced the reference: %q", d.IPMISecretRef)
+	}
+	if d, _ := dst.GetDevice(ctx, tenant, fresh); d.IPMISecretRef != "" {
+		t.Fatalf("import injected a reference: %q", d.IPMISecretRef)
+	}
+}

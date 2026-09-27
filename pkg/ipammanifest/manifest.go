@@ -107,6 +107,9 @@ var Abilities = []gatewayclient.Ability{
 	// ARP settings (feature 022): network configuration, same holders as the
 	// SNMP credentials; everyone with ipam:read sees them.
 	{Action: []string{"configure"}, Subject: []string{"ArpSettings"}, Requires: "subnets:manage"},
+	// Device BMC credentials (feature 024): device managers attach/clear the
+	// warden reference; viewing the status needs only ipam:read.
+	{Action: []string{"configure"}, Subject: []string{"DeviceBmc"}, Requires: "devices:manage"},
 }
 
 // writeActions are the CASL write verbs of a record type.

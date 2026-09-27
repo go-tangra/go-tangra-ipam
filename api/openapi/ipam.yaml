@@ -188,6 +188,32 @@ components:
         guest_device_name: { type: string }
         last_reported_at: { type: string, format: date-time }
 
+    # ---- Device BMC credentials (feature 024): a warden reference ----
+    DeviceBmcInput:
+      type: object
+      additionalProperties: false
+      required: [reference]
+      properties:
+        reference: { type: string, format: uuid, description: 'warden secret id' }
+    DeviceBmcSecret:
+      type: object
+      properties:
+        name: { type: string }
+        username: { type: string }
+        folder_path: { type: string }
+    DeviceBmcStatus:
+      type: object
+      required: [configured, ready]
+      properties:
+        configured: { type: boolean }
+        reference: { type: string, format: uuid }
+        access: { type: string, enum: [ok, forbidden, not_found, unavailable] }
+        secret: { $ref: '#/components/schemas/DeviceBmcSecret' }
+        address: { type: string }
+        address_source: { type: string, enum: [management_ip, reported] }
+        ready: { type: boolean }
+        reason: { type: string, enum: [bmc_not_configured, bmc_no_address, bmc_secret_forbidden, bmc_secret_not_found, warden_unavailable] }
+
     # ---- Subnet SNMP credentials (feature 021): write-only ----
     SubnetSNMPInput:
       type: object
@@ -555,12 +581,41 @@ paths:
   /api/ipam/v1/devices/{id}/host-groups:
     get: { operationId: getDeviceHostGroups, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'host groups for device' } } }
   /api/ipam/v1/devices/{id}/power:
-    get: { operationId: getDevicePower, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'power status' } } }
-    post: { operationId: setDevicePower, x-freya-permission: 'power:control', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'power action accepted' } } }
+    get: { operationId: getDevicePower, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'power status' }, '403': { description: 'forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user)' }, '404': { description: not_found }, '409': { description: 'bmc_not_configured | bmc_no_address | bmc_secret_not_found' }, '502': { description: 'bmc_auth_failed | bmc_error (detail.address)' }, '503': { description: warden_unavailable }, '504': { description: 'bmc_unreachable (detail.address)' } } }
+    post: { operationId: setDevicePower, x-freya-permission: 'power:control', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'power action accepted (audited power_action)' }, '400': { description: 'bad_request (unknown action)' }, '403': { description: 'forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user)' }, '404': { description: not_found }, '409': { description: 'bmc_not_configured | bmc_no_address | bmc_secret_not_found' }, '502': { description: 'bmc_auth_failed | bmc_error (detail.address)' }, '503': { description: warden_unavailable }, '504': { description: 'bmc_unreachable (detail.address)' } } }
   /api/ipam/v1/devices/{id}/sensors:
-    get: { operationId: getDeviceSensors, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: sensors } } }
+    get: { operationId: getDeviceSensors, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: sensors }, '403': { description: 'forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user)' }, '404': { description: not_found }, '409': { description: 'bmc_not_configured | bmc_no_address | bmc_secret_not_found' }, '502': { description: 'bmc_auth_failed | bmc_error (detail.address)' }, '503': { description: warden_unavailable }, '504': { description: 'bmc_unreachable (detail.address)' } } }
   /api/ipam/v1/devices/{id}/sel:
-    get: { operationId: getDeviceSel, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'system event log' } } }
+    get: { operationId: getDeviceSel, x-freya-permission: 'power:control', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'system event log' }, '403': { description: 'forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user)' }, '404': { description: not_found }, '409': { description: 'bmc_not_configured | bmc_no_address | bmc_secret_not_found' }, '502': { description: 'bmc_auth_failed | bmc_error (detail.address)' }, '503': { description: warden_unavailable }, '504': { description: 'bmc_unreachable (detail.address)' } } }
+  /api/ipam/v1/devices/{id}/bmc:
+    get:
+      operationId: getDeviceBmc
+      x-freya-permission: 'ipam:read'
+      description: 'BMC credentials status for the viewing user (feature 024): the warden reference, the secret''s metadata read from warden as the viewer (never material), the BMC address used and the first blocking reason.'
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: 'status', content: { application/json: { schema: { $ref: '#/components/schemas/DeviceBmcStatus' } } } }
+        '404': { description: not_found }
+    put:
+      operationId: setDeviceBmc
+      x-freya-permission: 'devices:manage'
+      x-freya-max-body-bytes: 1024
+      description: 'Point the device at a warden secret after warden confirmed the acting user may read it; audited bmc_reference_set / bmc_reference_changed.'
+      parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DeviceBmcInput' } } } }
+      responses:
+        '200': { description: 'status after the change', content: { application/json: { schema: { $ref: '#/components/schemas/DeviceBmcStatus' } } } }
+        '403': { description: bmc_secret_forbidden }
+        '404': { description: not_found }
+        '422': { description: 'validation_failed (detail.field = reference) | bmc_secret_not_found' }
+        '503': { description: warden_unavailable }
+    delete:
+      operationId: clearDeviceBmc
+      x-freya-permission: 'devices:manage'
+      parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
+      responses:
+        '204': { description: 'reference removed (audited bmc_reference_cleared; no-op when none)' }
+        '404': { description: not_found }
   /api/ipam/v1/devices/{id}/host-sync:
     get:
       operationId: getDeviceHostSync
@@ -594,7 +649,7 @@ paths:
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses: { '200': { description: 'guests reported by a hypervisor (matched and unmatched)' } }
   /api/ipam/v1/devices/{id}/kvm-session:
-    post: { operationId: startDeviceKvmSession, x-freya-permission: 'kvm:access', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: 'kvm session token + console url' } } }
+    post: { operationId: startDeviceKvmSession, x-freya-permission: 'kvm:access', parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '201': { description: 'kvm session token + console url (audited kvm_session_started)' }, '403': { description: 'forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user)' }, '404': { description: not_found }, '409': { description: 'bmc_not_configured | bmc_no_address | bmc_secret_not_found' }, '502': { description: 'bmc_auth_failed | bmc_error (detail.address)' }, '503': { description: warden_unavailable }, '504': { description: 'bmc_unreachable (detail.address)' } } }
 
   # ---- Host sync (feature 020) ----
   /api/ipam/v1/host-sync/settings:
@@ -639,11 +694,6 @@ paths:
         '422': { description: 'validation_failed (detail.field names the field)' }
 
   # ---- Warden secret references (metadata only) ----
-  /api/ipam/v1/warden-secrets:
-    get: { operationId: listWardenSecrets, x-freya-permission: 'ipam:read', responses: { '200': { description: 'secret metadata (no values)' } } }
-  /api/ipam/v1/warden-secrets/{id}:
-    get: { operationId: getWardenSecret, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: 'secret metadata (no values)' }, '404': { description: not_found } } }
-
   # ---- VLANs ----
   /api/ipam/v1/vlans:
     get: { operationId: listVlans, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/limit' }], responses: { '200': { description: list } } }

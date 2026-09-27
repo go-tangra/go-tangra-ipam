@@ -73,22 +73,22 @@ research D12. `FuzzReferenceInput` joined `make fuzz`.)
 
 ### Tests first
 
-- [ ] T016 [P] [US1] HTTP tests in `internal/httpapi/bmc_test.go`: GET status none/ok/forbidden/not_found/unavailable (per viewer token), reported address source; PUT ok → 200 status + audit `bmc_reference_set`, change → `bmc_reference_changed` with previous; **negative**: PUT unreadable secret → 403 `bmc_secret_forbidden` and device unchanged; unknown → 422 `bmc_secret_not_found`; Warden down → 503 `warden_unavailable`; non-UUID → 422 `validation_failed`; unknown field → 400; other tenant's device → 404; DELETE → 204 + `bmc_reference_cleared`, DELETE again → 204 without row
-- [ ] T017 [P] [US1] Device body tests in `internal/devices/devices_test.go` and `internal/httpapi/bmc_test.go`: **negative**: POST with `ipmi_secret_ref` → 422 `detail.field=ipmi_secret_ref`; PUT with a different ref → 422; PUT without the field keeps the ref; PUT with the same ref ok; gRPC `DeviceService.Update` with a different ref → `InvalidArgument` (`internal/grpcapi`)
-- [ ] T018 [P] [US1] Backup tests in `internal/backup/backup_test.go`: **negative**: import of a file carrying `ipmi_secret_ref` creates the device without it; overwrite of an existing device keeps its current ref
-- [ ] T019 [P] [US1] OpenAPI contract test (existing route/permission test in `internal/httpapi`): `/devices/{id}/bmc` GET `ipam:read`, PUT/DELETE `devices:manage` + CSRF, PUT body limit 1024; `/warden-secrets*` absent
-- [ ] T020 [P] [US1] Manifest test in `pkg/ipammanifest/manifest_test.go`: ability `configure DeviceBmc` requires `devices:manage`
-- [ ] T021 [P] [US1] UI unit tests `ui/src/components/__tests__/DeviceBmcCard.spec.ts` and `WardenSecretPicker.spec.ts`: card renders none / name+username+folder / no access / not found / unavailable and address + source; Attach/Change/Clear only with `configure DeviceBmc`; picker searches Warden (`/api/warden/v1/secrets/search?q=`), lists root on open, never requests `/password`, shows Warden 403/404/503 as explained states, saves via PUT and shows `bmc_secret_forbidden`
+- [x] T016 [P] [US1] HTTP tests in `internal/httpapi/bmc_test.go`: GET status none/ok/forbidden/not_found/unavailable (per viewer token), reported address source; PUT ok → 200 status + audit `bmc_reference_set`, change → `bmc_reference_changed` with previous; **negative**: PUT unreadable secret → 403 `bmc_secret_forbidden` and device unchanged; unknown → 422 `bmc_secret_not_found`; Warden down → 503 `warden_unavailable`; non-UUID → 422 `validation_failed`; unknown field → 400 `malformed_body`; other tenant's device → 404; DELETE → 204 + `bmc_reference_cleared`, DELETE again → 204 without row
+- [x] T017 [P] [US1] Device body tests in `internal/devices/devices_test.go` and `internal/httpapi/bmc_test.go`: **negative**: POST with `ipmi_secret_ref` → 422 `detail.field=ipmi_secret_ref`; PUT with a different ref → 422; PUT without the field keeps the ref; PUT with the same ref ok; gRPC `DeviceService.Update` with a different ref → `InvalidArgument` (`internal/grpcapi`)
+- [x] T018 [P] [US1] Backup tests in `internal/backup/backup_test.go`: **negative**: import of a file carrying `ipmi_secret_ref` creates the device without it; overwrite of an existing device keeps its current ref
+- [x] T019 [P] [US1] OpenAPI contract test (existing route/permission test in `internal/httpapi`): `/devices/{id}/bmc` GET `ipam:read`, PUT/DELETE `devices:manage` + CSRF, PUT body limit 1024; `/warden-secrets*` absent
+- [x] T020 [P] [US1] Manifest test in `pkg/ipammanifest/manifest_test.go`: ability `configure DeviceBmc` requires `devices:manage`
+- [x] T021 [P] [US1] UI unit tests `ui/tests/unit/bmc.spec.ts` (DeviceBmcCard, WardenSecretPicker): card renders none / name+username+folder / no access / not found / unavailable and address + source; Attach/Change/Clear only with `configure DeviceBmc`; picker searches Warden (`/api/warden/v1/secrets/search?q=`), lists root on open, never requests `/password`, shows Warden 403/404/503 as explained states, saves via PUT and shows `bmc_secret_forbidden`
 
 ### Implementation
 
-- [ ] T022 [US1] `internal/devices/devices.go`: `ErrBMCRefReadOnly` on create with a ref / update with a different ref; keep stored ref otherwise; map to 422 `detail.field` in `internal/httpapi` and `InvalidArgument` in `internal/grpcapi`
-- [ ] T023 [US1] `internal/httpapi/bmc.go`: GET/PUT/DELETE `/devices/{id}/bmc` via `bmc.Service` with the caller's token in the context; `failBMC` reason mapping; remove the `/warden-secrets` handlers from `handlers.go`; `Deps.BMCRefs *bmc.Service`
-- [ ] T024 [US1] `api/openapi/ipam.yaml`: `DeviceBmcStatus`, `DeviceBmcInput` schemas, the three operations with responses from contracts/ipam-http.md; drop `/warden-secrets*`; regenerate `ui/src/api/schema.d.ts`
-- [ ] T025 [P] [US1] `internal/backup/backup.go`: import drops the ref; overwrite keeps the existing one
-- [ ] T026 [P] [US1] `pkg/ipammanifest/manifest.go`: ability `configure DeviceBmc` → `devices:manage`
-- [ ] T027 [US1] `internal/app/app.go`: build `bmc.Service`; `warden.Unavailable{}` instead of a Fake when the Warden connection fails
-- [ ] T028 [US1] UI: `ui/src/api/types.ts` (BmcStatus, WardenSecretItem), `ui/src/api/bmc.ts` (Warden search/list), `ui/src/stores/devices.ts` (bmc, setBmc, clearBmc), `ui/src/components/WardenSecretPicker.vue`, `ui/src/components/DeviceBmcCard.vue`, `ui/src/views/devices/detail.vue` (card on Overview, BMC row with the secret name)
+- [x] T022 [US1] `internal/devices/devices.go`: `ErrBMCRefReadOnly` on create with a ref / update with a different ref; keep stored ref otherwise; map to 422 `detail.field` in `internal/httpapi` and `InvalidArgument` in `internal/grpcapi`
+- [x] T023 [US1] `internal/httpapi/bmc.go`: GET/PUT/DELETE `/devices/{id}/bmc` via `bmc.Service` with the caller's token in the context; `failBMC` reason mapping; remove the `/warden-secrets` handlers from `handlers.go`; `Deps.BMCRefs *bmc.Service`
+- [x] T024 [US1] `api/openapi/ipam.yaml`: `DeviceBmcStatus`, `DeviceBmcInput` schemas, the three operations with responses from contracts/ipam-http.md; drop `/warden-secrets*`; regenerate `ui/src/api/schema.d.ts`
+- [x] T025 [P] [US1] `internal/backup/backup.go`: import drops the ref; overwrite keeps the existing one
+- [x] T026 [P] [US1] `pkg/ipammanifest/manifest.go`: ability `configure DeviceBmc` → `devices:manage`
+- [x] T027 [US1] `internal/app/app.go`: build `bmc.Service`; `warden.Unavailable{}` instead of a Fake when the Warden connection fails
+- [x] T028 [US1] UI: `ui/src/api/types.ts` (BmcStatus, WardenSecretItem), `ui/src/api/bmc.ts` (Warden search/list), `ui/src/stores/devices.ts` (bmc, setBmc, clearBmc), `ui/src/components/WardenSecretPicker.vue`, `ui/src/components/DeviceBmcCard.vue`, `ui/src/views/devices/detail.vue` (card on Overview, BMC row with the secret name)
 
 **Checkpoint**: references are set only through Warden validation and are visible per viewer.
 

@@ -17,6 +17,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
@@ -31,6 +32,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
@@ -106,7 +108,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		return []string{"host.example.org."}, nil
 	})
 
-	bmc := ipmi.NewFake()
+	bmcFake := ipmi.NewFake()
 	inv := invclient.NewFake()
 	runner := hostsync.New(mem, inv, pub, hostsync.Config{Workers: 1, ConflictMoves: 3, ConflictWindow: 24 * time.Hour}, nil, nil)
 	env, _ := sealed.NewEnvelope(bytes.Repeat([]byte{6}, 32))
@@ -127,12 +129,13 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		Backup:    backup.New(mem),
 		DNS:       dns,
 		Scan:      scanSvc,
-		BMC:       bmc,
+		BMC:       bmcFake,
 		KVM:       kvm.NewManager(nil, 0),
 		Warden:    wf,
 		Hub:       hub,
 		HostSync:  hostsync.NewAdmin(mem, inv, runner, true),
 		ARP:       arpcfg.New(mem),
+		BMCRefs:   bmc.New(mem, wf),
 	}
 
 	v := fakeVerifier{ids: map[string]authclient.Identity{
@@ -145,7 +148,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		t.Fatal(err)
 	}
 	s.Register(deps)
-	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner, snmp: disc, sweeper: sweeper, scan: scanSvc, pub: pub}
+	return &apiFixture{s: s, mem: mem, bmc: bmcFake, warden: wf, inv: inv, runner: runner, snmp: disc, sweeper: sweeper, scan: scanSvc, pub: pub}
 }
 
 const p = "/api/ipam/v1"
@@ -433,11 +436,16 @@ func TestDNSConfig(t *testing.T) {
 func (f *apiFixture) newDeviceWithBMC(t *testing.T) string {
 	t.Helper()
 	w := f.req(t, "POST", p+"/devices", "admin",
-		`{"name":"oob-1","device_type":"server","management_ip":"10.99.0.10","ipmi_secret_ref":"`+bmcRef+`"}`)
+		`{"name":"oob-1","device_type":"server","management_ip":"10.99.0.10"}`)
 	if w.Code != 201 {
 		t.Fatalf("create oob device: %d %s", w.Code, w.Body)
 	}
 	id, _ := decodeBody(t, w)["id"].(string)
+	// Seed the reference as PUT /devices/{id}/bmc would (024).
+	if _, err := f.mem.SetDeviceBMCRef(context.Background(), apiTenant, id, bmcRef,
+		store.AuditRow{Action: "bmc_reference_set", SubjectKind: "device", SubjectID: id}); err != nil {
+		t.Fatal(err)
+	}
 	return id
 }
 
@@ -569,10 +577,10 @@ func TestRouteSmoke(t *testing.T) {
 		t.Fatalf("address delete: %d %s", w.Code, w.Body)
 	}
 
-	// The retired warden-secrets routes (024) answer 501.
+	// The retired warden-secrets routes (024) are gone.
 	for _, path := range []string{"/warden-secrets", "/warden-secrets/" + bmcRef} {
-		if w := f.req(t, "GET", p+path, "admin", ""); w.Code != 501 {
-			t.Fatalf("%s: want 501, got %d", path, w.Code)
+		if w := f.req(t, "GET", p+path, "admin", ""); w.Code != 404 {
+			t.Fatalf("%s: want 404, got %d", path, w.Code)
 		}
 	}
 

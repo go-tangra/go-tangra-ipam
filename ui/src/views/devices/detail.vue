@@ -5,7 +5,7 @@ import { useAbility } from '@casl/vue'
 import { UiPage, UiAlert, UiCard, UiButton, UiStatusChip, UiKeyValueTable, UiDataTable, UiTabs, UiBadge, UiRecordDrawer, UiSwitch, type Column, type KeyValue, type TabItem } from '@go-tangra/ui'
 import { useDevices } from '@/stores/devices'
 import { useHostSync } from '@/stores/hostsync'
-import type { Device, DeviceHostSync, DeviceInterface, DevicePackage, HypervisorGuest, IPAddress } from '@/api/types'
+import type { BmcStatus, Device, DeviceHostSync, DeviceInterface, DevicePackage, HypervisorGuest, IPAddress } from '@/api/types'
 import { describe } from '@/api/client'
 import { mergeEdit } from '@/api/merge'
 import { deviceSchema } from '@/schemas'
@@ -14,6 +14,7 @@ import { useDeviceFields } from './fields'
 import { statusColors } from './colors'
 import IpmiKvm from './ipmi-kvm.vue'
 import HardwarePanel from '@/components/HardwarePanel.vue'
+import DeviceBmcCard from '@/components/DeviceBmcCard.vue'
 import { hardwareSummaryLine } from './hardware'
 import { addressLinkText, linksText, sortedLinks } from '@/views/addresses/mac'
 
@@ -23,6 +24,10 @@ const store = useDevices()
 const ability = useAbility()
 const canOob = computed(() => ability.can('control', 'Power') || ability.can('access', 'Kvm'))
 const canResync = computed(() => ability.can('resync', 'HostSync'))
+// The BMC credentials card (024) reads the secret's metadata from Warden as
+// the viewer, so it is shown to those who manage devices or use the BMC.
+const canBmc = computed(() => canOob.value || ability.can('configure', 'DeviceBmc'))
+const bmcStatus = ref<BmcStatus | null>(null)
 const hostSync = useHostSync()
 
 const id = String(route.params.id)
@@ -133,8 +138,14 @@ const summary = computed<KeyValue[]>(() => {
     ...(d.virtualization_kind ? [{ label: 'Virtualization', value: d.virtualization_kind }] : []),
     ...(d.hypervisor_device_id ? [{ label: 'Runs on', value: hypervisorName.value || d.hypervisor_device_id }] : []),
     { label: 'Type', value: d.device_type }, { label: 'Manufacturer', value: d.manufacturer }, { label: 'Model', value: d.model }, { label: 'Management IP', value: d.management_ip, copyable: true },
-    { label: 'OS', value: [d.os_type, d.os_version].filter(Boolean).join(' ') }, { label: 'Firmware', value: d.firmware_version }, { label: 'Location', value: locName(d.location_id) }, { label: 'Rack', value: d.rack_id ? `${locName(d.rack_id)} · U${d.rack_position ?? '?'}${(d.device_height_u ?? 1) > 1 ? '–U' + ((d.rack_position ?? 0) + (d.device_height_u ?? 1) - 1) : ''}` : '' }, { label: 'BMC', value: d.ipmi_secret_ref ? 'configured' : 'none' },
+    { label: 'OS', value: [d.os_type, d.os_version].filter(Boolean).join(' ') }, { label: 'Firmware', value: d.firmware_version }, { label: 'Location', value: locName(d.location_id) }, { label: 'Rack', value: d.rack_id ? `${locName(d.rack_id)} · U${d.rack_position ?? '?'}${(d.device_height_u ?? 1) > 1 ? '–U' + ((d.rack_position ?? 0) + (d.device_height_u ?? 1) - 1) : ''}` : '' }, { label: 'BMC', value: bmcLabel.value },
   ]
+})
+// "zax-5 IPMI (Warden)" once the card read the metadata, else configured/none.
+const bmcLabel = computed(() => {
+  const name = bmcStatus.value?.secret?.name
+  if (name) return `${name} (Warden)`
+  return device.value?.ipmi_secret_ref ? 'configured (Warden)' : 'none'
 })
 const tabs = computed<TabItem[]>(() => [
   { key: 'interfaces', label: 'Interfaces', count: interfaces.value.length },
@@ -202,6 +213,7 @@ const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, 
         <li v-for="i in report.issues" :key="i.field + i.reason">{{ i.field }}: {{ i.reason }} ({{ i.count }})</li>
       </ul>
     </UiCard>
+    <DeviceBmcCard v-if="device && canBmc" :device-id="id" class="mb-4" @status="bmcStatus = $event" @changed="loadAll" />
     <UiTabs v-model="tab" :tabs="tabs" class="mb-3" />
     <UiCard v-if="tab === 'interfaces'" :padded="false">
       <UiDataTable :items="interfaces" :columns="ifaceColumns" caption="Interfaces" empty-title="No interfaces">

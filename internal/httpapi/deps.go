@@ -8,6 +8,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
@@ -52,6 +53,10 @@ type Deps struct {
 	// ARP is the per-tenant ARP settings service (feature 022); when nil its
 	// routes answer 503 temporarily_unavailable.
 	ARP *arpcfg.Service
+	// BMCRefs decides BMC access and owns the device BMC reference (feature
+	// 024); when nil the reference routes answer 503 and the power/KVM
+	// routes refuse.
+	BMCRefs *bmc.Service
 }
 
 // subjects derives the authz subject from the verified platform identity. The
@@ -80,7 +85,11 @@ func failSvc(w http.ResponseWriter, err error) {
 	var vlanVE vlans.ValidationError
 	var locVE locations.ValidationError
 	var grpVE groups.ValidationError
+	var devFE *devices.FieldError
 	switch {
+	case errors.As(err, &devFE):
+		WriteDetail(w, ErrValidation, map[string]any{"field": devFE.Field(), "message": devFE.Message(),
+			"fields": map[string]string{devFE.Field(): devFE.Message()}})
 	case errors.As(err, &subnetVE), errors.As(err, &vlanVE), errors.As(err, &locVE),
 		errors.As(err, &grpVE), errors.Is(err, backup.ErrBadSchema):
 		WriteError(w, http.StatusUnprocessableEntity, "validation_failed")

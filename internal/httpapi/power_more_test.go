@@ -1,8 +1,11 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"testing"
+
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // TestPowerNoBMCRef covers loadBMC's validation branch: a device with no
@@ -42,8 +45,11 @@ func TestPowerMissingDevice(t *testing.T) {
 func TestPowerWardenMissingSecret(t *testing.T) {
 	f := newAPI(t)
 	w := f.req(t, "POST", p+"/devices", "admin",
-		`{"name":"ghost","device_type":"server","management_ip":"10.0.0.1","ipmi_secret_ref":"does-not-exist"}`)
+		`{"name":"ghost","device_type":"server","management_ip":"10.0.0.1"}`)
 	did, _ := decodeBody(t, w)["id"].(string)
+	if _, err := f.mem.SetDeviceBMCRef(context.Background(), apiTenant, did, "01928f7e-3c1a-7b44-9d2e-00000000dead", store.AuditRow{}); err != nil {
+		t.Fatal(err)
+	}
 	if w := f.req(t, "GET", p+"/devices/"+did+"/power", "admin", ""); w.Code != 404 {
 		t.Fatalf("power missing secret: want 404, got %d %s", w.Code, w.Body)
 	}

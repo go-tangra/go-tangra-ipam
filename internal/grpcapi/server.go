@@ -70,7 +70,8 @@ func isValidation(err error) bool {
 	var ve vlans.ValidationError
 	var le locations.ValidationError
 	var ge groups.ValidationError
-	return errors.As(err, &se) || errors.As(err, &ve) || errors.As(err, &le) || errors.As(err, &ge)
+	var fe *devices.FieldError
+	return errors.As(err, &se) || errors.As(err, &ve) || errors.As(err, &le) || errors.As(err, &ge) || errors.As(err, &fe)
 }
 
 // grpcError maps a service/domain error to a gRPC status. Detail is never

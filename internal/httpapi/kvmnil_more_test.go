@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
@@ -39,7 +40,7 @@ func newAPINoKVM(t *testing.T) *apiFixture {
 		return []string{"host.example.org."}, nil
 	})
 
-	bmc := ipmi.NewFake()
+	bmcFake := ipmi.NewFake()
 	deps := Deps{
 		Subnets:   subnets.New(mem),
 		Addresses: addresses.New(mem, pub, 0, 0),
@@ -51,9 +52,10 @@ func newAPINoKVM(t *testing.T) *apiFixture {
 		Backup:    backup.New(mem),
 		DNS:       dns,
 		Scan:      scan.New(mem, nil, nil, nil, pub, scan.Config{MaxHosts: 65536}, nil),
-		BMC:       bmc,
+		BMC:       bmcFake,
 		KVM:       nil, // <- exercises the KVM==nil branch
 		Warden:    wf,
+		BMCRefs:   bmc.New(mem, wf),
 	}
 
 	v := fakeVerifier{ids: map[string]authclient.Identity{
@@ -65,7 +67,7 @@ func newAPINoKVM(t *testing.T) *apiFixture {
 		t.Fatal(err)
 	}
 	s.Register(deps)
-	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf}
+	return &apiFixture{s: s, mem: mem, bmc: bmcFake, warden: wf}
 }
 
 // TestKVMSessionNotImplemented covers the KVM==nil branch: the console route

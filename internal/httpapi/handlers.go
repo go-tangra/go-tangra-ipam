@@ -29,6 +29,7 @@ func (s *Server) Register(d Deps) {
 	s.registerHostSync(d)
 	s.registerSNMP(d)
 	s.registerARP(d)
+	s.registerBMC(d)
 
 	// ---------------------------------------------------------------- Subnets
 	s.MustHandle("GET", p+"/subnets", func(w http.ResponseWriter, r *http.Request) {
@@ -565,14 +566,6 @@ func (s *Server) Register(d Deps) {
 		}
 		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
 	})
-
-	// --------------------------------------------------- Warden secrets (meta)
-	// Retired (feature 024): secrets are listed through warden's own API.
-	for _, path := range []string{p + "/warden-secrets", p + "/warden-secrets/{id}"} {
-		s.MustHandle("GET", path, func(w http.ResponseWriter, _ *http.Request) {
-			WriteError(w, ErrNotImplemented.Status, ErrNotImplemented.Reason)
-		})
-	}
 
 	s.registerNetworking(d, p)
 	s.registerGroups(d, p)

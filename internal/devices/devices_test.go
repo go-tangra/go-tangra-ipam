@@ -266,3 +266,34 @@ func TestSetClock(t *testing.T) {
 	svc.SetClock(nil)
 	_ = svc
 }
+
+// TestBMCReferenceReadOnly (024 T017): create cannot set the BMC reference;
+// update keeps it when omitted or unchanged and refuses a different one.
+func TestBMCReferenceReadOnly(t *testing.T) {
+	svc, st := newSvc(t)
+	ctx := context.Background()
+	if _, err := svc.Create(ctx, subj(), store.Device{Name: "a", IPMISecretRef: "r1"}); !errors.Is(err, ErrBMCRefReadOnly) {
+		t.Fatalf("create with ref: %v", err)
+	}
+	d, err := svc.Create(ctx, subj(), store.Device{Name: "a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.SetDeviceBMCRef(ctx, "t1", d.ID, "r1", store.AuditRow{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Update(ctx, subj(), store.Device{ID: d.ID, Name: "a", IPMISecretRef: "r2"}); !errors.Is(err, ErrBMCRefReadOnly) {
+		t.Fatalf("update with other ref: %v", err)
+	}
+	if _, err := svc.Update(ctx, subj(), store.Device{ID: d.ID, Name: "a", IPMISecretRef: "R1"}); err != nil {
+		t.Fatalf("update with same ref (case): %v", err)
+	}
+	got, err := svc.Update(ctx, subj(), store.Device{ID: d.ID, Name: "b"})
+	if err != nil || got.IPMISecretRef != "r1" || got.Name != "b" {
+		t.Fatalf("update without ref: %+v %v", got, err)
+	}
+	var fe interface{ Field() string }
+	if !errors.As(ErrBMCRefReadOnly, &fe) || fe.Field() != "ipmi_secret_ref" {
+		t.Fatal("ErrBMCRefReadOnly names its field")
+	}
+}
