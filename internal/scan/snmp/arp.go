@@ -131,7 +131,7 @@ func addrFromOctets(o []int) (netip.Addr, bool) {
 		if v > 255 {
 			return netip.Addr{}, false
 		}
-		b[i] = byte(v)
+		b[i] = byte(v) // #nosec G115 -- v is 0..255 (checked above)
 	}
 	return netip.AddrFromSlice(b)
 }

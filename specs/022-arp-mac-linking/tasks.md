@@ -135,11 +135,11 @@ explicit user confirmation before they are executed.
 
 ## Phase 7: Polish, Release & Cross-Cutting Concerns
 
-- [ ] T038 Integration tests (testcontainers) in `internal/repo/repodb/arp_integration_test.go`: 0007→0008 upgrade with backfill (agent/manual), RLS isolation of `ipam_arp_settings`, `ApplyARP` transaction (rollback on failure), address links, MAC search via the index
-- [ ] T039 [P] Performance test: planner with 5,000 entries × 10 devices and 5,000 addresses completes well under 1 s (`internal/arpplan/bench_test.go`)
-- [ ] T040 [P] README section "ARP-based MAC linking" (sources, provenance, filters, settings, permissions, audit)
-- [ ] T041 Run `go vet ./...`, `go test -race ./...`, `sg docker -c 'make test-integration'`, `make cover` (arpplan 100 %), `make vuln`, UI lint/unit/build
-- [ ] T042 Update quickstart results and tick tasks in `specs/022-arp-mac-linking/tasks.md`
+- [x] T038 Integration tests (testcontainers) in `internal/repo/repodb/arp_integration_test.go`: 0007→0008 upgrade with backfill (agent/manual), RLS isolation of `ipam_arp_settings`, `ApplyARP` transaction (rollback on failure), address links, MAC search via the index
+- [x] T039 [P] Performance test: planner with 5,000 entries × 10 devices and 5,000 addresses completes well under 1 s (`internal/arpplan/bench_test.go`)
+- [x] T040 [P] README section "ARP-based MAC linking" (sources, provenance, filters, settings, permissions, audit)
+- [x] T041 Run `go vet ./...`, `go test -race ./...`, `sg docker -c 'make test-integration'`, `make cover` (arpplan 100 %), `make vuln`, UI lint/unit/build
+- [x] T042 Update quickstart results and tick tasks in `specs/022-arp-mac-linking/tasks.md`
 - [ ] T043 Release (user-confirmed): PR → merge → tag `v4.5.0`; bump `IPAM_IMAGE` in go-tangra-docker `.env.example`; production deploy on explicit request
 
 ---

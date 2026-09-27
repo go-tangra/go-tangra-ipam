@@ -24,6 +24,12 @@ interfaces, addresses (in auto-created subnets when needed), BMC management
 addresses, hypervisor guests, pending updates and switch ports current in IPAM
 (see [Host sync](#host-sync)).
 
+**ARP-based MAC linking**: scans with SNMP discovery read the ARP and
+neighbour tables of the routers, firewalls and layer-3 switches that answer,
+record the MAC of every active address (never overwriting an agent or manual
+MAC) and link agentless hosts to their switch port (see
+[ARP-based MAC linking](#arp-based-mac-linking)).
+
 Operations: [`deploy/README.md`](deploy/README.md).
 Design history: `specs/011-ipam-service` (walkthrough in `quickstart.md`).
 
@@ -73,7 +79,8 @@ SDK's published `sdk/vX.Y.Z` tag.
 | `internal/ipmi`, `internal/kvm` | BMC power/inventory and the KVM console proxy |
 | `internal/warden` | secret-reference client (plus an in-memory fake) |
 | `internal/{invclient,hostreport,hostplan,hostsync}` | host sync: inventory client, report validation, pure planner, poller/reconcile/apply and admin service |
-| `internal/portlink` | links reported host interfaces to switch ports from SNMP FDB/LLDP data |
+| `internal/portlink` | links reported host interfaces and addresses with a MAC to switch ports from SNMP FDB/LLDP data |
+| `internal/{arpplan,arpcfg}` | ARP-based MAC linking: pure planner (filters, MAC provenance) and per-tenant settings |
 | `internal/{authz,sealed,audit,stream,backup,stats,dnscfg}` | authorization, sealed owner data, audit vocabulary, event stream, tenant backup, statistics, DNS settings |
 | `internal/{repo,store,memstore}` | repository, SQL bindings (RLS, goose migrations), in-memory store |
 | `pkg/ipammanifest` | gateway manifest built from the OpenAPI document |
@@ -240,6 +247,57 @@ and password; MD5, SHA-1 and DES are labelled weak). v3 passwords need at least
 - **Legacy**: the never-functional warden reference `snmp_secret_ref` is no
   longer written or returned; at start ipam logs how many subnets still carry
   one so their credentials can be entered again.
+
+## ARP-based MAC linking
+
+Agentless hosts (printers, access points, cameras, BMCs, servers without the
+inventory agent) get their MAC and switch port from the network (feature 022).
+
+- **Collection**: a scan with SNMP discovery also walks each answering
+  device's `ipNetToPhysicalTable` (IPv4 and IPv6 neighbours), falling back to
+  the legacy `ipNetToMediaTable`, with the subnet's effective SNMP credentials
+  and read-only requests, at most 65,536 entries per device per scan (a capped
+  or interrupted read counts as partial).
+- **Filters**: entries are ignored and counted by reason when the MAC is
+  incomplete or invalid (`invalid`), multicast or broadcast (`multicast`),
+  a VRRP or HSRP virtual-router MAC (`virtual_router`), a network device's own
+  interface MAC (`network_device`), answers for more than the proxy threshold
+  of IPs in one scan (`proxy_arp`, default 8), comes from an excluded device
+  (`excluded_device`) or the IP is outside every subnet of the tenant
+  (`outside_subnets`). ARP data never crosses tenants.
+- **Provenance**: every address records `mac_source` (`agent` from the host
+  sync, `manual` from the address API, `arp`), and for ARP the reporting
+  device (`mac_source_device_id`) and `mac_seen_at`. ARP fills an empty MAC and
+  updates a MAC it learned itself; it never changes an agent or manual MAC, and
+  records a disagreement in `mac_conflict` instead (cleared when they agree
+  again). An IP inside a known subnet without an address record gets one
+  (status active, `origin: arp`); such addresses are never deleted
+  automatically. MACs that existed before migration 0008 were backfilled as
+  `agent` (host-reported addresses) or `manual`. The same IP reported by
+  several devices: the last device in id order wins and the disagreement
+  counts as a conflict.
+- **Switch ports**: the switch-port correlation links every address with a
+  MAC (any source) with the same rules as reported interfaces (fewest-MAC
+  port, maximum MACs per access port, uplinks and network-device MACs
+  excluded, stale links cleared). Addresses carry `link` (switch, port, VLAN,
+  source, last seen); an address whose MAC a reported interface carries shows
+  that interface's link; switch ports list `behind_addresses`.
+- **Scan result**: `arp_status` (`ran`, `disabled`, `failed`), `arp_devices`,
+  `arp_partial`, `arp_entries`, `arp_applied`, `arp_created`, `arp_conflicts`
+  and `arp_ignored` (reason to count).
+- **Search**: `GET /api/ipam/v1/ip-addresses?mac=` takes a full or partial
+  MAC in colon, dash, dot or bare notation (2-12 hex digits; otherwise 422
+  with `detail.field = mac`).
+- **Settings**: `GET /api/ipam/v1/arp/settings` (`ipam:read`) and `PUT`
+  (`subnets:manage`): `enabled` (default on), `excluded_devices` (up to 256
+  existing devices never used as ARP sources) and `proxy_threshold` (2-256).
+  Stored in `ipam_arp_settings` (row-level security); a tenant that never
+  saved them uses the defaults.
+- **Audit**: `mac_learned`, `mac_changed`, `mac_conflict`, `address_created`
+  (`origin: arp`), `port_linked`/`port_unlinked` for addresses, one `arp_run`
+  summary per scan (actor system/scan) and `arp_settings_updated` (the user),
+  with neutral detail keys (`address`, `mac`, `previous_mac`, `observed_mac`,
+  `source_device_id`, `job_id`).
 
 ## API permissions
 
