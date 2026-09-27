@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
-import type { IPScanJob, SplitResult, Subnet, SubnetStats, SubnetTreeNode } from '@/api/types'
+import type { IPScanJob, SNMPTestResult, SplitResult, Subnet, SubnetSNMPInput, SubnetSNMPStatus, SubnetStats, SubnetTreeNode } from '@/api/types'
 
 export interface SubnetFilter {
   vlan_id?: string | undefined
@@ -79,5 +79,26 @@ export const useSubnets = defineStore('ipam-subnets', () => {
     return api<SplitResult>('POST', 'subnets/' + id + '/split', { prefix_length: prefixLength, dry_run: dryRun })
   }
 
-  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan, split }
+  // SNMP credentials (feature 021) are write-only: reads return the status,
+  // never a value.
+  async function snmpStatus(id: string): Promise<SubnetSNMPStatus> {
+    return api<SubnetSNMPStatus>('GET', 'subnets/' + id + '/snmp')
+  }
+
+  async function setSnmp(id: string, body: SubnetSNMPInput): Promise<SubnetSNMPStatus> {
+    return api<SubnetSNMPStatus>('PUT', 'subnets/' + id + '/snmp', body)
+  }
+
+  // clearSnmp deletes the subnet's own credentials; it then inherits again.
+  async function clearSnmp(id: string): Promise<void> {
+    await api('DELETE', 'subnets/' + id + '/snmp')
+  }
+
+  // testSnmp probes one address of the subnet with its effective credentials
+  // (scan:run, rate-limited server side).
+  async function testSnmp(id: string, address: string): Promise<SNMPTestResult> {
+    return api<SNMPTestResult>('POST', 'subnets/' + id + '/snmp/test', { address })
+  }
+
+  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan, split, snmpStatus, setSnmp, clearSnmp, testSnmp }
 })

@@ -70,6 +70,7 @@ func TestADHelpers(t *testing.T) {
 		{"certkey", ADCertKey("k1"), "certkey:k1"},
 		{"target", ADTarget("t1"), "target:t1"},
 		{"config", ADConfig("cfg1"), "config:cfg1"},
+		{"snmp", ADSNMP("t-1", "s-1"), "snmp:t-1:s-1"},
 	}
 	for _, c := range cases {
 		if string(c.got) != c.want {

@@ -22,6 +22,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/snmpcred"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
@@ -43,6 +44,7 @@ func (e ValidationError) Error() string { return "subnets: " + e.Msg }
 type Service struct {
 	st  repo.Store
 	now func() time.Time
+	env snmpcred.Sealer // seals SNMP credentials (SetEnvelope)
 }
 
 // New builds the service.
@@ -75,6 +77,7 @@ func (s *Service) Create(ctx context.Context, subj authz.Subjects, in store.Subn
 		return store.Subnet{}, err
 	}
 	in.TenantID = subj.TenantID
+	dropLegacySNMP(&in)
 	if in.Name == "" {
 		return store.Subnet{}, ValidationError{Msg: "name required"}
 	}
@@ -201,6 +204,9 @@ func (s *Service) Get(ctx context.Context, subj authz.Subjects, id string) (stor
 		return store.Subnet{}, mapErr(err)
 	}
 	s.fill(ctx, subj.TenantID, &sub)
+	if err := s.withSNMP(ctx, subj.TenantID, &sub); err != nil {
+		return store.Subnet{}, err
+	}
 	return sub, nil
 }
 
@@ -213,8 +219,13 @@ func (s *Service) List(ctx context.Context, subj authz.Subjects, f store.SubnetF
 	if err != nil {
 		return nil, err
 	}
+	ptrs := make([]*store.Subnet, len(subs))
 	for i := range subs {
 		s.fill(ctx, subj.TenantID, &subs[i])
+		ptrs[i] = &subs[i]
+	}
+	if err := s.withSNMP(ctx, subj.TenantID, ptrs...); err != nil {
+		return nil, err
 	}
 	return subs, nil
 }
@@ -226,6 +237,7 @@ func (s *Service) Update(ctx context.Context, subj authz.Subjects, in store.Subn
 		return store.Subnet{}, err
 	}
 	in.TenantID = subj.TenantID
+	dropLegacySNMP(&in)
 	ex, err := s.st.GetSubnet(ctx, subj.TenantID, in.ID)
 	if err != nil {
 		return store.Subnet{}, mapErr(err)
@@ -287,9 +299,16 @@ func (s *Service) GetTree(ctx context.Context, subj authz.Subjects) ([]*TreeNode
 	if err != nil {
 		return nil, err
 	}
-	nodes := make(map[string]*TreeNode, len(subs))
+	ptrs := make([]*store.Subnet, len(subs))
 	for i := range subs {
 		s.fill(ctx, subj.TenantID, &subs[i])
+		ptrs[i] = &subs[i]
+	}
+	if err := s.withSNMP(ctx, subj.TenantID, ptrs...); err != nil {
+		return nil, err
+	}
+	nodes := make(map[string]*TreeNode, len(subs))
+	for i := range subs {
 		nodes[subs[i].ID] = &TreeNode{Subnet: subs[i]}
 	}
 	var roots []*TreeNode

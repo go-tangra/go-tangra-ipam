@@ -11,12 +11,13 @@ ping, IPMI/BMC power control and a token-gated KVM console proxy. Power, IPMI
 and KVM are platform-admin only; every active operation is tenant-scoped,
 bounded and audited.
 
-SNMP and BMC credentials are never stored by ipam. Subnets and devices hold only
-warden secret references (`snmp_secret_ref`, `ipmi_secret_ref`), resolved at use
-time and never logged, audited or exported. The gRPC binding to warden's
-`warden.v1.Secrets` is not wired yet (`internal/warden`): until it is, secret
-resolution fails closed and SNMP/IPMI/KVM operations that need a credential are
-refused.
+**SNMP credentials** live on subnets, sealed by ipam itself and write-only;
+child subnets inherit them (see [SNMP credentials](#snmp-credentials)). BMC
+credentials are not stored by ipam: devices hold only a warden secret reference
+(`ipmi_secret_ref`), resolved at use time and never logged, audited or
+exported. The gRPC binding to warden's `warden.v1.Secrets` is not wired yet
+(`internal/warden`): until it is, secret resolution fails closed and IPMI/KVM
+operations that need a credential are refused.
 
 **Host sync**: hosts running the inventory agent keep their devices,
 interfaces, addresses (in auto-created subnets when needed), BMC management
@@ -67,7 +68,8 @@ SDK's published `sdk/vX.Y.Z` tag.
 | `internal/app` | wiring: config, platform, store, events, HTTP/gRPC, gateway lease, auth registration (permissions, module roles), scan workers |
 | `internal/{subnets,addresses,devices,vlans,locations,groups}` | domain services |
 | `internal/ipnet` | pure CIDR/IP arithmetic that bounds allocation and scans |
-| `internal/scan` | scan executor and ICMP/SNMP/TCP probes |
+| `internal/scan` | scan executor, ICMP/SNMP/TCP probes and the SNMP credentials test |
+| `internal/snmpcred` | pure SNMP credential rules: validation, sealing binding, inheritance, error scrubbing |
 | `internal/ipmi`, `internal/kvm` | BMC power/inventory and the KVM console proxy |
 | `internal/warden` | secret-reference client (plus an in-memory fake) |
 | `internal/{invclient,hostreport,hostplan,hostsync}` | host sync: inventory client, report validation, pure planner, poller/reconcile/apply and admin service |
@@ -195,6 +197,49 @@ Audit vocabulary of the sync: `device_created`, `device_updated`,
 `address_conflict_cleared`, `packages_updated`, `hypervisor_linked`,
 `hypervisor_unlinked`, `port_linked`, `port_unlinked`, `hostsync_run`,
 `hostsync_settings_updated`, `hostsync_resync_requested`.
+
+## SNMP credentials
+
+A subnet can hold its own SNMP credentials (feature 021): SNMP v2c (community)
+or SNMP v3 (user, `authNoPriv` or `authPriv`, authentication protocol MD5,
+SHA-1, SHA-224/256/384/512 and password, privacy protocol DES or AES-128/192/256
+and password; MD5, SHA-1 and DES are labelled weak). v3 passwords need at least
+8 characters; no value may be empty or longer than 256 characters.
+
+- **Storage**: table `ipam_subnet_snmp` (migration 0006, row-level security):
+  version, level and protocols in clear, the secret values as one envelope
+  blob sealed with the module KEK and bound to tenant and subnet, so a blob
+  copied to another row or tenant does not open. Deleting the subnet deletes
+  its credentials.
+- **Write-only**: no response, event, backup, audit row or log line carries a
+  community, v3 user or password; reads return only whether credentials are
+  configured, their version, level and where the effective ones come from.
+  Editing a subnet never touches its credentials.
+- **Inheritance**: a subnet without its own credentials uses those of its
+  nearest ancestor that has them (never across tenants). Subnet responses carry
+  the read-only `snmp` summary (`none`, `own` or `inherited` with the source
+  subnet) and `snmp_version` is the effective version.
+- **Scans**: a scan with SNMP discovery resolves and opens the effective
+  credentials once, when it starts, and records the SNMP phase on the job:
+  `snmp_status` (`not_requested`, `no_live_hosts`, `no_credentials`,
+  `credentials_unreadable`, `ran`), `snmp_source_subnet_id`, `snmp_probed`,
+  `snmp_no_answer`, `snmp_rejected` and `snmp_discovered_count`.
+- **Endpoints**: `GET /api/ipam/v1/subnets/{id}/snmp` (`ipam:read`),
+  `PUT` set/replace and `DELETE` clear (`subnets:manage`),
+  `POST /api/ipam/v1/subnets/{id}/snmp/test` (`scan:run`): probes one usable
+  address inside the subnet within the SNMP timeout plus 2 seconds, at most 10
+  tests per user per minute, and answers `ok` (sysName, sysDescr),
+  `no_response`, `auth_failed`, `unknown_user`, `privacy_failed`,
+  `no_credentials`, `credentials_unreadable` or `error`.
+- **Audit**: `snmp_credentials_set`, `snmp_credentials_replaced`,
+  `snmp_credentials_cleared`, `snmp_credentials_tested`, with neutral detail
+  keys only (`protocol_version`, `security_level`, `previous_version`,
+  `target`, `outcome`, `source_subnet_id`).
+- **Backup**: exports carry the summary only; an import leaves SNMP
+  unconfigured and lists the subnets to re-enter in `snmp_credentials_required`.
+- **Legacy**: the never-functional warden reference `snmp_secret_ref` is no
+  longer written or returned; at start ipam logs how many subnets still carry
+  one so their credentials can be entered again.
 
 ## API permissions
 

@@ -15,6 +15,8 @@ import { splitSchema, subnetSchema } from '@/schemas'
 import type { IPScanJob, SplitResult, Subnet } from '@/api/types'
 import { describe } from '@/api/client'
 import { mergeEdit } from '@/api/merge'
+import SubnetSnmpCard from '@/components/SubnetSnmpCard.vue'
+import { snmpPhaseText } from '@/views/scans/snmp'
 
 export type SubnetDrawerMode = 'view' | 'create' | 'edit' | 'split'
 
@@ -67,8 +69,16 @@ const details = computed<KeyValue[]>(() => {
     { label: 'Mask', value: s.mask }, { label: 'Gateway', value: s.gateway },
     { label: 'DNS servers', value: s.dns_servers }, { label: 'Parent', value: parent.value ? `${parent.value.cidr} — ${parent.value.name}` : '' },
     { label: 'VLAN', value: vlanName(s.vlan_id) }, { label: 'Location', value: locationName(s.location_id) },
+    { label: 'SNMP', value: snmpText(s) },
   ]
 })
+// Effective SNMP credentials (feature 021): configured here, inherited, or none.
+function snmpText(s: Subnet): string {
+  const e = s.snmp
+  if (!e || e.state === 'none') return 'not configured'
+  const kind = (e.version === 3 ? 'v3' : 'v2c') + (e.security_level ? ' ' + e.security_level : '')
+  return e.state === 'own' ? kind : `${kind}, inherited from ${e.source_name} (${e.source_cidr})`
+}
 
 // --- edit / create ---
 const subnetKeys = Object.keys(subnetSchema.shape)
@@ -183,7 +193,10 @@ const scanKind = computed(() => ({ completed: 'success', failed: 'error', cancel
 const scanText = computed(() => {
   const j = scanJob.value
   if (!j) return ''
-  if (j.status === 'completed') return `Scan complete: ${j.alive_count ?? 0} alive, ${j.new_count ?? 0} new, ${j.updated_count ?? 0} updated.`
+  if (j.status === 'completed') {
+    const snmp = j.enable_snmp ? ` SNMP: ${snmpPhaseText(j, (id) => byId(id)?.cidr ?? id)}.` : ''
+    return `Scan complete: ${j.alive_count ?? 0} alive, ${j.new_count ?? 0} new, ${j.updated_count ?? 0} updated.${snmp}`
+  }
   if (j.status === 'failed') return `Scan failed: ${j.status_message || 'unknown error'}.`
   if (j.status === 'cancelled') return 'Scan cancelled.'
   return `Scanning… ${j.progress ?? 0}% (${j.scanned_count ?? 0}/${j.total_addresses ?? 0} probed, ${j.alive_count ?? 0} alive)`
@@ -298,6 +311,8 @@ const back = () => (subnet.value ? emit('navigate', subnet.value.id, 'view') : e
         </div>
       </div>
     </div>
+
+    <SubnetSnmpCard v-if="mode === 'edit' && subnet" :subnet="subnet" class="mt-6" @changed="emit('changed')" />
 
     <template v-if="mode !== 'view'" #actions>
       <UiButton variant="text" color="neutral" icon="mdi-arrow-left" @click="back">{{ subnet ? 'Back' : 'Cancel' }}</UiButton>

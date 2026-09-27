@@ -50,11 +50,21 @@ const openSubnet = (id: string) => (drawer.value = { id, mode: 'view' })
 const navigate = (id: string, mode: SubnetDrawerMode, parentId?: string) => (drawer.value = { id: id || null, mode, parentId })
 const closeDrawer = () => (drawer.value = { id: null, mode: 'view' })
 
+// Effective SNMP credentials per subnet (feature 021): own or inherited.
+function snmpBadge(s: Subnet): { text: string; color: 'success' | 'info'; title: string } | null {
+  const e = s.snmp
+  if (!e || e.state === 'none') return null
+  const v = e.version === 3 ? 'v3' : 'v2c'
+  return e.state === 'own'
+    ? { text: v, color: 'success', title: 'SNMP ' + v + ' configured on this subnet' }
+    : { text: v + ' inherited', color: 'info', title: `SNMP ${v} inherited from ${e.source_name} (${e.source_cidr})` }
+}
 const columns: Column<Subnet>[] = [
   { key: 'name', label: 'Name', sortable: true },
   { key: 'cidr', label: 'CIDR', sortable: true },
   { key: 'parent_id', label: 'Parent', hideOnStack: true, format: (s) => parentCidr(s.parent_id) },
   { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'snmp', label: 'SNMP', width: 'sm', hideOnStack: true, format: (s) => snmpBadge(s)?.text ?? '' },
   { key: 'utilization', label: 'Utilization', width: 'lg', format: (s) => `${utilPct(s)}% (${s.used_addresses ?? 0}/${s.total_addresses ?? 0})` },
 ]
 </script>
@@ -85,6 +95,7 @@ const columns: Column<Subnet>[] = [
         <UiCard :padded="false">
           <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="Subnets — select one to view and act on it" empty-title="No subnets match" clickable :row-attrs="(s) => ({ 'data-test': 'subnet-row-' + s.id })" data-test="subnets-table" @row-click="openSubnet($event.id)">
             <template #cell-cidr="{ row }">{{ row.cidr }} <UiBadge v-if="row.ip_version === 6" size="xs">v6</UiBadge></template>
+            <template #cell-snmp="{ row }"><UiBadge v-if="snmpBadge(row)" :color="snmpBadge(row)!.color" soft size="xs" :title="snmpBadge(row)!.title" data-test="snmp-badge">{{ snmpBadge(row)!.text }}</UiBadge></template>
             <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', deprecated: 'warning', deleted: 'neutral' }" /></template>
             <template #cell-utilization="{ row }">
               <div class="flex items-center gap-2">

@@ -7,17 +7,20 @@
 // Discovery is hidden behind the Discoverer interface so orchestration is
 // unit-tested against a Fake without any SNMP traffic. The real implementation
 // (Client) uses github.com/gosnmp/gosnmp for SNMPv2c and SNMPv3. Credentials
-// (community for v2c; user/auth/priv for v3) are supplied by the caller — the
-// executor fetches them from warden at use time and never stores or logs them.
+// (community for v2c; user/level/auth/priv for v3) are supplied by the caller
+// — the executor opens the subnet's sealed credentials for one scan or test
+// and never stores or logs them. There is no default community.
 package snmp
 
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -59,18 +62,72 @@ const (
 )
 
 // Creds carries the SNMP credentials for one probe. Version is 2 (v2c) or 3.
-// For v2c only Community is used; for v3 the User/auth/priv fields apply. These
-// values come from warden at use time and must never be persisted or logged.
+// For v2c only Community is used; for v3 the User/level/auth/priv fields
+// apply. These values are opened for one operation and must never be
+// persisted or logged.
 type Creds struct {
-	Version      int
-	Community    string // v2c
-	User         string // v3
-	AuthPassword string // v3
-	PrivPassword string // v3
-	AuthProtocol string // v3: MD5 | SHA
-	PrivProtocol string // v3: DES | AES
-	TimeoutMs    int
-	Retries      int
+	Version       int
+	Community     string // v2c
+	User          string // v3
+	SecurityLevel string // v3: authNoPriv | authPriv
+	AuthPassword  string // v3
+	PrivPassword  string // v3
+	AuthProtocol  string // v3: MD5 | SHA | SHA224 | SHA256 | SHA384 | SHA512
+	PrivProtocol  string // v3 authPriv: DES | AES | AES192 | AES256
+	TimeoutMs     int
+	Retries       int
+}
+
+// String never prints a credential value.
+func (Creds) String() string { return "snmp.Creds[REDACTED]" }
+
+// GoString never prints a credential value.
+func (Creds) GoString() string { return "snmp.Creds[REDACTED]" }
+
+// Outcome classifies an SNMP operation's result (tests and scan counters).
+type Outcome string
+
+// Outcomes.
+const (
+	OutcomeOK            Outcome = "ok"
+	OutcomeNoResponse    Outcome = "no_response"
+	OutcomeAuthFailed    Outcome = "auth_failed"
+	OutcomeUnknownUser   Outcome = "unknown_user"
+	OutcomePrivacyFailed Outcome = "privacy_failed"
+	OutcomeError         Outcome = "error"
+)
+
+// Rejected reports whether the agent answered but refused the credentials.
+func (o Outcome) Rejected() bool {
+	return o == OutcomeAuthFailed || o == OutcomeUnknownUser || o == OutcomePrivacyFailed
+}
+
+// Classify maps an SNMP error to its outcome: silence (timeouts, refused
+// ports) is no_response; USM reports are unknown_user, auth_failed (wrong
+// digest or unsupported security level) or privacy_failed (decryption).
+func Classify(err error) Outcome {
+	if err == nil {
+		return OutcomeOK
+	}
+	var ne net.Error
+	switch {
+	case errors.Is(err, gosnmp.ErrUnknownUsername):
+		return OutcomeUnknownUser
+	case errors.Is(err, gosnmp.ErrWrongDigest), errors.Is(err, gosnmp.ErrUnknownSecurityLevel):
+		return OutcomeAuthFailed
+	case errors.Is(err, gosnmp.ErrDecryption):
+		return OutcomePrivacyFailed
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &ne) && ne.Timeout():
+		return OutcomeNoResponse
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "timeout"), strings.Contains(msg, "connection refused"), strings.Contains(msg, "no response"):
+		return OutcomeNoResponse
+	case strings.Contains(msg, "decrypt"):
+		return OutcomePrivacyFailed
+	}
+	return OutcomeError
 }
 
 // Interface is one discovered NIC.
@@ -111,6 +168,8 @@ type Discoverer interface {
 	// interface and (best-effort) link data. A reachable-but-silent host yields
 	// an error; a partially-answering host yields a partial device and no error.
 	Discover(ctx context.Context, ip string, creds Creds) (DiscoveredDevice, error)
+	// Probe does one GET of sysName and sysDescr (credentials test).
+	Probe(ctx context.Context, ip string, creds Creds) (sysName, sysDescr string, err error)
 }
 
 // Client is the real gosnmp-backed Discoverer.
@@ -123,36 +182,15 @@ func NewClient() *Client { return &Client{} }
 func (c *Client) Discover(ctx context.Context, ip string, creds Creds) (DiscoveredDevice, error) {
 	dev := DiscoveredDevice{Address: ip}
 
-	client, err := newClient(ip, creds)
+	client, err := connect(ctx, ip, creds)
 	if err != nil {
-		return dev, fmt.Errorf("snmp: build client %s: %w", ip, err)
-	}
-	if err := client.ConnectIPv4(); err != nil {
-		return dev, fmt.Errorf("snmp: connect %s: %w", ip, err)
+		return dev, err
 	}
 	defer func() { _ = client.Conn.Close() }()
 
-	if err := ctx.Err(); err != nil {
-		return dev, err
-	}
-
-	res, err := client.Get([]string{oidSysName, oidSysDescr, oidSysObjectID})
-	if err != nil {
-		return dev, fmt.Errorf("snmp: get system oids %s: %w", ip, err)
-	}
 	var sysObjectID string
-	for _, v := range res.Variables {
-		if v.Type == gosnmp.NoSuchObject || v.Type == gosnmp.NoSuchInstance {
-			continue
-		}
-		switch v.Name {
-		case "." + oidSysName:
-			dev.SysName = extractString(v)
-		case "." + oidSysDescr:
-			dev.SysDescr = extractString(v)
-		case "." + oidSysObjectID:
-			sysObjectID = extractString(v)
-		}
+	if dev.SysName, dev.SysDescr, sysObjectID, err = systemOIDs(client, ip); err != nil {
+		return dev, err
 	}
 
 	dev.DeviceType = parseDeviceType(sysObjectID, dev.SysDescr)
@@ -178,7 +216,65 @@ func (c *Client) Discover(ctx context.Context, ip string, creds Creds) (Discover
 	return dev, nil
 }
 
-// newClient builds a configured gosnmp client for the address and credentials.
+// Probe implements Discoverer: one GET of the system OIDs.
+func (c *Client) Probe(ctx context.Context, ip string, creds Creds) (string, string, error) {
+	client, err := connect(ctx, ip, creds)
+	if err != nil {
+		return "", "", err
+	}
+	defer func() { _ = client.Conn.Close() }()
+	name, descr, _, err := systemOIDs(client, ip)
+	return name, descr, err
+}
+
+// connect builds the client and opens its socket (IPv4 or IPv6).
+func connect(ctx context.Context, ip string, creds Creds) (*gosnmp.GoSNMP, error) {
+	client, err := newClient(ip, creds)
+	if err != nil {
+		return nil, fmt.Errorf("snmp: build client %s: %w", ip, err)
+	}
+	client.Context = ctx
+	if err := client.Connect(); err != nil {
+		return nil, fmt.Errorf("snmp: connect %s: %w", ip, err)
+	}
+	if err := ctx.Err(); err != nil {
+		_ = client.Conn.Close()
+		return nil, err
+	}
+	return client, nil
+}
+
+// systemOIDs reads sysName, sysDescr and sysObjectID.
+func systemOIDs(client *gosnmp.GoSNMP, ip string) (name, descr, objectID string, err error) {
+	res, err := client.Get([]string{oidSysName, oidSysDescr, oidSysObjectID})
+	if err != nil {
+		return "", "", "", fmt.Errorf("snmp: get system oids %s: %w", ip, err)
+	}
+	for _, v := range res.Variables {
+		if v.Type == gosnmp.NoSuchObject || v.Type == gosnmp.NoSuchInstance {
+			continue
+		}
+		switch v.Name {
+		case "." + oidSysName:
+			name = extractString(v)
+		case "." + oidSysDescr:
+			descr = extractString(v)
+		case "." + oidSysObjectID:
+			objectID = extractString(v)
+		}
+	}
+	return name, descr, objectID, nil
+}
+
+var (
+	authProtocols = map[string]gosnmp.SnmpV3AuthProtocol{"MD5": gosnmp.MD5, "SHA": gosnmp.SHA, "SHA224": gosnmp.SHA224,
+		"SHA256": gosnmp.SHA256, "SHA384": gosnmp.SHA384, "SHA512": gosnmp.SHA512}
+	privProtocols = map[string]gosnmp.SnmpV3PrivProtocol{"DES": gosnmp.DES, "AES": gosnmp.AES, "AES192": gosnmp.AES192, "AES256": gosnmp.AES256}
+)
+
+// newClient builds a configured gosnmp client for the address and
+// credentials. Unknown protocols, levels or versions and an empty v2c
+// community are errors: nothing falls back to a default.
 func newClient(address string, creds Creds) (*gosnmp.GoSNMP, error) {
 	timeout := defaultTimeout
 	if creds.TimeoutMs > 0 {
@@ -200,41 +296,44 @@ func newClient(address string, creds Creds) (*gosnmp.GoSNMP, error) {
 		Retries: retries,
 	}
 
-	if creds.Version == 3 {
-		client.Version = gosnmp.Version3
-		client.SecurityModel = gosnmp.UserSecurityModel
-		client.MsgFlags = gosnmp.AuthPriv
-		usm := &gosnmp.UsmSecurityParameters{UserName: creds.User}
-		switch strings.ToUpper(creds.AuthProtocol) {
-		case "SHA":
-			usm.AuthenticationProtocol = gosnmp.SHA
-		default:
-			usm.AuthenticationProtocol = gosnmp.MD5
+	switch creds.Version {
+	case 3:
+		return v3Client(client, creds)
+	case 2:
+		if creds.Community == "" {
+			return nil, errors.New("empty community")
 		}
-		usm.AuthenticationPassphrase = creds.AuthPassword
-		switch strings.ToUpper(creds.PrivProtocol) {
-		case "AES":
-			usm.PrivacyProtocol = gosnmp.AES
-		default:
-			usm.PrivacyProtocol = gosnmp.DES
-		}
-		usm.PrivacyPassphrase = creds.PrivPassword
-		switch {
-		case creds.AuthPassword == "":
-			client.MsgFlags = gosnmp.NoAuthNoPriv
-		case creds.PrivPassword == "":
-			client.MsgFlags = gosnmp.AuthNoPriv
-		}
-		client.SecurityParameters = usm
+		client.Version = gosnmp.Version2c
+		client.Community = creds.Community
 		return client, nil
+	default:
+		return nil, fmt.Errorf("unsupported SNMP version %d", creds.Version)
 	}
+}
 
-	client.Version = gosnmp.Version2c
-	community := creds.Community
-	if community == "" {
-		community = "public"
+func v3Client(client *gosnmp.GoSNMP, creds Creds) (*gosnmp.GoSNMP, error) {
+	auth, ok := authProtocols[creds.AuthProtocol]
+	if !ok {
+		return nil, errors.New("unsupported authentication protocol")
 	}
-	client.Community = community
+	usm := &gosnmp.UsmSecurityParameters{UserName: creds.User, AuthenticationProtocol: auth,
+		AuthenticationPassphrase: creds.AuthPassword, PrivacyProtocol: gosnmp.NoPriv}
+	switch creds.SecurityLevel {
+	case "authNoPriv":
+		client.MsgFlags = gosnmp.AuthNoPriv
+	case "authPriv":
+		priv, ok := privProtocols[creds.PrivProtocol]
+		if !ok {
+			return nil, errors.New("unsupported privacy protocol")
+		}
+		client.MsgFlags = gosnmp.AuthPriv
+		usm.PrivacyProtocol, usm.PrivacyPassphrase = priv, creds.PrivPassword
+	default:
+		return nil, errors.New("unsupported security level")
+	}
+	client.Version = gosnmp.Version3
+	client.SecurityModel = gosnmp.UserSecurityModel
+	client.SecurityParameters = usm
 	return client, nil
 }
 
@@ -613,14 +712,19 @@ func ifTypeToString(ifType int) string {
 	}
 }
 
-// Fake is an in-memory Discoverer for tests, keyed by host IP.
+// Fake is an in-memory Discoverer for tests, keyed by host IP. It records
+// the credentials of every call (tests assert what reached the client).
 type Fake struct {
 	Devices map[string]DiscoveredDevice
+	Errs    map[string]error // per-IP failure (e.g. gosnmp.ErrWrongDigest)
 	Err     error
+
+	mu   sync.Mutex
+	seen []Creds
 }
 
 // NewFake builds an empty Fake.
-func NewFake() *Fake { return &Fake{Devices: map[string]DiscoveredDevice{}} }
+func NewFake() *Fake { return &Fake{Devices: map[string]DiscoveredDevice{}, Errs: map[string]error{}} }
 
 // Set records the device an IP should resolve to.
 func (f *Fake) Set(ip string, dev DiscoveredDevice) {
@@ -628,17 +732,43 @@ func (f *Fake) Set(ip string, dev DiscoveredDevice) {
 	f.Devices[ip] = dev
 }
 
-// Discover returns the configured device for ip, or an error when none is set
-// (mirroring a silent host).
-func (f *Fake) Discover(_ context.Context, ip string, _ Creds) (DiscoveredDevice, error) {
+// Fail makes every call for ip return err.
+func (f *Fake) Fail(ip string, err error) { f.Errs[ip] = err }
+
+// Seen returns the credentials of every call so far.
+func (f *Fake) Seen() []Creds {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]Creds(nil), f.seen...)
+}
+
+func (f *Fake) answer(ip string, creds Creds) (DiscoveredDevice, error) {
+	f.mu.Lock()
+	f.seen = append(f.seen, creds)
+	f.mu.Unlock()
 	if f.Err != nil {
 		return DiscoveredDevice{}, f.Err
+	}
+	if err := f.Errs[ip]; err != nil {
+		return DiscoveredDevice{Address: ip}, fmt.Errorf("snmp: get system oids %s: %w", ip, err)
 	}
 	dev, ok := f.Devices[ip]
 	if !ok {
 		return DiscoveredDevice{Address: ip}, fmt.Errorf("snmp: no response from %s", ip)
 	}
 	return dev, nil
+}
+
+// Discover returns the configured device for ip, or an error when none is set
+// (mirroring a silent host).
+func (f *Fake) Discover(_ context.Context, ip string, creds Creds) (DiscoveredDevice, error) {
+	return f.answer(ip, creds)
+}
+
+// Probe returns the configured device's sysName/sysDescr.
+func (f *Fake) Probe(_ context.Context, ip string, creds Creds) (string, string, error) {
+	dev, err := f.answer(ip, creds)
+	return dev.SysName, dev.SysDescr, err
 }
 
 // interface conformance.

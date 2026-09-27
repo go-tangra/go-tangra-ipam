@@ -3,6 +3,7 @@
 package repodb_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -18,8 +19,9 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/snmpcred"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 // TestInterfaceLinksUniqueFix is the regression test for the link uniqueness
@@ -78,12 +80,19 @@ func TestInterfaceLinksUniqueFix(t *testing.T) {
 
 	// An SNMP scan of a switch whose first port learned two MACs persists the
 	// following interfaces too, and correlation links the reported host.
-	sub := store.Subnet{ID: store.NewID(), TenantID: tenantA, Name: "mgmt", CIDR: "10.0.0.0/29", IPVersion: 4, PrefixLength: 29, SNMPSecretRef: "snmp", SNMPVersion: 2}
+	sub := store.Subnet{ID: store.NewID(), TenantID: tenantA, Name: "mgmt", CIDR: "10.0.0.0/29", IPVersion: 4, PrefixLength: 29}
 	if err := db.CreateSubnet(ctx, sub); err != nil {
 		t.Fatal(err)
 	}
-	wf := warden.NewFake()
-	wf.Put("snmp", map[string]string{"community": "public"}, warden.SecretMeta{Name: "snmp"})
+	env, _ := sealed.NewEnvelope(bytes.Repeat([]byte{4}, 32))
+	blob, err := snmpcred.Seal(env, tenantA, sub.ID, snmpcred.Input{Version: 2, Community: "lab"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.PutSubnetSNMP(ctx, store.SubnetSNMP{TenantID: tenantA, SubnetID: sub.ID, Version: 2, Sealed: blob, UpdatedBy: "u"},
+		store.AuditRow{Action: "snmp_credentials_set", ActorKind: "user", ActorID: "u", SubjectKind: "subnet", SubjectID: sub.ID, Outcome: "ok"}); err != nil {
+		t.Fatal(err)
+	}
 	disc := snmp.NewFake()
 	disc.Set("10.0.0.1", snmp.DiscoveredDevice{SysName: "sw2", DeviceType: store.DevSwitch,
 		Interfaces: []snmp.Interface{{Name: "Gi0/1", IfIndex: 1}, {Name: "Gi0/2", IfIndex: 2}},
@@ -102,8 +111,9 @@ func TestInterfaceLinksUniqueFix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := scan.New(db, icmp.NewFake("10.0.0.1"), icmp.NewFake(), disc, wf, events.HubPublisher{},
+	svc := scan.New(db, icmp.NewFake("10.0.0.1"), icmp.NewFake(), disc, events.HubPublisher{},
 		scan.Config{MaxHosts: 64, Concurrency: 4, TimeoutMs: 100, Workers: 1, MaxRetries: 0}, nil)
+	svc.SetEnvelope(env)
 	svc.SetLinker(portlink.New(db, 16, 14*24*time.Hour))
 	if _, err := svc.StartScan(ctx, authz.Subjects{TenantID: tenantA, UserID: "u", Roles: []string{"admin"}, ActorKind: authz.ActorUser}, sub.ID, scan.Options{EnableSNMP: true, SkipReverseDNS: true}); err != nil {
 		t.Fatal(err)

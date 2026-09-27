@@ -46,6 +46,7 @@ type Mem struct {
 	guests      map[string]store.HypervisorGuest     // keyed by id
 	hsSettings  map[string]store.HostSyncSettings    // keyed by tenant id
 	devState    map[string]store.HostSyncDeviceState // keyed by device id
+	snmp        map[string]store.SubnetSNMP          // keyed by subnet id
 
 	failNext map[string]bool
 	Now      func() time.Time
@@ -71,6 +72,7 @@ func New() *Mem {
 		guests:      map[string]store.HypervisorGuest{},
 		hsSettings:  map[string]store.HostSyncSettings{},
 		devState:    map[string]store.HostSyncDeviceState{},
+		snmp:        map[string]store.SubnetSNMP{},
 		failNext:    map[string]bool{},
 		Now:         func() time.Time { return time.Now().UTC() },
 	}
@@ -296,6 +298,7 @@ func (m *Mem) DeleteSubnet(_ context.Context, tenantID, id string, force bool) e
 			m.subnets[cid] = c
 		}
 	}
+	delete(m.snmp, id) // FK ON DELETE CASCADE
 	delete(m.subnets, id)
 	return nil
 }
@@ -342,6 +345,9 @@ func (m *Mem) SubnetsForVlan(_ context.Context, tenantID, vlanID string) ([]stor
 func (m *Mem) AllSubnetCIDRs(_ context.Context, tenantID string) ([]store.Subnet, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.fail("AllSubnetCIDRs"); err != nil {
+		return nil, err
+	}
 	var out []store.Subnet
 	for _, s := range m.subnets {
 		if s.TenantID == tenantID {

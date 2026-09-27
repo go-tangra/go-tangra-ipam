@@ -45,6 +45,16 @@ type Store interface {
 	SubnetsForVlan(ctx context.Context, tenantID, vlanID string) ([]store.Subnet, error)
 	AllSubnetCIDRs(ctx context.Context, tenantID string) ([]store.Subnet, error) // for overlap checks
 
+	// Subnet SNMP credentials (feature 021). Writes carry their audit row in
+	// the same transaction; Put and Delete answer ErrNotFound for a subnet (or
+	// credential row) outside the tenant. ListSubnetSNMP returns metadata only
+	// (Sealed nil). LegacySNMPRefCount is system scope (startup report).
+	GetSubnetSNMP(ctx context.Context, tenantID, subnetID string) (store.SubnetSNMP, error)
+	PutSubnetSNMP(ctx context.Context, row store.SubnetSNMP, audit store.AuditRow) error
+	DeleteSubnetSNMP(ctx context.Context, tenantID, subnetID string, audit store.AuditRow) error
+	ListSubnetSNMP(ctx context.Context, tenantID string) ([]store.SubnetSNMP, error)
+	LegacySNMPRefCount(ctx context.Context) (int64, error)
+
 	// IP addresses
 	CreateAddress(ctx context.Context, a store.IPAddress) error // ErrConflict on duplicate (allocation guard)
 	GetAddress(ctx context.Context, tenantID, id string) (store.IPAddress, error)

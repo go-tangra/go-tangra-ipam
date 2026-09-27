@@ -76,6 +76,14 @@ const (
 	HostSyncSettingsUpdated EventType = "hostsync_settings_updated"
 	HostSyncResyncRequested EventType = "hostsync_resync_requested"
 	HostSyncRun             EventType = "hostsync_run"
+
+	// Subnet SNMP credentials (feature 021, contracts/audit-events.md).
+	// Details use neutral keys only (protocol_version, security_level,
+	// previous_version, target, outcome, source_subnet_id).
+	SNMPCredentialsSet      EventType = "snmp_credentials_set"
+	SNMPCredentialsReplaced EventType = "snmp_credentials_replaced"
+	SNMPCredentialsCleared  EventType = "snmp_credentials_cleared"
+	SNMPCredentialsTested   EventType = "snmp_credentials_tested"
 )
 
 // HostSyncActor is the actor id of every change the host sync makes.
@@ -132,6 +140,7 @@ func init() {
 		AddressMoved, AddressReleased, AddressConflict, AddressConflictCleared,
 		PackagesUpdated, HypervisorLinked, HypervisorUnlinked, PortLinked, PortUnlinked,
 		DeviceNotReported, HostSyncSettingsUpdated, HostSyncResyncRequested, HostSyncRun,
+		SNMPCredentialsSet, SNMPCredentialsReplaced, SNMPCredentialsCleared, SNMPCredentialsTested,
 	} {
 		known[t] = struct{}{}
 	}
@@ -189,9 +198,10 @@ func Validate(e Event) error {
 	return nil
 }
 
-// forbidden detail-key substrings (case-insensitive): SNMP/IPMI credentials,
-// sealed owner/contact fields and passwords never belong in an audit detail.
-var forbidden = []string{"secret", "credential", "snmp", "ipmi", "password", "owner", "contact"}
+// forbidden detail-key substrings (case-insensitive): SNMP/IPMI credentials
+// (communities, passphrases), sealed owner/contact fields and passwords never
+// belong in an audit detail (SR-005).
+var forbidden = []string{"secret", "credential", "snmp", "ipmi", "password", "passphrase", "community", "owner", "contact"}
 
 func forbiddenKey(k string) bool {
 	lk := strings.ToLower(k)
@@ -224,7 +234,8 @@ func guardValue(v any) any {
 }
 
 // guardMap returns a copy of m with any key whose lowercased name carries
-// secret|credential|snmp|ipmi|password|owner|contact (at any depth) dropped and
+// secret|credential|snmp|ipmi|password|passphrase|community|owner|contact (at
+// any depth) dropped and
 // string values truncated to 256 characters.
 func guardMap(m map[string]any) map[string]any {
 	out := make(map[string]any, len(m))

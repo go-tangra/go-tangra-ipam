@@ -28,6 +28,7 @@ const MaxImportBytes = 256 << 20
 func (s *Server) Register(d Deps) {
 	p := ipamBase
 	s.registerHostSync(d)
+	s.registerSNMP(d)
 
 	// ---------------------------------------------------------------- Subnets
 	s.MustHandle("GET", p+"/subnets", func(w http.ResponseWriter, r *http.Request) {

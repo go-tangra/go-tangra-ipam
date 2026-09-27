@@ -43,7 +43,7 @@ func newKit(t *testing.T) kit {
 	t.Helper()
 	mem := memstore.New()
 	pub := events.HubPublisher{}
-	scanSvc := scan.New(mem, nil, nil, nil, warden.NewFake(), pub, scan.Config{
+	scanSvc := scan.New(mem, nil, nil, nil, pub, scan.Config{
 		MaxHosts: 100000, Concurrency: 1, TimeoutMs: 1000, Workers: 1, MaxRetries: 0,
 	}, nil)
 	bmc := ipmi.NewFake()

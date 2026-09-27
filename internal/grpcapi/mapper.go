@@ -445,19 +445,23 @@ func powerActionToStore(a ipamv1.PowerAction) string {
 
 // ---- subnet ----
 
+// subnetToPB maps a subnet: snmp_version is the effective SNMP version the
+// subnets service filled; the legacy warden reference is never sent (021).
 func subnetToPB(v store.Subnet) *ipamv1.Subnet {
 	return &ipamv1.Subnet{
 		Id: v.ID, TenantId: v.TenantID, Name: v.Name, Cidr: v.CIDR, Description: v.Description,
 		Gateway: v.Gateway, DnsServers: v.DNSServers, VlanId: v.VlanID, ParentId: v.ParentID,
 		LocationId: v.LocationID, Status: subnetStatusToPB(v.Status), IpVersion: int32(v.IPVersion),
 		NetworkAddress: v.NetworkAddress, BroadcastAddress: v.BroadcastAddr, Mask: v.Mask,
-		PrefixLength: int32(v.PrefixLength), SnmpSecretRef: v.SNMPSecretRef, SnmpVersion: int32(v.SNMPVersion),
+		PrefixLength: int32(v.PrefixLength), SnmpVersion: int32(v.SNMPVersion),
 		Tags: v.Tags, CreatedBy: v.CreatedBy, CreatedAt: unix(v.CreatedAt), UpdatedAt: unix(v.UpdatedAt),
 		TotalAddresses: v.TotalAddresses, UsedAddresses: v.UsedAddresses,
 		AvailableAddresses: v.AvailableAddresses, Utilization: v.Utilization, Origin: v.Origin,
 	}
 }
 
+// subnetFromPB maps an inbound subnet; SNMP credentials are managed only
+// through the dedicated HTTP endpoints, so its SNMP fields are dropped.
 func subnetFromPB(p *ipamv1.Subnet) store.Subnet {
 	if p == nil {
 		return store.Subnet{}
@@ -466,8 +470,7 @@ func subnetFromPB(p *ipamv1.Subnet) store.Subnet {
 		ID: p.GetId(), TenantID: p.GetTenantId(), Name: p.GetName(), CIDR: p.GetCidr(),
 		Description: p.GetDescription(), Gateway: p.GetGateway(), DNSServers: p.GetDnsServers(),
 		VlanID: p.GetVlanId(), ParentID: p.GetParentId(), LocationID: p.GetLocationId(),
-		Status: subnetStatusFromPB(p.GetStatus()), SNMPSecretRef: p.GetSnmpSecretRef(),
-		SNMPVersion: int(p.GetSnmpVersion()), Tags: p.GetTags(),
+		Status: subnetStatusFromPB(p.GetStatus()), Tags: p.GetTags(),
 	}
 }
 

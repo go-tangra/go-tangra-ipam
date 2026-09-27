@@ -12,7 +12,6 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 // emptyTenantSubj is a caller with no tenant, which trips RequireTenant.
@@ -27,7 +26,7 @@ func TestNewDefaultsNowWhenNil(t *testing.T) {
 	m := memstore.New()
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
 	// Pass a nil now func: the constructor must substitute time.Now.
-	svc := New(m, icmp.NewFake(), icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), nil)
+	svc := New(m, icmp.NewFake(), icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), nil)
 	if svc.now == nil {
 		t.Fatal("now func should be defaulted, not nil")
 	}
@@ -49,7 +48,7 @@ func TestListScanJobs(t *testing.T) {
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
 	mustSubnet(t, m, "t1", "s2", "10.0.1.0/29", 4)
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 
 	j1, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true})
 	if err != nil {
@@ -105,7 +104,7 @@ func TestListScanJobs(t *testing.T) {
 func TestGetScanJobErrors(t *testing.T) {
 	ctx := context.Background()
 	m := memstore.New()
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), &clock{t: time.Now().UTC()})
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), &clock{t: time.Now().UTC()})
 
 	if _, err := svc.GetScanJob(ctx, adminSubj("t1"), "does-not-exist"); err == nil {
 		t.Fatal("expected error for missing job id")
@@ -123,7 +122,7 @@ func TestCancelScanErrors(t *testing.T) {
 	clk := &clock{t: time.Now().UTC()}
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 
 	// Missing id.
 	if _, err := svc.CancelScan(ctx, adminSubj("t1"), "nope"); err == nil {
@@ -150,7 +149,7 @@ func TestCancelScanErrors(t *testing.T) {
 func TestStartScanTenantlessForbidden(t *testing.T) {
 	ctx := context.Background()
 	m := memstore.New()
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), &clock{t: time.Now().UTC()})
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), &clock{t: time.Now().UTC()})
 	if _, err := svc.StartScan(ctx, emptyTenantSubj(), "s1", Options{}); !errors.Is(err, authz.ErrForbidden) {
 		t.Fatalf("err = %v, want ErrForbidden", err)
 	}
@@ -162,7 +161,7 @@ func TestStartScanCreateFailure(t *testing.T) {
 	clk := &clock{t: time.Now().UTC()}
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 	m.FailNext("CreateScanJob")
 	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true}); err == nil {
 		t.Fatal("expected CreateScanJob failure to surface")
@@ -180,7 +179,7 @@ func TestStartScanBadCIDRParseError(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create subnet: %v", err)
 	}
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 	if _, err := svc.StartScan(ctx, adminSubj("t1"), "bad", Options{}); err == nil {
 		t.Fatal("expected parse error for bad CIDR")
 	}
@@ -190,7 +189,7 @@ func TestStartScanBadCIDRParseError(t *testing.T) {
 
 func TestRunReturnsOnContextCancel(t *testing.T) {
 	m := memstore.New()
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), &clock{t: time.Now().UTC()})
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), &clock{t: time.Now().UTC()})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // already cancelled -> Run returns immediately
 	if err := svc.Run(ctx, nil); !errors.Is(err, context.Canceled) {
@@ -203,7 +202,7 @@ func TestRunReturnsOnContextCancel(t *testing.T) {
 func TestRunOnceClaimError(t *testing.T) {
 	ctx := context.Background()
 	m := memstore.New()
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), &clock{t: time.Now().UTC()})
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), &clock{t: time.Now().UTC()})
 	m.FailNext("ClaimDueScanJobs")
 	if _, err := svc.RunOnce(ctx, nil); err == nil {
 		t.Fatal("expected ClaimDueScanJobs failure to surface")
@@ -220,7 +219,7 @@ func TestRunOnceReverseDNS(t *testing.T) {
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/30", 4) // .1 .. .2
 
 	sweeper := icmp.NewFake("10.0.0.1")
-	svc := newService(m, sweeper, snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, sweeper, snmp.NewFake(), &recPub{}, testConfig(), clk)
 
 	// SkipReverseDNS false -> processJob invokes the default reverse-DNS lookup.
 	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: false}); err != nil {
@@ -247,7 +246,7 @@ func TestProcessJobUpsertFailureRetries(t *testing.T) {
 	sweeper := icmp.NewFake("10.0.0.1")
 	cfg := testConfig()
 	cfg.MaxRetries = 0
-	svc := newService(m, sweeper, snmp.NewFake(), warden.NewFake(), &recPub{}, cfg, clk)
+	svc := newService(m, sweeper, snmp.NewFake(), &recPub{}, cfg, clk)
 
 	job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true})
 	if err != nil {
@@ -272,7 +271,7 @@ func TestProcessJobSubnetGone(t *testing.T) {
 	m.Now = clk.now
 	cfg := testConfig()
 	cfg.MaxRetries = 0
-	svc := newService(m, icmp.NewFake("10.0.0.1"), snmp.NewFake(), warden.NewFake(), &recPub{}, cfg, clk)
+	svc := newService(m, icmp.NewFake("10.0.0.1"), snmp.NewFake(), &recPub{}, cfg, clk)
 
 	// A claimed (scanning) job whose subnet does not exist: the GetSubnet reload
 	// inside processJob fails, driving retryOrFail -> failed.
@@ -291,46 +290,6 @@ func TestProcessJobSubnetGone(t *testing.T) {
 	}
 }
 
-// --- snmpCreds: version defaulting and error/empty branches ---
-
-func TestSNMPCredsVersionDefault(t *testing.T) {
-	ctx := context.Background()
-	m := memstore.New()
-	clk := &clock{t: time.Now().UTC()}
-	m.Now = clk.now
-	mustSubnet(t, m, "t1", "s1", "10.0.0.0/30", 4)
-	sub, _ := m.GetSubnet(ctx, "t1", "s1")
-	sub.SNMPSecretRef = "snmp-ref"
-	sub.SNMPVersion = 0 // -> defaults to 2 inside snmpCreds
-	_ = m.UpdateSubnet(ctx, sub)
-
-	w := warden.NewFake()
-	w.Put("snmp-ref", map[string]string{"community": "public"}, warden.SecretMeta{Name: "snmp"})
-
-	creds, ok := svc(m, w, clk).snmpCreds(ctx, sub)
-	if !ok {
-		t.Fatal("expected creds ok")
-	}
-	if creds.Version != 2 {
-		t.Fatalf("version = %d, want defaulted 2", creds.Version)
-	}
-}
-
-func TestSNMPCredsMissingRef(t *testing.T) {
-	ctx := context.Background()
-	m := memstore.New()
-	clk := &clock{t: time.Now().UTC()}
-	s := svc(m, warden.NewFake(), clk)
-	// Empty ref -> not ok.
-	if _, ok := s.snmpCreds(ctx, store.Subnet{}); ok {
-		t.Fatal("empty ref should be not-ok")
-	}
-	// Ref present but warden lookup fails -> not ok.
-	if _, ok := s.snmpCreds(ctx, store.Subnet{SNMPSecretRef: "unknown"}); ok {
-		t.Fatal("unknown ref should be not-ok")
-	}
-}
-
 func TestDiscoverSNMPMissingCredsIsZero(t *testing.T) {
 	ctx := context.Background()
 	m := memstore.New()
@@ -341,7 +300,7 @@ func TestDiscoverSNMPMissingCredsIsZero(t *testing.T) {
 	sweeper := icmp.NewFake("10.0.0.1")
 	disc := snmp.NewFake()
 	disc.Set("10.0.0.1", snmp.DiscoveredDevice{SysName: "sw"})
-	s := newService(m, sweeper, disc, warden.NewFake(), &recPub{}, testConfig(), clk)
+	s := newService(m, sweeper, disc, &recPub{}, testConfig(), clk)
 	if _, err := s.StartScan(ctx, adminSubj("t1"), "s1", Options{EnableSNMP: true, SkipReverseDNS: true}); err != nil {
 		t.Fatalf("StartScan: %v", err)
 	}
@@ -361,7 +320,7 @@ func TestPersistDeviceNamingFallbacks(t *testing.T) {
 	m := memstore.New()
 	clk := &clock{t: time.Now().UTC()}
 	m.Now = clk.now
-	s := svc(m, warden.NewFake(), clk)
+	s := svc(m, clk)
 
 	dev := snmp.DiscoveredDevice{
 		// SysName empty -> deviceName falls back to "device-<ip>".
@@ -386,7 +345,7 @@ func TestPersistDeviceErrors(t *testing.T) {
 	m := memstore.New()
 	clk := &clock{t: time.Now().UTC()}
 	m.Now = clk.now
-	s := svc(m, warden.NewFake(), clk)
+	s := svc(m, clk)
 	dev := snmp.DiscoveredDevice{
 		SysName:    "sw",
 		Interfaces: []snmp.Interface{{Name: "Gi0/1", IfIndex: 1}},
@@ -419,7 +378,7 @@ func TestRetryOrFailCancelledUnderneath(t *testing.T) {
 	m := memstore.New()
 	clk := &clock{t: time.Now().UTC()}
 	m.Now = clk.now
-	s := svc(m, warden.NewFake(), clk)
+	s := svc(m, clk)
 
 	// Branch: the second GetScanJob (by job.ID) finds the job cancelled.
 	cancelled := store.IPScanJob{
@@ -444,7 +403,7 @@ func TestRetryOrFailCancelledUnderneath(t *testing.T) {
 func TestObserveCancelReloadError(t *testing.T) {
 	ctx := context.Background()
 	m := memstore.New()
-	s := svc(m, warden.NewFake(), &clock{t: time.Now().UTC()})
+	s := svc(m, &clock{t: time.Now().UTC()})
 	// A job whose id is not in the store: GetScanJob errors -> observeCancel false.
 	j := store.IPScanJob{ID: "ghost", TenantID: "t1"}
 	if s.observeCancel(ctx, nil, &j) {
@@ -458,19 +417,19 @@ func TestTimeoutDefault(t *testing.T) {
 	m := memstore.New()
 	cfg := testConfig()
 	cfg.TimeoutMs = 0
-	s := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, cfg, &clock{t: time.Now().UTC()})
+	s := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, cfg, &clock{t: time.Now().UTC()})
 	if got := s.timeout(); got != time.Second {
 		t.Fatalf("timeout = %v, want 1s default", got)
 	}
 	cfg.TimeoutMs = 250
-	s2 := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, cfg, &clock{t: time.Now().UTC()})
+	s2 := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, cfg, &clock{t: time.Now().UTC()})
 	if got := s2.timeout(); got != 250*time.Millisecond {
 		t.Fatalf("timeout = %v, want 250ms", got)
 	}
 }
 
-// svc is a compact Service builder for tests that only need the store, warden
-// and clock (sweeper/discoverer default to fakes).
-func svc(m *memstore.Mem, w warden.Client, clk *clock) *Service {
-	return newService(m, icmp.NewFake(), snmp.NewFake(), w, &recPub{}, testConfig(), clk)
+// svc is a compact Service builder for tests that only need the store and
+// clock (sweeper/discoverer default to fakes).
+func svc(m *memstore.Mem, clk *clock) *Service {
+	return newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 }

@@ -9,7 +9,8 @@ info:
     statistics, tenant backup and a realtime event stream. Gateway-proxied under
     /api/ipam. Every route declares an x-freya-permission (health is public).
     SNMP/BMC/IPMI credentials and sealed owner/contact fields are never returned
-    in any response; devices and subnets expose only opaque warden secret refs.
+    in any response; devices expose only opaque warden secret refs and subnets
+    only their effective SNMP state (write-only SNMP credentials, feature 021).
 servers:
   - url: /
 components:
@@ -120,6 +121,66 @@ components:
         guest_device_name: { type: string }
         last_reported_at: { type: string, format: date-time }
 
+    # ---- Subnet SNMP credentials (feature 021): write-only ----
+    SubnetSNMPInput:
+      type: object
+      additionalProperties: false
+      description: >
+        Set or replace a subnet's own SNMP credentials. Every field of the
+        chosen kind is required (v2c: community; v3: user, security_level,
+        auth_protocol, auth_password and, for authPriv, priv_protocol and
+        priv_password). Values are sealed at rest and never returned.
+      required: [version]
+      properties:
+        version: { type: integer, enum: [2, 3] }
+        community: { type: string, minLength: 1, maxLength: 256, writeOnly: true }
+        user: { type: string, minLength: 1, maxLength: 256, writeOnly: true }
+        security_level: { type: string, enum: [authNoPriv, authPriv] }
+        auth_protocol: { type: string, enum: [MD5, SHA, SHA224, SHA256, SHA384, SHA512], description: 'MD5 and SHA (SHA-1) are weak' }
+        auth_password: { type: string, minLength: 8, maxLength: 256, writeOnly: true }
+        priv_protocol: { type: string, enum: [DES, AES, AES192, AES256], description: 'DES is weak; AES is AES-128' }
+        priv_password: { type: string, minLength: 8, maxLength: 256, writeOnly: true }
+    SNMPSummary:
+      type: object
+      description: Effective SNMP state of a subnet (own, inherited from the nearest ancestor, or none). Never a credential value.
+      properties:
+        state: { type: string, enum: [none, own, inherited] }
+        version: { type: integer, enum: [2, 3] }
+        security_level: { type: string, enum: [authNoPriv, authPriv] }
+        weak: { type: boolean }
+        source_subnet_id: { type: string }
+        source_name: { type: string }
+        source_cidr: { type: string }
+    SubnetSNMPOwn:
+      type: object
+      properties:
+        version: { type: integer, enum: [2, 3] }
+        security_level: { type: string, enum: [authNoPriv, authPriv] }
+        auth_protocol: { type: string }
+        priv_protocol: { type: string }
+        weak: { type: boolean }
+        updated_by: { type: string }
+        updated_at: { type: string, format: date-time }
+    SNMPTestInput:
+      type: object
+      additionalProperties: false
+      required: [address]
+      properties:
+        address: { type: string, maxLength: 45, description: 'a usable IP address inside the subnet' }
+    SNMPTestResult:
+      type: object
+      properties:
+        outcome: { type: string, enum: [ok, no_response, auth_failed, unknown_user, privacy_failed, no_credentials, credentials_unreadable, error] }
+        sys_name: { type: string, maxLength: 1024 }
+        sys_descr: { type: string, maxLength: 1024 }
+        source_subnet_id: { type: string }
+        duration_ms: { type: integer }
+    SubnetSNMPStatus:
+      type: object
+      properties:
+        own: { oneOf: [{ $ref: '#/components/schemas/SubnetSNMPOwn' }, { type: 'null' }] }
+        effective: { $ref: '#/components/schemas/SNMPSummary' }
+
     Error:
       type: object
       properties:
@@ -143,6 +204,43 @@ paths:
     get: { operationId: getSubnetStats, x-freya-permission: 'ipam:read', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { description: stats } } }
   /api/ipam/v1/subnets/{id}/split:
     post: { operationId: splitSubnet, x-freya-permission: 'subnets:manage', x-freya-max-body-bytes: 4096, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'created children and skipped blocks' }, '400': { description: validation_failed } } }
+  /api/ipam/v1/subnets/{id}/snmp:
+    get:
+      operationId: getSubnetSnmp
+      x-freya-permission: 'ipam:read'
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: 'own and effective SNMP credential status (never values)', content: { application/json: { schema: { $ref: '#/components/schemas/SubnetSNMPStatus' } } } }
+        '404': { description: not_found }
+    put:
+      operationId: setSubnetSnmp
+      x-freya-permission: 'subnets:manage'
+      x-freya-max-body-bytes: 4096
+      parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SubnetSNMPInput' } } } }
+      responses:
+        '200': { description: 'credentials set or replaced (status, never values)', content: { application/json: { schema: { $ref: '#/components/schemas/SubnetSNMPStatus' } } } }
+        '404': { description: not_found }
+        '422': { description: 'validation_failed (detail.field names the field)' }
+    delete:
+      operationId: clearSubnetSnmp
+      x-freya-permission: 'subnets:manage'
+      parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
+      responses:
+        '204': { description: 'own credentials deleted (no-op when the subnet has none); the subnet inherits again or has none' }
+        '404': { description: not_found }
+  /api/ipam/v1/subnets/{id}/snmp/test:
+    post:
+      operationId: testSubnetSnmp
+      x-freya-permission: 'scan:run'
+      x-freya-max-body-bytes: 1024
+      parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SNMPTestInput' } } } }
+      responses:
+        '200': { description: 'test outcome with sysName/sysDescr on success (never credentials)', content: { application/json: { schema: { $ref: '#/components/schemas/SNMPTestResult' } } } }
+        '404': { description: not_found }
+        '422': { description: 'validation_failed (detail.field = address: not a usable address of the subnet)' }
+        '429': { description: 'rate_limited (more than 10 tests per user per minute)' }
   /api/ipam/v1/subnets/{id}/scan:
     post: { operationId: scanSubnet, x-freya-permission: 'scan:run', x-freya-max-body-bytes: 65536, parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }], responses: { '200': { description: 'synchronous discovery result' } } }
 

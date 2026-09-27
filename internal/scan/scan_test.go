@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync"
@@ -11,8 +12,9 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/snmpcred"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 // --- test doubles ---
@@ -68,8 +70,30 @@ func mustSubnet(t *testing.T, m *memstore.Mem, tenant, id, cidr string, version 
 	}
 }
 
-func newService(m *memstore.Mem, sweeper icmp.Sweeper, disc snmp.Discoverer, w warden.Client, pub *recPub, cfg Config, clk *clock) *Service {
-	return New(m, sweeper, icmp.NewFake(), disc, w, pub, cfg, clk.now)
+func newService(m *memstore.Mem, sweeper icmp.Sweeper, disc snmp.Discoverer, pub *recPub, cfg Config, clk *clock) *Service {
+	svc := New(m, sweeper, icmp.NewFake(), disc, pub, cfg, clk.now)
+	svc.SetEnvelope(testEnv)
+	return svc
+}
+
+// testEnv is the module envelope of the scan tests.
+var testEnv, _ = sealed.NewEnvelope(bytes.Repeat([]byte{5}, 32))
+
+// setCreds stores sealed own credentials on a subnet.
+func setCreds(t *testing.T, m *memstore.Mem, tenant, subnetID string, in snmpcred.Input) {
+	t.Helper()
+	if err := in.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	blob, err := snmpcred.Seal(testEnv, tenant, subnetID, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta := in.Meta()
+	if err := m.PutSubnetSNMP(context.Background(), store.SubnetSNMP{TenantID: tenant, SubnetID: subnetID, Version: meta.Version,
+		SecurityLevel: meta.SecurityLevel, AuthProtocol: meta.AuthProtocol, PrivProtocol: meta.PrivProtocol, Sealed: blob, UpdatedBy: "u1"}, store.AuditRow{TenantID: tenant}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // --- StartScan ---
@@ -81,7 +105,7 @@ func TestStartScanEnqueuesPending(t *testing.T) {
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
 	pub := &recPub{}
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), pub, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), pub, testConfig(), clk)
 
 	job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{SkipReverseDNS: true})
 	if err != nil {
@@ -103,7 +127,7 @@ func TestStartScanRefusesIPv6(t *testing.T) {
 	m := memstore.New()
 	clk := &clock{t: time.Now().UTC()}
 	mustSubnet(t, m, "t1", "s6", "2001:db8::/64", 6)
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 
 	_, err := svc.StartScan(ctx, adminSubj("t1"), "s6", Options{})
 	if !errors.Is(err, ErrIPv6) {
@@ -118,7 +142,7 @@ func TestStartScanRefusesTooLarge(t *testing.T) {
 	mustSubnet(t, m, "t1", "big", "10.0.0.0/20", 4) // 4094 usable
 	cfg := testConfig()
 	cfg.MaxHosts = 1024
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, cfg, clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, cfg, clk)
 
 	_, err := svc.StartScan(ctx, adminSubj("t1"), "big", Options{})
 	if !errors.Is(err, ErrTooLarge) {
@@ -132,7 +156,7 @@ func TestStartScanRefusesActive(t *testing.T) {
 	clk := &clock{t: time.Now().UTC()}
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 
 	if _, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{}); err != nil {
 		t.Fatalf("first StartScan: %v", err)
@@ -148,7 +172,7 @@ func TestStartScanCrossTenantForbidden(t *testing.T) {
 	m := memstore.New()
 	clk := &clock{t: time.Now().UTC()}
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 
 	// A caller scoped to t2 has TenantID t2; RequireTenant(subj, subj.TenantID)
 	// passes, but the subnet lookup is under t2 and finds nothing.
@@ -166,7 +190,7 @@ func TestCancelScan(t *testing.T) {
 	clk := &clock{t: time.Now().UTC()}
 	m.Now = clk.now
 	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
-	svc := newService(m, icmp.NewFake(), snmp.NewFake(), warden.NewFake(), &recPub{}, testConfig(), clk)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
 
 	job, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{})
 	if err != nil {

@@ -334,3 +334,32 @@ func TestRowGuardsHostSyncDetail(t *testing.T) {
 		t.Fatal("unknown type")
 	}
 }
+
+// TestSNMPCredentialEvents (021, contracts/audit-events.md): the four event
+// types are known; their neutral detail keys survive the guard while any
+// credential-looking key is dropped.
+func TestSNMPCredentialEvents(t *testing.T) {
+	for _, et := range []EventType{SNMPCredentialsSet, SNMPCredentialsReplaced, SNMPCredentialsCleared, SNMPCredentialsTested} {
+		if !Known(string(et)) {
+			t.Fatalf("%s unknown", et)
+		}
+	}
+	row, err := Row(Event{TenantID: "t1", EventType: SNMPCredentialsTested, ActorKind: ActorUser, ActorID: "u1",
+		SubjectKind: SubjectSubnet, SubjectID: "s1", Target: "10.0.0.5", Outcome: OutcomeError,
+		Details: map[string]any{"protocol_version": 3, "security_level": "authPriv", "previous_version": 2,
+			"target": "10.0.0.5", "outcome": "auth_failed", "source_subnet_id": "s0",
+			"community": "c0mm", "auth_password": "p", "snmp_user": "u", "credential": "x"}}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"protocol_version", "security_level", "previous_version", "target", "outcome", "source_subnet_id"} {
+		if _, ok := row.Detail[k]; !ok {
+			t.Errorf("neutral key %s dropped", k)
+		}
+	}
+	for _, k := range []string{"community", "auth_password", "snmp_user", "credential"} {
+		if _, ok := row.Detail[k]; ok {
+			t.Errorf("guarded key %s kept", k)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http/httptest"
@@ -25,6 +26,9 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/locations"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/icmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
@@ -54,25 +58,33 @@ func (f fakeVerifier) Verify(_ context.Context, token string) (authclient.Identi
 	return authclient.Identity{}, ErrUnauthenticated
 }
 
-// recPub records the event types published (a stand-in for the real hub).
+// recPub records the event types and payloads published (a stand-in for
+// the real hub).
 type recPub struct {
-	mu     sync.Mutex
-	events []string
+	mu       sync.Mutex
+	events   []string
+	payloads []string
 }
 
-func (p *recPub) Publish(_ context.Context, _ string, eventType string, _ any) {
+func (p *recPub) Publish(_ context.Context, _ string, eventType string, payload any) {
+	b, _ := json.Marshal(payload)
 	p.mu.Lock()
 	p.events = append(p.events, eventType)
+	p.payloads = append(p.payloads, string(b))
 	p.mu.Unlock()
 }
 
 type apiFixture struct {
-	s      *Server
-	mem    *memstore.Mem
-	bmc    *ipmi.Fake
-	warden *warden.Fake
-	inv    *invclient.Fake
-	runner *hostsync.Runner
+	s       *Server
+	mem     *memstore.Mem
+	bmc     *ipmi.Fake
+	warden  *warden.Fake
+	inv     *invclient.Fake
+	runner  *hostsync.Runner
+	snmp    *snmp.Fake
+	sweeper *icmp.Fake
+	scan    *scan.Service
+	pub     *recPub
 }
 
 func newAPI(t *testing.T) *apiFixture { return newAPIWith(t, nil) }
@@ -98,8 +110,15 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 	bmc := ipmi.NewFake()
 	inv := invclient.NewFake()
 	runner := hostsync.New(mem, inv, pub, hostsync.Config{Workers: 1, ConflictMoves: 3, ConflictWindow: 24 * time.Hour}, nil, nil)
+	env, _ := sealed.NewEnvelope(bytes.Repeat([]byte{6}, 32))
+	subnetsSvc := subnets.New(mem)
+	subnetsSvc.SetEnvelope(env)
+	disc := snmp.NewFake()
+	sweeper := icmp.NewFake()
+	scanSvc := scan.New(mem, sweeper, sweeper, disc, pub, scan.Config{MaxHosts: 65536, TimeoutMs: 200, Workers: 2}, nil)
+	scanSvc.SetEnvelope(env)
 	deps := Deps{
-		Subnets:   subnets.New(mem),
+		Subnets:   subnetsSvc,
 		Addresses: addresses.New(mem, pub, 0, 0),
 		Devices:   devices.New(mem),
 		Vlans:     vlans.New(mem),
@@ -108,7 +127,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		Stats:     stats.New(mem),
 		Backup:    backup.New(mem),
 		DNS:       dns,
-		Scan:      scan.New(mem, nil, nil, nil, wf, pub, scan.Config{MaxHosts: 65536}, nil),
+		Scan:      scanSvc,
 		BMC:       bmc,
 		KVM:       kvm.NewManager(nil, 0),
 		Warden:    wf,
@@ -126,7 +145,7 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		t.Fatal(err)
 	}
 	s.Register(deps)
-	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner}
+	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner, snmp: disc, sweeper: sweeper, scan: scanSvc, pub: pub}
 }
 
 const p = "/api/ipam/v1"
