@@ -100,6 +100,13 @@ const (
 	// (summary, changes [{field, change, before, after}], changes_truncated).
 	HardwareReported EventType = "hardware_reported"
 	HardwareUpdated  EventType = "hardware_updated"
+
+	// Device BMC reference (feature 024, contracts/audit-events.md). Written
+	// with the column change in one transaction; details use neutral keys
+	// (reference, previous_reference, reference_name).
+	BMCReferenceSet     EventType = "bmc_reference_set"
+	BMCReferenceChanged EventType = "bmc_reference_changed"
+	BMCReferenceCleared EventType = "bmc_reference_cleared"
 )
 
 // HostSyncActor is the actor id of every change the host sync makes.
@@ -163,6 +170,7 @@ func init() {
 		SNMPCredentialsSet, SNMPCredentialsReplaced, SNMPCredentialsCleared, SNMPCredentialsTested,
 		MACLearned, MACChanged, MACConflict, ARPRun, ARPSettingsUpdated,
 		HardwareReported, HardwareUpdated,
+		BMCReferenceSet, BMCReferenceChanged, BMCReferenceCleared,
 	} {
 		known[t] = struct{}{}
 	}

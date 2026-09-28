@@ -46,7 +46,8 @@ FUZZ_TARGETS := \
 	./internal/portlink:FuzzRank \
 	./internal/snmpcred:FuzzDecodeValidate \
 	./internal/arpplan:FuzzPlan \
-	./internal/scan/snmp:FuzzARPIndex
+	./internal/scan/snmp:FuzzARPIndex \
+	./internal/bmc:FuzzReferenceInput
 
 fuzz:
 	@set -e; for t in $(FUZZ_TARGETS); do \

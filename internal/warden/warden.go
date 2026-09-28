@@ -1,178 +1,361 @@
-// Package warden is a secret-reference client. The IPAM module stores only
-// opaque warden references (snmp_secret_ref, ipmi_secret_ref) on subnets and
-// devices; the actual SNMP/BMC/IPMI credential material is fetched from the
-// warden module at USE TIME (immediately before an SNMP walk, an IPMI power
-// action or a KVM login) and is never persisted, cached to disk or logged.
+// Package warden is IPAM's client for the warden module's secrets. A device
+// stores only an opaque warden secret id (ipmi_secret_ref); the BMC username
+// and password are fetched from warden at USE TIME, immediately before a power
+// action, a sensor/SEL read or a KVM login, and are never persisted, cached
+// or logged.
 //
-// A secret is a map[string]string of named fields (for example "username",
-// "password", "host_url"). Only GetSecret ever returns values; ListSecrets and
-// the SecretMeta it returns are metadata only and are safe to log. Callers must
-// never log the map returned by GetSecret.
+// Every call is made ON BEHALF OF THE SIGNED-IN USER (feature 024): the
+// caller puts the user's platform token into the context with WithUserToken
+// and the client forwards it as "authorization" metadata over the Freya
+// SPIFFE mesh, so warden applies its own per-secret authorization and audit.
+// Without a user token no call is made.
 package warden
 
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
+	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+
+	wardenv1 "github.com/go-tangra/go-tangra-warden/sdk/v4/api/proto/warden/v1"
 )
 
-// SecretMeta is metadata about a secret. It NEVER carries secret values (no
-// password, key or token) and is safe to return to the browser and to log.
+// SecretMeta is metadata about a secret. It NEVER carries secret material and
+// is safe to return to the browser and to log.
 type SecretMeta struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	// Optional, non-sensitive descriptors surfaced by warden.
-	Username string `json:"username,omitempty"`
-	HostURL  string `json:"host_url,omitempty"`
-	FolderID string `json:"folder_id,omitempty"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Username   string `json:"username,omitempty"`
+	FolderPath string `json:"folder_path,omitempty"`
+	HostURL    string `json:"host_url,omitempty"`
 }
 
-// Client fetches secret material by opaque reference at use time and lists the
-// non-sensitive metadata of the secrets the caller may reach.
+// Credentials are a secret's login material. They are used immediately and
+// must never be stored or logged; every textual form is redacted.
+type Credentials struct {
+	Username string
+	Password string
+	HostURL  string
+}
+
+const redacted = "[REDACTED]"
+
+// String implements fmt.Stringer (redacted).
+func (Credentials) String() string { return redacted }
+
+// GoString implements fmt.GoStringer (redacted).
+func (Credentials) GoString() string { return redacted }
+
+// Format redacts every fmt verb (%v, %+v, %#v, %s, %q, …).
+func (Credentials) Format(f fmt.State, _ rune) { _, _ = f.Write([]byte(redacted)) }
+
+// LogValue implements slog.LogValuer (redacted).
+func (Credentials) LogValue() slog.Value { return slog.StringValue(redacted) }
+
+// Client reads secrets for the user carried in the context.
 type Client interface {
-	// GetSecret resolves a warden reference to its named credential fields
-	// (e.g. {"username":..., "password":...}). The result is used immediately
-	// and MUST NOT be stored or logged. It is an error to call with an empty ref.
-	GetSecret(ctx context.Context, ref string) (map[string]string, error)
-	// ListSecrets returns metadata only (id/name/description) for the secrets
-	// matching query. It never returns secret values.
-	ListSecrets(ctx context.Context, query string) ([]SecretMeta, error)
+	// Meta returns the secret's metadata (warden Secrets/Get).
+	Meta(ctx context.Context, ref string) (SecretMeta, error)
+	// Credentials returns username, password and host URL (Secrets/Get +
+	// Secrets/GetPassword). The result is used immediately and never stored.
+	Credentials(ctx context.Context, ref string) (Credentials, error)
 }
 
-// ErrEmptyRef is returned when a secret reference is empty.
-var ErrEmptyRef = errors.New("warden: empty secret reference")
+// Errors. None of them carries warden's message or any secret value.
+var (
+	ErrEmptyRef    = errors.New("warden: empty secret reference")
+	ErrNotFound    = errors.New("warden: secret not found")
+	ErrForbidden   = errors.New("warden: access to the secret refused")
+	ErrUnavailable = errors.New("warden: unavailable")
+	ErrNoUserToken = fmt.Errorf("%w: no user token to act on behalf of", ErrForbidden)
+	// ErrPolicyDenied is the Freya mesh refusing this module (a missing
+	// warden policy rule): it reads as unavailable, never as "no access".
+	ErrPolicyDenied = fmt.Errorf("%w: mesh policy refused the ipam service", ErrUnavailable)
+)
 
-// ErrNotFound is returned when no secret matches the reference.
-var ErrNotFound = errors.New("warden: secret not found")
+// ---- user token
 
-// ---- real gRPC-backed client ----
+type tokenKey struct{}
 
-// grpcClient talks to the warden module's Secrets gRPC service over the Freya
-// SPIFFE mTLS channel. It combines the metadata (Get) and material (GetPassword)
-// RPCs into the field map returned by GetSecret.
-type grpcClient struct {
-	cc grpc.ClientConnInterface
+// WithUserToken returns ctx carrying the signed-in user's platform token.
+func WithUserToken(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, tokenKey{}, strings.TrimSpace(token))
 }
 
-// New builds a Client backed by a gRPC connection to the warden module.
-//
-// The warden surface is warden.v1.Secrets:
-//
-//	rpc Get(GetRequest{id}) returns (GetResponse{Secret})                  // metadata only
-//	rpc GetPassword(GetPasswordRequest{id,version}) returns (GetPasswordResponse{password}) // material; audited
-//	rpc Check(CheckRequest) returns (CheckResponse)
-//
-// GetSecret(ref) should call Secrets/Get for the descriptor fields (name,
-// username, host_url, ...) and Secrets/GetPassword for the material, then
-// assemble the map {"username":..., "host_url":..., "password":...}.
-//
-// TODO(ipam): wire the concrete calls once the warden proto is a dependency of
-// this module. That requires adding to go.mod (owned elsewhere):
-//
-//	require  github.com/go-tangra/go-tangra-warden/v4 v0.0.0-...
-//	replace  github.com/go-tangra/go-tangra-warden/v4 => ../warden
-//
-// and then, with wardenv1 "github.com/go-tangra/go-tangra-warden/sdk/v4/api/proto/warden/v1":
-//
-//	sc := wardenv1.NewSecretsClient(c.cc)
-//	meta, err := sc.Get(ctx, &wardenv1.GetRequest{Id: ref})
-//	pw, err   := sc.GetPassword(ctx, &wardenv1.GetPasswordRequest{Id: ref})
-//	return map[string]string{"username": meta.GetSecret().GetUsername(),
-//	    "host_url": meta.GetSecret().GetHostUrl(), "password": pw.GetPassword()}, nil
-//
-// Until that dependency is present the real client is inert: GetSecret and
-// ListSecrets return errNotWired so the module fails closed (no secret is ever
-// fabricated). Tests use Fake, which is fully functional.
-func New(cc grpc.ClientConnInterface) Client {
-	return &grpcClient{cc: cc}
+// UserToken returns the user token carried by ctx ("" when none).
+func UserToken(ctx context.Context) string {
+	t, _ := ctx.Value(tokenKey{}).(string)
+	return t
 }
 
-// errNotWired signals that the real warden RPCs are not yet bound (see New).
-var errNotWired = errors.New("warden: gRPC client not wired (warden proto not a module dependency)")
+var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-func (c *grpcClient) GetSecret(_ context.Context, ref string) (map[string]string, error) {
+// ValidRef reports whether ref has the shape of a warden secret id (UUID).
+func ValidRef(ref string) bool { return uuidRe.MatchString(ref) }
+
+// precheck refuses a call that must not reach warden.
+func precheck(ctx context.Context, ref string) (string, error) {
 	if ref == "" {
-		return nil, ErrEmptyRef
+		return "", ErrEmptyRef
 	}
-	// TODO(ipam): call warden.v1.Secrets/Get + /GetPassword (see New). Never log
-	// the assembled map.
-	return nil, errNotWired
+	if !ValidRef(ref) {
+		return "", ErrNotFound
+	}
+	tok := UserToken(ctx)
+	if tok == "" {
+		return "", ErrNoUserToken
+	}
+	return tok, nil
 }
 
-func (c *grpcClient) ListSecrets(_ context.Context, _ string) ([]SecretMeta, error) {
-	// TODO(ipam): warden has no List RPC; expose the caller-reachable secrets
-	// via the appropriate warden metadata RPC once available (see New).
-	return nil, errNotWired
+// ---- real gRPC-backed client
+
+// DefaultTimeout bounds one warden call.
+const DefaultTimeout = 5 * time.Second
+
+type grpcClient struct {
+	sc      wardenv1.SecretsClient
+	timeout time.Duration
 }
 
-// ---- in-memory fake for tests ----
+// New builds a Client over a Freya mesh connection to the warden module.
+func New(cc grpc.ClientConnInterface) Client {
+	return &grpcClient{sc: wardenv1.NewSecretsClient(cc), timeout: DefaultTimeout}
+}
 
-// Fake is an in-memory Client for tests. It resolves refs to secret values and
-// exposes metadata separately, so allocation, scan orchestration, IPMI/KVM and
-// redaction can be tested without touching warden or the network. Values held
-// by a Fake are test fixtures and never real credentials.
+func (c *grpcClient) outgoing(ctx context.Context, tok string) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+tok), cancel
+}
+
+func (c *grpcClient) get(ctx context.Context, ref, tok string) (SecretMeta, error) {
+	ctx, cancel := c.outgoing(ctx, tok)
+	defer cancel()
+	res, err := c.sc.Get(ctx, &wardenv1.GetRequest{Id: ref})
+	if err != nil {
+		return SecretMeta{}, mapErr(err)
+	}
+	s := res.GetSecret()
+	return SecretMeta{ID: s.GetId(), Name: s.GetName(), Username: s.GetUsername(), FolderPath: s.GetFolderPath(), HostURL: s.GetHostUrl()}, nil
+}
+
+// Meta implements Client.
+func (c *grpcClient) Meta(ctx context.Context, ref string) (SecretMeta, error) {
+	tok, err := precheck(ctx, ref)
+	if err != nil {
+		return SecretMeta{}, err
+	}
+	return c.get(ctx, ref, tok)
+}
+
+// Credentials implements Client.
+func (c *grpcClient) Credentials(ctx context.Context, ref string) (Credentials, error) {
+	tok, err := precheck(ctx, ref)
+	if err != nil {
+		return Credentials{}, err
+	}
+	m, err := c.get(ctx, ref, tok)
+	if err != nil {
+		return Credentials{}, err
+	}
+	pctx, cancel := c.outgoing(ctx, tok)
+	defer cancel()
+	pw, err := c.sc.GetPassword(pctx, &wardenv1.GetPasswordRequest{Id: ref})
+	if err != nil {
+		return Credentials{}, mapErr(err)
+	}
+	return Credentials{Username: m.Username, Password: pw.GetPassword(), HostURL: m.HostURL}, nil
+}
+
+// wardenForbidden is the message warden's Secrets service uses for its own
+// per-secret refusal; the Freya policy middleware refuses with another one.
+const wardenForbidden = "forbidden"
+
+// mapErr keeps only the status code of a warden failure.
+func mapErr(err error) error {
+	st, ok := status.FromError(err)
+	if !ok {
+		return fmt.Errorf("%w (%s)", ErrUnavailable, codes.Unknown)
+	}
+	switch st.Code() {
+	case codes.NotFound, codes.InvalidArgument:
+		return ErrNotFound
+	case codes.Unauthenticated:
+		return ErrForbidden
+	case codes.PermissionDenied:
+		if st.Message() == wardenForbidden {
+			return ErrForbidden
+		}
+		return ErrPolicyDenied
+	}
+	return fmt.Errorf("%w (%s)", ErrUnavailable, st.Code())
+}
+
+// ---- unavailable client
+
+// Unavailable is the client wired when the warden connection cannot be
+// created: every call fails closed with ErrUnavailable.
+type Unavailable struct{}
+
+// Meta implements Client.
+func (Unavailable) Meta(context.Context, string) (SecretMeta, error) {
+	return SecretMeta{}, ErrUnavailable
+}
+
+// Credentials implements Client.
+func (Unavailable) Credentials(context.Context, string) (Credentials, error) {
+	return Credentials{}, ErrUnavailable
+}
+
+// ---- in-memory fake for tests
+
+// Operations recorded by Fake.
+const (
+	OpMeta        = "meta"
+	OpCredentials = "credentials"
+)
+
+// Call is one recorded Fake call.
+type Call struct {
+	Op, Ref, Token string
+}
+
+type fakeSecret struct {
+	meta     SecretMeta
+	password string
+}
+
+// Fake is an in-memory Client for tests with warden's semantics: a user
+// token is required, access can be denied per token and secret, and the
+// service can be switched unavailable. Values are test fixtures only.
 type Fake struct {
-	secrets map[string]map[string]string
-	meta    map[string]SecretMeta
+	mu          sync.Mutex
+	secrets     map[string]fakeSecret
+	deny        map[string]map[string]bool
+	unavailable bool
+	calls       []Call
 }
 
 // NewFake builds an empty Fake.
 func NewFake() *Fake {
-	return &Fake{secrets: map[string]map[string]string{}, meta: map[string]SecretMeta{}}
+	return &Fake{secrets: map[string]fakeSecret{}, deny: map[string]map[string]bool{}}
 }
 
-// Put registers a secret's value map and its metadata under ref. The metadata's
-// ID is set to ref. The value map is copied.
-func (f *Fake) Put(ref string, value map[string]string, meta SecretMeta) {
-	cp := make(map[string]string, len(value))
-	for k, v := range value {
-		cp[k] = v
-	}
-	f.secrets[ref] = cp
+// Put stores a secret under ref (meta.ID is set to ref).
+func (f *Fake) Put(ref string, meta SecretMeta, password string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	meta.ID = ref
-	f.meta[ref] = meta
+	f.secrets[strings.ToLower(ref)] = fakeSecret{meta: meta, password: password}
 }
 
-// GetSecret returns a copy of the stored value map for ref.
-func (f *Fake) GetSecret(_ context.Context, ref string) (map[string]string, error) {
-	if ref == "" {
-		return nil, ErrEmptyRef
+// SetPassword rotates a stored secret's password (no-op when unknown).
+func (f *Fake) SetPassword(ref, password string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if s, ok := f.secrets[strings.ToLower(ref)]; ok {
+		s.password = password
+		f.secrets[strings.ToLower(ref)] = s
 	}
-	v, ok := f.secrets[ref]
-	if !ok {
-		return nil, ErrNotFound
-	}
-	cp := make(map[string]string, len(v))
-	for k, val := range v {
-		cp[k] = val
-	}
-	return cp, nil
 }
 
-// ListSecrets returns metadata (never values) for secrets whose name, id or
-// description contains query (empty query returns all).
-func (f *Fake) ListSecrets(_ context.Context, query string) ([]SecretMeta, error) {
-	var out []SecretMeta
-	for _, m := range f.meta {
-		if query == "" || contains(m.Name, query) || contains(m.ID, query) || contains(m.Description, query) {
-			out = append(out, m)
+// Remove deletes a secret.
+func (f *Fake) Remove(ref string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.secrets, strings.ToLower(ref))
+}
+
+// Deny refuses ref to the user holding token.
+func (f *Fake) Deny(token, ref string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.deny[token] == nil {
+		f.deny[token] = map[string]bool{}
+	}
+	f.deny[token][strings.ToLower(ref)] = true
+}
+
+// SetUnavailable switches every call to ErrUnavailable.
+func (f *Fake) SetUnavailable(v bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.unavailable = v
+}
+
+// Calls returns the recorded calls (only those that passed the local checks).
+func (f *Fake) Calls() []Call {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]Call(nil), f.calls...)
+}
+
+// CredentialCalls counts the recorded Credentials calls.
+func (f *Fake) CredentialCalls() int {
+	n := 0
+	for _, c := range f.Calls() {
+		if c.Op == OpCredentials {
+			n++
 		}
 	}
-	return out, nil
+	return n
 }
 
-func contains(s, sub string) bool {
-	if sub == "" {
-		return true
+// ResetCalls clears the call log.
+func (f *Fake) ResetCalls() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = nil
+}
+
+func (f *Fake) lookup(ctx context.Context, op, ref string) (fakeSecret, error) {
+	tok, err := precheck(ctx, ref)
+	if err != nil {
+		return fakeSecret{}, err
 	}
-	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, Call{Op: op, Ref: ref, Token: tok})
+	if f.unavailable {
+		return fakeSecret{}, ErrUnavailable
+	}
+	s, ok := f.secrets[strings.ToLower(ref)]
+	if !ok {
+		return fakeSecret{}, ErrNotFound
+	}
+	if f.deny[tok][strings.ToLower(ref)] {
+		return fakeSecret{}, ErrForbidden
+	}
+	return s, nil
+}
+
+// Meta implements Client.
+func (f *Fake) Meta(ctx context.Context, ref string) (SecretMeta, error) {
+	s, err := f.lookup(ctx, OpMeta, ref)
+	return s.meta, err
+}
+
+// Credentials implements Client.
+func (f *Fake) Credentials(ctx context.Context, ref string) (Credentials, error) {
+	s, err := f.lookup(ctx, OpCredentials, ref)
+	if err != nil {
+		return Credentials{}, err
+	}
+	return Credentials{Username: s.meta.Username, Password: s.password, HostURL: s.meta.HostURL}, nil
 }
 
 // interface conformance checks.
 var (
 	_ Client = (*grpcClient)(nil)
 	_ Client = (*Fake)(nil)
+	_ Client = Unavailable{}
 )

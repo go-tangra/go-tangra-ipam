@@ -104,17 +104,8 @@ func TestSuggestMissingSubnet(t *testing.T) {
 }
 
 // TestWardenListEmptyAndSuggestEmpty covers the nil->[] normalization branches.
-func TestWardenListEmptyAndSuggestEmpty(t *testing.T) {
+func TestSuggestEmpty(t *testing.T) {
 	f := newAPI(t)
-
-	// A query matching no secret yields nil -> [] (metas == nil branch).
-	w := f.req(t, "GET", p+"/warden-secrets?query=zzz-no-match-zzz", "admin", "")
-	if w.Code != 200 {
-		t.Fatalf("warden filtered list: %d %s", w.Code, w.Body)
-	}
-	if items, ok := decodeBody(t, w)["items"].([]any); !ok || len(items) != 0 {
-		t.Fatalf("warden filtered list should be empty: %s", w.Body)
-	}
 
 	// Suggest on a fully-allocated /31 yields no suggestions (sugg == nil branch).
 	sid := f.createSubnet(t, "sugg", "10.95.0.0/31")
@@ -122,7 +113,7 @@ func TestWardenListEmptyAndSuggestEmpty(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		f.req(t, "POST", p+"/ip-addresses/allocate", "admin", `{"subnet_id":"`+sid+`"}`)
 	}
-	w = f.req(t, "GET", p+"/ip-addresses/suggest?subnet_id="+sid+"&count=2", "admin", "")
+	w := f.req(t, "GET", p+"/ip-addresses/suggest?subnet_id="+sid+"&count=2", "admin", "")
 	if w.Code != 200 {
 		t.Fatalf("suggest exhausted: %d %s", w.Code, w.Body)
 	}

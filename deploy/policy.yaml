@@ -1,9 +1,12 @@
 # Freya service-to-service policy for ipam: the gateway forwards browser traffic
 # and probes health; the ipam.v1 gRPC surface (subnet/address/device/vlan/location/
-# group/scan/system) is called by other modules directly. ipam calls warden (secret
-# refs), auth, lcm and inventory (host reports, feature 020 — the allowing rule
-# `ipam-hostsync` lives in inventory's policy) as a client. Active network
-# operations (scan/ping/SNMP/IPMI/KVM) reach hosts on the lab network, NOT mesh peers.
+# group/scan/system) is called by other modules directly. ipam calls auth, lcm,
+# inventory (host reports, feature 020 — the allowing rule `ipam-hostsync` lives
+# in inventory's policy) and warden as a client: warden.v1.Secrets/Get and
+# /GetPassword for device BMC credentials, carrying the signed-in user's platform
+# token (feature 024 — the allowing rule `ipam-bmc-secrets` lives in warden's
+# policy). Active network operations (scan/ping/SNMP/IPMI/KVM) reach hosts on the
+# lab network, NOT mesh peers.
 version: ipam-dev-1
 rules:
   - id: gateway-forwards

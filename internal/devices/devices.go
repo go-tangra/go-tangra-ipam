@@ -13,6 +13,7 @@ package devices
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
@@ -26,6 +27,24 @@ var (
 	ErrConflict = errors.New("devices: conflict")
 	ErrNotEmpty = errors.New("devices: not empty")
 )
+
+// FieldError is a refused field of the device body.
+type FieldError struct {
+	field, msg string
+}
+
+func (e *FieldError) Error() string { return "devices: " + e.field + ": " + e.msg }
+
+// Field names the refused field.
+func (e *FieldError) Field() string { return e.field }
+
+// Message is the human explanation (never a value).
+func (e *FieldError) Message() string { return e.msg }
+
+// ErrBMCRefReadOnly refuses setting or changing the BMC warden reference
+// through the device body: it is set only through PUT /devices/{id}/bmc,
+// which validates it against warden for the acting user (feature 024).
+var ErrBMCRefReadOnly error = &FieldError{"ipmi_secret_ref", "set BMC credentials through the device BMC credentials endpoint"}
 
 // SyncResult reports the outcome of a package sync: the total package count and
 // how many of them are updatable / carry a security update.
@@ -53,6 +72,9 @@ func (s *Service) Create(ctx context.Context, subj authz.Subjects, in store.Devi
 		return store.Device{}, err
 	}
 	in.TenantID = subj.TenantID
+	if in.IPMISecretRef != "" {
+		return store.Device{}, ErrBMCRefReadOnly
+	}
 	if in.ID == "" {
 		in.ID = store.NewID()
 	}
@@ -127,6 +149,10 @@ func (s *Service) Update(ctx context.Context, subj authz.Subjects, in store.Devi
 	if in.DeviceType == "" {
 		in.DeviceType = ex.DeviceType
 	}
+	if in.IPMISecretRef != "" && !strings.EqualFold(in.IPMISecretRef, ex.IPMISecretRef) {
+		return store.Device{}, ErrBMCRefReadOnly
+	}
+	in.IPMISecretRef = ex.IPMISecretRef
 	in.CreatedBy = ex.CreatedBy
 	in.CreatedAt = ex.CreatedAt
 	if err := s.st.UpdateDevice(ctx, in); err != nil {

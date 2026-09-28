@@ -17,6 +17,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
@@ -31,6 +32,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan/snmp"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/sealed"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
@@ -42,7 +44,7 @@ const (
 	apiAdmin  = "22222222-2222-7222-8222-222222222222"
 	apiUser   = "33333333-3333-7333-8333-333333333333"
 
-	bmcRef  = "bmc-ref-1"
+	bmcRef  = "01928f7e-3c1a-7b44-9d2e-5a6b7c8d9e0f"
 	bmcUser = "bmcuser"
 	bmcPass = "s3cr3tpw"
 )
@@ -92,23 +94,25 @@ func newAPI(t *testing.T) *apiFixture { return newAPIWith(t, nil) }
 
 // newAPIWith builds a fully wired IPAM API over a fresh memstore. When hub is
 // non-nil the SSE stream route is enabled.
-func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
+func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture { return newAPIMut(t, hub, nil) }
+
+// newAPIMut is newAPIWith with a hook that may change the dependencies
+// before the routes are registered.
+func newAPIMut(t *testing.T, hub *stream.Hub, mut func(*Deps)) *apiFixture {
 	t.Helper()
 	mem := memstore.New()
 	rt := testrt.New(t, testutil.MustCA("example.org"), "ipam")
 
 	pub := &recPub{}
 	wf := warden.NewFake()
-	wf.Put(bmcRef, map[string]string{
-		"username": bmcUser, "password": bmcPass, "protocol": "2.0", "port": "623",
-	}, warden.SecretMeta{Name: "bmc-1", Description: "test BMC creds"})
+	wf.Put(bmcRef, warden.SecretMeta{Name: "bmc-1", Username: bmcUser, HostURL: "lanplus://bmc:623"}, bmcPass)
 
 	dns := dnscfg.New(mem)
 	dns.SetLookup(func(_ context.Context, _ string) ([]string, error) {
 		return []string{"host.example.org."}, nil
 	})
 
-	bmc := ipmi.NewFake()
+	bmcFake := ipmi.NewFake()
 	inv := invclient.NewFake()
 	runner := hostsync.New(mem, inv, pub, hostsync.Config{Workers: 1, ConflictMoves: 3, ConflictWindow: 24 * time.Hour}, nil, nil)
 	env, _ := sealed.NewEnvelope(bytes.Repeat([]byte{6}, 32))
@@ -129,25 +133,30 @@ func newAPIWith(t *testing.T, hub *stream.Hub) *apiFixture {
 		Backup:    backup.New(mem),
 		DNS:       dns,
 		Scan:      scanSvc,
-		BMC:       bmc,
+		BMC:       bmcFake,
 		KVM:       kvm.NewManager(nil, 0),
-		Warden:    wf,
 		Hub:       hub,
 		HostSync:  hostsync.NewAdmin(mem, inv, runner, true),
 		ARP:       arpcfg.New(mem),
+		BMCRefs:   bmc.New(mem, wf),
 	}
 
 	v := fakeVerifier{ids: map[string]authclient.Identity{
 		"admin": {UserID: apiAdmin, TenantID: apiTenant, Roles: []string{"admin"}},
 		"user":  {UserID: apiUser, TenantID: apiTenant, Roles: []string{"user"}},
 		"other": {UserID: apiUser, TenantID: "44444444-4444-7444-8444-444444444444", Roles: []string{"admin"}},
+		// A distinctive admin token the BMC leak test searches for (024).
+		leakToken: {UserID: apiAdmin, TenantID: apiTenant, Roles: []string{"admin"}},
 	}}
 	s, err := NewHandler(rt, WithVerifier(v))
 	if err != nil {
 		t.Fatal(err)
 	}
+	if mut != nil {
+		mut(&deps)
+	}
 	s.Register(deps)
-	return &apiFixture{s: s, mem: mem, bmc: bmc, warden: wf, inv: inv, runner: runner, snmp: disc, sweeper: sweeper, scan: scanSvc, pub: pub}
+	return &apiFixture{s: s, mem: mem, bmc: bmcFake, warden: wf, inv: inv, runner: runner, snmp: disc, sweeper: sweeper, scan: scanSvc, pub: pub}
 }
 
 const p = "/api/ipam/v1"
@@ -435,11 +444,16 @@ func TestDNSConfig(t *testing.T) {
 func (f *apiFixture) newDeviceWithBMC(t *testing.T) string {
 	t.Helper()
 	w := f.req(t, "POST", p+"/devices", "admin",
-		`{"name":"oob-1","device_type":"server","management_ip":"10.99.0.10","ipmi_secret_ref":"`+bmcRef+`"}`)
+		`{"name":"oob-1","device_type":"server","management_ip":"10.99.0.10"}`)
 	if w.Code != 201 {
 		t.Fatalf("create oob device: %d %s", w.Code, w.Body)
 	}
 	id, _ := decodeBody(t, w)["id"].(string)
+	// Seed the reference as PUT /devices/{id}/bmc would (024).
+	if _, err := f.mem.SetDeviceBMCRef(context.Background(), apiTenant, id, bmcRef,
+		store.AuditRow{Action: "bmc_reference_set", SubjectKind: "device", SubjectID: id}); err != nil {
+		t.Fatal(err)
+	}
 	return id
 }
 
@@ -571,18 +585,11 @@ func TestRouteSmoke(t *testing.T) {
 		t.Fatalf("address delete: %d %s", w.Code, w.Body)
 	}
 
-	// Warden secret metadata (never values).
-	w = f.req(t, "GET", p+"/warden-secrets", "admin", "")
-	if items, _ := decodeBody(t, w)["items"].([]any); w.Code != 200 || len(items) != 1 {
-		t.Fatalf("warden list: %d %s", w.Code, w.Body)
-	}
-	w = f.req(t, "GET", p+"/warden-secrets/"+bmcRef, "admin", "")
-	if w.Code != 200 {
-		t.Fatalf("warden get: %d %s", w.Code, w.Body)
-	}
-	assertNoCreds(t, w.Body.String())
-	if w := f.req(t, "GET", p+"/warden-secrets/nope", "admin", ""); w.Code != 404 {
-		t.Fatalf("warden get missing: want 404, got %d", w.Code)
+	// The retired warden-secrets routes (024) are gone.
+	for _, path := range []string{"/warden-secrets", "/warden-secrets/" + bmcRef} {
+		if w := f.req(t, "GET", p+path, "admin", ""); w.Code != 404 {
+			t.Fatalf("%s: want 404, got %d", path, w.Code)
+		}
 	}
 
 	// VLAN get + subnets; scan get + cancel; device addresses + host-groups.

@@ -437,6 +437,35 @@ export interface SelEntry {
   severity?: string
 }
 
+// --- BMC credentials (feature 024): a Warden secret reference ---
+
+// BmcReason is the closed set of reasons a BMC action (or the reference
+// status) cannot proceed.
+export type BmcReason =
+  | 'bmc_not_configured' | 'bmc_no_address' | 'bmc_secret_forbidden' | 'bmc_secret_not_found'
+  | 'warden_unavailable' | 'bmc_unreachable' | 'bmc_auth_failed' | 'bmc_error'
+
+// BmcStatus is GET /devices/{id}/bmc: the reference, the secret's metadata as
+// the viewer may see it in Warden (never material) and the BMC address used.
+export interface BmcStatus {
+  configured: boolean
+  reference?: string
+  access?: 'ok' | 'forbidden' | 'not_found' | 'unavailable'
+  secret?: { name: string; username?: string; folder_path?: string }
+  address?: string
+  address_source?: 'management_ip' | 'reported'
+  ready: boolean
+  reason?: BmcReason
+}
+
+// WardenSecretItem is the part of a Warden secret listing the picker shows.
+export interface WardenSecretItem {
+  id: string
+  name: string
+  username?: string
+  folder_path?: string
+}
+
 // KvmSession is the POST /devices/{id}/kvm-session response.
 export interface KvmSession {
   token: string

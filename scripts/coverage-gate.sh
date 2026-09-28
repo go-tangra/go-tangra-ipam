@@ -6,11 +6,12 @@
 # validation and the pure host-sync planner that decide what a host report may
 # write, and the SNMP credential rules: validation, sealing binding,
 # inheritance and error scrubbing, and the ARP planner that decides which
-# untrusted ARP observations may change an address MAC).
+# untrusted ARP observations may change an address MAC, and the BMC access
+# decisions: reference validation, BMC address and the refusal reasons).
 set -euo pipefail
 PROFILE="${1:-coverage.out}"
 MODULE="github.com/go-tangra/go-tangra-ipam/v4"
-SECURITY_PKGS=("internal/authz" "internal/sealed" "internal/ipnet" "internal/hostreport" "internal/hostplan" "internal/snmpcred" "internal/arpplan")
+SECURITY_PKGS=("internal/authz" "internal/sealed" "internal/ipnet" "internal/hostreport" "internal/hostplan" "internal/snmpcred" "internal/arpplan" "internal/bmc")
 total=$(go tool cover -func="$PROFILE" | awk '/^total:/ {gsub("%","",$3); print $3}')
 echo "coverage: total ${total}%"
 fail=0

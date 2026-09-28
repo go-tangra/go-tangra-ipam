@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
 import type {
+  BmcStatus,
   Device,
   DeviceHardware,
   DeviceInterface,
@@ -140,11 +141,26 @@ export const useDevices = defineStore('ipam-devices', () => {
     return api<KvmSession>('POST', 'devices/' + id + '/kvm-session', {})
   }
 
+  // --- BMC credentials (feature 024): a Warden secret reference ---
+
+  async function bmc(id: string): Promise<BmcStatus> {
+    return api<BmcStatus>('GET', 'devices/' + id + '/bmc')
+  }
+
+  async function setBmc(id: string, reference: string): Promise<BmcStatus> {
+    return api<BmcStatus>('PUT', 'devices/' + id + '/bmc', { reference })
+  }
+
+  async function clearBmc(id: string): Promise<void> {
+    await api('DELETE', 'devices/' + id + '/bmc')
+  }
+
   return {
     items, loading, error,
     list, lookup, inRack, get, create, update, remove,
     interfaces, addInterface, removeInterface,
     packages, addresses, hardware,
     power, setPower, sensors, sel, kvmSession,
+    bmc, setBmc, clearBmc,
   }
 })

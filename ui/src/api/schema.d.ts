@@ -436,6 +436,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ipam/v1/devices/{id}/bmc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description BMC credentials status for the viewing user (feature 024): the warden reference, the secret's metadata read from warden as the viewer (never material), the BMC address used and the first blocking reason. */
+        get: operations["getDeviceBmc"];
+        /** @description Point the device at a warden secret after warden confirmed the acting user may read it; audited bmc_reference_set / bmc_reference_changed. */
+        put: operations["setDeviceBmc"];
+        post?: never;
+        delete: operations["clearDeviceBmc"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ipam/v1/devices/{id}/host-sync": {
         parameters: {
             query?: never;
@@ -558,38 +576,6 @@ export interface paths {
         };
         get: operations["getArpSettings"];
         put: operations["updateArpSettings"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/ipam/v1/warden-secrets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listWardenSecrets"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/ipam/v1/warden-secrets/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getWardenSecret"];
-        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1183,6 +1169,32 @@ export interface components {
             guest_device_name?: string;
             /** Format: date-time */
             last_reported_at?: string;
+        };
+        DeviceBmcInput: {
+            /**
+             * Format: uuid
+             * @description warden secret id
+             */
+            reference: string;
+        };
+        DeviceBmcSecret: {
+            name?: string;
+            username?: string;
+            folder_path?: string;
+        };
+        DeviceBmcStatus: {
+            configured: boolean;
+            /** Format: uuid */
+            reference?: string;
+            /** @enum {string} */
+            access?: "ok" | "forbidden" | "not_found" | "unavailable";
+            secret?: components["schemas"]["DeviceBmcSecret"];
+            address?: string;
+            /** @enum {string} */
+            address_source?: "management_ip" | "reported";
+            ready: boolean;
+            /** @enum {string} */
+            reason?: "bmc_not_configured" | "bmc_no_address" | "bmc_secret_forbidden" | "bmc_secret_not_found" | "warden_unavailable";
         };
         /** @description Set or replace a subnet's own SNMP credentials. Every field of the chosen kind is required (v2c: community; v3: user, security_level, auth_protocol, auth_password and, for authPriv, priv_protocol and priv_password). Values are sealed at rest and never returned. */
         SubnetSNMPInput: {
@@ -2357,6 +2369,48 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_not_configured | bmc_no_address | bmc_secret_not_found */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_auth_failed | bmc_error (detail.address) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description warden_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_unreachable (detail.address) */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     setDevicePower: {
@@ -2373,8 +2427,57 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description power action accepted */
+            /** @description power action accepted (audited power_action) */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bad_request (unknown action) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_not_configured | bmc_no_address | bmc_secret_not_found */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_auth_failed | bmc_error (detail.address) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description warden_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_unreachable (detail.address) */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2401,6 +2504,48 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_not_configured | bmc_no_address | bmc_secret_not_found */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_auth_failed | bmc_error (detail.address) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description warden_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_unreachable (detail.address) */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getDeviceSel: {
@@ -2417,6 +2562,165 @@ export interface operations {
         responses: {
             /** @description system event log */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_not_configured | bmc_no_address | bmc_secret_not_found */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_auth_failed | bmc_error (detail.address) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description warden_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_unreachable (detail.address) */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getDeviceBmc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceBmcStatus"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    setDeviceBmc: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceBmcInput"];
+            };
+        };
+        responses: {
+            /** @description status after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceBmcStatus"];
+                };
+            };
+            /** @description bmc_secret_forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation_failed (detail.field = reference) | bmc_secret_not_found */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description warden_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    clearDeviceBmc: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["csrf"];
+            };
+            path: {
+                /** @example 018f3a2b-0000-7000-8000-000000000001 */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description reference removed (audited bmc_reference_cleared; no-op when none) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2558,8 +2862,50 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description kvm session token + console url */
+            /** @description kvm session token + console url (audited kvm_session_started) */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden (not platform-admin) | bmc_secret_forbidden (warden refused the signed-in user) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_not_configured | bmc_no_address | bmc_secret_not_found */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_auth_failed | bmc_error (detail.address) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description warden_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description bmc_unreachable (detail.address) */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2711,52 +3057,6 @@ export interface operations {
             };
             /** @description validation_failed (detail.field names the field) */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    listWardenSecrets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description secret metadata (no values) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    getWardenSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @example 018f3a2b-0000-7000-8000-000000000001 */
-                id: components["parameters"]["id"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description secret metadata (no values) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description not_found */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };

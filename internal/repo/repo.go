@@ -75,6 +75,10 @@ type Store interface {
 	// GetDeviceHardware returns the reported hardware of a device
 	// (feature 023); ErrNotFound when the device has none.
 	GetDeviceHardware(ctx context.Context, tenantID, deviceID string) (store.DeviceHardware, error)
+	// SetDeviceBMCRef replaces the device's warden BMC reference and appends
+	// audit in the same transaction (feature 024); it returns the previous
+	// reference, or ErrNotFound when the device is not the tenant's.
+	SetDeviceBMCRef(ctx context.Context, tenantID, deviceID, ref string, audit store.AuditRow) (previous string, err error)
 
 	// Device interfaces + links
 	CreateInterface(ctx context.Context, i store.DeviceInterface) error

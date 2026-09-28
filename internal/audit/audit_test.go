@@ -395,3 +395,29 @@ func TestARPEvents(t *testing.T) {
 		t.Fatalf("scan actor %q", ScanActor)
 	}
 }
+
+// TestBMCReferenceEvents (024 T006): the reference events are in the closed
+// vocabulary and their neutral detail keys survive the guard, while a
+// credential-named key is dropped.
+func TestBMCReferenceEvents(t *testing.T) {
+	for _, et := range []EventType{BMCReferenceSet, BMCReferenceChanged, BMCReferenceCleared} {
+		if !Known(string(et)) {
+			t.Fatalf("%s not known", et)
+		}
+		row, err := Row(Event{TenantID: "t", EventType: et, ActorKind: ActorUser, ActorID: "u",
+			SubjectKind: SubjectDevice, SubjectID: "d", Outcome: OutcomeOK,
+			Details: map[string]any{"reference": "r2", "previous_reference": "r1", "reference_name": "zax-5 IPMI", "ipmi_password": "x"}}, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.Detail["reference"] != "r2" || row.Detail["previous_reference"] != "r1" || row.Detail["reference_name"] != "zax-5 IPMI" {
+			t.Fatalf("neutral keys dropped: %v", row.Detail)
+		}
+		if _, ok := row.Detail["ipmi_password"]; ok {
+			t.Fatalf("guarded key kept: %v", row.Detail)
+		}
+	}
+	if BMCReferenceSet != "bmc_reference_set" || BMCReferenceChanged != "bmc_reference_changed" || BMCReferenceCleared != "bmc_reference_cleared" {
+		t.Fatal("event names changed")
+	}
+}

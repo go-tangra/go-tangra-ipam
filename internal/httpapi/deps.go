@@ -8,6 +8,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/groups"
@@ -22,15 +23,14 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
-	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
 
 // Deps wire the IPAM HTTP handlers. Every domain service is required; the
-// out-of-band surfaces (BMC, KVM, Warden) gate the privileged power/console
+// out-of-band surfaces (BMC, KVM, BMCRefs) gate the privileged power/console
 // routes; Hub is optional and, when set, enables the GET /stream SSE route
-// (otherwise that route stays 501 not_implemented). Credentials fetched from
-// Warden and passed to BMC/KVM are used at call time only and are never
-// returned to, or persisted by, this layer.
+// (otherwise that route stays 501 not_implemented). Credentials released by
+// warden for the signed-in user and passed to BMC/KVM are used at call time
+// only and are never returned to, or persisted by, this layer.
 type Deps struct {
 	Subnets   *subnets.Service
 	Addresses *addresses.Service
@@ -44,7 +44,6 @@ type Deps struct {
 	Scan      *scan.Service
 	BMC       ipmi.BMC
 	KVM       *kvm.Manager
-	Warden    warden.Client
 	Hub       *stream.Hub // optional: enables GET /stream (SSE) when set
 	// HostSync is the host-sync administrator surface (feature 020); when nil
 	// its routes answer 503 temporarily_unavailable.
@@ -52,6 +51,10 @@ type Deps struct {
 	// ARP is the per-tenant ARP settings service (feature 022); when nil its
 	// routes answer 503 temporarily_unavailable.
 	ARP *arpcfg.Service
+	// BMCRefs decides BMC access and owns the device BMC reference (feature
+	// 024); when nil the reference routes answer 503 and the power/KVM
+	// routes refuse.
+	BMCRefs *bmc.Service
 }
 
 // subjects derives the authz subject from the verified platform identity. The
@@ -80,12 +83,16 @@ func failSvc(w http.ResponseWriter, err error) {
 	var vlanVE vlans.ValidationError
 	var locVE locations.ValidationError
 	var grpVE groups.ValidationError
+	var devFE *devices.FieldError
 	switch {
+	case errors.As(err, &devFE):
+		WriteDetail(w, ErrValidation, map[string]any{"field": devFE.Field(), "message": devFE.Message(),
+			"fields": map[string]string{devFE.Field(): devFE.Message()}})
 	case errors.As(err, &subnetVE), errors.As(err, &vlanVE), errors.As(err, &locVE),
 		errors.As(err, &grpVE), errors.Is(err, backup.ErrBadSchema):
 		WriteError(w, http.StatusUnprocessableEntity, "validation_failed")
 	case errors.Is(err, subnets.ErrNotFound), errors.Is(err, addresses.ErrNotFound),
-		errors.Is(err, devices.ErrNotFound), errors.Is(err, warden.ErrNotFound),
+		errors.Is(err, devices.ErrNotFound),
 		errors.Is(err, repo.ErrNotFound), errors.Is(err, store.ErrNotFound):
 		WriteError(w, http.StatusNotFound, "not_found")
 	case errors.Is(err, authz.ErrForbidden):

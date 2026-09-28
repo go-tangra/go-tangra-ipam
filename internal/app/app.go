@@ -27,6 +27,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/config"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
@@ -156,11 +157,13 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 
 	// Warden secret-reference client (BMC creds fetched at use time; SNMP
 	// credentials are sealed by IPAM itself since feature 021).
-	var wclient warden.Client = warden.NewFake()
+	// Fail closed (024 D12): without a mesh connection every fetch reports
+	// warden_unavailable — never a fabricated or empty secret store.
+	var wclient warden.Client = warden.Unavailable{}
 	if wconn, werr := a.Freya.Client(ctx, cfg.Warden.Service); werr == nil {
 		wclient = warden.New(wconn)
 	} else {
-		a.Log.Warn("warden client unavailable; power/KVM credential fetch will fail", "err", werr)
+		a.Log.Warn("warden client unavailable; power/KVM/sensors will answer warden_unavailable", "err", werr)
 	}
 
 	// Event bus.
@@ -183,7 +186,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	a.closers = append(a.closers, func() { _ = pinger.Close() })
 	portScanner := tcp.NewDialer()
 	snmpDisc := snmp.NewClient()
-	bmc := ipmi.NewClient(cfg.IPMITimeout())
+	bmcClient := ipmi.NewClient(cfg.IPMITimeout())
 	kvmMgr := kvm.NewManager(a.Log, cfg.KVMTokenTTL())
 
 	// Domain services.
@@ -230,6 +233,9 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 		a.Log.Warn("host sync disabled by configuration (host_sync.enabled=false): host reports are not applied")
 	}
 
+	// BMC access decisions and the device BMC reference (feature 024).
+	bmcRefs := bmc.New(a.Repo, wclient)
+
 	// Mesh HTTP surface + the /bmc KVM console proxy on the outer mux.
 	hopts := []httpapi.Option{httpapi.WithVerifier(a.Verifier)}
 	if o.Remote != nil {
@@ -241,9 +247,10 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	deps := httpapi.Deps{
 		Subnets: subnetsSvc, Addresses: addressesSvc, Devices: devicesSvc, Vlans: vlansSvc,
 		Locations: locationsSvc, Groups: groupsSvc, Stats: statsSvc, Backup: backupSvc,
-		DNS: dnsSvc, Scan: scanSvc, BMC: bmc, KVM: kvmMgr, Warden: wclient, Hub: a.Hub,
+		DNS: dnsSvc, Scan: scanSvc, BMC: bmcClient, KVM: kvmMgr, Hub: a.Hub,
 		HostSync: hostAdmin,
 		ARP:      arpcfg.New(a.Repo),
+		BMCRefs:  bmcRefs,
 	}
 	a.HTTP.Register(deps)
 	mux := http.NewServeMux()
@@ -255,7 +262,7 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	grpcapi.Register(a.Freya.GRPC(), grpcapi.Deps{
 		Subnets: subnetsSvc, Addresses: addressesSvc, Devices: devicesSvc, Vlans: vlansSvc,
 		Locations: locationsSvc, Groups: groupsSvc, Stats: statsSvc, Backup: backupSvc,
-		DNS: dnsSvc, Scan: scanSvc, BMC: bmc, KVM: kvmMgr, Warden: wclient,
+		DNS: dnsSvc, Scan: scanSvc, BMC: bmcClient, KVM: kvmMgr, BMCRefs: bmcRefs,
 	})
 
 	// Scan executor worker pool.

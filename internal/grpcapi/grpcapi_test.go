@@ -5,10 +5,12 @@ import (
 	"testing"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
+	bmcsvc "github.com/go-tangra/go-tangra-ipam/v4/internal/bmc"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/devices"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/dnscfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
@@ -19,6 +21,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stats"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
@@ -37,6 +40,7 @@ type kit struct {
 	system   *SystemServer
 	bmc      *ipmi.Fake
 	warden   *warden.Fake
+	mem      *memstore.Mem
 }
 
 func newKit(t *testing.T) kit {
@@ -46,19 +50,20 @@ func newKit(t *testing.T) kit {
 	scanSvc := scan.New(mem, nil, nil, nil, pub, scan.Config{
 		MaxHosts: 100000, Concurrency: 1, TimeoutMs: 1000, Workers: 1, MaxRetries: 0,
 	}, nil)
-	bmc := ipmi.NewFake()
+	bmcFake := ipmi.NewFake()
 	wf := warden.NewFake()
 	return kit{
 		subnet:   &SubnetServer{subnets: subnets.New(mem), scan: scanSvc},
 		addr:     &IpAddressServer{addresses: addresses.New(mem, pub, 0, 0)},
-		device:   &DeviceServer{devices: devices.New(mem), bmc: bmc, kvm: kvm.NewManager(nil, 0), warden: wf},
+		device:   &DeviceServer{devices: devices.New(mem), bmc: bmcFake, kvm: kvm.NewManager(nil, 0), refs: bmcsvc.New(mem, wf)},
 		vlan:     &VlanServer{vlans: vlans.New(mem)},
 		location: &LocationServer{locations: locations.New(mem)},
 		ipgroup:  &IpGroupServer{groups: groups.New(mem)},
 		scanSrv:  &IpScanServer{scan: scanSvc},
 		system:   &SystemServer{stats: stats.New(mem), dns: dnscfg.New(mem)},
-		bmc:      bmc,
+		bmc:      bmcFake,
 		warden:   wf,
+		mem:      mem,
 	}
 }
 
@@ -138,9 +143,8 @@ func TestAddressRPCs(t *testing.T) {
 func TestDevicePowerAuthz(t *testing.T) {
 	k := newKit(t)
 	ctx := context.Background()
-	k.warden.Put("ipmi-ref", map[string]string{
-		"username": "admin", "password": "pw", "protocol": "2.0", "port": "623",
-	}, warden.SecretMeta{Name: "bmc"})
+	const ipmiRef = "01928f7e-3c1a-7b44-9d2e-5a6b7c8d9e0f"
+	k.warden.Put(ipmiRef, warden.SecretMeta{Name: "bmc", Username: "admin", HostURL: "lanplus://bmc:623"}, "pw")
 
 	// Create the device as a plain service caller.
 	withCaller(t, "spiffe://example.org/svc/deployer", nil, true)
@@ -148,11 +152,15 @@ func TestDevicePowerAuthz(t *testing.T) {
 		TenantId: tenant,
 		Device: &ipamv1.Device{
 			Name: "srv-1", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER,
-			ManagementIp: "10.0.0.9", IpmiSecretRef: "ipmi-ref",
+			ManagementIp: "10.0.0.9",
 		},
 	})
 	if err != nil {
 		t.Fatalf("create device: %v", err)
+	}
+	// The reference is set through the validated HTTP route (024); seed it.
+	if _, err := k.mem.SetDeviceBMCRef(ctx, tenant, dev.GetId(), ipmiRef, store.AuditRow{}); err != nil {
+		t.Fatal(err)
 	}
 
 	got, err := k.device.Get(ctx, &ipamv1.GetDeviceRequest{TenantId: tenant, Id: dev.GetId()})
@@ -165,8 +173,10 @@ func TestDevicePowerAuthz(t *testing.T) {
 		t.Fatalf("plain service power: want PermissionDenied, got %v", err)
 	}
 
-	// A platform-admin caller may drive power; creds are fetched at use time.
+	// A platform-admin caller may drive power; creds are fetched at use time
+	// on behalf of the user whose platform token the gateway forwarded.
 	withCaller(t, "spiffe://example.org/svc/console", []string{"platform-admin"}, true)
+	ctx = metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer user-token"))
 	ps, err := k.device.PowerStatus(ctx, &ipamv1.PowerStatusRequest{TenantId: tenant, Id: dev.GetId()})
 	if err != nil || ps.GetState() != "on" {
 		t.Fatalf("power status: %v %+v", err, ps)
@@ -282,5 +292,25 @@ func TestInvalidArgument(t *testing.T) {
 		TenantId: tenant, Subnet: &ipamv1.Subnet{Name: "bad", Cidr: "not-a-cidr"},
 	}); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("bad cidr: want InvalidArgument, got %v", err)
+	}
+}
+
+// TestDeviceBMCReferenceReadOnlyOnMesh (024 T017): mesh callers cannot set or
+// change a device's BMC reference through Create/Update.
+func TestDeviceBMCReferenceReadOnlyOnMesh(t *testing.T) {
+	k := newKit(t)
+	ctx := context.Background()
+	withCaller(t, "spiffe://example.org/svc/deployer", nil, true)
+	if _, err := k.device.Create(ctx, &ipamv1.CreateDeviceRequest{TenantId: tenant, Device: &ipamv1.Device{
+		Name: "srv-x", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER, IpmiSecretRef: "01928f7e-3c1a-7b44-9d2e-5a6b7c8d9e0f"}}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("create with ref: %v", err)
+	}
+	dev, err := k.device.Create(ctx, &ipamv1.CreateDeviceRequest{TenantId: tenant, Device: &ipamv1.Device{Name: "srv-y", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := k.device.Update(ctx, &ipamv1.UpdateDeviceRequest{TenantId: tenant, Id: dev.GetId(), Device: &ipamv1.Device{
+		Name: "srv-y", DeviceType: ipamv1.DeviceType_DEVICE_TYPE_SERVER, IpmiSecretRef: "01928f7e-3c1a-7b44-9d2e-5a6b7c8d9e0f"}}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("update with ref: %v", err)
 	}
 }

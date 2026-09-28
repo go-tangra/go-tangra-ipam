@@ -300,7 +300,17 @@ func (s *Service) Import(ctx context.Context, subj authz.Subjects, b Backup, mod
 
 	for _, d := range b.Devices {
 		d.TenantID = tenant
-		exists, err := s.exists(func() error { _, e := s.st.GetDevice(ctx, tenant, d.ID); return e })
+		// A BMC reference is never taken from the file (it must pass warden's
+		// check for the acting user, feature 024); an overwritten device keeps
+		// the reference it already has.
+		d.IPMISecretRef = ""
+		exists, err := s.exists(func() error {
+			ex, e := s.st.GetDevice(ctx, tenant, d.ID)
+			if e == nil {
+				d.IPMISecretRef = ex.IPMISecretRef
+			}
+			return e
+		})
 		if err != nil {
 			return res, err
 		}
