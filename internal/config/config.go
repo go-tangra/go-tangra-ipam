@@ -122,8 +122,17 @@ type IPMI struct {
 
 // KVM bounds the console-session token minter.
 type KVM struct {
+	// TokenTTLSeconds bounds the single-use start token in the console URL.
 	TokenTTLSeconds int `yaml:"token_ttl_seconds"`
-	SessionSeconds  int `yaml:"session_seconds"`
+	// SessionSeconds bounds the console session the start token is
+	// exchanged for (the freya_kvm cookie).
+	SessionSeconds int `yaml:"session_seconds"`
+	// ConsoleOrigin is the gateway console listener's public origin (portal
+	// feature 025, e.g. https://portal.example.com:8444). When set, console
+	// URLs are absolute on it and console WebSockets must come from it;
+	// empty keeps relative URLs (the UI then explains that the console
+	// origin is not configured).
+	ConsoleOrigin string `yaml:"console_origin"`
 }
 
 // Events toggles the realtime publisher.
@@ -258,6 +267,11 @@ func (c Config) Validate() error {
 	if c.KVM.SessionSeconds < 60 || c.KVM.SessionSeconds > 86400 {
 		return errors.New("config: kvm.session_seconds must be within [60, 86400]")
 	}
+	if c.KVM.ConsoleOrigin != "" {
+		if _, err := consoleOrigin(c.KVM.ConsoleOrigin); err != nil {
+			return fmt.Errorf("config: kvm.console_origin: %w", err)
+		}
+	}
 	if c.Gateway.Service == "" {
 		return errors.New("config: gateway.service is required")
 	}
@@ -345,4 +359,28 @@ func (c Config) KVMTokenTTL() time.Duration {
 // KVMSession is the maximum console-session duration.
 func (c Config) KVMSession() time.Duration {
 	return time.Duration(c.KVM.SessionSeconds) * time.Second
+}
+
+// KVMConsoleOrigin is the canonical console origin ("" when unset).
+func (c Config) KVMConsoleOrigin() string {
+	o, _ := consoleOrigin(c.KVM.ConsoleOrigin)
+	return o
+}
+
+// consoleOrigin returns v as a lower-case https origin, or an error when v is
+// not exactly an origin (no user, path, query or fragment).
+func consoleOrigin(v string) (string, error) {
+	if strings.ContainsAny(v, " \t\r\n;,'\"") {
+		return "", errors.New("must not contain whitespace, quotes, ';' or ','")
+	}
+	u, err := url.Parse(v)
+	switch {
+	case err != nil:
+		return "", errors.New("not a URL")
+	case u.Scheme != "https" || u.Hostname() == "":
+		return "", errors.New("must be an https origin")
+	case u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery:
+		return "", errors.New("must be an origin (no user, path, query or fragment)")
+	}
+	return "https://" + strings.ToLower(u.Host), nil
 }

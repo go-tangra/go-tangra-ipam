@@ -100,6 +100,14 @@ func TestValidateRejects(t *testing.T) {
 		{"ipmi timeout", func(c *Config) { c.IPMI.TimeoutSeconds = 0 }, "ipmi.timeout_seconds"},
 		{"kvm token ttl", func(c *Config) { c.KVM.TokenTTLSeconds = 1 }, "kvm.token_ttl_seconds"},
 		{"kvm session", func(c *Config) { c.KVM.SessionSeconds = 1 }, "kvm.session_seconds"},
+		{"kvm console origin http", func(c *Config) { c.KVM.ConsoleOrigin = "http://portal.example.org:8444" }, "kvm.console_origin"},
+		{"kvm console origin path", func(c *Config) { c.KVM.ConsoleOrigin = "https://portal.example.org:8444/bmc" }, "kvm.console_origin"},
+		{"kvm console origin query", func(c *Config) { c.KVM.ConsoleOrigin = "https://portal.example.org:8444?x=1" }, "kvm.console_origin"},
+		{"kvm console origin user", func(c *Config) { c.KVM.ConsoleOrigin = "https://u@portal.example.org:8444" }, "kvm.console_origin"},
+		{"kvm console origin fragment", func(c *Config) { c.KVM.ConsoleOrigin = "https://portal.example.org#x" }, "kvm.console_origin"},
+		{"kvm console origin garbage", func(c *Config) { c.KVM.ConsoleOrigin = "%zz" }, "kvm.console_origin"},
+		{"kvm console origin no host", func(c *Config) { c.KVM.ConsoleOrigin = "https://" }, "kvm.console_origin"},
+		{"kvm console origin spaces", func(c *Config) { c.KVM.ConsoleOrigin = "https://a b" }, "kvm.console_origin"},
 		{"gateway service", func(c *Config) { c.Gateway.Service = "" }, "gateway.service"},
 		{"gateway issuer", func(c *Config) { c.Gateway.Issuer = "http://gw" }, "gateway.issuer"},
 		{"mesh prod insecure", func(c *Config) {
@@ -175,6 +183,16 @@ func TestDurationHelpers(t *testing.T) {
 	}
 	if c.KVMSession() != 30*time.Minute {
 		t.Errorf("KVMSession=%v", c.KVMSession())
+	}
+	if c.KVMConsoleOrigin() != "" {
+		t.Errorf("KVMConsoleOrigin default=%q", c.KVMConsoleOrigin())
+	}
+	c.KVM.ConsoleOrigin = "https://Portal.Example.org:8444/"
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if c.KVMConsoleOrigin() != "https://portal.example.org:8444" {
+		t.Errorf("KVMConsoleOrigin=%q", c.KVMConsoleOrigin())
 	}
 }
 
