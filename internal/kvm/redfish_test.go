@@ -752,3 +752,16 @@ func TestWithTransport(t *testing.T) {
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// TestBootstrapFocusesViewerCanvas: the injected script gives the HTML5
+// viewer's canvas a tabindex and focuses it (at load, on clicks and when the
+// frame gains focus) — without it keyboard input never reaches the BMC.
+func TestBootstrapFocusesViewerCanvas(t *testing.T) {
+	s := bootstrapScript(bmcAuth{})
+	for _, want := range []string{"getElementById('noVNC_canvas')", "setAttribute('tabindex','0')", "c.focus()",
+		"addEventListener('mousedown'", "window.addEventListener('focus',fc)"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("bootstrap script lacks %q", want)
+		}
+	}
+}
