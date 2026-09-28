@@ -59,7 +59,8 @@ privilege and is confined to the scanner.
 (secret-reference service), `scan` (max_hosts, concurrency, timeout, workers,
 retries), `allocation` (skip_first/skip_last, reserved ranges), `ipmi`
 (timeout), `kvm` (token/session TTLs), `events`, `gateway`, `mesh_enroll`,
-`limits_ipam` and `host_sync` (see the repository README). Framework
+`limits_ipam`, `host_sync` (see the repository README) and `task_scheduler`
+(see "Scheduled tasks" below). Framework
 `server`/`admin`/`discovery` supply the mesh listeners.
 
 ## Host sync and service policy
@@ -86,6 +87,27 @@ nothing is written. Set `host_sync.enabled: false` to keep the feature off at
 rollout. Sync metrics (`hostsync_hosts_total`, `hostsync_changes_total`,
 `hostsync_entries_skipped_total`, `hostsync_apply_seconds`,
 `hostsync_degraded`) are on the admin listener.
+
+## Scheduled tasks
+
+ipam executes the scheduler's task type `ipam:scan-network` (feature 026): it
+queues scans of one subnet (`subnetId` or `cidr`) or of every subnet of the
+task's tenant (`all`, the default); in-progress, IPv6 and too-large subnets
+are skipped. The executor (`scheduler.v1.TaskExecutor/ExecuteTask`) is always
+served and admits only `spiffe://<trust-domain>/svc/scheduler` — through the
+`scheduler-execute` rule in `deploy/policy.yaml` and again in the handler.
+ipam registers its task types with the scheduler only when enabled:
+
+```yaml
+task_scheduler:
+  enabled: false        # true: register ipam's task types with the scheduler
+  service: scheduler    # discovery name of the scheduler module
+```
+
+The scheduler must be resolvable (`discovery.static.scheduler`) and its policy
+must list `spiffe://<trust-domain>/svc/ipam` in `modules-register`. Queued scans
+carry `triggered_by: auto` and are audited as `scan_started` with actor
+`service` (the scheduler) and details `trigger: scheduler`, `execution_id`.
 
 ## Secrets
 

@@ -6,7 +6,10 @@
 # /GetPassword for device BMC credentials, carrying the signed-in user's platform
 # token (feature 024 — the allowing rule `ipam-bmc-secrets` lives in warden's
 # policy). Active network operations (scan/ping/SNMP/IPMI/KVM) reach hosts on the
-# lab network, NOT mesh peers.
+# lab network, NOT mesh peers. The scheduler (feature 026) calls
+# scheduler.v1.TaskExecutor/ExecuteTask to run ipam's scheduled task types; ipam
+# registers those types with the scheduler as a client (the allowing rule
+# `modules-register` lives in the scheduler's policy).
 version: ipam-dev-1
 rules:
   - id: gateway-forwards
@@ -20,4 +23,11 @@ rules:
     from: ["spiffe://example.org/svc/dns"]
     to: ["ipam"]
     operations: ["/ipam.v1.IpAddressService/Get", "/ipam.v1.IpAddressService/Find", "/ipam.v1.SubnetService/Get"]
+    effect: allow
+  - id: scheduler-execute
+    # The scheduler runs ipam's task types (ipam:scan-network); the executor
+    # server re-checks that the verified peer is the scheduler.
+    from: ["spiffe://example.org/svc/scheduler"]
+    to: ["ipam"]
+    operations: ["/scheduler.v1.TaskExecutor/ExecuteTask"]
     effect: allow
