@@ -13,6 +13,16 @@ import { describe } from '@/api/client'
 // fetched for the signed-in user at each call (feature 024): the panel first
 // reads the BMC status and, when something blocks, explains it instead of
 // firing calls that must fail; every call failure shows its reason.
+// consoleFrame is the KVM iframe; focusing its window hands keyboard focus to
+// the cross-origin viewer (allowed across origins).
+const consoleFrame = ref<HTMLIFrameElement | null>(null)
+function focusConsole(): void {
+  try {
+    consoleFrame.value?.contentWindow?.focus()
+  } catch {
+    // frame not ready — the viewer focuses its canvas itself
+  }
+}
 const props = defineProps<{ deviceId: string }>()
 const store = useDevices()
 const ability = useAbility()
@@ -152,7 +162,10 @@ onMounted(loadAll)
           <div class="flex grow items-center gap-2"><span class="grow" /><UiButton v-if="canKvm" size="sm" variant="soft" icon="mdi-monitor-dashboard" :loading="busy === 'kvm'" data-test="kvm-start" @click="launchKvm">Start session</UiButton></div>
         </template>
         <div v-if="kvm && consoleUrl">
-          <iframe :src="consoleUrl" class="aspect-video w-full rounded-box border-0 bg-black" title="KVM console" referrerpolicy="no-referrer" allow="fullscreen" />
+          <!-- The viewer takes keys only while focused: focus the frame when it
+               loads and when the pointer enters it (the frame then focuses
+               its own canvas, see internal/kvm bootstrap). -->
+          <iframe ref="consoleFrame" :src="consoleUrl" class="aspect-video w-full rounded-box border-0 bg-black" title="KVM console" referrerpolicy="no-referrer" allow="fullscreen; keyboard-map" data-test="kvm-frame" @load="focusConsole" @mouseenter="focusConsole" />
           <p class="mt-1 text-xs text-base-content/70">Token-gated session; expires {{ kvm.expires_at ?? 'shortly' }}.</p>
         </div>
         <UiAlert v-else-if="kvm" kind="warning" data-test="kvm-no-origin">

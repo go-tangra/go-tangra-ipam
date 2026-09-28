@@ -94,5 +94,13 @@ func bootstrapScript(auth bmcAuth) string {
 		`var O=window.WebSocket;if(O){var W=function(u,p){var t='/';try{var x=new URL(String(u),location.href);t=x.pathname;if(t.indexOf(B+'/')===0){t=t.slice(B.length);}t+=x.search;}catch(e){}` +
 		`var P=(location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+B+'/__kvmws?u='+encodeURIComponent(t);return p===undefined?new O(P):new O(P,p);};` +
 		`W.prototype=O.prototype;W.CONNECTING=O.CONNECTING;W.OPEN=O.OPEN;W.CLOSING=O.CLOSING;W.CLOSED=O.CLOSED;window.WebSocket=W;}` +
+		// Keyboard focus (v3 parity): the HTML5 viewer only receives keys while
+		// its canvas has focus, and a canvas cannot take focus without a
+		// tabindex. The portal page cannot reach into this cross-origin frame
+		// (feature 025), so the frame focuses its own canvas: once it appears,
+		// on every click inside the viewer, and whenever the frame gains focus.
+		`function fc(){var c=document.getElementById('noVNC_canvas');if(!c)return false;if(!c.getAttribute('tabindex')){c.setAttribute('tabindex','0');}try{c.focus();}catch(e){}return true;}` +
+		`var n=0,T=setInterval(function(){if(fc()||++n>60){clearInterval(T);}},500);` +
+		`document.addEventListener('mousedown',function(){setTimeout(fc,0);},true);window.addEventListener('focus',fc);` +
 		`})();</script>`
 }
