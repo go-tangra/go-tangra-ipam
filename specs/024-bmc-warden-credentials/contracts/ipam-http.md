@@ -72,6 +72,14 @@ Unchanged success bodies. Platform-admin remains required (403
 | 504 | `bmc_unreachable` | `address` |
 | 502 | `bmc_auth_failed` | `address` |
 | 502 | `bmc_error` | `address` |
+| 409 | `bmc_2fa_required` (kvm-session only) | `address` |
+| 502 | `bmc_session_limit` (kvm-session only) | `address` |
+
+Amendment (fix/kvm-redfish-login, 2026-09-28): the kvm-session start logs in
+to the BMC web UI server-side (Redfish session login, else the legacy form
+login), so its login failures answer `bmc_auth_failed`, `bmc_unreachable`,
+`bmc_error` and the two KVM-only reasons above; a 2FA-required outcome is
+audited `refused`, a session limit `error`. See README "KVM console".
 
 The BMC is contacted only after Warden released the credentials. A power
 action or KVM session writes an audit row (`power_action` /

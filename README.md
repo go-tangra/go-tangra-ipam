@@ -307,7 +307,9 @@ Power status and actions, sensors, the SEL and KVM sessions use a Warden secret
 - **Reasons**: `bmc_not_configured`, `bmc_no_address` (409),
   `bmc_secret_forbidden` (403), `bmc_secret_not_found` (409),
   `warden_unavailable` (503), `bmc_unreachable` (504), `bmc_auth_failed`,
-  `bmc_error` (502, with `detail.address`). The Power / KVM tab explains each.
+  `bmc_error` (502, with `detail.address`); a KVM session also answers
+  `bmc_2fa_required` (409) and `bmc_session_limit` (502), see
+  [KVM console](#kvm-console). The Power / KVM tab explains each.
 - **Audit**: power actions (`power_action`) and KVM sessions
   (`kvm_session_started`) with outcome and reason; reads go to the module log.
 - **Policy**: Warden must allow `spiffe://<trust>/svc/ipam` exactly
@@ -332,8 +334,10 @@ kvm:
   console_origin: https://portal.example.com:8444
 ```
 
-- **Start**: `POST /devices/{id}/kvm-session` returns
-  `console_url = <console_origin>/bmc/<device>/?kvmtoken=<token>` (relative
+- **Start**: `POST /devices/{id}/kvm-session` logs in to the BMC web UI
+  (see [KVM console](#kvm-console)) and returns `console_url =
+  <console_origin>/bmc/<device>/cgi/url_redirect.cgi?url_name=man_ikvm_html5_bootstrap&kvmtoken=<token>`,
+  the BMC's HTML5 viewer (relative
   when `console_origin` is empty — the Power / KVM tab then shows "KVM console
   origin not configured" instead of a frame the browser would refuse).
 - **Session**: the first request with the token consumes it and sets
@@ -341,10 +345,49 @@ kvm:
   SameSite=Strict`, `Max-Age=session_seconds`); a replayed token is refused.
 - **WebSocket**: `/bmc/<device>/__kvmws` needs the session cookie and, when
   `console_origin` is set, `Origin` equal to it.
-- **BMC**: receives only IPAM's server-side `SID` cookie (never browser
-  cookies); its `Set-Cookie` never reaches the browser.
+- **BMC**: receives only IPAM's server-side BMC session (`SID` cookie and/or
+  `X-Auth-Token`), never browser cookies or headers; its `Set-Cookie` and
+  `X-Auth-Token` never reach the browser as headers.
 - Sessions live in the IPAM process: run one IPAM instance (or sticky routing)
   for consoles.
+
+### KVM console
+
+`POST /devices/{id}/kvm-session` logs in to the BMC web UI server-side before
+it answers, with the Warden credentials, so a refused login is explained in the
+Power / KVM tab instead of inside the console frame. Supported Supermicro
+login flows (tried in this order, one attempt each):
+
+1. **Redfish session** (X12 and later, e.g. web UI 1.8.x, whose login page
+   still shows the `/cgi/login.cgi` form but never posts it):
+   `POST /redfish/v1/SessionService/Sessions {"UserName","Password"}` → the
+   `X-Auth-Token` header and the session URI (`Location` / `Id`). A 401/403
+   ends the login there (`bmc_auth_failed`), so a wrong password costs one
+   failed attempt.
+2. **Form login** (older firmware): `POST /cgi/login.cgi` with `name`, `pwd`,
+   `check=00` → the `SID` cookie. An X11 that offers both gets both.
+
+The proxy sets the token/cookie on every request and WebSocket to the BMC.
+HTML pages the BMC serves get a small script at the top of `<head>` that
+seeds `sessionStorage._x_auth` / `_sess_idx` (the BMC UI's own Redfish
+session, on the isolated console origin only), keeps the page's
+absolute-path calls (`/redfish/v1/...`) under `/bmc/<device>/` and routes its
+WebSocket through `/bmc/<device>/__kvmws`.
+
+One BMC session per (BMC, user) is shared by all consoles and deleted on the
+BMC (`DELETE` of the Redfish session, `/cgi/logout.cgi` for a SID) when the
+last console using it ends, and on shutdown — BMCs allow only a few web
+sessions. A session the BMC expired (401) is replaced by a new login.
+
+Limitations:
+
+- **Two-factor login**: a BMC user with 2FA enabled (`Oem.Supermicro.TwoFAEnabled`)
+  cannot be logged in automatically; the session is deleted again and the
+  start answers `bmc_2fa_required` — open the BMC web UI directly or use a
+  BMC user without 2FA for the Warden secret.
+- **Session limit**: when the BMC answers `SessionLimitExceeded` the start
+  answers `bmc_session_limit` — close other BMC web sessions (or wait for them
+  to time out) and try again.
 
 ## ARP-based MAC linking
 
