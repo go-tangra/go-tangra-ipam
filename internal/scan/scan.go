@@ -60,6 +60,9 @@ type Options struct {
 	SNMPAuto        bool
 	EnableDNSUpdate bool
 	SkipReverseDNS  bool
+	// Trigger records who started the scan: store.TriggerManual (default) or
+	// store.TriggerAuto for scans the scheduler queues (feature 026).
+	Trigger string
 }
 
 // Service orchestrates subnet scans over a repo.Store and the active-ops
@@ -158,13 +161,17 @@ func (s *Service) StartScan(ctx context.Context, subj authz.Subjects, subnetID s
 		_, _, opts.EnableSNMP = idx.Effective(subnetID)
 	}
 
+	trigger := store.TriggerManual
+	if opts.Trigger == store.TriggerAuto {
+		trigger = store.TriggerAuto
+	}
 	now := s.now()
 	job := store.IPScanJob{
 		ID:              store.NewID(),
 		TenantID:        tenantID,
 		SubnetID:        subnetID,
 		Status:          store.ScanPending,
-		TriggeredBy:     store.TriggerManual,
+		TriggeredBy:     trigger,
 		TotalAddresses:  usable,
 		MaxRetries:      s.cfg.MaxRetries,
 		TimeoutMs:       s.cfg.TimeoutMs,
