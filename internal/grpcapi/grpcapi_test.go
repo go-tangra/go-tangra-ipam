@@ -2,6 +2,9 @@ package grpcapi
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -55,7 +58,7 @@ func newKit(t *testing.T) kit {
 	return kit{
 		subnet:   &SubnetServer{subnets: subnets.New(mem), scan: scanSvc},
 		addr:     &IpAddressServer{addresses: addresses.New(mem, pub, 0, 0)},
-		device:   &DeviceServer{devices: devices.New(mem), bmc: bmcFake, kvm: kvm.NewManager(nil, 0), refs: bmcsvc.New(mem, wf)},
+		device:   &DeviceServer{devices: devices.New(mem), bmc: bmcFake, kvm: kvm.NewManager(nil, 0, kvm.WithTransport(bmcWeb(http.StatusCreated))), refs: bmcsvc.New(mem, wf)},
 		vlan:     &VlanServer{vlans: vlans.New(mem)},
 		location: &LocationServer{locations: locations.New(mem)},
 		ipgroup:  &IpGroupServer{groups: groups.New(mem)},
@@ -314,3 +317,29 @@ func TestDeviceBMCReferenceReadOnlyOnMesh(t *testing.T) {
 		t.Fatalf("update with ref: %v", err)
 	}
 }
+
+// bmcWeb is a fake BMC web UI for KVM console logins: the Redfish session
+// login answers status (201 = a session with an X-Auth-Token; the body names
+// a two-factor login when twoFA), everything else 200.
+func bmcWeb(status int, twoFA ...bool) http.RoundTripper {
+	return rtFunc(func(r *http.Request) (*http.Response, error) {
+		h, code, body := http.Header{}, http.StatusOK, `{"Id":"1"}`
+		if r.URL.Path == "/redfish/v1/SessionService/Sessions" {
+			code = status
+			if status == http.StatusCreated {
+				h.Set("X-Auth-Token", "web-token")
+			}
+			if len(twoFA) > 0 && twoFA[0] {
+				body = `{"Id":"1","Oem":{"Supermicro":{"TwoFAEnabled":true}}}`
+			}
+			if status == http.StatusBadRequest {
+				body = `{"error":{"@Message.ExtendedInfo":[{"MessageId":"SessionLimitExceeded"}]}}`
+			}
+		}
+		return &http.Response{StatusCode: code, Header: h, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
+	})
+}
+
+type rtFunc func(*http.Request) (*http.Response, error)
+
+func (f rtFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

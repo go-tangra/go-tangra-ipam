@@ -14,8 +14,9 @@ import (
 func TestStartSessionMintsTokenNoCredsLeak(t *testing.T) {
 	m := NewManager(nil, time.Minute)
 	const pw = "super-secret-pw"
+	bmc := newFakeBMC(t)
 
-	tok, consoleURL, err := m.StartSession(context.Background(), "dev1", "10.0.0.9", Creds{Username: "admin", Password: pw})
+	tok, consoleURL, err := m.StartSession(context.Background(), "dev1", bmc.host(), Creds{Username: "admin", Password: pw})
 	if err != nil {
 		t.Fatalf("StartSession: %v", err)
 	}
@@ -31,7 +32,7 @@ func TestStartSessionMintsTokenNoCredsLeak(t *testing.T) {
 
 	// The token resolves to its binding while valid...
 	e, ok := m.resolve(tok)
-	if !ok || e.deviceID != "dev1" || e.host != "10.0.0.9" {
+	if !ok || e.deviceID != "dev1" || e.sess.host != bmc.host() {
 		t.Fatalf("resolve = %+v ok=%v", e, ok)
 	}
 	// ...an unknown token does not...
@@ -131,7 +132,7 @@ func TestProxyRejectsBadToken(t *testing.T) {
 
 func TestProxyRejectsTokenDeviceMismatch(t *testing.T) {
 	m := NewManager(nil, time.Minute)
-	tok, _, _ := m.StartSession(context.Background(), "dev1", "10.0.0.9", Creds{Username: "admin", Password: "x"})
+	tok, _, _ := m.StartSession(context.Background(), "dev1", newFakeBMC(t).host(), Creds{Username: "admin", Password: "x"})
 	// Token minted for dev1 used against dev2's path.
 	req := httptest.NewRequest(http.MethodGet, "/bmc/dev2/console.html?kvmtoken="+tok, nil)
 	rec := httptest.NewRecorder()

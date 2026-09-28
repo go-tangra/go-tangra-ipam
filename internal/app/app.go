@@ -191,6 +191,13 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	if cfg.KVMConsoleOrigin() == "" {
 		a.Log.Warn("kvm.console_origin is not set: KVM consoles cannot be embedded (portal feature 025 console listener)")
 	}
+	// Expired consoles end their BMC web sessions; shutdown logs out of all.
+	a.workers = append(a.workers, kvmMgr.Run)
+	a.closers = append(a.closers, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		kvmMgr.Close(ctx)
+	})
 
 	// Domain services.
 	subnetsSvc := subnets.New(a.Repo)

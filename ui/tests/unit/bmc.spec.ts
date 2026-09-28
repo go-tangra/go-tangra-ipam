@@ -255,8 +255,26 @@ describe('Power / KVM tab (024 US3)', () => {
     return w
   }
 
+  it.each([
+    ['bmc_2fa_required', 409, 'BMC 10.1.112.14 requires two-factor login — the console cannot sign in; open its web UI directly.'],
+    ['bmc_session_limit', 502, 'BMC 10.1.112.14 session limit reached — close other BMC web sessions and try again.'],
+    ['bmc_auth_failed', 502, 'rejected the credentials'],
+  ])('explains a refused KVM console login (%s)', async (reason, status, text) => {
+    fetchMock((url) => {
+      if (url.endsWith('/bmc')) return { body: ready }
+      if (url.endsWith('/kvm-session')) return { status, body: { reason, detail: { address: '10.1.112.14' } } }
+      return { body: {} }
+    })
+    const w = await mountTab([{ action: 'access', subject: 'Kvm' }])
+    await w.find('[data-test=kvm-start]').trigger('click')
+    await flushPromises()
+    expect(w.find('[data-test=oob-error]').text()).toContain(text)
+    expect(w.find('iframe').exists()).toBe(false)
+    w.unmount()
+  })
+
   it('embeds a console served from the console origin', async () => {
-    const url = 'https://portal.example.org:8444/bmc/d1/?kvmtoken=t'
+    const url = 'https://portal.example.org:8444/bmc/d1/cgi/url_redirect.cgi?url_name=man_ikvm_html5_bootstrap&kvmtoken=t'
     const w = await startKvm(url)
     const frame = w.find('iframe')
     expect(frame.attributes('src')).toBe(url)

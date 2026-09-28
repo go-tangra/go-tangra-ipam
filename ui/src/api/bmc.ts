@@ -38,6 +38,8 @@ const REASONS: Record<BmcReason, (address?: string) => string> = {
   bmc_unreachable: (a) => `BMC ${a ?? ''} did not answer.`.replace('  ', ' '),
   bmc_auth_failed: (a) => `BMC ${a ?? ''} rejected the credentials — check the Warden secret.`.replace('  ', ' '),
   bmc_error: (a) => `BMC ${a ?? ''} reported an error.`.replace('  ', ' '),
+  bmc_2fa_required: (a) => `BMC ${a ?? ''} requires two-factor login — the console cannot sign in; open its web UI directly.`.replace('  ', ' '),
+  bmc_session_limit: (a) => `BMC ${a ?? ''} session limit reached — close other BMC web sessions and try again.`.replace('  ', ' '),
 }
 
 export function isBmcReason(r: unknown): r is BmcReason {

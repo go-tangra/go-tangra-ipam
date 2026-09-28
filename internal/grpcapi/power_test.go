@@ -2,6 +2,8 @@ package grpcapi
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -10,6 +12,7 @@ import (
 
 	ipamv1 "github.com/go-tangra/go-tangra-ipam/sdk/v4/api/proto/ipam/v1"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 )
@@ -89,5 +92,26 @@ func TestMeshPowerForwardsUserToken(t *testing.T) {
 	k.bmc.Err = ipmi.ErrAuthFailed
 	if _, err := k.device.Power(other, &ipamv1.PowerRequest{TenantId: tenant, Id: dev.GetId(), Action: ipamv1.PowerAction_POWER_ACTION_OFF}); status.Code(err) != codes.Unavailable || status.Convert(err).Message() != "bmc_auth_failed" {
 		t.Fatalf("auth failed: %v", err)
+	}
+
+	// KVM console web logins refused by the BMC.
+	for _, tc := range []struct {
+		rt     http.RoundTripper
+		code   codes.Code
+		reason string
+	}{
+		{bmcWeb(http.StatusCreated, true), codes.FailedPrecondition, "bmc_2fa_required"},
+		{bmcWeb(http.StatusBadRequest), codes.ResourceExhausted, "bmc_session_limit"},
+		{bmcWeb(http.StatusUnauthorized), codes.Unavailable, "bmc_auth_failed"},
+	} {
+		k.device.kvm = kvm.NewManager(nil, 0, kvm.WithTransport(tc.rt))
+		_, err := k.device.StartKvmSession(other, &ipamv1.StartKvmSessionRequest{TenantId: tenant, Id: dev.GetId()})
+		if status.Code(err) != tc.code || status.Convert(err).Message() != tc.reason {
+			t.Fatalf("kvm %s: %v", tc.reason, err)
+		}
+	}
+	k.device.kvm = kvm.NewManager(nil, 0, kvm.WithTransport(rtFunc(func(*http.Request) (*http.Response, error) { return nil, io.EOF })))
+	if _, err := k.device.StartKvmSession(other, &ipamv1.StartKvmSessionRequest{TenantId: tenant, Id: dev.GetId()}); status.Code(err) != codes.DeadlineExceeded {
+		t.Fatalf("kvm unreachable: %v", err)
 	}
 }

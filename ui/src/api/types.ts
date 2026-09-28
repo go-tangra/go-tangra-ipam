@@ -444,6 +444,7 @@ export interface SelEntry {
 export type BmcReason =
   | 'bmc_not_configured' | 'bmc_no_address' | 'bmc_secret_forbidden' | 'bmc_secret_not_found'
   | 'warden_unavailable' | 'bmc_unreachable' | 'bmc_auth_failed' | 'bmc_error'
+  | 'bmc_2fa_required' | 'bmc_session_limit'
 
 // BmcStatus is GET /devices/{id}/bmc: the reference, the secret's metadata as
 // the viewer may see it in Warden (never material) and the BMC address used.
