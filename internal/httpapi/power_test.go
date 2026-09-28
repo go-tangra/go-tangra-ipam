@@ -198,7 +198,7 @@ func TestOOBReasons(t *testing.T) {
 			did := tc.setup(f)
 			for _, rt := range oobRoutes {
 				if tc.addr && rt.suffix == "/kvm-session" {
-					continue // the KVM session is minted without contacting the BMC
+					continue // the console logs in through the BMC web UI (TestKVMSessionLoginReasons)
 				}
 				w := f.req(t, rt.method, p+"/devices/"+did+rt.suffix, "admin", rt.body)
 				checkReason(t, w.Code, w.Body.String(), tc.status, tc.reason)

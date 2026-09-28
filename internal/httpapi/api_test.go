@@ -134,7 +134,7 @@ func newAPIMut(t *testing.T, hub *stream.Hub, mut func(*Deps)) *apiFixture {
 		DNS:       dns,
 		Scan:      scanSvc,
 		BMC:       bmcFake,
-		KVM:       kvm.NewManager(nil, 0),
+		KVM:       kvm.NewManager(nil, 0, kvm.WithTransport(bmcWeb(201, `{"Id":"1"}`))),
 		Hub:       hub,
 		HostSync:  hostsync.NewAdmin(mem, inv, runner, true),
 		ARP:       arpcfg.New(mem),

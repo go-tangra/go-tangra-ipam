@@ -522,8 +522,12 @@ func (s *DeviceServer) StartKvmSession(ctx context.Context, req *ipamv1.StartKvm
 	}
 	token, consoleURL, err := s.kvm.StartSession(ctx, tg.Device.ID, tg.Address, tg.KVM())
 	if err != nil {
-		s.refs.AuditAction(ctx, subj, audit.KVMSessionStarted, req.GetId(), tg.Address, "", "internal")
-		return nil, grpcError(err)
+		reason := bmc.Reason(err)
+		if reason == "" {
+			reason = "internal"
+		}
+		s.refs.AuditAction(ctx, subj, audit.KVMSessionStarted, req.GetId(), tg.Address, "", reason)
+		return nil, bmcError(bmc.Reason(err), err)
 	}
 	s.refs.AuditAction(ctx, subj, audit.KVMSessionStarted, req.GetId(), tg.Address, "", "")
 	return &ipamv1.KvmSession{Token: token, ConsoleUrl: consoleURL}, nil
@@ -555,8 +559,10 @@ func bmcError(reason string, err error) error {
 	switch reason {
 	case "":
 		return grpcError(err)
-	case bmc.ReasonNotConfigured, bmc.ReasonNoAddress, bmc.ReasonSecretNotFound:
+	case bmc.ReasonNotConfigured, bmc.ReasonNoAddress, bmc.ReasonSecretNotFound, bmc.ReasonBMC2FARequired:
 		return status.Error(codes.FailedPrecondition, reason)
+	case bmc.ReasonBMCSessionLimit:
+		return status.Error(codes.ResourceExhausted, reason)
 	case bmc.ReasonForbidden:
 		return status.Error(codes.PermissionDenied, reason)
 	case bmc.ReasonBMCUnreachable:

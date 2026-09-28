@@ -125,12 +125,21 @@ func (s *Server) registerPower(d Deps, p string) {
 			failResolve(w, err, tg.Address)
 			return
 		}
-		// The credentials only bootstrap the BMC web login of this one-time
-		// token (held in memory until the token expires, never persisted).
+		// StartSession logs in to the BMC web UI now, so a refused login is
+		// answered with its reason (bmc_auth_failed, bmc_2fa_required,
+		// bmc_session_limit, bmc_unreachable, bmc_error) before a console
+		// opens. The credentials stay in memory while the console lives,
+		// never persisted.
 		token, consoleURL, err := d.KVM.StartSession(r.Context(), tg.Device.ID, tg.Address, tg.KVM())
 		if err != nil {
-			d.BMCRefs.AuditAction(r.Context(), subj, audit.KVMSessionStarted, id, tg.Address, "", "internal")
-			failSvc(w, err)
+			reason := bmc.Reason(err)
+			if reason == "" {
+				d.BMCRefs.AuditAction(r.Context(), subj, audit.KVMSessionStarted, id, tg.Address, "", "internal")
+				failSvc(w, err)
+				return
+			}
+			d.BMCRefs.AuditAction(r.Context(), subj, audit.KVMSessionStarted, id, tg.Address, "", reason)
+			writeBMCReason(w, reason, tg.Address)
 			return
 		}
 		d.BMCRefs.AuditAction(r.Context(), subj, audit.KVMSessionStarted, id, tg.Address, "", "")

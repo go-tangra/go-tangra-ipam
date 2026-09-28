@@ -2862,7 +2862,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description kvm session token + console url (audited kvm_session_started) */
+            /** @description kvm session token + console url, after a server-side BMC web login (audited kvm_session_started) */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -2883,14 +2883,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description bmc_not_configured | bmc_no_address | bmc_secret_not_found */
+            /** @description bmc_not_configured | bmc_no_address | bmc_secret_not_found | bmc_2fa_required (detail.address; the BMC user has two-factor login) */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description bmc_auth_failed | bmc_error (detail.address) */
+            /** @description bmc_auth_failed | bmc_session_limit | bmc_error (detail.address) */
             502: {
                 headers: {
                     [name: string]: unknown;

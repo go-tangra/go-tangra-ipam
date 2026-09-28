@@ -12,6 +12,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/audit"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipmi"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/kvm"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/memstore"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
@@ -334,6 +335,11 @@ func TestReasonTable(t *testing.T) {
 		repo.ErrNotFound:                        "",
 		ipmi.ErrUnknownAction:                   "",
 		ErrInvalidReference:                     "",
+		fmt.Errorf("x: %w", kvm.ErrUnreachable): ReasonBMCUnreachable,
+		kvm.ErrAuthFailed:                       ReasonBMCAuthFailed,
+		kvm.ErrTwoFactor:                        ReasonBMC2FARequired,
+		kvm.ErrSessionLimit:                     ReasonBMCSessionLimit,
+		kvm.ErrLogin:                            ReasonBMCError,
 	}
 	for err, want := range cases {
 		if got := Reason(err); got != want {
@@ -344,6 +350,8 @@ func TestReasonTable(t *testing.T) {
 		nil: "", ipmi.ErrUnknownAction: "", fmt.Errorf("x: %w", ipmi.ErrUnknownAction): "",
 		ipmi.ErrUnreachable: ReasonBMCUnreachable, ipmi.ErrAuthFailed: ReasonBMCAuthFailed,
 		errors.New("completion code 0xc1"): ReasonBMCError,
+		kvm.ErrTwoFactor:                   ReasonBMC2FARequired, kvm.ErrSessionLimit: ReasonBMCSessionLimit,
+		kvm.ErrUnreachable: ReasonBMCUnreachable, kvm.ErrAuthFailed: ReasonBMCAuthFailed, kvm.ErrLogin: ReasonBMCError,
 	} {
 		if got := BMCReason(err); got != want {
 			t.Errorf("BMCReason(%v) = %q, want %q", err, got, want)
@@ -354,13 +362,14 @@ func TestReasonTable(t *testing.T) {
 		ReasonForbidden: http.StatusForbidden, ReasonSecretNotFound: http.StatusConflict,
 		ReasonWardenUnavailable: http.StatusServiceUnavailable, ReasonBMCUnreachable: http.StatusGatewayTimeout,
 		ReasonBMCAuthFailed: http.StatusBadGateway, ReasonBMCError: http.StatusBadGateway, "": http.StatusInternalServerError,
+		ReasonBMC2FARequired: http.StatusConflict, ReasonBMCSessionLimit: http.StatusBadGateway,
 	}
 	for r, want := range statuses {
 		if got := HTTPStatus(r); got != want {
 			t.Errorf("HTTPStatus(%q) = %d, want %d", r, got, want)
 		}
 	}
-	for _, r := range []string{ReasonBMCUnreachable, ReasonBMCAuthFailed, ReasonBMCError} {
+	for _, r := range []string{ReasonBMCUnreachable, ReasonBMCAuthFailed, ReasonBMCError, ReasonBMC2FARequired, ReasonBMCSessionLimit} {
 		if !BMCSide(r) {
 			t.Errorf("%s is BMC side", r)
 		}
@@ -368,12 +377,12 @@ func TestReasonTable(t *testing.T) {
 	if BMCSide(ReasonForbidden) {
 		t.Error("forbidden is not BMC side")
 	}
-	for _, r := range []string{ReasonNotConfigured, ReasonNoAddress, ReasonForbidden, ReasonSecretNotFound} {
+	for _, r := range []string{ReasonNotConfigured, ReasonNoAddress, ReasonForbidden, ReasonSecretNotFound, ReasonBMC2FARequired} {
 		if Outcome(r) != audit.OutcomeRefused {
 			t.Errorf("Outcome(%s)", r)
 		}
 	}
-	for _, r := range []string{ReasonWardenUnavailable, ReasonBMCUnreachable, ReasonBMCAuthFailed, ReasonBMCError, "bad_request"} {
+	for _, r := range []string{ReasonWardenUnavailable, ReasonBMCUnreachable, ReasonBMCAuthFailed, ReasonBMCError, ReasonBMCSessionLimit, "bad_request"} {
 		if Outcome(r) != audit.OutcomeError {
 			t.Errorf("Outcome(%s)", r)
 		}

@@ -87,16 +87,18 @@ func sessionCookie(t *testing.T, rec *httptest.ResponseRecorder) *http.Cookie {
 }
 
 func TestConsoleURL(t *testing.T) {
+	bmc := newFakeBMC(t)
 	m := NewManager(nil, time.Minute, WithConsoleOrigin(consoleOrigin))
-	tok, u, err := m.StartSession(context.Background(), "dev 1", "10.0.0.9", Creds{Username: "a", Password: "p"})
+	tok, u, err := m.StartSession(context.Background(), "dev 1", bmc.host(), Creds{Username: "a", Password: "p"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if u != consoleOrigin+"/bmc/dev%201/?kvmtoken="+tok {
+	// The console lands on the BMC's HTML5 viewer, past its login page.
+	if u != consoleOrigin+"/bmc/dev%201/cgi/url_redirect.cgi?url_name=man_ikvm_html5_bootstrap&kvmtoken="+tok {
 		t.Fatalf("console url %q", u)
 	}
-	_, u, _ = NewManager(nil, 0).StartSession(context.Background(), "dev1", "h", Creds{})
-	if !strings.HasPrefix(u, "/bmc/dev1/?kvmtoken=") {
+	_, u, _ = NewManager(nil, 0).StartSession(context.Background(), "dev1", bmc.host(), Creds{Username: "a", Password: "p"})
+	if !strings.HasPrefix(u, "/bmc/dev1/cgi/url_redirect.cgi?url_name=man_ikvm_html5_bootstrap&kvmtoken=") {
 		t.Fatalf("relative url %q", u)
 	}
 }

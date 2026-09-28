@@ -2,14 +2,21 @@
 // KVM console, so a platform admin can open a remote console from the platform
 // UI without the BMC password ever reaching the browser.
 //
-// The authenticated caller (after a platform-admin check) calls StartSession to
-// mint a short-lived, single-use start token bound to the device's BMC host and
-// the credentials fetched from warden. The unauthenticated /bmc/ proxy Handler
-// exchanges that token, on its first use, for a console session (the
-// freya_kvm cookie, scoped to /bmc/<device>/, valid WithConsoleSessionTTL),
-// logs in to the BMC server-side (POST /cgi/login.cgi -> SID cookie), and
-// mounts the BMC's own console under the console origin, injecting the BMC
-// session on every proxied HTTP request and WebSocket upgrade.
+// The authenticated caller (after a platform-admin check) calls StartSession,
+// which logs in to the BMC server-side with the credentials fetched from
+// warden (so a refused login is answered with its reason before any console
+// opens) and mints a short-lived, single-use start token bound to that BMC
+// session. The unauthenticated /bmc/ proxy Handler exchanges the token, on its
+// first use, for a console session (the freya_kvm cookie, scoped to
+// /bmc/<device>/, valid WithConsoleSessionTTL) and mounts the BMC's own
+// HTML5 viewer under the console origin, injecting the BMC session on every
+// proxied HTTP request and WebSocket upgrade.
+//
+// Both Supermicro login generations are supported (session.go): the Redfish
+// session login of newer firmware (X-Auth-Token) and the legacy form login
+// (SID cookie). One BMC session per (BMC host, user) is shared by the consoles
+// that use it and deleted on the BMC when the last of them ends, so consoles
+// do not exhaust the BMC's few session slots.
 //
 // The console is served by the gateway's console listener on an origin of its
 // own (portal feature 025, WithConsoleOrigin), never on the portal origin: the
@@ -18,7 +25,7 @@
 // from it. Because the BMC
 // uses a self-signed certificate, an isolated http.Client / websocket.Dialer
 // with InsecureSkipVerify is used ONLY here; the browser never receives the BMC
-// credentials or the raw session.
+// credentials (see injectBootstrap for the Redfish session token).
 package kvm
 
 import (
@@ -46,15 +53,23 @@ const kvmCookie = "freya_kvm"
 // Default lifetimes.
 const (
 	defaultTokenTTL   = 60 * time.Second
-	defaultSessionTTL = 15 * time.Minute // cached BMC login
-	defaultConsoleTTL = time.Hour        // console session (freya_kvm)
+	defaultConsoleTTL = time.Hour // console session (freya_kvm)
 	loginTimeout      = 20 * time.Second
+	logoutTimeout     = 10 * time.Second
 	proxyTimeout      = 30 * time.Second
+	// reloginAfter: a BMC session answered with 401 is dropped (and a new
+	// one logged in) only when it is at least this old, so a path the BMC
+	// always refuses cannot cause a login storm.
+	reloginAfter = 10 * time.Second
+	// janitorInterval: how often Run ends expired tokens and consoles.
+	janitorInterval = 30 * time.Second
 )
 
+var errSessionEnded = &loginError{kind: ErrLogin, detail: "console session ended"}
+
 // Creds are the BMC web login credentials. They come from warden at use time
-// and are held only in the token store, server-side; they are never sent to the
-// browser or logged.
+// and are held only in memory, server-side, while a console uses them; they
+// are never sent to the browser or logged.
 type Creds struct {
 	Username string
 	Password string
@@ -66,21 +81,24 @@ type Manager struct {
 	log        *slog.Logger
 	now        func() time.Time
 	tokenTTL   time.Duration
-	sessionTTL time.Duration
 	consoleTTL time.Duration
+	janitor    time.Duration
 	scheme     string // "https"; overridable in tests
 	// consoleOrigin is the gateway console listener's origin ("" = relative
 	// console URLs and no WebSocket Origin check).
 	consoleOrigin string
 
-	httpClient *http.Client
+	httpClient *http.Client      // logins and logouts
+	proxyRT    http.RoundTripper // proxied console requests (limitTransport)
 	wsDialer   *websocket.Dialer
 	mux        *http.ServeMux
+	wg         sync.WaitGroup // background logouts
 
 	mu       sync.Mutex
-	tokens   map[string]tokenEntry   // single-use start tokens
-	consoles map[string]tokenEntry   // console sessions (freya_kvm)
-	sessions map[string]sessionEntry // cached BMC logins
+	tokens   map[string]tokenEntry  // single-use start tokens
+	consoles map[string]tokenEntry  // console sessions (freya_kvm)
+	sessions map[string]*bmcSession // BMC logins by host + user
+	dead     []*bmcSession          // released sessions to log out after unlocking
 }
 
 // Option tunes a Manager.
@@ -102,16 +120,38 @@ func WithConsoleSessionTTL(d time.Duration) Option {
 	}
 }
 
+// WithTransport replaces the HTTP transport to the BMCs (login, logout and
+// proxied requests; nil keeps the default). Tests use it for a fake BMC.
+func WithTransport(rt http.RoundTripper) Option {
+	return func(m *Manager) {
+		if rt != nil {
+			m.httpClient.Transport = rt
+		}
+	}
+}
+
+// tokenEntry binds a start token or console session to a device and the BMC
+// session it uses.
 type tokenEntry struct {
 	deviceID string
-	host     string
-	creds    Creds
+	sess     *bmcSession
 	expires  time.Time
 }
 
-type sessionEntry struct {
-	cookie  string
-	expires time.Time
+// bmcSession is one BMC web login shared by every token and console of the
+// same (host, user). refs and creds are guarded by Manager.mu; the login
+// state by mu, which also serialises logins. Lock order: mu before
+// Manager.mu, never the reverse.
+type bmcSession struct {
+	key   string
+	host  string
+	refs  int
+	creds Creds
+
+	mu       sync.Mutex
+	auth     bmcAuth
+	loggedAt time.Time
+	closed   bool
 }
 
 // NewManager builds a KVM manager. A non-positive tokenTTL uses the default; a
@@ -122,6 +162,7 @@ func NewManager(log *slog.Logger, tokenTTL time.Duration, opts ...Option) *Manag
 	}
 	// Isolated transport that accepts the BMC's self-signed certificate. This
 	// InsecureSkipVerify is confined to this client and never leaks elsewhere.
+	// Keep-alives are off: old BMC web servers mishandle connection reuse.
 	transport := &http.Transport{
 		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // BMC web UIs use self-signed certs
 		DisableKeepAlives: true,
@@ -130,8 +171,8 @@ func NewManager(log *slog.Logger, tokenTTL time.Duration, opts ...Option) *Manag
 		log:        log,
 		now:        time.Now,
 		tokenTTL:   tokenTTL,
-		sessionTTL: defaultSessionTTL,
 		consoleTTL: defaultConsoleTTL,
+		janitor:    janitorInterval,
 		scheme:     "https",
 		httpClient: &http.Client{
 			Timeout:       loginTimeout,
@@ -145,21 +186,25 @@ func NewManager(log *slog.Logger, tokenTTL time.Duration, opts ...Option) *Manag
 		},
 		tokens:   map[string]tokenEntry{},
 		consoles: map[string]tokenEntry{},
-		sessions: map[string]sessionEntry{},
+		sessions: map[string]*bmcSession{},
 	}
 	for _, o := range opts {
 		o(m)
 	}
+	m.proxyRT = newLimitTransport(m.httpClient.Transport)
 	m.mux = http.NewServeMux()
 	m.mux.HandleFunc("/bmc/{id}/__kvmws", m.handleWS)
 	m.mux.HandleFunc("/bmc/{id}/{path...}", m.handleProxy)
 	return m
 }
 
-// StartSession mints a short-lived token bound to the device's BMC host and
-// credentials and returns the token plus the console bootstrap URL to open. The
-// caller must have verified platform-admin authorization before calling.
-func (m *Manager) StartSession(_ context.Context, deviceID, bmcHost string, creds Creds) (token, consoleURL string, err error) {
+// StartSession logs in to the device's BMC (or reuses the live BMC session of
+// the same host and user), mints a short-lived start token bound to it and
+// returns the token plus the console bootstrap URL to open. A refused login
+// is returned as its classified error (ErrAuthFailed, ErrTwoFactor,
+// ErrSessionLimit, ErrUnreachable, ErrLogin). The caller must have verified
+// platform-admin authorization before calling.
+func (m *Manager) StartSession(ctx context.Context, deviceID, bmcHost string, creds Creds) (token, consoleURL string, err error) {
 	buf := make([]byte, 24)
 	if _, err := rand.Read(buf); err != nil {
 		return "", "", err
@@ -167,17 +212,64 @@ func (m *Manager) StartSession(_ context.Context, deviceID, bmcHost string, cred
 	token = hex.EncodeToString(buf)
 
 	m.mu.Lock()
-	m.tokens[token] = tokenEntry{deviceID: deviceID, host: bmcHost, creds: creds, expires: m.now().Add(m.tokenTTL)}
-	m.gcLocked()
+	s := m.acquireLocked(bmcHost, creds)
 	m.mu.Unlock()
+	lctx, cancel := context.WithTimeout(ctx, loginTimeout)
+	defer cancel()
+	if _, err := m.sessionAuth(lctx, s); err != nil {
+		m.mu.Lock()
+		m.releaseLocked(s)
+		m.unlockAndRetire()
+		m.warn("kvm console login", "host", bmcHost, "err", err)
+		return "", "", err
+	}
 
-	consoleURL = m.consoleOrigin + "/bmc/" + url.PathEscape(deviceID) + "/?kvmtoken=" + token
+	m.mu.Lock()
+	m.tokens[token] = tokenEntry{deviceID: deviceID, sess: s, expires: m.now().Add(m.tokenTTL)}
+	m.gcLocked()
+	m.unlockAndRetire()
+
+	consoleURL = m.consoleOrigin + "/bmc/" + url.PathEscape(deviceID) + "/" + consoleEntry + "&kvmtoken=" + token
 	return token, consoleURL, nil
 }
 
 // Handler returns the /bmc/ reverse-proxy handler. Mount it on the module HTTP
 // server; access is gated by the session token, not the gateway.
 func (m *Manager) Handler() http.Handler { return m.mux }
+
+// Run ends expired start tokens and consoles (and so their BMC sessions)
+// until ctx is done.
+func (m *Manager) Run(ctx context.Context) {
+	t := time.NewTicker(m.janitor)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			m.gc()
+		}
+	}
+}
+
+// Close ends every console and logs out of every BMC session, waiting for
+// the logouts until ctx is done.
+func (m *Manager) Close(ctx context.Context) {
+	m.mu.Lock()
+	for _, s := range m.sessions {
+		m.dead = append(m.dead, s)
+	}
+	m.sessions = map[string]*bmcSession{}
+	m.tokens = map[string]tokenEntry{}
+	m.consoles = map[string]tokenEntry{}
+	m.unlockAndRetire()
+	done := make(chan struct{})
+	go func() { m.wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
+}
 
 // resolve returns a start token's binding if it is present and unexpired
 // (without consuming it).
@@ -194,24 +286,117 @@ func (m *Manager) resolve(token string) (tokenEntry, bool) {
 	return e, true
 }
 
-// gcLocked drops expired tokens and sessions. Caller holds the lock.
+// acquireLocked returns the BMC session of (host, user), creating it, and
+// counts one more user of it. The latest credentials win (a rotated password
+// is used by the next login). Caller holds m.mu.
+func (m *Manager) acquireLocked(host string, creds Creds) *bmcSession {
+	key := host + "\x00" + creds.Username
+	s := m.sessions[key]
+	if s == nil {
+		s = &bmcSession{key: key, host: host}
+		m.sessions[key] = s
+	}
+	s.refs++
+	s.creds = creds
+	return s
+}
+
+// releaseLocked drops one user of s; the last one queues it for logout.
+// Caller holds m.mu.
+func (m *Manager) releaseLocked(s *bmcSession) {
+	s.refs--
+	if s.refs > 0 {
+		return
+	}
+	if m.sessions[s.key] == s {
+		delete(m.sessions, s.key)
+	}
+	m.dead = append(m.dead, s)
+}
+
+// unlockAndRetire releases m.mu and logs out the sessions released under it.
+func (m *Manager) unlockAndRetire() {
+	dead := m.dead
+	m.dead = nil
+	m.mu.Unlock()
+	for _, s := range dead {
+		m.wg.Add(1)
+		go func(s *bmcSession) {
+			defer m.wg.Done()
+			s.mu.Lock()
+			a := s.auth
+			s.auth, s.closed = bmcAuth{}, true
+			s.mu.Unlock()
+			if !a.empty() {
+				m.logout(context.Background(), s.host, a)
+			}
+		}(s)
+	}
+}
+
+// gc ends expired tokens and consoles.
+func (m *Manager) gc() {
+	m.mu.Lock()
+	m.gcLocked()
+	m.unlockAndRetire()
+}
+
+// gcLocked drops expired tokens and consoles, releasing their BMC sessions.
+// Caller holds the lock (and retires m.dead after unlocking).
 func (m *Manager) gcLocked() {
 	now := m.now()
-	for k, v := range m.tokens {
-		if !now.Before(v.expires) {
-			delete(m.tokens, k)
+	for _, set := range []map[string]tokenEntry{m.tokens, m.consoles} {
+		for k, v := range set {
+			if !now.Before(v.expires) {
+				delete(set, k)
+				m.releaseLocked(v.sess)
+			}
 		}
 	}
-	for k, v := range m.consoles {
-		if !now.Before(v.expires) {
-			delete(m.consoles, k)
-		}
+}
+
+// sessionAuth returns the BMC session's credentials, logging in when there
+// is no live login.
+func (m *Manager) sessionAuth(ctx context.Context, s *bmcSession) (bmcAuth, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return bmcAuth{}, errSessionEnded
 	}
-	for k, v := range m.sessions {
-		if !now.Before(v.expires) {
-			delete(m.sessions, k)
-		}
+	if !s.auth.empty() {
+		return s.auth, nil
 	}
+	m.mu.Lock()
+	creds := s.creds
+	m.mu.Unlock()
+	a, err := m.login(ctx, s.host, creds)
+	if err != nil {
+		return bmcAuth{}, err
+	}
+	s.auth, s.loggedAt = a, m.now()
+	if m.log != nil {
+		m.log.Info("kvm bmc login", "host", s.host, "redfish", a.token != "", "cookie", a.cookie != "")
+	}
+	return a, nil
+}
+
+// invalidate drops the BMC login stale (answered 401) unless it was already
+// replaced or is too fresh to blame, logging it out in the background. It
+// reports whether a new login will be made.
+func (m *Manager) invalidate(s *bmcSession, stale bmcAuth) bool {
+	s.mu.Lock()
+	if s.auth != stale || s.auth.empty() || m.now().Sub(s.loggedAt) < reloginAfter {
+		s.mu.Unlock()
+		return false
+	}
+	s.auth = bmcAuth{}
+	s.mu.Unlock()
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.logout(context.Background(), s.host, stale)
+	}()
+	return true
 }
 
 // exchange consumes a start token bound to device and opens a console
@@ -219,16 +404,16 @@ func (m *Manager) gcLocked() {
 // left unused.
 func (m *Manager) exchange(token, device string) (string, tokenEntry, bool) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	defer m.unlockAndRetire()
 	e, ok := m.tokens[token]
 	if !ok || !m.now().Before(e.expires) || e.deviceID != device {
 		return "", tokenEntry{}, false
 	}
-	delete(m.tokens, token)
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", tokenEntry{}, false
 	}
+	delete(m.tokens, token)
 	id := hex.EncodeToString(buf)
 	e.expires = m.now().Add(m.consoleTTL)
 	m.consoles[id] = e
@@ -281,52 +466,9 @@ func (m *Manager) originAllowed(r *http.Request) bool {
 	return strings.EqualFold(r.Header.Get("Origin"), m.consoleOrigin)
 }
 
-// auth returns a valid BMC session cookie for the target, logging in if needed.
-func (m *Manager) auth(ctx context.Context, host string, creds Creds) (string, error) {
-	key := host + "\x00" + creds.Username
-	m.mu.Lock()
-	if s, ok := m.sessions[key]; ok && m.now().Before(s.expires) {
-		cookie := s.cookie
-		m.mu.Unlock()
-		return cookie, nil
-	}
-	m.mu.Unlock()
-
-	cookie, err := m.login(ctx, host, creds)
-	if err != nil {
-		return "", err
-	}
-	m.mu.Lock()
-	m.sessions[key] = sessionEntry{cookie: cookie, expires: m.now().Add(m.sessionTTL)}
-	m.mu.Unlock()
-	return cookie, nil
-}
-
-// login authenticates to the BMC web UI and returns the SID cookie value.
-func (m *Manager) login(ctx context.Context, host string, creds Creds) (string, error) {
-	form := url.Values{"name": {creds.Username}, "pwd": {creds.Password}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		m.scheme+"://"+host+"/cgi/login.cgi", strings.NewReader(form.Encode()))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := m.httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer drain(resp)
-	for _, c := range resp.Cookies() {
-		if c.Name == "SID" && c.Value != "" {
-			return "SID=" + c.Value, nil
-		}
-	}
-	return "", &loginError{host: host, status: resp.StatusCode}
-}
-
-// handleProxy reverse-proxies the BMC console assets under our origin, injecting
-// the server-side session cookie. The browser's request never carries the BMC
-// credentials.
+// handleProxy reverse-proxies the BMC console under the console origin,
+// injecting the server-side BMC session. The browser's own cookies and
+// X-Auth-Token never reach the BMC; the BMC's cookies never reach the browser.
 func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
 	e, ok := m.authorize(w, r)
 	if !ok {
@@ -335,29 +477,50 @@ func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), loginTimeout)
 	defer cancel()
-	cookie, err := m.auth(ctx, e.host, e.creds)
+	auth, err := m.sessionAuth(ctx, e.sess)
 	if err != nil {
-		m.warn("kvm console login", "host", e.host, "err", err)
-		http.Error(w, "could not log in to BMC", http.StatusBadGateway)
+		m.warn("kvm console login", "host", e.sess.host, "err", err)
+		http.Error(w, loginFailureText(err), http.StatusBadGateway)
 		return
 	}
 
 	upstreamPath := "/" + r.PathValue("path")
-	host, scheme := e.host, m.scheme
+	host, scheme := e.sess.host, m.scheme
 	proxy := &httputil.ReverseProxy{
-		Transport: m.httpClient.Transport,
+		// A 401 means the BMC ended its session (idle timeout, the UI's own
+		// logout): drop it, log in again and repeat a bodiless request once,
+		// so the page never sees the expiry.
+		Transport: transportFunc(func(req *http.Request) (*http.Response, error) {
+			resp, err := m.proxyRT.RoundTrip(req)
+			if err != nil || resp.StatusCode != http.StatusUnauthorized || !m.invalidate(e.sess, auth) {
+				return resp, err
+			}
+			if req.Body != nil && req.Body != http.NoBody {
+				return resp, nil // the next request logs in again
+			}
+			fresh, lerr := m.sessionAuth(req.Context(), e.sess)
+			if lerr != nil {
+				return resp, nil
+			}
+			drain(resp)
+			auth = fresh
+			retry := req.Clone(req.Context())
+			setBMCAuth(retry.Header, auth)
+			return m.proxyRT.RoundTrip(retry)
+		}),
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			req := pr.Out
 			req.URL.Scheme = scheme
 			req.URL.Host = host
-			req.URL.Path = upstreamPath
+			req.URL.Path, req.URL.RawPath = upstreamPath, ""
 			req.Host = host
-			// The browser's cookies (console session, anything else) never
-			// reach the BMC: only the server-side BMC session does.
-			req.Header.Del("Cookie")
-			if cookie != "" {
-				req.Header.Set("Cookie", cookie)
+			if q := req.URL.Query(); q.Has("kvmtoken") {
+				q.Del("kvmtoken") // the start token is ours, not the BMC's
+				req.URL.RawQuery = q.Encode()
 			}
+			setBMCAuth(req.Header, auth)
+			// Uncompressed, so HTML pages can take the bootstrap script.
+			req.Header.Set("Accept-Encoding", "identity")
 			req.Header.Del("Referer")
 			if req.Header.Get("Origin") != "" {
 				req.Header.Set("Origin", scheme+"://"+host)
@@ -367,10 +530,11 @@ func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
 			resp.Header.Del("X-Frame-Options")
 			// The BMC session stays server-side.
 			resp.Header.Del("Set-Cookie")
-			return nil
+			resp.Header.Del("X-Auth-Token")
+			return injectBootstrap(resp, auth)
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
-			m.warn("kvm console proxy", "host", host, "err", err)
+			m.warn("kvm console proxy", "host", host, "err", transportError(err))
 			http.Error(w, "BMC console unreachable", http.StatusBadGateway)
 		},
 	}
@@ -378,6 +542,25 @@ func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
 	defer pcancel()
 	proxy.ServeHTTP(w, r.WithContext(pctx))
 }
+
+// setBMCAuth replaces the browser's Cookie and X-Auth-Token headers with the
+// server-side BMC session.
+func setBMCAuth(h http.Header, auth bmcAuth) {
+	h.Del("Cookie")
+	h.Del("X-Auth-Token")
+	if auth.cookie != "" {
+		h.Set("Cookie", auth.cookie)
+	}
+	if auth.token != "" {
+		h.Set("X-Auth-Token", auth.token)
+	}
+}
+
+// transportFunc adapts a function to http.RoundTripper.
+type transportFunc func(*http.Request) (*http.Response, error)
+
+// RoundTrip implements http.RoundTripper.
+func (f transportFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 // upgrader relays the viewer's WebSocket; the Origin is checked in handleWS
 // before any BMC contact (originAllowed).
@@ -397,8 +580,10 @@ func (m *Manager) refuse(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "invalid or expired KVM session", http.StatusForbidden)
 }
 
-// handleWS proxies the browser's KVM WebSocket to the BMC, attaching the
-// server-side session cookie. The stream is relayed transparently both ways.
+// handleWS relays the browser's KVM WebSocket to the BMC, attaching the
+// server-side BMC session. The injected bootstrap passes the path the viewer
+// asked for in "u" (default "/"). A BMC that answers 401 (session expired)
+// gets one new login and a second dial.
 func (m *Manager) handleWS(w http.ResponseWriter, r *http.Request) {
 	e, ok := m.console(r)
 	if !ok || !m.originAllowed(r) {
@@ -407,27 +592,21 @@ func (m *Manager) handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 14*time.Second)
 	defer cancel()
-	cookie, err := m.auth(ctx, e.host, e.creds)
+	auth, err := m.sessionAuth(ctx, e.sess)
 	if err != nil {
-		m.warn("kvm ws login", "host", e.host, "err", err)
-		http.Error(w, "could not log in to BMC", http.StatusBadGateway)
+		m.warn("kvm ws login", "host", e.sess.host, "err", err)
+		http.Error(w, loginFailureText(err), http.StatusBadGateway)
 		return
 	}
-
-	wsScheme := "wss"
-	if m.scheme == "http" {
-		wsScheme = "ws"
-	}
-	hdr := http.Header{"Origin": {m.scheme + "://" + e.host}}
-	if cookie != "" {
-		hdr.Set("Cookie", cookie)
-	}
-	upstream, resp, err := m.wsDialer.DialContext(ctx, wsScheme+"://"+e.host+"/", hdr)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusUnauthorized {
-			m.invalidate(e.host, e.creds)
+	target := wsPath(r.URL.Query().Get("u"))
+	upstream, resp, err := m.dialBMC(ctx, e.sess.host, target, auth)
+	if err != nil && resp != nil && resp.StatusCode == http.StatusUnauthorized && m.invalidate(e.sess, auth) {
+		if auth, err = m.sessionAuth(ctx, e.sess); err == nil {
+			upstream, _, err = m.dialBMC(ctx, e.sess.host, target, auth)
 		}
-		m.warn("kvm ws dial", "host", e.host, "err", err)
+	}
+	if err != nil {
+		m.warn("kvm ws dial", "host", e.sess.host, "err", err)
 		http.Error(w, "could not open BMC console stream", http.StatusBadGateway)
 		return
 	}
@@ -435,7 +614,7 @@ func (m *Manager) handleWS(w http.ResponseWriter, r *http.Request) {
 
 	client, err := m.upgrader().Upgrade(w, r, nil)
 	if err != nil {
-		m.warn("kvm ws upgrade", "host", e.host, "err", err)
+		m.warn("kvm ws upgrade", "host", e.sess.host, "err", err)
 		return
 	}
 	for _, c := range []*websocket.Conn{client, upstream} {
@@ -445,11 +624,34 @@ func (m *Manager) handleWS(w http.ResponseWriter, r *http.Request) {
 	proxyWebSocket(client, upstream)
 }
 
-// invalidate drops any cached BMC session for the target.
-func (m *Manager) invalidate(host string, creds Creds) {
-	m.mu.Lock()
-	delete(m.sessions, host+"\x00"+creds.Username)
-	m.mu.Unlock()
+// dialBMC opens the BMC's KVM WebSocket with the BMC session.
+func (m *Manager) dialBMC(ctx context.Context, host, target string, auth bmcAuth) (*websocket.Conn, *http.Response, error) {
+	wsScheme := "wss"
+	if m.scheme == "http" {
+		wsScheme = "ws"
+	}
+	hdr := http.Header{"Origin": {m.scheme + "://" + host}}
+	if auth.cookie != "" {
+		hdr.Set("Cookie", auth.cookie)
+	}
+	if auth.token != "" {
+		hdr.Set("X-Auth-Token", auth.token)
+	}
+	c, resp, err := m.wsDialer.DialContext(ctx, wsScheme+"://"+host+target, hdr)
+	if resp != nil && resp.Body != nil {
+		drain(resp)
+	}
+	return c, resp, err
+}
+
+// wsPath is the BMC WebSocket path the viewer asked for: an absolute path
+// (with query) on the BMC host, "/" for anything else.
+func wsPath(u string) string {
+	p, err := url.Parse(u)
+	if err != nil || p.Scheme != "" || p.Host != "" || !strings.HasPrefix(p.Path, "/") || strings.HasPrefix(p.Path, "//") {
+		return "/"
+	}
+	return p.RequestURI()
 }
 
 // proxyWebSocket relays messages between the browser and the BMC until either
@@ -503,14 +705,4 @@ func (m *Manager) warn(msg string, args ...any) {
 func drain(resp *http.Response) {
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
-}
-
-// loginError is a BMC login failure carrying the status without exposing creds.
-type loginError struct {
-	host   string
-	status int
-}
-
-func (e *loginError) Error() string {
-	return "kvm: login to " + e.host + " failed (no SID cookie)"
 }
