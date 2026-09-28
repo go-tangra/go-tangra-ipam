@@ -242,6 +242,39 @@ describe('Power / KVM tab (024 US3)', () => {
     w.unmount()
   })
 
+  // Feature 025: consoles live on the gateway's console origin (port 8444).
+  const startKvm = async (consoleUrl: string) => {
+    fetchMock((url) => {
+      if (url.endsWith('/bmc')) return { body: ready }
+      if (url.endsWith('/kvm-session')) return { status: 201, body: { token: 't', console_url: consoleUrl } }
+      return { body: {} }
+    })
+    const w = await mountTab([{ action: 'access', subject: 'Kvm' }])
+    await w.find('[data-test=kvm-start]').trigger('click')
+    await flushPromises()
+    return w
+  }
+
+  it('embeds a console served from the console origin', async () => {
+    const url = 'https://portal.example.org:8444/bmc/d1/?kvmtoken=t'
+    const w = await startKvm(url)
+    const frame = w.find('iframe')
+    expect(frame.attributes('src')).toBe(url)
+    expect(frame.attributes('referrerpolicy')).toBe('no-referrer')
+    expect(w.find('[data-test=kvm-no-origin]').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it.each(['/bmc/d1/?kvmtoken=t', 'http://portal.example.org:8444/bmc/d1/', 'javascript:alert(1)', 'not a url'])(
+    'explains a console URL that is not on an https console origin (%s)',
+    async (consoleUrl) => {
+      const w = await startKvm(consoleUrl)
+      expect(w.find('iframe').exists()).toBe(false)
+      expect(w.find('[data-test=kvm-no-origin]').text()).toContain('KVM console origin not configured')
+      w.unmount()
+    },
+  )
+
   it('hides power actions and KVM without the platform abilities', async () => {
     const calls = fetchMock(() => ({ body: ready }))
     const w = await mountTab([{ action: 'access', subject: 'Kvm' }])

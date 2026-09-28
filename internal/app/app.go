@@ -187,7 +187,10 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	portScanner := tcp.NewDialer()
 	snmpDisc := snmp.NewClient()
 	bmcClient := ipmi.NewClient(cfg.IPMITimeout())
-	kvmMgr := kvm.NewManager(a.Log, cfg.KVMTokenTTL())
+	kvmMgr := kvm.NewManager(a.Log, cfg.KVMTokenTTL(), kvm.WithConsoleOrigin(cfg.KVMConsoleOrigin()), kvm.WithConsoleSessionTTL(cfg.KVMSession()))
+	if cfg.KVMConsoleOrigin() == "" {
+		a.Log.Warn("kvm.console_origin is not set: KVM consoles cannot be embedded (portal feature 025 console listener)")
+	}
 
 	// Domain services.
 	subnetsSvc := subnets.New(a.Repo)

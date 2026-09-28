@@ -318,6 +318,34 @@ Power status and actions, sensors, the SEL and KVM sessions use a Warden secret
 - **Backup**: references are not exported and never imported; overwriting an
   existing device keeps its reference.
 
+### KVM console origin (feature 025)
+
+The BMC's HTML5 console is vendor JavaScript, so it is never served on the
+portal origin. The gateway's console listener (`console:` in the gateway
+configuration, `https://<public host>:8444`) forwards only `/bmc/` to IPAM,
+and IPAM is told that origin:
+
+```yaml
+kvm:
+  token_ttl_seconds: 60      # single-use start token in the console URL
+  session_seconds: 3600      # console session the token is exchanged for
+  console_origin: https://portal.example.com:8444
+```
+
+- **Start**: `POST /devices/{id}/kvm-session` returns
+  `console_url = <console_origin>/bmc/<device>/?kvmtoken=<token>` (relative
+  when `console_origin` is empty — the Power / KVM tab then shows "KVM console
+  origin not configured" instead of a frame the browser would refuse).
+- **Session**: the first request with the token consumes it and sets
+  `freya_kvm=<session>` (`Path=/bmc/<device>/; Secure; HttpOnly;
+  SameSite=Strict`, `Max-Age=session_seconds`); a replayed token is refused.
+- **WebSocket**: `/bmc/<device>/__kvmws` needs the session cookie and, when
+  `console_origin` is set, `Origin` equal to it.
+- **BMC**: receives only IPAM's server-side `SID` cookie (never browser
+  cookies); its `Set-Cookie` never reaches the browser.
+- Sessions live in the IPAM process: run one IPAM instance (or sticky routing)
+  for consoles.
+
 ## ARP-based MAC linking
 
 Agentless hosts (printers, access points, cameras, BMCs, servers without the

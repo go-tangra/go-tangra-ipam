@@ -80,6 +80,18 @@ async function launchKvm(): Promise<void> {
     busy.value = null
   }
 }
+// The console is only embedded from the gateway's console origin (an absolute
+// https URL, portal feature 025): a relative URL would be served by the portal
+// origin, which refuses to be framed and must never run BMC vendor scripts.
+const consoleUrl = computed(() => {
+  const raw = kvm.value?.console_url ?? ''
+  try {
+    const u = new URL(raw)
+    return u.protocol === 'https:' ? u.href : ''
+  } catch {
+    return ''
+  }
+})
 const sensorRows = computed(() => sensors.value.map((s) => ({ ...s, id: s.name })))
 const sensorColumns: Column<Sensor & { id: string }>[] = [
   { key: 'name', label: 'Sensor' }, { key: 'reading', label: 'Reading', format: (s) => s.reading || [s.value, s.unit].filter((x) => x !== undefined && x !== '').join(' ') }, { key: 'status', label: 'Status', width: 'sm' },
@@ -139,10 +151,13 @@ onMounted(loadAll)
         <template #header>
           <div class="flex grow items-center gap-2"><span class="grow" /><UiButton v-if="canKvm" size="sm" variant="soft" icon="mdi-monitor-dashboard" :loading="busy === 'kvm'" data-test="kvm-start" @click="launchKvm">Start session</UiButton></div>
         </template>
-        <div v-if="kvm">
-          <iframe :src="kvm.console_url" class="aspect-video w-full rounded-box border-0 bg-black" title="KVM console" />
+        <div v-if="kvm && consoleUrl">
+          <iframe :src="consoleUrl" class="aspect-video w-full rounded-box border-0 bg-black" title="KVM console" referrerpolicy="no-referrer" allow="fullscreen" />
           <p class="mt-1 text-xs text-base-content/70">Token-gated session; expires {{ kvm.expires_at ?? 'shortly' }}.</p>
         </div>
+        <UiAlert v-else-if="kvm" kind="warning" data-test="kvm-no-origin">
+          KVM console origin not configured. An administrator must enable the gateway console listener and set IPAM's kvm.console_origin.
+        </UiAlert>
         <p v-else class="text-sm text-base-content/70">{{ canKvm ? 'Start a session to open the out-of-band console.' : 'KVM access requires the platform-admin role (kvm:access).' }}</p>
       </UiCard>
     </template>

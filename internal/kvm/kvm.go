@@ -3,11 +3,19 @@
 // UI without the BMC password ever reaching the browser.
 //
 // The authenticated caller (after a platform-admin check) calls StartSession to
-// mint a short-lived, opaque token bound to the device's BMC host and the
-// credentials fetched from warden. The unauthenticated /bmc/ proxy Handler
-// validates that token, logs in to the BMC server-side (POST /cgi/login.cgi ->
-// SID cookie), and mounts the BMC's own console under our origin, injecting the
-// session on every proxied HTTP request and WebSocket upgrade. Because the BMC
+// mint a short-lived, single-use start token bound to the device's BMC host and
+// the credentials fetched from warden. The unauthenticated /bmc/ proxy Handler
+// exchanges that token, on its first use, for a console session (the
+// freya_kvm cookie, scoped to /bmc/<device>/, valid WithConsoleSessionTTL),
+// logs in to the BMC server-side (POST /cgi/login.cgi -> SID cookie), and
+// mounts the BMC's own console under the console origin, injecting the BMC
+// session on every proxied HTTP request and WebSocket upgrade.
+//
+// The console is served by the gateway's console listener on an origin of its
+// own (portal feature 025, WithConsoleOrigin), never on the portal origin: the
+// BMC's JavaScript is untrusted vendor code. When a console origin is set,
+// StartSession returns an absolute URL on it and console WebSockets must come
+// from it. Because the BMC
 // uses a self-signed certificate, an isolated http.Client / websocket.Dialer
 // with InsecureSkipVerify is used ONLY here; the browser never receives the BMC
 // credentials or the raw session.
@@ -30,14 +38,16 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// kvmCookie carries the session token across the BMC viewer's relative asset and
-// WebSocket requests (which cannot carry a query parameter).
+// kvmCookie carries the console session across the BMC viewer's relative
+// asset and WebSocket requests (which cannot carry a query parameter). The
+// gateway's console listener forwards only this cookie.
 const kvmCookie = "freya_kvm"
 
 // Default lifetimes.
 const (
 	defaultTokenTTL   = 60 * time.Second
-	defaultSessionTTL = 15 * time.Minute
+	defaultSessionTTL = 15 * time.Minute // cached BMC login
+	defaultConsoleTTL = time.Hour        // console session (freya_kvm)
 	loginTimeout      = 20 * time.Second
 	proxyTimeout      = 30 * time.Second
 )
@@ -57,15 +67,39 @@ type Manager struct {
 	now        func() time.Time
 	tokenTTL   time.Duration
 	sessionTTL time.Duration
+	consoleTTL time.Duration
 	scheme     string // "https"; overridable in tests
+	// consoleOrigin is the gateway console listener's origin ("" = relative
+	// console URLs and no WebSocket Origin check).
+	consoleOrigin string
 
 	httpClient *http.Client
 	wsDialer   *websocket.Dialer
 	mux        *http.ServeMux
 
 	mu       sync.Mutex
-	tokens   map[string]tokenEntry
-	sessions map[string]sessionEntry
+	tokens   map[string]tokenEntry   // single-use start tokens
+	consoles map[string]tokenEntry   // console sessions (freya_kvm)
+	sessions map[string]sessionEntry // cached BMC logins
+}
+
+// Option tunes a Manager.
+type Option func(*Manager)
+
+// WithConsoleOrigin sets the gateway console listener's public origin
+// (https://host[:port]); the configuration validates it.
+func WithConsoleOrigin(origin string) Option {
+	return func(m *Manager) { m.consoleOrigin = strings.ToLower(strings.TrimRight(origin, "/")) }
+}
+
+// WithConsoleSessionTTL sets how long a console session lasts after its
+// start token was used (default 1h; non-positive keeps the default).
+func WithConsoleSessionTTL(d time.Duration) Option {
+	return func(m *Manager) {
+		if d > 0 {
+			m.consoleTTL = d
+		}
+	}
 }
 
 type tokenEntry struct {
@@ -82,7 +116,7 @@ type sessionEntry struct {
 
 // NewManager builds a KVM manager. A non-positive tokenTTL uses the default; a
 // nil logger disables logging.
-func NewManager(log *slog.Logger, tokenTTL time.Duration) *Manager {
+func NewManager(log *slog.Logger, tokenTTL time.Duration, opts ...Option) *Manager {
 	if tokenTTL <= 0 {
 		tokenTTL = defaultTokenTTL
 	}
@@ -97,6 +131,7 @@ func NewManager(log *slog.Logger, tokenTTL time.Duration) *Manager {
 		now:        time.Now,
 		tokenTTL:   tokenTTL,
 		sessionTTL: defaultSessionTTL,
+		consoleTTL: defaultConsoleTTL,
 		scheme:     "https",
 		httpClient: &http.Client{
 			Timeout:       loginTimeout,
@@ -109,7 +144,11 @@ func NewManager(log *slog.Logger, tokenTTL time.Duration) *Manager {
 			HandshakeTimeout: 12 * time.Second,
 		},
 		tokens:   map[string]tokenEntry{},
+		consoles: map[string]tokenEntry{},
 		sessions: map[string]sessionEntry{},
+	}
+	for _, o := range opts {
+		o(m)
 	}
 	m.mux = http.NewServeMux()
 	m.mux.HandleFunc("/bmc/{id}/__kvmws", m.handleWS)
@@ -132,7 +171,7 @@ func (m *Manager) StartSession(_ context.Context, deviceID, bmcHost string, cred
 	m.gcLocked()
 	m.mu.Unlock()
 
-	consoleURL = "/bmc/" + url.PathEscape(deviceID) + "/?kvmtoken=" + token
+	consoleURL = m.consoleOrigin + "/bmc/" + url.PathEscape(deviceID) + "/?kvmtoken=" + token
 	return token, consoleURL, nil
 }
 
@@ -140,7 +179,8 @@ func (m *Manager) StartSession(_ context.Context, deviceID, bmcHost string, cred
 // server; access is gated by the session token, not the gateway.
 func (m *Manager) Handler() http.Handler { return m.mux }
 
-// resolve returns a token's binding if it is present and unexpired.
+// resolve returns a start token's binding if it is present and unexpired
+// (without consuming it).
 func (m *Manager) resolve(token string) (tokenEntry, bool) {
 	if token == "" {
 		return tokenEntry{}, false
@@ -162,6 +202,11 @@ func (m *Manager) gcLocked() {
 			delete(m.tokens, k)
 		}
 	}
+	for k, v := range m.consoles {
+		if !now.Before(v.expires) {
+			delete(m.consoles, k)
+		}
+	}
 	for k, v := range m.sessions {
 		if !now.Before(v.expires) {
 			delete(m.sessions, k)
@@ -169,20 +214,71 @@ func (m *Manager) gcLocked() {
 	}
 }
 
-// tokenFor resolves the request's token (query param, then cookie) and checks it
-// is bound to the path's device id.
-func (m *Manager) tokenFor(r *http.Request) (tokenEntry, bool) {
-	tok := r.URL.Query().Get("kvmtoken")
-	if tok == "" {
-		if c, err := r.Cookie(kvmCookie); err == nil {
-			tok = c.Value
-		}
+// exchange consumes a start token bound to device and opens a console
+// session with the same binding. A token for another device is refused and
+// left unused.
+func (m *Manager) exchange(token, device string) (string, tokenEntry, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e, ok := m.tokens[token]
+	if !ok || !m.now().Before(e.expires) || e.deviceID != device {
+		return "", tokenEntry{}, false
 	}
-	e, ok := m.resolve(tok)
-	if !ok || e.deviceID != r.PathValue("id") {
+	delete(m.tokens, token)
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", tokenEntry{}, false
+	}
+	id := hex.EncodeToString(buf)
+	e.expires = m.now().Add(m.consoleTTL)
+	m.consoles[id] = e
+	m.gcLocked()
+	return id, e, true
+}
+
+// console returns the live console session named by the request's cookie,
+// bound to the path's device.
+func (m *Manager) console(r *http.Request) (tokenEntry, bool) {
+	c, err := r.Cookie(kvmCookie)
+	if err != nil || c.Value == "" {
+		return tokenEntry{}, false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e, ok := m.consoles[c.Value]
+	if !ok || !m.now().Before(e.expires) || e.deviceID != r.PathValue("id") {
 		return tokenEntry{}, false
 	}
 	return e, true
+}
+
+// authorize admits a request by its start token (first use: the console
+// session cookie is set on w) or by its console session cookie.
+func (m *Manager) authorize(w http.ResponseWriter, r *http.Request) (tokenEntry, bool) {
+	tok := r.URL.Query().Get("kvmtoken")
+	if tok == "" {
+		return m.console(r)
+	}
+	device := r.PathValue("id")
+	id, e, ok := m.exchange(tok, device)
+	if !ok {
+		return tokenEntry{}, false
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: kvmCookie, Value: id, Path: "/bmc/" + url.PathEscape(device) + "/",
+		MaxAge: int(m.consoleTTL / time.Second), Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode,
+	})
+	return e, true
+}
+
+// originAllowed reports whether a console WebSocket may be opened from the
+// request's Origin: the console origin when one is configured (CSWSH), any
+// origin otherwise (legacy relative consoles).
+func (m *Manager) originAllowed(r *http.Request) bool {
+	if m.consoleOrigin == "" {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("Origin"), m.consoleOrigin)
 }
 
 // auth returns a valid BMC session cookie for the target, logging in if needed.
@@ -232,9 +328,9 @@ func (m *Manager) login(ctx context.Context, host string, creds Creds) (string, 
 // the server-side session cookie. The browser's request never carries the BMC
 // credentials.
 func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
-	e, ok := m.tokenFor(r)
+	e, ok := m.authorize(w, r)
 	if !ok {
-		http.Error(w, "invalid or expired KVM session", http.StatusForbidden)
+		m.refuse(w, r)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), loginTimeout)
@@ -244,15 +340,6 @@ func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
 		m.warn("kvm console login", "host", e.host, "err", err)
 		http.Error(w, "could not log in to BMC", http.StatusBadGateway)
 		return
-	}
-
-	// Persist the token as a cookie so the viewer's relative asset/WS requests
-	// (no query param) stay authorized.
-	if r.URL.Query().Get("kvmtoken") != "" {
-		http.SetCookie(w, &http.Cookie{
-			Name: kvmCookie, Value: r.URL.Query().Get("kvmtoken"),
-			Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
-		})
 	}
 
 	upstreamPath := "/" + r.PathValue("path")
@@ -265,13 +352,21 @@ func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
 			req.URL.Host = host
 			req.URL.Path = upstreamPath
 			req.Host = host
+			// The browser's cookies (console session, anything else) never
+			// reach the BMC: only the server-side BMC session does.
+			req.Header.Del("Cookie")
 			if cookie != "" {
 				req.Header.Set("Cookie", cookie)
 			}
 			req.Header.Del("Referer")
+			if req.Header.Get("Origin") != "" {
+				req.Header.Set("Origin", scheme+"://"+host)
+			}
 		},
 		ModifyResponse: func(resp *http.Response) error {
 			resp.Header.Del("X-Frame-Options")
+			// The BMC session stays server-side.
+			resp.Header.Del("Set-Cookie")
 			return nil
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
@@ -284,19 +379,30 @@ func (m *Manager) handleProxy(w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r.WithContext(pctx))
 }
 
-var kvmUpgrader = websocket.Upgrader{
-	Subprotocols:    []string{"binary"},
-	ReadBufferSize:  16 * 1024,
-	WriteBufferSize: 16 * 1024,
-	CheckOrigin:     func(*http.Request) bool { return true }, // same-origin via the gateway proxy
+// upgrader relays the viewer's WebSocket; the Origin is checked in handleWS
+// before any BMC contact (originAllowed).
+func (m *Manager) upgrader() *websocket.Upgrader {
+	return &websocket.Upgrader{
+		Subprotocols:    []string{"binary"},
+		ReadBufferSize:  16 * 1024,
+		WriteBufferSize: 16 * 1024,
+		CheckOrigin:     m.originAllowed,
+	}
+}
+
+// refuse answers a request without a valid start token or console session.
+// The token value is never logged.
+func (m *Manager) refuse(w http.ResponseWriter, r *http.Request) {
+	m.warn("kvm console refused", "device", r.PathValue("id"), "path", r.URL.Path)
+	http.Error(w, "invalid or expired KVM session", http.StatusForbidden)
 }
 
 // handleWS proxies the browser's KVM WebSocket to the BMC, attaching the
 // server-side session cookie. The stream is relayed transparently both ways.
 func (m *Manager) handleWS(w http.ResponseWriter, r *http.Request) {
-	e, ok := m.tokenFor(r)
-	if !ok {
-		http.Error(w, "invalid or expired KVM session", http.StatusForbidden)
+	e, ok := m.console(r)
+	if !ok || !m.originAllowed(r) {
+		m.refuse(w, r)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 14*time.Second)
@@ -327,7 +433,7 @@ func (m *Manager) handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer upstream.Close()
 
-	client, err := kvmUpgrader.Upgrade(w, r, nil)
+	client, err := m.upgrader().Upgrade(w, r, nil)
 	if err != nil {
 		m.warn("kvm ws upgrade", "host", e.host, "err", err)
 		return
