@@ -23,6 +23,9 @@ import (
 	authv1 "github.com/go-tangra/go-tangra-auth/sdk/v4/api/proto/auth/v1"
 	"github.com/go-tangra/go-tangra-auth/sdk/v4/pkg/authclient"
 	"github.com/go-tangra/go-tangra-portal/sdk/v4/pkg/gatewayclient"
+	schedulerv1 "github.com/go-tangra/go-tangra-scheduler/sdk/v4/api/proto/scheduler/v1"
+	"github.com/go-tangra/go-tangra-scheduler/sdk/v4/pkg/schedulerclient"
+	schedexec "github.com/go-tangra/go-tangra-scheduler/sdk/v4/pkg/taskexec"
 
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
@@ -53,6 +56,7 @@ import (
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/stream/valkeykv"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/subnets"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/taskexec"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/vlans"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/warden"
 	"github.com/go-tangra/go-tangra-ipam/v4/pkg/ipammanifest"
@@ -274,6 +278,25 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 		Locations: locationsSvc, Groups: groupsSvc, Stats: statsSvc, Backup: backupSvc,
 		DNS: dnsSvc, Scan: scanSvc, BMC: bmcClient, KVM: kvmMgr, BMCRefs: bmcRefs,
 	})
+
+	// Scheduled tasks (feature 026): the executor is always served and admits
+	// only the scheduler of this trust domain (mesh policy scheduler-execute +
+	// the caller check); task types are registered only when enabled.
+	sched := cfg.Scheduler.Service
+	if sched == "" {
+		sched = schedulerclient.Service
+	}
+	taskExec := taskexec.New(a.Repo, scanSvc, taskexec.Actor(cfg.TrustDomain, sched))
+	schedulerv1.RegisterTaskExecutorServer(a.Freya.GRPC(), schedexec.NewServer(taskExec.Handlers(), schedexec.Options{
+		Caller: taskexec.Caller(cfg.TrustDomain), Scheduler: sched, Log: a.Log,
+	}))
+	if cfg.Scheduler.Enabled {
+		reg := &schedulerclient.Registrar{
+			Dial:  func(c context.Context) (grpc.ClientConnInterface, error) { return a.Freya.Client(c, sched) },
+			Types: taskexec.Descriptors(), Log: a.Log,
+		}
+		a.workers = append(a.workers, reg.Run)
+	}
 
 	// Scan executor worker pool.
 	a.workers = append(a.workers, func(c context.Context) { _ = scanSvc.Run(c, a.Log) })

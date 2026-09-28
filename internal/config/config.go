@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,19 +32,29 @@ import (
 type Config struct {
 	fconfig.Config `yaml:",inline"`
 
-	DB         DB         `yaml:"db"`
-	Valkey     Valkey     `yaml:"valkey"`
-	KEK        KEK        `yaml:"kek"`
-	Warden     Warden     `yaml:"warden"`
-	Scan       Scan       `yaml:"scan"`
-	Allocation Allocation `yaml:"allocation"`
-	IPMI       IPMI       `yaml:"ipmi"`
-	KVM        KVM        `yaml:"kvm"`
-	Events     Events     `yaml:"events"`
-	Gateway    Gateway    `yaml:"gateway"`
-	MeshEnroll MeshEnroll `yaml:"mesh_enroll"`
-	Limits     Limits     `yaml:"limits_ipam"`
-	HostSync   HostSync   `yaml:"host_sync"`
+	DB         DB            `yaml:"db"`
+	Valkey     Valkey        `yaml:"valkey"`
+	KEK        KEK           `yaml:"kek"`
+	Warden     Warden        `yaml:"warden"`
+	Scan       Scan          `yaml:"scan"`
+	Allocation Allocation    `yaml:"allocation"`
+	IPMI       IPMI          `yaml:"ipmi"`
+	KVM        KVM           `yaml:"kvm"`
+	Events     Events        `yaml:"events"`
+	Gateway    Gateway       `yaml:"gateway"`
+	MeshEnroll MeshEnroll    `yaml:"mesh_enroll"`
+	Limits     Limits        `yaml:"limits_ipam"`
+	HostSync   HostSync      `yaml:"host_sync"`
+	Scheduler  TaskScheduler `yaml:"task_scheduler"`
+}
+
+// TaskScheduler configures the scheduler integration (feature 026). The
+// executor server (scheduler.v1.TaskExecutor) is always served and admits only
+// the scheduler's SPIFFE identity; Enabled only controls whether ipam
+// registers its task types with the scheduler named by Service.
+type TaskScheduler struct {
+	Enabled bool   `yaml:"enabled"`
+	Service string `yaml:"service"`
 }
 
 // HostSync configures the host sync (feature 020): IPAM pulls host reports
@@ -180,6 +191,7 @@ func Default() Config {
 		Events:     Events{Enabled: true},
 		Gateway:    Gateway{Service: "gateway"},
 		Limits:     Limits{MaxRequestBytes: 1 << 20, MaxBackupBytes: 32 << 20},
+		Scheduler:  TaskScheduler{Service: "scheduler"},
 		HostSync: HostSync{
 			Enabled: true, InventoryService: "inventory", PollIntervalSeconds: 60, Workers: 2, PageSize: 100,
 			PaceMs: 10, RequestTimeoutSeconds: 30, ConflictMoves: 3, ConflictWindowHours: 24,
@@ -287,7 +299,20 @@ func (c Config) Validate() error {
 	if c.Limits.MaxBackupBytes < 1<<10 || c.Limits.MaxBackupBytes > 256<<20 {
 		return errors.New("config: limits_ipam.max_backup_bytes must be within [1 KiB, 256 MiB]")
 	}
+	if err := c.Scheduler.validate(); err != nil {
+		return err
+	}
 	return c.HostSync.validate()
+}
+
+// serviceName is a mesh service name (the SPIFFE path segment after /svc/).
+var serviceName = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
+
+func (s TaskScheduler) validate() error {
+	if s.Enabled && !serviceName.MatchString(s.Service) {
+		return errors.New("config: task_scheduler.service must be a service name ([a-z][a-z0-9-]{0,62})")
+	}
+	return nil
 }
 
 func (h HostSync) validate() error {

@@ -356,3 +356,42 @@ func TestHostSyncUnknownKeyRejected(t *testing.T) {
 		t.Fatalf("load: %+v %v", c.HostSync, err)
 	}
 }
+
+func TestTaskSchedulerDefaultsAndValidation(t *testing.T) {
+	d := Default().Scheduler
+	if d.Enabled || d.Service != "scheduler" {
+		t.Fatalf("task_scheduler defaults: %+v", d)
+	}
+	cfg := valid()
+	cfg.Scheduler = TaskScheduler{Enabled: false, Service: ""}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("disabled task_scheduler rejected: %v", err)
+	}
+	cfg.Scheduler = TaskScheduler{Enabled: true, Service: "scheduler"}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("enabled task_scheduler rejected: %v", err)
+	}
+	for _, svc := range []string{"", "Scheduler", "sched uler", "-x", strings.Repeat("s", 64)} {
+		cfg.Scheduler = TaskScheduler{Enabled: true, Service: svc}
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "task_scheduler.service") {
+			t.Fatalf("service %q: err = %v", svc, err)
+		}
+	}
+}
+
+func TestTaskSchedulerLoad(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "c.yaml")
+	if err := os.WriteFile(p, []byte("task_scheduler:\n  enabled: true\n  surprise: 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(p); err == nil {
+		t.Fatal("unknown task_scheduler key must be rejected")
+	}
+	if err := os.WriteFile(p, []byte("task_scheduler:\n  enabled: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(p)
+	if err != nil || !c.Scheduler.Enabled || c.Scheduler.Service != "scheduler" {
+		t.Fatalf("load: %+v %v", c.Scheduler, err)
+	}
+}

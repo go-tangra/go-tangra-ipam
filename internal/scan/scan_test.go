@@ -212,3 +212,22 @@ func TestCancelScan(t *testing.T) {
 		t.Fatalf("err = %v, want ErrTerminal", err)
 	}
 }
+
+func TestStartScanTrigger(t *testing.T) {
+	ctx := context.Background()
+	m := memstore.New()
+	clk := &clock{t: time.Now().UTC()}
+	m.Now = clk.now
+	mustSubnet(t, m, "t1", "s1", "10.0.0.0/29", 4)
+	mustSubnet(t, m, "t1", "s2", "10.0.1.0/29", 4)
+	svc := newService(m, icmp.NewFake(), snmp.NewFake(), &recPub{}, testConfig(), clk)
+
+	manual, err := svc.StartScan(ctx, adminSubj("t1"), "s1", Options{})
+	if err != nil || manual.TriggeredBy != store.TriggerManual {
+		t.Fatalf("default trigger = %q (%v), want manual", manual.TriggeredBy, err)
+	}
+	auto, err := svc.StartScan(ctx, adminSubj("t1"), "s2", Options{Trigger: store.TriggerAuto})
+	if err != nil || auto.TriggeredBy != store.TriggerAuto {
+		t.Fatalf("scheduled trigger = %q (%v), want auto", auto.TriggeredBy, err)
+	}
+}
