@@ -81,8 +81,8 @@ github.com/go-tangra/go-tangra-inventory/sdk/v4 v4.2.0 h1:u1mMrrilqUnh5Gm2NPafuM
 github.com/go-tangra/go-tangra-inventory/sdk/v4 v4.2.0/go.mod h1:Vj2/MYHQM3W1/SpFlvZ5FB1c8HrlCd4iff0D46Mh3Co=
 github.com/go-tangra/go-tangra-lcm/sdk/v4 v4.1.0 h1:KjAVJn8jAZbcIyL6B3yasngtFTxwBA1s9y7TW1ylqjc=
 github.com/go-tangra/go-tangra-lcm/sdk/v4 v4.1.0/go.mod h1:j/24DHoyBPfYcHzehJKkQLL/s1jDPToGr/LqV/qA/HM=
-github.com/go-tangra/go-tangra-portal/sdk/v4 v4.0.0 h1:THNjBM31OknVg0TJey5EuntROMaCY1ndozbN5ZBlLlg=
-github.com/go-tangra/go-tangra-portal/sdk/v4 v4.0.0/go.mod h1:SKP6ZWoKPtYo7IZboDjGZW3rbGnKtSBr7I24EoLT2Bk=
+github.com/go-tangra/go-tangra-portal/sdk/v4 v4.1.0 h1:vER2dKZi79h1Q4AvLyLmrcJ47vAa6jY5AlvUl+kXIiw=
+github.com/go-tangra/go-tangra-portal/sdk/v4 v4.1.0/go.mod h1:SKP6ZWoKPtYo7IZboDjGZW3rbGnKtSBr7I24EoLT2Bk=
 github.com/go-tangra/go-tangra-scheduler/sdk/v4 v4.0.0 h1:bbBnhjuw+6iJgSwc+4+DooLu0ES1XNTSLBpaYyav+us=
 github.com/go-tangra/go-tangra-scheduler/sdk/v4 v4.0.0/go.mod h1:9rdsSKJ8nNRf6OrrtzSVoVmPIfaRrjTWge0OKe5ne3U=
 github.com/go-tangra/go-tangra-warden/sdk/v4 v4.0.0 h1:oP7sd8Gqnvh4yNRhTsGLHL7ANWYsmGme1SQxsqn7sUw=
