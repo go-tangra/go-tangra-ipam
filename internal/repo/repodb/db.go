@@ -185,40 +185,15 @@ func (d *DB) GetSubnet(ctx context.Context, tenantID, id string) (out store.Subn
 
 func (d *DB) ListSubnets(ctx context.Context, tenantID string, f store.SubnetFilter) (out []store.Subnet, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
-		var b strings.Builder
-		b.WriteString("SELECT " + subnetCols + " FROM ipam_subnets WHERE tenant_id=$1")
-		args := []any{tenantID}
-		add := func(cond string, val any) {
-			args = append(args, val)
-			b.WriteString(fmt.Sprintf(cond, len(args)))
-		}
-		if f.VlanID != "" {
-			add(" AND vlan_id = $%d", f.VlanID)
-		}
-		if f.ParentID != "" {
-			add(" AND parent_id = $%d", f.ParentID)
-		}
-		if f.LocationID != "" {
-			add(" AND location_id = $%d", f.LocationID)
-		}
-		if f.Status != "" {
-			add(" AND status = $%d", f.Status)
-		}
-		if f.IPVersion != 0 {
-			add(" AND ip_version = $%d", f.IPVersion)
-		}
-		if f.Query != "" {
-			args = append(args, "%"+f.Query+"%")
-			b.WriteString(fmt.Sprintf(" AND (name ILIKE $%d OR cidr ILIKE $%d)", len(args), len(args)))
-		}
+		w := subnetWhere(tenantID, f)
 		if f.CursorID != "" {
-			add(" AND id < $%d", f.CursorID)
+			w.add(" AND id < $%d", f.CursorID)
 		}
-		b.WriteString(" ORDER BY id DESC")
+		w.raw(" ORDER BY id DESC")
 		if f.Limit > 0 {
-			add(" LIMIT $%d", f.Limit)
+			w.add(" LIMIT $%d", f.Limit)
 		}
-		rows, e := tx.Query(ctx, b.String(), args...)
+		rows, e := tx.Query(ctx, "SELECT "+subnetCols+" FROM ipam_subnets WHERE "+w.String(), w.args...)
 		if e != nil {
 			return e
 		}
@@ -440,49 +415,15 @@ func (d *DB) FindAddress(ctx context.Context, tenantID, address string) (out sto
 
 func (d *DB) ListAddresses(ctx context.Context, tenantID string, f store.AddressFilter) (out []store.IPAddress, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
-		var b strings.Builder
-		b.WriteString("SELECT " + addrCols + " FROM ipam_ip_addresses WHERE tenant_id=$1")
-		args := []any{tenantID}
-		add := func(cond string, val any) {
-			args = append(args, val)
-			b.WriteString(fmt.Sprintf(cond, len(args)))
-		}
-		if f.SubnetID != "" {
-			add(" AND subnet_id = $%d", f.SubnetID)
-		}
-		if f.DeviceID != "" {
-			add(" AND device_id = $%d", f.DeviceID)
-		}
-		if f.Status != "" {
-			add(" AND status = $%d", f.Status)
-		}
-		if f.AddressType != "" {
-			add(" AND address_type = $%d", f.AddressType)
-		}
-		if f.AddressPrefix != "" {
-			add(" AND address LIKE $%d", f.AddressPrefix+"%")
-		}
-		if f.HostnamePattern != "" {
-			add(" AND hostname ILIKE $%d", "%"+f.HostnamePattern+"%")
-		}
-		if f.ReportState != "" {
-			add(" AND report_state = $%d", f.ReportState)
-		}
-		if f.Conflict != nil {
-			add(" AND conflict = $%d", *f.Conflict)
-		}
-		if f.MAC != "" {
-			// Matches the addresses_mac_hex expression index.
-			add(" AND regexp_replace(lower(mac_address), '[^0-9a-f]', '', 'g') LIKE $%d", "%"+f.MAC+"%")
-		}
+		w := addressWhere(tenantID, f)
 		if f.CursorID != "" {
-			add(" AND id < $%d", f.CursorID)
+			w.add(" AND id < $%d", f.CursorID)
 		}
-		b.WriteString(" ORDER BY id DESC")
+		w.raw(" ORDER BY id DESC")
 		if f.Limit > 0 {
-			add(" LIMIT $%d", f.Limit)
+			w.add(" LIMIT $%d", f.Limit)
 		}
-		rows, e := tx.Query(ctx, b.String(), args...)
+		rows, e := tx.Query(ctx, "SELECT "+addrCols+" FROM ipam_ip_addresses WHERE "+w.String(), w.args...)
 		if e != nil {
 			return e
 		}
@@ -677,52 +618,15 @@ func (d *DB) GetDevice(ctx context.Context, tenantID, id string) (out store.Devi
 
 func (d *DB) ListDevices(ctx context.Context, tenantID string, f store.DeviceFilter) (out []store.Device, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
-		var b strings.Builder
-		b.WriteString("SELECT " + deviceCols + " FROM ipam_devices WHERE tenant_id=$1")
-		args := []any{tenantID}
-		add := func(cond string, val any) {
-			args = append(args, val)
-			b.WriteString(fmt.Sprintf(cond, len(args)))
-		}
-		if f.DeviceType != "" {
-			add(" AND device_type = $%d", f.DeviceType)
-		}
-		if f.Status != "" {
-			add(" AND status = $%d", f.Status)
-		}
-		if f.LocationID != "" {
-			add(" AND location_id = $%d", f.LocationID)
-		}
-		if f.Manufacturer != "" {
-			add(" AND manufacturer = $%d", f.Manufacturer)
-		}
-		if f.RackID != "" {
-			add(" AND rack_id = $%d", f.RackID)
-		}
-		if f.Source != "" {
-			add(" AND source = $%d", f.Source)
-		}
-		if f.ReportState != "" {
-			add(" AND report_state = $%d", f.ReportState)
-		}
-		if f.Query != "" {
-			args = append(args, "%"+f.Query+"%")
-			b.WriteString(fmt.Sprintf(" AND (name ILIKE $%d OR primary_ip ILIKE $%d)", len(args), len(args)))
-		}
-		switch f.HasHardware {
-		case "true":
-			b.WriteString(" AND EXISTS (SELECT 1 FROM ipam_device_hardware h WHERE h.device_id = ipam_devices.id)")
-		case "false":
-			b.WriteString(" AND NOT EXISTS (SELECT 1 FROM ipam_device_hardware h WHERE h.device_id = ipam_devices.id)")
-		}
+		w := deviceWhere(tenantID, f)
 		if f.CursorID != "" {
-			add(" AND id < $%d", f.CursorID)
+			w.add(" AND id < $%d", f.CursorID)
 		}
-		b.WriteString(" ORDER BY id DESC")
+		w.raw(" ORDER BY id DESC")
 		if f.Limit > 0 {
-			add(" LIMIT $%d", f.Limit)
+			w.add(" LIMIT $%d", f.Limit)
 		}
-		rows, e := tx.Query(ctx, b.String(), args...)
+		rows, e := tx.Query(ctx, "SELECT "+deviceCols+" FROM ipam_devices WHERE "+w.String(), w.args...)
 		if e != nil {
 			return e
 		}
@@ -961,27 +865,34 @@ func (d *DB) ListInterfaces(ctx context.Context, tenantID, deviceID string) (out
 		if e := rows.Err(); e != nil {
 			return e
 		}
-		for k := range out {
-			i := &out[k]
-			if i.RemoteDeviceID != "" {
-				_ = tx.QueryRow(ctx, "SELECT name FROM ipam_devices WHERE tenant_id=$1 AND id::text=$2", tenantID, i.RemoteDeviceID).Scan(&i.RemoteDeviceName)
-			}
-			// Device behind: a host interface linked here as primary or as a
-			// per-switch link (bonded across a switch pair).
-			_ = tx.QueryRow(ctx, `SELECT d.id::text, d.name FROM (
-					SELECT id, link_last_seen AS seen FROM ipam_device_interfaces WHERE tenant_id=$1 AND remote_interface_id=$2
-					UNION ALL
-					SELECT host_id, last_seen FROM ipam_host_switch_links WHERE tenant_id=$1 AND host_kind='interface' AND port_id=$2::uuid
-				) x JOIN ipam_device_interfaces h ON h.id = x.id JOIN ipam_devices d ON d.id = h.device_id
-				WHERE h.tenant_id=$1 ORDER BY x.seen DESC NULLS LAST, d.id LIMIT 1`,
-				tenantID, i.ID).Scan(&i.BehindDeviceID, &i.BehindDeviceName)
-			if i.BehindAddresses, e = behindAddresses(ctx, tx, tenantID, i.ID); e != nil {
-				return e
-			}
-		}
-		return attachIfaceLinks(ctx, tx, tenantID, out)
+		return enrichIfaces(ctx, tx, tenantID, out)
 	})
 	return
+}
+
+// enrichIfaces computes the remote device name, the device behind a switch
+// port, the addresses behind it and the per-switch links of each interface.
+func enrichIfaces(ctx context.Context, tx pgx.Tx, tenantID string, out []store.DeviceInterface) error {
+	var e error
+	for k := range out {
+		i := &out[k]
+		if i.RemoteDeviceID != "" {
+			_ = tx.QueryRow(ctx, "SELECT name FROM ipam_devices WHERE tenant_id=$1 AND id::text=$2", tenantID, i.RemoteDeviceID).Scan(&i.RemoteDeviceName)
+		}
+		// Device behind: a host interface linked here as primary or as a
+		// per-switch link (bonded across a switch pair).
+		_ = tx.QueryRow(ctx, `SELECT d.id::text, d.name FROM (
+				SELECT id, link_last_seen AS seen FROM ipam_device_interfaces WHERE tenant_id=$1 AND remote_interface_id=$2
+				UNION ALL
+				SELECT host_id, last_seen FROM ipam_host_switch_links WHERE tenant_id=$1 AND host_kind='interface' AND port_id=$2::uuid
+			) x JOIN ipam_device_interfaces h ON h.id = x.id JOIN ipam_devices d ON d.id = h.device_id
+			WHERE h.tenant_id=$1 ORDER BY x.seen DESC NULLS LAST, d.id LIMIT 1`,
+			tenantID, i.ID).Scan(&i.BehindDeviceID, &i.BehindDeviceName)
+		if i.BehindAddresses, e = behindAddresses(ctx, tx, tenantID, i.ID); e != nil {
+			return e
+		}
+	}
+	return attachIfaceLinks(ctx, tx, tenantID, out)
 }
 
 func (d *DB) UpsertInterfaceByName(ctx context.Context, i store.DeviceInterface) (out store.DeviceInterface, err error) {
@@ -1113,24 +1024,9 @@ func (d *DB) ReplaceDevicePackages(ctx context.Context, tenantID, deviceID strin
 
 func (d *DB) ListDevicePackages(ctx context.Context, tenantID, deviceID string, needsUpdate, securityOnly *bool, manager string) (out []store.DevicePackage, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
-		var b strings.Builder
-		b.WriteString("SELECT " + pkgCols + " FROM ipam_device_packages WHERE tenant_id=$1 AND device_id=$2")
-		args := []any{tenantID, deviceID}
-		add := func(cond string, val any) {
-			args = append(args, val)
-			b.WriteString(fmt.Sprintf(cond, len(args)))
-		}
-		if needsUpdate != nil {
-			add(" AND needs_update = $%d", *needsUpdate)
-		}
-		if securityOnly != nil {
-			add(" AND is_security_update = $%d", *securityOnly)
-		}
-		if manager != "" {
-			add(" AND package_manager = $%d", manager)
-		}
-		b.WriteString(" ORDER BY name")
-		rows, e := tx.Query(ctx, b.String(), args...)
+		w := packageWhere(tenantID, deviceID, needsUpdate, securityOnly, manager)
+		w.raw(" ORDER BY name")
+		rows, e := tx.Query(ctx, "SELECT "+pkgCols+" FROM ipam_device_packages WHERE "+w.String(), w.args...)
 		if e != nil {
 			return e
 		}
@@ -1208,36 +1104,15 @@ func (d *DB) GetVlan(ctx context.Context, tenantID, id string) (out store.Vlan, 
 
 func (d *DB) ListVlans(ctx context.Context, tenantID string, f store.VlanFilter) (out []store.Vlan, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
-		var b strings.Builder
-		b.WriteString("SELECT " + vlanCols + " FROM ipam_vlans WHERE tenant_id=$1")
-		args := []any{tenantID}
-		add := func(cond string, val any) {
-			args = append(args, val)
-			b.WriteString(fmt.Sprintf(cond, len(args)))
-		}
-		if f.LocationID != "" {
-			add(" AND location_id = $%d", f.LocationID)
-		}
-		if f.Domain != "" {
-			add(" AND domain = $%d", f.Domain)
-		}
-		if f.Status != "" {
-			add(" AND status = $%d", f.Status)
-		}
-		if f.VlanIDMin != 0 {
-			add(" AND vlan_id >= $%d", f.VlanIDMin)
-		}
-		if f.VlanIDMax != 0 {
-			add(" AND vlan_id <= $%d", f.VlanIDMax)
-		}
+		w := vlanWhere(tenantID, f)
 		if f.CursorID != "" {
-			add(" AND id < $%d", f.CursorID)
+			w.add(" AND id < $%d", f.CursorID)
 		}
-		b.WriteString(" ORDER BY id DESC")
+		w.raw(" ORDER BY id DESC")
 		if f.Limit > 0 {
-			add(" LIMIT $%d", f.Limit)
+			w.add(" LIMIT $%d", f.Limit)
 		}
-		rows, e := tx.Query(ctx, b.String(), args...)
+		rows, e := tx.Query(ctx, "SELECT "+vlanCols+" FROM ipam_vlans WHERE "+w.String(), w.args...)
 		if e != nil {
 			return e
 		}
@@ -1960,27 +1835,15 @@ func (d *DB) GetScanJob(ctx context.Context, tenantID, id string) (out store.IPS
 
 func (d *DB) ListScanJobs(ctx context.Context, tenantID string, f store.ScanFilter) (out []store.IPScanJob, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
-		var b strings.Builder
-		b.WriteString("SELECT " + scanJobCols + " FROM ipam_ip_scan_jobs WHERE tenant_id=$1")
-		args := []any{tenantID}
-		add := func(cond string, val any) {
-			args = append(args, val)
-			b.WriteString(fmt.Sprintf(cond, len(args)))
-		}
-		if f.SubnetID != "" {
-			add(" AND subnet_id = $%d", f.SubnetID)
-		}
-		if f.Status != "" {
-			add(" AND status = $%d", f.Status)
-		}
+		w := scanJobWhere(tenantID, f)
 		if f.CursorID != "" {
-			add(" AND id < $%d", f.CursorID)
+			w.add(" AND id < $%d", f.CursorID)
 		}
-		b.WriteString(" ORDER BY id DESC")
+		w.raw(" ORDER BY id DESC")
 		if f.Limit > 0 {
-			add(" LIMIT $%d", f.Limit)
+			w.add(" LIMIT $%d", f.Limit)
 		}
-		rows, e := tx.Query(ctx, b.String(), args...)
+		rows, e := tx.Query(ctx, "SELECT "+scanJobCols+" FROM ipam_ip_scan_jobs WHERE "+w.String(), w.args...)
 		if e != nil {
 			return e
 		}

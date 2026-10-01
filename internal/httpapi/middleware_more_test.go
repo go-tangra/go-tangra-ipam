@@ -19,13 +19,13 @@ func TestMethodNotAllowed(t *testing.T) {
 	}
 }
 
-// TestBadQueryParamValidation covers validate's parse-error branch (a
-// non-integer limit -> 400) and its validation-failed branch (an out-of-range
-// limit that parses but violates the schema minimum -> 422).
+// TestBadQueryParamValidation covers validate's query-parameter branch: a
+// non-integer limit and an out-of-range limit are both 422 validation_failed
+// naming the parameter (list contract, go-tangra specs/032).
 func TestBadQueryParamValidation(t *testing.T) {
 	f := newAPI(t)
-	if w := f.req(t, "GET", p+"/subnets?limit=notanint", "admin", ""); w.Code != 400 {
-		t.Fatalf("non-int limit: want 400, got %d %s", w.Code, w.Body)
+	if w := f.req(t, "GET", p+"/subnets?limit=notanint", "admin", ""); w.Code != 422 || !strings.Contains(w.Body.String(), `"param":"limit"`) {
+		t.Fatalf("non-int limit: want 422 naming limit, got %d %s", w.Code, w.Body)
 	}
 	if w := f.req(t, "GET", p+"/subnets?limit=0", "admin", ""); w.Code != 422 {
 		t.Fatalf("out-of-range limit: want 422, got %d %s", w.Code, w.Body)

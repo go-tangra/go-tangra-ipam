@@ -7,6 +7,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/audit"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/hostreport"
@@ -260,6 +262,15 @@ func (a *Admin) Guests(ctx context.Context, subj authz.Subjects, deviceID string
 		out = []store.HypervisorGuest{}
 	}
 	return out, err
+}
+
+// PageGuests returns one page of the guests a hypervisor device reports
+// (store.GuestList order).
+func (a *Admin) PageGuests(ctx context.Context, subj authz.Subjects, deviceID string, req listquery.Request) ([]store.HypervisorGuest, int, listquery.Request, error) {
+	if _, err := a.hostDevice(ctx, subj, deviceID); err != nil {
+		return nil, 0, req, err
+	}
+	return a.st.PageGuests(ctx, subj.TenantID, deviceID, req)
 }
 
 // ClearConflict resets an address's conflict flag (audited with the user).

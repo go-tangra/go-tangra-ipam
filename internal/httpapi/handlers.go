@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/scan"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
@@ -39,20 +41,21 @@ func (s *Server) Register(d Deps) {
 			return
 		}
 		q := r.URL.Query()
-		items, err := d.Subnets.List(r.Context(), subj, store.SubnetFilter{
+		f := store.SubnetFilter{
 			VlanID:     q.Get("vlan_id"),
 			ParentID:   q.Get("parent_id"),
 			LocationID: q.Get("location_id"),
 			Status:     q.Get("status"),
+			IPVersion:  atoiDefault(q.Get("ip_version"), 0),
 			Query:      q.Get("query"),
-			Limit:      atoiDefault(q.Get("limit"), 0),
-			CursorID:   q.Get("cursor"),
-		})
-		if err != nil {
-			failSvc(w, err)
-			return
 		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.SubnetList, func() ([]store.Subnet, error) {
+			lf := f
+			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			return d.Subnets.List(r.Context(), subj, lf)
+		}, func(req listquery.Request) ([]store.Subnet, int, listquery.Request, error) {
+			return d.Subnets.Page(r.Context(), subj, f, req)
+		})
 	})
 	s.MustHandle("POST", p+"/subnets", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -205,22 +208,23 @@ func (s *Server) Register(d Deps) {
 			WriteDetail(w, ErrValidation, map[string]any{"field": "mac", "message": "2 to 12 hex digits", "fields": map[string]string{"mac": "2 to 12 hex digits"}})
 			return
 		}
-		items, err := d.Addresses.List(r.Context(), subj, store.AddressFilter{
-			MAC:         mac,
-			SubnetID:    q.Get("subnet_id"),
-			DeviceID:    q.Get("device_id"),
-			Status:      q.Get("status"),
-			AddressType: q.Get("address_type"),
-			ReportState: q.Get("report_state"),
-			Conflict:    optBool(q, "conflict"),
-			Limit:       atoiDefault(q.Get("limit"), 0),
-			CursorID:    q.Get("cursor"),
-		})
-		if err != nil {
-			failSvc(w, err)
-			return
+		f := store.AddressFilter{
+			MAC:             mac,
+			SubnetID:        q.Get("subnet_id"),
+			DeviceID:        q.Get("device_id"),
+			Status:          q.Get("status"),
+			AddressType:     q.Get("address_type"),
+			HostnamePattern: q.Get("hostname"),
+			ReportState:     q.Get("report_state"),
+			Conflict:        optBool(q, "conflict"),
 		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.AddressList, func() ([]store.IPAddress, error) {
+			lf := f
+			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			return d.Addresses.List(r.Context(), subj, lf)
+		}, func(req listquery.Request) ([]store.IPAddress, int, listquery.Request, error) {
+			return d.Addresses.Page(r.Context(), subj, f, req)
+		})
 	})
 	s.MustHandle("POST", p+"/ip-addresses", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -380,7 +384,7 @@ func (s *Server) Register(d Deps) {
 			return
 		}
 		q := r.URL.Query()
-		items, err := d.Devices.List(r.Context(), subj, store.DeviceFilter{
+		f := store.DeviceFilter{
 			DeviceType:   q.Get("device_type"),
 			Status:       q.Get("status"),
 			LocationID:   q.Get("location_id"),
@@ -390,14 +394,14 @@ func (s *Server) Register(d Deps) {
 			ReportState:  q.Get("report_state"),
 			HasHardware:  q.Get("has_hardware"),
 			Query:        q.Get("query"),
-			Limit:        atoiDefault(q.Get("limit"), 0),
-			CursorID:     q.Get("cursor"),
-		})
-		if err != nil {
-			failSvc(w, err)
-			return
 		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.DeviceList, func() ([]store.Device, error) {
+			lf := f
+			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			return d.Devices.List(r.Context(), subj, lf)
+		}, func(req listquery.Request) ([]store.Device, int, listquery.Request, error) {
+			return d.Devices.Page(r.Context(), subj, f, req)
+		})
 	})
 	s.MustHandle("POST", p+"/devices", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -468,12 +472,9 @@ func (s *Server) Register(d Deps) {
 			failSvc(w, err)
 			return
 		}
-		items, err := d.Devices.GetAddresses(r.Context(), subj, r.PathValue("id"))
-		if err != nil {
-			failSvc(w, err)
-			return
-		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.AddressList, nil, func(req listquery.Request) ([]store.IPAddress, int, listquery.Request, error) {
+			return d.Devices.PageAddresses(r.Context(), subj, r.PathValue("id"), req)
+		})
 	})
 	s.MustHandle("GET", p+"/devices/{id}/interfaces", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -481,12 +482,9 @@ func (s *Server) Register(d Deps) {
 			failSvc(w, err)
 			return
 		}
-		items, err := d.Devices.ListInterfaces(r.Context(), subj, r.PathValue("id"))
-		if err != nil {
-			failSvc(w, err)
-			return
-		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.InterfaceList, nil, func(req listquery.Request) ([]store.DeviceInterface, int, listquery.Request, error) {
+			return d.Devices.PageInterfaces(r.Context(), subj, r.PathValue("id"), req)
+		})
 	})
 	s.MustHandle("POST", p+"/devices/{id}/interfaces", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -525,13 +523,10 @@ func (s *Server) Register(d Deps) {
 			return
 		}
 		q := r.URL.Query()
-		items, err := d.Devices.ListPackages(r.Context(), subj, r.PathValue("id"),
-			optBool(q, "needs_update"), optBool(q, "security_only"), q.Get("manager"))
-		if err != nil {
-			failSvc(w, err)
-			return
-		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.PackageList, nil, func(req listquery.Request) ([]store.DevicePackage, int, listquery.Request, error) {
+			return d.Devices.PagePackages(r.Context(), subj, r.PathValue("id"),
+				optBool(q, "needs_update"), optBool(q, "security_only"), q.Get("manager"), req)
+		})
 	})
 	s.MustHandle("POST", p+"/devices/{id}/packages/sync", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -589,18 +584,18 @@ func (s *Server) registerNetworking(d Deps, p string) {
 			return
 		}
 		q := r.URL.Query()
-		items, err := d.Vlans.List(r.Context(), subj, store.VlanFilter{
+		f := store.VlanFilter{
 			LocationID: q.Get("location_id"),
 			Domain:     q.Get("domain"),
 			Status:     q.Get("status"),
-			Limit:      atoiDefault(q.Get("limit"), 0),
-			CursorID:   q.Get("cursor"),
-		})
-		if err != nil {
-			failSvc(w, err)
-			return
 		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.VlanList, func() ([]store.Vlan, error) {
+			lf := f
+			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			return d.Vlans.List(r.Context(), subj, lf)
+		}, func(req listquery.Request) ([]store.Vlan, int, listquery.Request, error) {
+			return d.Vlans.Page(r.Context(), subj, f, req)
+		})
 	})
 	s.MustHandle("POST", p+"/vlans", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -878,12 +873,9 @@ func (s *Server) registerGroups(d Deps, p string) {
 			failSvc(w, err)
 			return
 		}
-		items, err := d.Groups.ListIPGroupMembers(r.Context(), subj, r.PathValue("id"))
-		if err != nil {
-			failSvc(w, err)
-			return
-		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.IPMemberList, nil, func(req listquery.Request) ([]store.IPGroupMember, int, listquery.Request, error) {
+			return d.Groups.PageIPGroupMembers(r.Context(), subj, r.PathValue("id"), req)
+		})
 	})
 	s.MustHandle("POST", p+"/ip-groups/{id}/members", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -1020,12 +1012,9 @@ func (s *Server) registerGroups(d Deps, p string) {
 			failSvc(w, err)
 			return
 		}
-		items, err := d.Groups.ListHostGroupMembers(r.Context(), subj, r.PathValue("id"))
-		if err != nil {
-			failSvc(w, err)
-			return
-		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.HostMemberList, nil, func(req listquery.Request) ([]store.HostGroupMember, int, listquery.Request, error) {
+			return d.Groups.PageHostGroupMembers(r.Context(), subj, r.PathValue("id"), req)
+		})
 	})
 	s.MustHandle("POST", p+"/host-groups/{id}/members", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)
@@ -1089,17 +1078,17 @@ func (s *Server) registerScans(d Deps, p string) {
 			return
 		}
 		q := r.URL.Query()
-		items, err := d.Scan.ListScanJobs(r.Context(), subj, store.ScanFilter{
+		f := store.ScanFilter{
 			SubnetID: q.Get("subnet_id"),
 			Status:   q.Get("status"),
-			Limit:    atoiDefault(q.Get("limit"), 0),
-			CursorID: q.Get("cursor"),
-		})
-		if err != nil {
-			failSvc(w, err)
-			return
 		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+		serveList(w, r, store.ScanList, func() ([]store.IPScanJob, error) {
+			lf := f
+			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			return d.Scan.ListScanJobs(r.Context(), subj, lf)
+		}, func(req listquery.Request) ([]store.IPScanJob, int, listquery.Request, error) {
+			return d.Scan.PageScanJobs(r.Context(), subj, f, req)
+		})
 	})
 	s.MustHandle("POST", p+"/ip-scans", func(w http.ResponseWriter, r *http.Request) {
 		subj, err := subjects(r)

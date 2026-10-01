@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
@@ -113,4 +115,43 @@ func failSvc(w http.ResponseWriter, err error) {
 	default:
 		WriteError(w, http.StatusInternalServerError, "internal")
 	}
+}
+
+// listPager pages one list for the list contract.
+type listPager[T any] func(listquery.Request) ([]T, int, listquery.Request, error)
+
+// serveList answers a list endpoint (go-tangra specs/032-server-side-tables,
+// contracts/http-list.md). page, page_size, sort and order are read against
+// spec; an invalid value — or mixing them with the legacy cursor/limit — is
+// 422 validation_failed naming the parameter only. When legacy is set and the
+// request carries only cursor/limit, the old keyset path answers for one more
+// release with its previous shape ({"items"}) plus the total of matches.
+// Otherwise the response is {items,total,page,page_size,sort,order}.
+func serveList[T any](w http.ResponseWriter, r *http.Request, spec listquery.Spec, legacy func() ([]T, error), page listPager[T]) {
+	req, err := listquery.Parse(r.URL.Query(), spec)
+	var le *listquery.Error
+	if errors.As(err, &le) {
+		WriteDetail(w, ErrValidation, map[string]any{"param": le.Param})
+		return
+	}
+	if legacy != nil && listquery.Legacy(r.URL.Query()) {
+		items, err := legacy()
+		if err != nil {
+			failSvc(w, err)
+			return
+		}
+		_, total, _, err := page(listquery.Request{Page: 1, PageSize: 1})
+		if err != nil {
+			failSvc(w, err)
+			return
+		}
+		WriteJSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
+		return
+	}
+	items, total, applied, err := page(req)
+	if err != nil {
+		failSvc(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, listquery.NewPage(items, total, applied))
 }

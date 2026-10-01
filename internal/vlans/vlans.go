@@ -11,6 +11,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
@@ -89,6 +91,14 @@ func (s *Service) List(ctx context.Context, subj authz.Subjects, f store.VlanFil
 		return nil, err
 	}
 	return s.st.ListVlans(ctx, subj.TenantID, f)
+}
+
+// Page returns one page of the caller's VLANs matching f (store.VlanList order).
+func (s *Service) Page(ctx context.Context, subj authz.Subjects, f store.VlanFilter, req listquery.Request) ([]store.Vlan, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	return s.st.PageVlans(ctx, subj.TenantID, f, req)
 }
 
 // Update validates and replaces a VLAN. The id and tenant are pinned from the

@@ -12,6 +12,8 @@ import (
 	"net"
 	"strings"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
@@ -157,6 +159,14 @@ func (s *Service) ListIPGroupMembers(ctx context.Context, subj authz.Subjects, g
 		return nil, err
 	}
 	return s.st.ListIPGroupMembers(ctx, subj.TenantID, groupID)
+}
+
+// PageIPGroupMembers returns one page of a group's members (store.IPMemberList order).
+func (s *Service) PageIPGroupMembers(ctx context.Context, subj authz.Subjects, groupID string, req listquery.Request) ([]store.IPGroupMember, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	return s.st.PageIPGroupMembers(ctx, subj.TenantID, groupID, req)
 }
 
 // CheckIpInGroup returns the IP groups (from groupIDs, or all of the tenant's
@@ -350,6 +360,15 @@ func (s *Service) ListHostGroupMembers(ctx context.Context, subj authz.Subjects,
 		return nil, err
 	}
 	return s.st.ListHostGroupMembers(ctx, subj.TenantID, groupID)
+}
+
+// PageHostGroupMembers returns one page of a host group's members
+// (store.HostMemberList order, device summaries filled).
+func (s *Service) PageHostGroupMembers(ctx context.Context, subj authz.Subjects, groupID string, req listquery.Request) ([]store.HostGroupMember, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	return s.st.PageHostGroupMembers(ctx, subj.TenantID, groupID, req)
 }
 
 // ListDeviceHostGroups returns the host groups a device belongs to.

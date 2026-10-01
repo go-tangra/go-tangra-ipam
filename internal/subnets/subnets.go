@@ -19,6 +19,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
@@ -228,6 +230,27 @@ func (s *Service) List(ctx context.Context, subj authz.Subjects, f store.SubnetF
 		return nil, err
 	}
 	return subs, nil
+}
+
+// Page returns one page of the caller's subnets matching f (store.SubnetList
+// order, computed counts and SNMP state), the total and the applied request.
+func (s *Service) Page(ctx context.Context, subj authz.Subjects, f store.SubnetFilter, req listquery.Request) ([]store.Subnet, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	subs, total, applied, err := s.st.PageSubnets(ctx, subj.TenantID, f, req)
+	if err != nil {
+		return nil, 0, req, err
+	}
+	ptrs := make([]*store.Subnet, len(subs))
+	for i := range subs {
+		s.fill(ctx, subj.TenantID, &subs[i])
+		ptrs[i] = &subs[i]
+	}
+	if err := s.withSNMP(ctx, subj.TenantID, ptrs...); err != nil {
+		return nil, 0, req, err
+	}
+	return subs, total, applied, nil
 }
 
 // Update revalidates and replaces a subnet. A missing name/CIDR is inherited
