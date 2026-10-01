@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"net/url"
 
 	"github.com/go-tangra/go-tangra/v4/listquery"
 
@@ -115,6 +116,33 @@ func failSvc(w http.ResponseWriter, err error) {
 	default:
 		WriteError(w, http.StatusInternalServerError, "internal")
 	}
+}
+
+// legacyDefaultLimit is the page size of a legacy request without a usable
+// limit (cursor only, or limit absent, invalid or < 1).
+const legacyDefaultLimit = 50
+
+// legacyLimit is the page size a legacy cursor/limit request stands for:
+// always 1..listquery.MaxPageSize, legacyDefaultLimit when the limit is
+// absent, invalid or < 1. A legacy request never reads an unbounded list
+// (032 security review F-1).
+func legacyLimit(q url.Values) int {
+	n := atoiDefault(q.Get("limit"), legacyDefaultLimit)
+	if n < 1 {
+		n = legacyDefaultLimit
+	}
+	return min(n, listquery.MaxPageSize)
+}
+
+// unpagedLimit is the limit of a list without the list contract (locations,
+// IP groups, host groups): a request carrying cursor or limit is bounded by
+// legacyLimit; one carrying neither reads the whole tenant list, as the UI
+// pickers expect (0: no limit).
+func unpagedLimit(q url.Values) int {
+	if listquery.Legacy(q) {
+		return legacyLimit(q)
+	}
+	return 0
 }
 
 // listPager pages one list for the list contract.

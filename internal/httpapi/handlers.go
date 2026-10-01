@@ -51,7 +51,7 @@ func (s *Server) Register(d Deps) {
 		}
 		serveList(w, r, store.SubnetList, func() ([]store.Subnet, error) {
 			lf := f
-			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			lf.Limit, lf.CursorID = legacyLimit(q), q.Get("cursor")
 			return d.Subnets.List(r.Context(), subj, lf)
 		}, func(req listquery.Request) ([]store.Subnet, int, listquery.Request, error) {
 			return d.Subnets.Page(r.Context(), subj, f, req)
@@ -220,7 +220,7 @@ func (s *Server) Register(d Deps) {
 		}
 		serveList(w, r, store.AddressList, func() ([]store.IPAddress, error) {
 			lf := f
-			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			lf.Limit, lf.CursorID = legacyLimit(q), q.Get("cursor")
 			return d.Addresses.List(r.Context(), subj, lf)
 		}, func(req listquery.Request) ([]store.IPAddress, int, listquery.Request, error) {
 			return d.Addresses.Page(r.Context(), subj, f, req)
@@ -397,7 +397,7 @@ func (s *Server) Register(d Deps) {
 		}
 		serveList(w, r, store.DeviceList, func() ([]store.Device, error) {
 			lf := f
-			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			lf.Limit, lf.CursorID = legacyLimit(q), q.Get("cursor")
 			return d.Devices.List(r.Context(), subj, lf)
 		}, func(req listquery.Request) ([]store.Device, int, listquery.Request, error) {
 			return d.Devices.Page(r.Context(), subj, f, req)
@@ -591,7 +591,7 @@ func (s *Server) registerNetworking(d Deps, p string) {
 		}
 		serveList(w, r, store.VlanList, func() ([]store.Vlan, error) {
 			lf := f
-			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			lf.Limit, lf.CursorID = legacyLimit(q), q.Get("cursor")
 			return d.Vlans.List(r.Context(), subj, lf)
 		}, func(req listquery.Request) ([]store.Vlan, int, listquery.Request, error) {
 			return d.Vlans.Page(r.Context(), subj, f, req)
@@ -686,7 +686,7 @@ func (s *Server) registerNetworking(d Deps, p string) {
 			LocationType: q.Get("location_type"),
 			Country:      q.Get("country"),
 			Status:       q.Get("status"),
-			Limit:        atoiDefault(q.Get("limit"), 0),
+			Limit:        unpagedLimit(q),
 			CursorID:     q.Get("cursor"),
 		})
 		if err != nil {
@@ -782,7 +782,7 @@ func (s *Server) registerGroups(d Deps, p string) {
 			return
 		}
 		q := r.URL.Query()
-		items, err := d.Groups.ListIPGroups(r.Context(), subj, atoiDefault(q.Get("limit"), 0), q.Get("cursor"))
+		items, err := d.Groups.ListIPGroups(r.Context(), subj, unpagedLimit(q), q.Get("cursor"))
 		if err != nil {
 			failSvc(w, err)
 			return
@@ -937,7 +937,7 @@ func (s *Server) registerGroups(d Deps, p string) {
 			return
 		}
 		q := r.URL.Query()
-		items, err := d.Groups.ListHostGroups(r.Context(), subj, atoiDefault(q.Get("limit"), 0), q.Get("cursor"))
+		items, err := d.Groups.ListHostGroups(r.Context(), subj, unpagedLimit(q), q.Get("cursor"))
 		if err != nil {
 			failSvc(w, err)
 			return
@@ -1084,7 +1084,7 @@ func (s *Server) registerScans(d Deps, p string) {
 		}
 		serveList(w, r, store.ScanList, func() ([]store.IPScanJob, error) {
 			lf := f
-			lf.Limit, lf.CursorID = atoiDefault(q.Get("limit"), 0), q.Get("cursor")
+			lf.Limit, lf.CursorID = legacyLimit(q), q.Get("cursor")
 			return d.Scan.ListScanJobs(r.Context(), subj, lf)
 		}, func(req listquery.Request) ([]store.IPScanJob, int, listquery.Request, error) {
 			return d.Scan.PageScanJobs(r.Context(), subj, f, req)
