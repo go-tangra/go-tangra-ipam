@@ -201,7 +201,7 @@ func (d *DB) ListGuests(ctx context.Context, tenantID, hostDeviceID string) (out
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
 		var e error
 		out, e = queryGuests(ctx, tx, true, "SELECT "+guestCols+`, coalesce(gd.name,'')
-			FROM ipam_hypervisor_guests g LEFT JOIN ipam_devices gd ON gd.id = g.guest_device_id
+			FROM ipam_hypervisor_guests g LEFT JOIN ipam_devices gd ON gd.tenant_id = g.tenant_id AND gd.id = g.guest_device_id
 			WHERE g.tenant_id=$1 AND g.host_device_id=$2 ORDER BY g.guest_ref`, tenantID, hostDeviceID)
 		return e
 	})

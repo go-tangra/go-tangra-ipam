@@ -18,7 +18,7 @@ import (
 // of addrCols; the statement's FROM must be ipam_ip_addresses unaliased).
 const addrLinksCol = `coalesce((SELECT json_agg(json_build_object('switch_id', l.switch_id, 'switch_name', coalesce(sw.name, ''),
 	'port_id', l.port_id, 'port_name', l.port_name, 'vlan', l.vlan, 'source', l.source, 'last_seen', l.last_seen))
-	FROM ipam_host_switch_links l LEFT JOIN ipam_devices sw ON sw.id = l.switch_id
+	FROM ipam_host_switch_links l LEFT JOIN ipam_devices sw ON sw.tenant_id = l.tenant_id AND sw.id = l.switch_id
 	WHERE l.tenant_id = ipam_ip_addresses.tenant_id AND l.host_kind = 'address' AND l.host_id = ipam_ip_addresses.id), '[]')`
 
 // decodeLinks parses addrLinksCol and marks the primary (the port of the
@@ -40,7 +40,7 @@ func hostLinks(ctx context.Context, tx pgx.Tx, tenantID, kind string, ids []stri
 	}
 	rows, err := tx.Query(ctx, `SELECT l.host_id::text, l.switch_id::text, coalesce(sw.name, ''), l.port_id::text, l.port_name,
 		l.vlan, l.source, l.last_seen
-		FROM ipam_host_switch_links l LEFT JOIN ipam_devices sw ON sw.id = l.switch_id
+		FROM ipam_host_switch_links l LEFT JOIN ipam_devices sw ON sw.tenant_id = l.tenant_id AND sw.id = l.switch_id
 		WHERE l.tenant_id=$1 AND l.host_kind=$2 AND l.host_id = ANY($3) ORDER BY l.host_id, l.switch_id`, tenantID, kind, ids)
 	if err != nil {
 		return nil, err

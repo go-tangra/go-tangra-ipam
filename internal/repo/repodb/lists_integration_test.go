@@ -139,6 +139,36 @@ func TestPagedLists(t *testing.T) {
 	if hs, total, _, err := db.PageAddresses(ctx, tenantA, store.AddressFilter{HostnamePattern: "web"}, listquery.Request{Sort: "hostname"}); err != nil || total != 5 || len(hs) != 5 {
 		t.Fatalf("hostname filter total = %d, %d items (%v)", total, len(hs), err)
 	}
+	// LIKE wildcards in filters match literally (security review F-4).
+	for _, pat := range []string{"%", "_", "w_b", `\`} {
+		if _, total, _, err := db.PageAddresses(ctx, tenantA, store.AddressFilter{HostnamePattern: pat}, listquery.Request{}); err != nil || total != 0 {
+			t.Fatalf("hostname %q matched %d (%v)", pat, total, err)
+		}
+	}
+	if _, total, _, err := db.PageAddresses(ctx, tenantA, store.AddressFilter{AddressPrefix: "10.0.0._"}, listquery.Request{}); err != nil || total != 0 {
+		t.Fatalf("address prefix wildcard matched %d (%v)", total, err)
+	}
+	if _, total, _, err := db.PageSubnets(ctx, tenantA, store.SubnetFilter{Query: "%"}, listquery.Request{}); err != nil || total != 0 {
+		t.Fatalf("subnet query wildcard matched %d (%v)", total, err)
+	}
+	// Descending inet order through the deferred page query: unparsable last,
+	// page rows in order, deep page equal to the tail of a full walk.
+	desc, _, _, err := db.PageAddresses(ctx, tenantA, store.AddressFilter{}, listquery.Request{PageSize: 50, Sort: "address", Order: listquery.Desc})
+	mustDo(t, err)
+	got = got[:0]
+	for _, a := range desc {
+		got = append(got, a.Address)
+	}
+	if len(got) != 13 || got[0] != "2001:db8::1" || got[1] != "10.0.0.200" || got[12] != "bogus" {
+		t.Fatalf("addresses desc = %v", got)
+	}
+	deep, _, _, err := db.PageAddresses(ctx, tenantA, store.AddressFilter{}, listquery.Request{Page: 3, PageSize: 5, Sort: "address", Order: listquery.Desc})
+	mustDo(t, err)
+	for i, a := range deep {
+		if a.Address != got[10+i] {
+			t.Fatalf("deep desc page = %v, want tail %v", deep, got[10:])
+		}
+	}
 	walkAll(t, "addresses", store.AddressList, func(r listquery.Request) ([]store.IPAddress, int, listquery.Request, error) {
 		return db.PageAddresses(ctx, tenantA, store.AddressFilter{}, r)
 	}, func(a store.IPAddress) string { return a.ID }, 13)

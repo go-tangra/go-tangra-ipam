@@ -343,7 +343,7 @@ const addrCols = `id, tenant_id, address, subnet_id, hostname, mac_address, desc
 	report_state, coalesce(previous_device_id::text,''), moved_at, move_count, move_window_start, conflict,
 	mac_source, coalesce(mac_source_device_id::text,''), mac_seen_at, mac_conflict, origin,
 	coalesce(link_switch_id::text,''), coalesce(link_port_id::text,''), link_port_name, link_vlan, link_source,
-	link_last_seen, coalesce((SELECT sw.name FROM ipam_devices sw WHERE sw.id = ipam_ip_addresses.link_switch_id), ''),
+	link_last_seen, coalesce((SELECT sw.name FROM ipam_devices sw WHERE sw.tenant_id = ipam_ip_addresses.tenant_id AND sw.id = ipam_ip_addresses.link_switch_id), ''),
 	` + addrLinksCol
 
 func scanAddress(sc scanner) (store.IPAddress, error) {
@@ -1716,7 +1716,7 @@ const hostMemberCols = `m.id, m.tenant_id, m.host_group_id, m.device_id, m.seque
 func (d *DB) ListHostGroupMembers(ctx context.Context, tenantID, groupID string) (out []store.HostGroupMember, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
 		rows, e := tx.Query(ctx, "SELECT "+hostMemberCols+` FROM ipam_host_group_members m
-			LEFT JOIN ipam_devices d ON d.id = m.device_id
+			LEFT JOIN ipam_devices d ON d.tenant_id = m.tenant_id AND d.id = m.device_id
 			WHERE m.tenant_id=$1 AND m.host_group_id=$2 ORDER BY m.sequence, m.id`, tenantID, groupID)
 		if e != nil {
 			return e
