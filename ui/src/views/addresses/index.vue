@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiNumberInput, UiButton, UiDataTable, UiStatusChip, UiBadge, UiLiveIndicator, UiDrawer, UiTooltip, useConfirm, type Column, type SelectOption } from '@go-tangra/ui'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiNumberInput, UiButton, UiDataTable, UiStatusChip, UiBadge, UiLiveIndicator, UiDrawer, UiTooltip, useConfirm, useListQuery, type Column, type SelectOption } from '@go-tangra/ui'
 import { useZodForm } from '@go-tangra/ui/forms'
-import { useAddresses } from '@/stores/addresses'
+import { ADDRESS_LIST, useAddresses, type AddressFilter } from '@/stores/addresses'
 import { useSubnets } from '@/stores/subnets'
 import { useLive } from '@/stores/live'
 import { addressFilterSchema, allocateSchema, bulkAllocateSchema, suggestSchema, ADDRESS_STATUSES, ADDRESS_TYPES } from '@/schemas'
@@ -24,7 +24,7 @@ const reportOptions: SelectOption[] = [{ title: 'reported', value: 'reported' },
 const reportFilter = ref<string | undefined>(undefined)
 const statusOptions: SelectOption[] = ADDRESS_STATUSES.map((s) => ({ title: s, value: s }))
 const typeOptions: SelectOption[] = ADDRESS_TYPES.map((s) => ({ title: s, value: s }))
-const subnetOptions = computed<SelectOption[]>(() => subnets.items.map((s) => ({ title: s.name + ' (' + s.cidr + ')', value: s.id })))
+const subnetOptions = computed<SelectOption[]>(() => subnets.all.map((s) => ({ title: s.name + ' (' + s.cidr + ')', value: s.id })))
 
 let release: (() => void) | null = null
 // Names of the devices that reported ARP-learned MACs (feature 022).
@@ -39,20 +39,36 @@ async function loadDeviceNames(): Promise<void> {
     // names are a convenience: the tooltip falls back to the id
   }
 }
+// --- server paging and sorting (page / size / sort in the URL: ?addresses.page=…) ---
+const lq = useListQuery('addresses', ADDRESS_LIST)
+let filterValue: AddressFilter = {}
+async function load(): Promise<void> {
+  const res = await store.list(filterValue, lq.query.value)
+  if (res?.page) lq.clampTo(res.page) // a page beyond the end answers the last page
+}
+watch(lq.query, () => void load())
+
 onMounted(() => {
-  void store.list()
-  void subnets.list()
+  void load()
+  void subnets.loadAll()
   void loadDeviceNames()
   release = live.connect()
 })
 onUnmounted(() => release?.())
 
+/** Filters changed: back to page 1 (which reloads), or reload in place. */
 const filter = useZodForm(addressFilterSchema, {
   initial: { hostname: '', mac: '' },
-  onSubmit: (f) => store.list({
-    subnet_id: f.subnet_id || undefined, status: f.status, address_type: f.address_type, hostname: f.hostname || undefined, mac: f.mac || undefined,
-    report_state: reportFilter.value === 'conflict' ? undefined : reportFilter.value, conflict: reportFilter.value === 'conflict' ? true : undefined,
-  }),
+  onSubmit: (f) => {
+    const next: AddressFilter = {
+      subnet_id: f.subnet_id || undefined, status: f.status, address_type: f.address_type, hostname: f.hostname || undefined, mac: f.mac || undefined,
+      report_state: reportFilter.value === 'conflict' ? undefined : reportFilter.value, conflict: reportFilter.value === 'conflict' ? true : undefined,
+    }
+    const changed = JSON.stringify(next) !== JSON.stringify(filterValue)
+    filterValue = next
+    if (changed && lq.page.value !== 1) lq.resetPage()
+    else return load()
+  },
 })
 const reload = () => void filter.submit()
 
@@ -67,7 +83,7 @@ const suggest = useZodForm(suggestSchema, { onSubmit: async (v) => { suggested.v
 const forms = { single, bulk, suggest }
 const current = computed(() => (mode.value ? forms[mode.value] : null))
 function open(m: Mode): void {
-  const subnet_id = (filter.values.subnet_id as string | undefined) || subnets.items[0]?.id || ''
+  const subnet_id = (filter.values.subnet_id as string | undefined) || subnets.all[0]?.id || ''
   single.reset({ subnet_id, hostname: '' })
   bulk.reset({ subnet_id, count: 1, hostname_prefix: '' })
   suggest.reset({ subnet_id, count: 5 })
@@ -113,13 +129,15 @@ async function removeAddr(a: IPAddress): Promise<void> {
     actionError.value = describe(e)
   }
 }
+// Sortable columns are the server's sort fields (ADDRESS_LIST): sorting orders
+// the whole list, not the visible page. Address sorts in inet order.
 const columns: Column<IPAddress>[] = [
   { key: 'address', label: 'Address', sortable: true },
-  { key: 'hostname', label: 'Hostname' },
-  { key: 'mac_address', label: 'MAC', hideOnStack: true },
+  { key: 'hostname', label: 'Hostname', sortable: true },
+  { key: 'mac', label: 'MAC', sortable: true, hideOnStack: true },
   { key: 'link', label: 'Connected to', hideOnStack: true, format: addressLinkText },
-  { key: 'address_type', label: 'Type', hideOnStack: true },
-  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'address_type', label: 'Type', sortable: true, hideOnStack: true },
+  { key: 'status', label: 'Status', width: 'sm', sortable: true },
   { key: 'ping', label: 'Ping', width: 'sm', format: (a) => { const p = pingResult.value[a.id]; return p ? (p.alive ? (p.rtt_ms ?? 0) + ' ms' : 'down') : '' } },
 ]
 </script>
@@ -147,9 +165,9 @@ const columns: Column<IPAddress>[] = [
     <UiAlert v-if="store.error" kind="error" class="mb-3">{{ store.error }}</UiAlert>
     <UiAlert v-if="actionError" kind="error" class="mb-3">{{ actionError }}</UiAlert>
     <UiCard :padded="false">
-      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="IP addresses" empty-title="No addresses match" :row-attrs="(a) => ({ 'data-test': 'address-row-' + a.id })" data-test="addresses-table">
+      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" :total="store.total" :page="lq.page.value" :page-size="lq.pageSize.value" :sort="lq.sort.value" caption="IP addresses" empty-title="No addresses match" :row-attrs="(a) => ({ 'data-test': 'address-row-' + a.id })" data-test="addresses-table" @update:page="lq.setPage" @update:page-size="lq.setPageSize" @update:sort="lq.setSort">
         <template #cell-address="{ row }">{{ row.address }} <UiBadge v-if="row.is_primary" color="primary" size="xs">primary</UiBadge> <UiBadge v-if="row.report_state === 'not_reported'" color="neutral" size="xs">not reported</UiBadge> <UiBadge v-if="row.conflict" color="error" size="xs">conflict</UiBadge> <UiBadge v-if="row.origin === 'arp'" color="info" size="xs">from ARP</UiBadge></template>
-        <template #cell-mac_address="{ row }">
+        <template #cell-mac="{ row }">
           <span v-if="row.mac_address" class="inline-flex items-center gap-1">
             <span class="font-mono text-xs">{{ row.mac_address }}</span>
             <UiTooltip v-if="macSourceLabel(row)" :text="macSourceText(row, deviceName)"><UiBadge :color="macColors[macSourceLabel(row) as keyof typeof macColors]" size="xs" :data-test="'mac-source-' + row.id">{{ macSourceLabel(row) }}</UiBadge></UiTooltip>

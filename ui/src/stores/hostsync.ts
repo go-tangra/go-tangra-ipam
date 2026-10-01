@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
+import { fetchPage, type ListParams, type Page } from '@/api/list'
 import type { DeviceHostSync, HostSyncSettings, HostSyncStatus, HypervisorGuest, IPAddress, ResyncResult } from '@/api/types'
 
 // The host sync (feature 020): tenant settings and status, per-device report
@@ -47,9 +48,10 @@ export const useHostSync = defineStore('ipam-hostsync', () => {
     return api<ResyncResult>('POST', 'devices/' + id + '/host-sync', {})
   }
 
-  async function guests(id: string): Promise<HypervisorGuest[]> {
-    const res = await api<{ items: HypervisorGuest[] | null }>('GET', 'devices/' + id + '/guests')
-    return res.items ?? []
+  // guests reads one page of the guests a hypervisor reports (name order by
+  // default, server Spec store.GuestList).
+  async function guests(id: string, q: ListParams): Promise<Page<HypervisorGuest>> {
+    return fetchPage<HypervisorGuest>('devices/' + id + '/guests', { ...q })
   }
 
   async function clearConflict(addressId: string): Promise<IPAddress> {

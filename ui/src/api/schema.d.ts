@@ -1357,8 +1357,109 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
         IPAddressList: {
-            items?: components["schemas"]["IPAddress"][];
+            items: components["schemas"]["IPAddress"][];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "address" | "hostname" | "mac" | "status" | "address_type" | "last_seen" | "created_at";
+            /** @enum {string} */
+            order?: "asc" | "desc";
+        };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
+        SubnetPage: {
+            items: Record<string, never>[];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "cidr" | "name" | "vlan" | "location" | "status";
+            /** @enum {string} */
+            order?: "asc" | "desc";
+        };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
+        DevicePage: {
+            items: Record<string, never>[];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "name" | "device_type" | "status" | "manufacturer" | "location" | "created_at";
+            /** @enum {string} */
+            order?: "asc" | "desc";
+        };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
+        VlanPage: {
+            items: Record<string, never>[];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "vlan_id" | "name" | "domain" | "status";
+            /** @enum {string} */
+            order?: "asc" | "desc";
+        };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
+        MemberPage: {
+            items: Record<string, never>[];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "sequence" | "name";
+            /** @enum {string} */
+            order?: "asc" | "desc";
+        };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
+        InterfacePage: {
+            items: components["schemas"]["DeviceInterface"][];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "name";
+            /** @enum {string} */
+            order?: "asc" | "desc";
+        };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
+        PackagePage: {
+            items: Record<string, never>[];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "name" | "version";
+            /** @enum {string} */
+            order?: "asc" | "desc";
+        };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
+        GuestPage: {
+            items: Record<string, never>[];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "name";
+            /** @enum {string} */
+            order?: "asc" | "desc";
         };
         IPScanJob: {
             id?: string;
@@ -1401,8 +1502,18 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** @description one page of the list contract (legacy cursor/limit requests: items and total only) */
         IPScanJobList: {
-            items?: components["schemas"]["IPScanJob"][];
+            items: components["schemas"]["IPScanJob"][];
+            /** @description records matching the filters */
+            total: number;
+            /** @description the page returned (a page beyond the end answers the last page) */
+            page?: number;
+            page_size?: number;
+            /** @enum {string} */
+            sort?: "created_at" | "status" | "subnet";
+            /** @enum {string} */
+            order?: "asc" | "desc";
         };
         /**
          * @example {
@@ -1426,6 +1537,10 @@ export interface components {
         mid: string;
         cursor: string;
         limit: number;
+        page: number;
+        pageSize: number;
+        /** @description sort direction; defaults to the chosen field's default direction */
+        order: "asc" | "desc";
         force: boolean;
         reportState: "reported" | "not_reported";
     };
@@ -1438,6 +1553,15 @@ export interface operations {
     listSubnets: {
         parameters: {
             query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default cidr (asc, inet order); vlan and location order by the referenced id */
+                sort?: "cidr" | "name" | "vlan" | "location" | "status";
+                ip_version?: 4 | 6;
+                status?: string;
+                query?: string;
                 cursor?: components["parameters"]["cursor"];
                 limit?: components["parameters"]["limit"];
             };
@@ -1449,6 +1573,15 @@ export interface operations {
         responses: {
             /** @description list */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubnetPage"];
+                };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1800,9 +1933,17 @@ export interface operations {
     listIpAddresses: {
         parameters: {
             query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description default address (asc, inet order) */
+                sort?: "address" | "hostname" | "mac" | "status" | "address_type" | "last_seen" | "created_at";
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
                 cursor?: components["parameters"]["cursor"];
                 limit?: components["parameters"]["limit"];
                 report_state?: components["parameters"]["reportState"];
+                /** @description case-insensitive substring of the hostname */
+                hostname?: string;
                 conflict?: boolean;
                 /** @description full or partial MAC in any notation (colon, dash, dot, none): 2-12 hex digits after separators are dropped; invalid is 422 validation_failed with detail.field = mac */
                 mac?: string;
@@ -1822,7 +1963,7 @@ export interface operations {
                     "application/json": components["schemas"]["IPAddressList"];
                 };
             };
-            /** @description validation_failed (detail.field = mac) */
+            /** @description validation_failed (detail.field = mac, or detail.param naming a list parameter) */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -2071,6 +2212,12 @@ export interface operations {
     listDevices: {
         parameters: {
             query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description default name (asc); location orders by the location id */
+                sort?: "name" | "device_type" | "status" | "manufacturer" | "location" | "created_at";
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
                 cursor?: components["parameters"]["cursor"];
                 limit?: components["parameters"]["limit"];
                 report_state?: components["parameters"]["reportState"];
@@ -2086,6 +2233,15 @@ export interface operations {
         responses: {
             /** @description list; items carry a read-only hardware_summary (HardwareSummary) when hardware is reported */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicePage"];
+                };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2191,7 +2347,14 @@ export interface operations {
     };
     getDeviceAddresses: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default address (asc, inet order) */
+                sort?: "address" | "hostname" | "mac" | "status" | "address_type" | "last_seen" | "created_at";
+            };
             header?: never;
             path: {
                 /** @example 018f3a2b-0000-7000-8000-000000000001 */
@@ -2201,7 +2364,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description addresses (with their links) */
+            /** @description list */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2210,11 +2373,25 @@ export interface operations {
                     "application/json": components["schemas"]["IPAddressList"];
                 };
             };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getDeviceInterfaces: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default name (asc) */
+                sort?: "name";
+            };
             header?: never;
             path: {
                 /** @example 018f3a2b-0000-7000-8000-000000000001 */
@@ -2224,16 +2401,21 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description interfaces (switch ports list the addresses behind them) */
+            /** @description list */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        items?: components["schemas"]["DeviceInterface"][];
-                    };
+                    "application/json": components["schemas"]["InterfacePage"];
                 };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2287,7 +2469,14 @@ export interface operations {
     };
     listDevicePackages: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default name (asc); version is the installed version */
+                sort?: "name" | "version";
+            };
             header?: never;
             path: {
                 /** @example 018f3a2b-0000-7000-8000-000000000001 */
@@ -2297,8 +2486,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description packages */
+            /** @description list */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagePage"];
+                };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2829,7 +3027,14 @@ export interface operations {
     };
     listDeviceGuests: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default name (asc) */
+                sort?: "name";
+            };
             header?: never;
             path: {
                 /** @example 018f3a2b-0000-7000-8000-000000000001 */
@@ -2841,6 +3046,15 @@ export interface operations {
         responses: {
             /** @description guests reported by a hypervisor (matched and unmatched) */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestPage"];
+                };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3067,6 +3281,12 @@ export interface operations {
     listVlans: {
         parameters: {
             query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default vlan_id (asc) */
+                sort?: "vlan_id" | "name" | "domain" | "status";
                 cursor?: components["parameters"]["cursor"];
                 limit?: components["parameters"]["limit"];
             };
@@ -3078,6 +3298,15 @@ export interface operations {
         responses: {
             /** @description list */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VlanPage"];
+                };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3472,7 +3701,14 @@ export interface operations {
     };
     listIpGroupMembers: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default sequence (asc); name is the member value */
+                sort?: "sequence" | "name";
+            };
             header?: never;
             path: {
                 /** @example 018f3a2b-0000-7000-8000-000000000001 */
@@ -3482,8 +3718,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description members */
+            /** @description list */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberPage"];
+                };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3681,7 +3926,14 @@ export interface operations {
     };
     listHostGroupMembers: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default sequence (asc); name is the device name */
+                sort?: "sequence" | "name";
+            };
             header?: never;
             path: {
                 /** @example 018f3a2b-0000-7000-8000-000000000001 */
@@ -3691,8 +3943,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description members */
+            /** @description list */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberPage"];
+                };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3776,6 +4037,12 @@ export interface operations {
     listIpScans: {
         parameters: {
             query?: {
+                page?: components["parameters"]["page"];
+                page_size?: components["parameters"]["pageSize"];
+                /** @description sort direction; defaults to the chosen field's default direction */
+                order?: components["parameters"]["order"];
+                /** @description default created_at (desc); subnet orders by the subnet id */
+                sort?: "created_at" | "status" | "subnet";
                 cursor?: components["parameters"]["cursor"];
                 limit?: components["parameters"]["limit"];
             };
@@ -3793,6 +4060,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["IPScanJobList"];
                 };
+            };
+            /** @description validation_failed (detail.param names the list parameter) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

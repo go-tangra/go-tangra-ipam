@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch, type Ref, type UnwrapRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAbility } from '@casl/vue'
-import { UiPage, UiAlert, UiCard, UiButton, UiStatusChip, UiKeyValueTable, UiDataTable, UiTabs, UiBadge, UiRecordDrawer, UiSwitch, type Column, type KeyValue, type TabItem } from '@go-tangra/ui'
-import { useDevices } from '@/stores/devices'
+import { UiPage, UiAlert, UiCard, UiButton, UiStatusChip, UiKeyValueTable, UiDataTable, UiTabs, UiBadge, UiRecordDrawer, UiSwitch, useListQuery, type Column, type ListQueryOptions, type KeyValue, type TabItem } from '@go-tangra/ui'
+import { DEVICE_ADDRESS_LIST, INTERFACE_LIST, PACKAGE_LIST, useDevices } from '@/stores/devices'
+import { listOptions } from '@/stores/paged'
+import type { ListParams, Page } from '@/api/list'
 import { useHostSync } from '@/stores/hostsync'
 import type { BmcStatus, Device, DeviceHostSync, DeviceInterface, DevicePackage, HypervisorGuest, IPAddress } from '@/api/types'
 import { describe } from '@/api/client'
@@ -34,10 +36,6 @@ const id = String(route.params.id)
 const device = ref<Device | null>(null)
 const error = ref('')
 const tab = ref('interfaces')
-const interfaces = ref<DeviceInterface[]>([])
-const packages = ref<DevicePackage[]>([])
-const addresses = ref<IPAddress[]>([])
-const guests = ref<HypervisorGuest[]>([])
 const report = ref<DeviceHostSync | null>(null)
 const hypervisorName = ref('')
 const syncing = ref(false)
@@ -45,14 +43,51 @@ const resyncing = ref(false)
 const resyncMessage = ref('')
 const securityOnly = ref(false)
 
+// One server-paged table of the device (page / size / sort in the URL under
+// its key, e.g. ?interfaces.page=2). A superseded request's rows are ignored.
+interface SubTable<T> {
+  lq: ReturnType<typeof useListQuery>
+  rows: Ref<UnwrapRef<T[]>>
+  total: Ref<number>
+  loading: Ref<boolean>
+  load(): Promise<void>
+}
+function subTable<T>(key: string, opts: ListQueryOptions, fetch: (q: ListParams) => Promise<Page<T>>): SubTable<T> {
+  const lq = useListQuery(key, opts)
+  const rows = ref<T[]>([])
+  const total = ref(0)
+  const loading = ref(false)
+  async function load(): Promise<void> {
+    loading.value = true
+    try {
+      const res = await lq.track(fetch(lq.query.value))
+      if (!res) return
+      rows.value = res.items as UnwrapRef<T[]>
+      total.value = res.total
+      if (res.page) lq.clampTo(res.page) // a page beyond the end answers the last page
+    } catch (e) {
+      error.value = describe(e)
+    } finally {
+      loading.value = false
+    }
+  }
+  watch(lq.query, () => void load())
+  return { lq, rows, total, loading, load }
+}
+const interfaces = subTable<DeviceInterface>('interfaces', INTERFACE_LIST, (q) => store.interfaces(id, q))
+const packages = subTable<DevicePackage>('packages', PACKAGE_LIST, (q) => store.packages(id, q, securityOnly.value ? { security_only: true } : {}))
+const addresses = subTable<IPAddress>('device-addresses', DEVICE_ADDRESS_LIST, (q) => store.addresses(id, q))
+const guests = subTable<HypervisorGuest>('guests', listOptions(['name'], 'name', 'asc'), (q) => hostSync.guests(id, q))
+// The security filter is applied by the server: back to page 1 (which reloads).
+watch(securityOnly, () => (packages.lq.page.value !== 1 ? packages.lq.resetPage() : void packages.load()))
+
 async function loadAll(): Promise<void> {
   error.value = ''
   try {
     const d = await store.get(id)
     device.value = d
-    ;[interfaces.value, packages.value, addresses.value] = await Promise.all([store.interfaces(id), store.packages(id), store.addresses(id)])
+    await Promise.all([interfaces.load(), packages.load(), addresses.load(), (d.guest_count ?? 0) > 0 ? guests.load() : Promise.resolve()])
     report.value = d.source === 'host_report' ? await hostSync.device(id) : null
-    guests.value = (d.guest_count ?? 0) > 0 ? await hostSync.guests(id) : []
     hypervisorName.value = d.hypervisor_device_id ? (await store.get(d.hypervisor_device_id)).name : ''
   } catch (e) {
     error.value = describe(e)
@@ -78,7 +113,7 @@ async function reloadPackages(): Promise<void> {
   syncing.value = true
   error.value = ''
   try {
-    packages.value = await store.packages(id)
+    await packages.load()
   } catch (e) {
     error.value = describe(e)
   } finally {
@@ -148,10 +183,10 @@ const bmcLabel = computed(() => {
   return device.value?.ipmi_secret_ref ? 'configured (Warden)' : 'none'
 })
 const tabs = computed<TabItem[]>(() => [
-  { key: 'interfaces', label: 'Interfaces', count: interfaces.value.length },
-  { key: 'packages', label: 'Packages', count: packages.value.length },
-  { key: 'addresses', label: 'Addresses', count: addresses.value.length },
-  ...(guests.value.length ? [{ key: 'guests', label: 'Guests', count: guests.value.length }] : []),
+  { key: 'interfaces', label: 'Interfaces', count: interfaces.total.value },
+  { key: 'packages', label: 'Packages', count: packages.total.value },
+  { key: 'addresses', label: 'Addresses', count: addresses.total.value },
+  ...(guests.total.value ? [{ key: 'guests', label: 'Guests', count: guests.total.value }] : []),
   ...(showHardware.value ? [{ key: 'hardware', label: 'Hardware' }] : []),
   ...(canOob.value ? [{ key: 'oob', label: 'Power / KVM' }] : []),
 ])
@@ -172,21 +207,22 @@ function connectedTo(i: DeviceInterface): string {
   }
   return i.remote_port_name ?? ''
 }
+// Sortable columns are the server's sort fields of each table.
 const ifaceColumns: Column<DeviceInterface>[] = [
-  { key: 'name', label: 'Name' }, { key: 'mac_address', label: 'MAC', hideOnStack: true }, { key: 'interface_type', label: 'Kind', hideOnStack: true },
+  { key: 'name', label: 'Name', sortable: true }, { key: 'mac_address', label: 'MAC', hideOnStack: true }, { key: 'interface_type', label: 'Kind', hideOnStack: true },
   { key: 'speed_mbps', label: 'Speed', format: (i) => (i.speed_mbps ? i.speed_mbps + ' Mbps' : '') }, { key: 'connected', label: 'Connected to', format: connectedTo },
 ]
 const guestColumns: Column<HypervisorGuest & { id: string }>[] = [
-  { key: 'name', label: 'Guest' }, { key: 'guest_ref', label: 'ID', width: 'sm' }, { key: 'kind', label: 'Kind', width: 'sm' },
+  { key: 'name', label: 'Guest', sortable: true }, { key: 'guest_ref', label: 'ID', width: 'sm' }, { key: 'kind', label: 'Kind', width: 'sm' },
   { key: 'macs', label: 'MACs', hideOnStack: true, format: (g) => (g.macs ?? []).join(', ') },
 ]
-const guestRows = computed(() => guests.value.map((g) => ({ ...g, id: g.guest_ref })))
-const pkgRows = computed(() => packages.value.filter((p) => !securityOnly.value || p.is_security_update).map((p) => ({ ...p, id: p.name })))
+const guestRows = computed(() => guests.rows.value.map((g) => ({ ...g, id: g.guest_ref })))
+const pkgRows = computed(() => packages.rows.value.map((p) => ({ ...p, id: p.name })))
 const pkgColumns: Column<DevicePackage & { id: string }>[] = [
-  { key: 'name', label: 'Package', sortable: true }, { key: 'current_version', label: 'Current' }, { key: 'available_version', label: 'Available', hideOnStack: true },
+  { key: 'name', label: 'Package', sortable: true }, { key: 'version', label: 'Current', sortable: true, format: (p) => p.current_version ?? '' }, { key: 'available_version', label: 'Available', hideOnStack: true },
   { key: 'state', label: 'Status', width: 'sm', format: (p) => (p.is_security_update ? 'security' : p.needs_update ? 'update' : 'current') },
 ]
-const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, { key: 'hostname', label: 'Hostname' }, { key: 'link', label: 'Connected to', hideOnStack: true, format: addressLinkText }, { key: 'address_type', label: 'Type', hideOnStack: true }, { key: 'status', label: 'Status', width: 'sm' }]
+const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address', sortable: true }, { key: 'hostname', label: 'Hostname', sortable: true }, { key: 'link', label: 'Connected to', hideOnStack: true, format: addressLinkText }, { key: 'address_type', label: 'Type', sortable: true, hideOnStack: true }, { key: 'status', label: 'Status', width: 'sm', sortable: true }]
 </script>
 
 <template>
@@ -216,7 +252,7 @@ const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, 
     <DeviceBmcCard v-if="device && canBmc" :device-id="id" class="mb-4" @status="bmcStatus = $event" @changed="loadAll" />
     <UiTabs v-model="tab" :tabs="tabs" class="mb-3" />
     <UiCard v-if="tab === 'interfaces'" :padded="false">
-      <UiDataTable :items="interfaces" :columns="ifaceColumns" caption="Interfaces" empty-title="No interfaces">
+      <UiDataTable :items="interfaces.rows.value" :columns="ifaceColumns" :loading="interfaces.loading.value" :total="interfaces.total.value" :page="interfaces.lq.page.value" :page-size="interfaces.lq.pageSize.value" :sort="interfaces.lq.sort.value" caption="Interfaces" empty-title="No interfaces" @update:page="interfaces.lq.setPage" @update:page-size="interfaces.lq.setPageSize" @update:sort="interfaces.lq.setSort">
         <template #cell-name="{ row }">{{ row.name }} <UiBadge v-if="row.interface_type === 'management'" color="info" size="xs">BMC</UiBadge> <UiBadge v-if="row.report_state === 'not_reported'" color="neutral" size="xs">not reported</UiBadge></template>
       </UiDataTable>
     </UiCard>
@@ -225,18 +261,18 @@ const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address' }, 
         <UiSwitch id="pkg-security-only" v-model="securityOnly" label="Security updates only" />
         <UiButton size="sm" variant="soft" icon="mdi-refresh" :loading="syncing" @click="reloadPackages">Refresh</UiButton>
       </div>
-      <UiDataTable :items="pkgRows" :columns="pkgColumns" caption="Packages" empty-title="No packages" :virtual-at="200">
+      <UiDataTable :items="pkgRows" :columns="pkgColumns" :loading="packages.loading.value" :total="packages.total.value" :page="packages.lq.page.value" :page-size="packages.lq.pageSize.value" :sort="packages.lq.sort.value" caption="Packages" empty-title="No packages" @update:page="packages.lq.setPage" @update:page-size="packages.lq.setPageSize" @update:sort="packages.lq.setSort">
         <template #cell-state="{ row }"><UiStatusChip :status="row.is_security_update ? 'security' : row.needs_update ? 'update' : 'current'" :colors="{ security: 'error', update: 'warning', current: 'success' }" /></template>
       </UiDataTable>
     </UiCard>
     <UiCard v-if="tab === 'addresses'" :padded="false">
-      <UiDataTable :items="addresses" :columns="addrColumns" caption="Addresses" empty-title="No addresses">
+      <UiDataTable :items="addresses.rows.value" :columns="addrColumns" :loading="addresses.loading.value" :total="addresses.total.value" :page="addresses.lq.page.value" :page-size="addresses.lq.pageSize.value" :sort="addresses.lq.sort.value" caption="Addresses" empty-title="No addresses" @update:page="addresses.lq.setPage" @update:page-size="addresses.lq.setPageSize" @update:sort="addresses.lq.setSort">
         <template #cell-address="{ row }">{{ row.address }} <UiBadge v-if="row.is_primary" color="primary" size="xs">primary</UiBadge> <UiBadge v-if="row.report_state === 'not_reported'" color="neutral" size="xs">not reported</UiBadge> <UiBadge v-if="row.conflict" color="error" size="xs">conflict</UiBadge> <UiBadge v-if="row.previous_device_id" color="info" size="xs">moved</UiBadge></template>
         <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', dhcp: 'accent', deprecated: 'warning', offline: 'neutral' }" /></template>
       </UiDataTable>
     </UiCard>
     <UiCard v-if="tab === 'guests'" :padded="false" data-test="device-guests">
-      <UiDataTable :items="guestRows" :columns="guestColumns" caption="Guests" empty-title="No guests">
+      <UiDataTable :items="guestRows" :columns="guestColumns" :loading="guests.loading.value" :total="guests.total.value" :page="guests.lq.page.value" :page-size="guests.lq.pageSize.value" :sort="guests.lq.sort.value" caption="Guests" empty-title="No guests" @update:page="guests.lq.setPage" @update:page-size="guests.lq.setPageSize" @update:sort="guests.lq.setSort">
         <template #cell-name="{ row }">
           <RouterLink v-if="row.guest_device_id" class="link" :to="{ name: 'ipam-device', params: { id: row.guest_device_id } }">{{ row.guest_device_name || row.name || row.guest_ref }}</RouterLink>
           <span v-else>{{ row.name || row.guest_ref }} <UiBadge color="neutral" size="xs">not in IPAM</UiBadge></span>

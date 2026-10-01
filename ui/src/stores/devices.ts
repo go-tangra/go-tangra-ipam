@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
 import { api } from '@/api/client'
+import { fetchAll, fetchPage, type ListParams, type Page } from '@/api/list'
+import { listOptions, pagedList } from './paged'
 import type {
   BmcStatus,
   Device,
@@ -15,6 +16,21 @@ import type {
   Sensor,
 } from '@/api/types'
 
+/** Sortable fields of GET /devices (server Spec store.DeviceList). */
+export const DEVICE_SORTS = ['name', 'device_type', 'status', 'manufacturer', 'location', 'created_at'] as const
+export const DEVICE_LIST = listOptions(DEVICE_SORTS, 'name', 'asc')
+// The device's own tables (server Specs store.InterfaceList, PackageList,
+// AddressList).
+export const INTERFACE_LIST = listOptions(['name'], 'name', 'asc')
+export const PACKAGE_LIST = listOptions(['name', 'version'], 'name', 'asc')
+export const DEVICE_ADDRESS_LIST = listOptions(['address', 'hostname', 'mac', 'status', 'address_type', 'last_seen', 'created_at'], 'address', 'asc')
+
+export interface PackageFilter {
+  needs_update?: boolean | undefined
+  security_only?: boolean | undefined
+  manager?: string | undefined
+}
+
 export interface DeviceFilter {
   device_type?: string | undefined
   status?: string | undefined
@@ -25,40 +41,24 @@ export interface DeviceFilter {
   report_state?: string | undefined
   has_hardware?: 'true' | 'false' | undefined
   query?: string | undefined
-  cursor?: string | undefined
-  limit?: number | undefined
 }
 
 export const useDevices = defineStore('ipam-devices', () => {
-  const items = ref<Device[]>([])
-  const loading = ref(false)
-  const error = ref('')
+  // The table page (server order); writes reload it rather than insert rows.
+  const { items, total, params, filter, loading, error, listed, list, reload } = pagedList<Device, DeviceFilter>('devices', DEVICE_LIST)
+  const refresh = async () => (listed.value ? reload() : null)
 
-  async function list(filter: DeviceFilter = {}): Promise<void> {
-    loading.value = true
-    error.value = ''
-    try {
-      const res = await api<{ items: Device[] }>('GET', 'devices', undefined, { query: { ...filter } })
-      items.value = res.items ?? []
-    } catch (e) {
-      error.value = (e as Error).message
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // lookup lists devices without replacing `items` (names for references
-  // such as the device that reported an ARP-learned MAC).
+  // lookup lists every matching device without replacing `items` (pick lists
+  // and names for references such as the device that reported an ARP-learned
+  // MAC).
   async function lookup(filter: DeviceFilter = {}): Promise<Device[]> {
-    const res = await api<{ items: Device[] }>('GET', 'devices', undefined, { query: { limit: 500, ...filter } })
-    return res.items ?? []
+    return fetchAll<Device>('devices', { ...filter })
   }
 
   // inRack lists the devices mounted in a rack without replacing `items`, so a
   // rack elevation can load alongside the device list.
   async function inRack(rackId: string): Promise<Device[]> {
-    const res = await api<{ items: Device[] }>('GET', 'devices', undefined, { query: { rack_id: rackId, limit: 500 } })
-    return res.items ?? []
+    return fetchAll<Device>('devices', { rack_id: rackId })
   }
 
   async function get(id: string): Promise<Device> {
@@ -67,7 +67,7 @@ export const useDevices = defineStore('ipam-devices', () => {
 
   async function create(body: Partial<Device>): Promise<Device> {
     const d = await api<Device>('POST', 'devices', body)
-    items.value = [d, ...items.value]
+    void refresh()
     return d
   }
 
@@ -83,13 +83,14 @@ export const useDevices = defineStore('ipam-devices', () => {
   async function remove(id: string, force = false): Promise<void> {
     await api('DELETE', 'devices/' + id, undefined, { query: { force } })
     items.value = items.value.filter((x) => x.id !== id)
+    void refresh()
   }
 
   // --- related collections ---
 
-  async function interfaces(id: string): Promise<DeviceInterface[]> {
-    const res = await api<{ items: DeviceInterface[] }>('GET', 'devices/' + id + '/interfaces')
-    return res.items ?? []
+  // One page of a device's interfaces / packages / addresses (its tables).
+  async function interfaces(id: string, q: ListParams): Promise<Page<DeviceInterface>> {
+    return fetchPage<DeviceInterface>('devices/' + id + '/interfaces', { ...q })
   }
 
   async function addInterface(id: string, body: Partial<DeviceInterface>): Promise<DeviceInterface> {
@@ -100,9 +101,8 @@ export const useDevices = defineStore('ipam-devices', () => {
     await api('DELETE', 'devices/' + id + '/interfaces/' + ifid)
   }
 
-  async function packages(id: string): Promise<DevicePackage[]> {
-    const res = await api<{ items: DevicePackage[] }>('GET', 'devices/' + id + '/packages')
-    return res.items ?? []
+  async function packages(id: string, q: ListParams, f: PackageFilter = {}): Promise<Page<DevicePackage>> {
+    return fetchPage<DevicePackage>('devices/' + id + '/packages', { ...f, ...q })
   }
 
   // hardware reads the device's reported hardware (feature 023).
@@ -110,9 +110,8 @@ export const useDevices = defineStore('ipam-devices', () => {
     return api<DeviceHardware>('GET', 'devices/' + id + '/hardware')
   }
 
-  async function addresses(id: string): Promise<IPAddress[]> {
-    const res = await api<{ items: IPAddress[] }>('GET', 'devices/' + id + '/addresses')
-    return res.items ?? []
+  async function addresses(id: string, q: ListParams): Promise<Page<IPAddress>> {
+    return fetchPage<IPAddress>('devices/' + id + '/addresses', { ...q })
   }
 
   // --- out-of-band (platform-admin) ---
@@ -156,8 +155,8 @@ export const useDevices = defineStore('ipam-devices', () => {
   }
 
   return {
-    items, loading, error,
-    list, lookup, inRack, get, create, update, remove,
+    items, total, params, filter, loading, error, listed,
+    list, reload, lookup, inRack, get, create, update, remove,
     interfaces, addInterface, removeInterface,
     packages, addresses, hardware,
     power, setPower, sensors, sel, kvmSession,

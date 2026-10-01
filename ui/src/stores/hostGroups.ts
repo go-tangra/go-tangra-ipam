@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
+import { fetchPage, type ListParams, type Page } from '@/api/list'
 import type { HostGroup, HostGroupMember } from '@/api/types'
 
 export const useHostGroups = defineStore('ipam-host-groups', () => {
@@ -42,9 +43,9 @@ export const useHostGroups = defineStore('ipam-host-groups', () => {
     items.value = items.value.filter((x) => x.id !== id)
   }
 
-  async function members(id: string): Promise<HostGroupMember[]> {
-    const res = await api<{ items: HostGroupMember[] }>('GET', 'host-groups/' + id + '/members')
-    return res.items ?? []
+  // members reads one page of a host group's members.
+  async function members(id: string, q: ListParams): Promise<Page<HostGroupMember>> {
+    return fetchPage<HostGroupMember>('host-groups/' + id + '/members', { ...q })
   }
 
   async function addMember(id: string, body: Partial<HostGroupMember>): Promise<HostGroupMember> {

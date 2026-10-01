@@ -92,7 +92,11 @@ describe('ipam views on the kit', () => {
     const post = calls.find((c) => c.init.method === 'POST')!
     expect(post.url).toBe('/api/ipam/v1/ip-addresses/allocate')
     expect(JSON.parse(String(post.init.body))).toEqual({ subnet_id: 's1', hostname: 'web-01' })
-    expect(w.find('[data-test="address-row-a9"]').exists()).toBe(true)
+    // Server mode: the new address is not prepended; the page is reloaded and
+    // shows it only where the server's order puts it (here: not on this page).
+    const after = calls.slice(calls.indexOf(post) + 1)
+    expect(after.some((c) => (c.init.method ?? 'GET') === 'GET' && c.url.startsWith('/api/ipam/v1/ip-addresses?') && c.url.includes('page=1'))).toBe(true)
+    expect(w.find('[data-test="address-row-a9"]').exists()).toBe(false)
     w.unmount()
   })
 
@@ -132,7 +136,10 @@ describe('ipam views on the kit', () => {
     await flushPromises()
     const post = calls.find((c) => c.init.method === 'POST')!
     expect(JSON.parse(String(post.init.body))).toEqual({ subnet_id: 's1', enable_snmp: true, enable_dns_update: false })
-    expect(w.find('[data-test="scan-row-j1"]').exists()).toBe(true)
+    // The scan list is reloaded (newest first on the server), not prepended.
+    const after = calls.slice(calls.indexOf(post) + 1)
+    expect(after.some((c) => (c.init.method ?? 'GET') === 'GET' && c.url.startsWith('/api/ipam/v1/ip-scans?') && c.url.includes('sort=created_at') && c.url.includes('order=desc'))).toBe(true)
+    expect(w.find('[data-test="scan-row-j1"]').exists()).toBe(false)
     w.unmount()
   })
 })
