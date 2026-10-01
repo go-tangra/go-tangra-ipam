@@ -4,9 +4,12 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/hostsync"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/invclient"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
+	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
 // Body bounds of the host-sync writes (contracts/ipam-http.md).
@@ -153,12 +156,18 @@ func (s *Server) registerHostSync(d Deps) {
 			failSvc(w, err)
 			return
 		}
-		v, err := a.Guests(r.Context(), subj, r.PathValue("id"))
+		req, err := listquery.Parse(r.URL.Query(), store.GuestList)
+		var le *listquery.Error
+		if errors.As(err, &le) {
+			WriteDetail(w, ErrValidation, map[string]any{"param": le.Param})
+			return
+		}
+		v, total, applied, err := a.PageGuests(r.Context(), subj, r.PathValue("id"), req)
 		if err != nil {
 			failHostSync(w, err)
 			return
 		}
-		WriteJSON(w, http.StatusOK, map[string]any{"items": v})
+		WriteJSON(w, http.StatusOK, listquery.NewPage(v, total, applied))
 	}))
 	s.MustHandle("POST", p+"/ip-addresses/{id}/clear-conflict", h(func(w http.ResponseWriter, r *http.Request, a *hostsync.Admin) {
 		subj, err := subjects(r)

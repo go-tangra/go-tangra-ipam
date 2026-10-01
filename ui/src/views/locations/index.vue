@@ -14,6 +14,9 @@ import Rack from './rack.vue'
 const router = useRouter()
 const store = useLocations()
 const devices = useDevices()
+// Every device, for the rack placement pick list (refreshed after a placement).
+const allDevices = ref<Device[]>([])
+const loadDevices = () => devices.lookup().then((d) => (allDevices.value = d), () => {})
 const confirm = useConfirm()
 const selectedId = ref('')
 const error = ref('')
@@ -27,7 +30,7 @@ const childType: Record<string, string> = { region: 'country', country: 'city', 
 
 onMounted(() => {
   void refresh()
-  void devices.list()
+  void loadDevices()
 })
 async function refresh(): Promise<void> {
   await Promise.all([store.loadTree(), store.list()])
@@ -122,11 +125,11 @@ const placeForm = useZodForm(rackPlacementSchema, {
       placeForm.setFieldError('rack_position', clash)
       return
     }
-    const d = devices.items.find((x) => x.id === v.device_id) ?? rackDevices.value.find((x) => x.id === v.device_id)
+    const d = allDevices.value.find((x) => x.id === v.device_id) ?? rackDevices.value.find((x) => x.id === v.device_id)
     if (!d) return
     await devices.update(d.id, { ...d, rack_id: rack.id, rack_position: v.rack_position, device_height_u: v.device_height_u })
     placing.value = false
-    await loadRack()
+    await Promise.all([loadRack(), loadDevices()])
   },
 })
 // collision explains why a placement does not fit, or returns '' when it does.
@@ -141,7 +144,7 @@ function collision(deviceId: string, pos: number, h: number, size: number): stri
 }
 const deviceOptions = computed<SelectOption[]>(() => {
   const inThisRack = new Set(rackDevices.value.map((d) => d.id))
-  const pool = moving.value ? [moving.value] : devices.items.filter((d) => !inThisRack.has(d.id) || !d.rack_position)
+  const pool = moving.value ? [moving.value] : allDevices.value.filter((d) => !inThisRack.has(d.id) || !d.rack_position)
   return pool.map((d) => ({ title: `${d.name} (${d.device_type})${d.rack_id && d.rack_id !== selected.value?.id ? ' — in another rack' : ''}`, value: d.id }))
 })
 function place(position: number): void {
@@ -161,7 +164,7 @@ async function unrack(d: Device): Promise<void> {
   try {
     await devices.update(d.id, { ...d, rack_id: '', rack_position: 0 })
     placing.value = false
-    await loadRack()
+    await Promise.all([loadRack(), loadDevices()])
   } catch (e) {
     error.value = describe(e)
   }

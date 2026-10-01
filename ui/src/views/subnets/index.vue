@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // Subnet list + tree. Everything done *to* a subnet lives in the right-hand
 // drawer (view → scan / split / add child / edit / delete), as in go-tangra.
-import { computed, onMounted, ref } from 'vue'
-import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiBadge, UiDataTable, UiStatusChip, UiTree, type Column, type SelectOption, type TreeNode } from '@go-tangra/ui'
+import { computed, onMounted, ref, watch } from 'vue'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiBadge, UiDataTable, UiStatusChip, UiTree, useListQuery, type Column, type SelectOption, type TreeNode } from '@go-tangra/ui'
 import { useZodForm } from '@go-tangra/ui/forms'
-import { useSubnets } from '@/stores/subnets'
+import { SUBNET_LIST, useSubnets, type SubnetFilter } from '@/stores/subnets'
 import { useVlans } from '@/stores/vlans'
 import { useLocations } from '@/stores/locations'
 import { subnetFilterSchema, SUBNET_STATUSES } from '@/schemas'
@@ -17,19 +17,36 @@ const locations = useLocations()
 const statusOptions: SelectOption[] = SUBNET_STATUSES.map((s) => ({ title: s, value: s }))
 const versionOptions: SelectOption[] = [{ title: 'IPv4', value: '4' }, { title: 'IPv6', value: '6' }]
 
+// --- server paging and sorting (page / size / sort in the URL: ?subnets.page=…) ---
+const lq = useListQuery('subnets', SUBNET_LIST)
+let filterValue: SubnetFilter = {}
+async function load(): Promise<void> {
+  const res = await store.list(filterValue, lq.query.value)
+  if (res?.page) lq.clampTo(res.page) // a page beyond the end answers the last page
+}
+watch(lq.query, () => void load())
+
 onMounted(() => {
-  void store.list()
+  void load()
+  void store.loadAll()
   void store.loadTree()
-  void vlans.list()
+  void vlans.loadAll()
   void locations.list()
 })
+/** Filters changed: back to page 1 (which reloads), or reload in place. */
 const filter = useZodForm(subnetFilterSchema, {
   initial: { q: '' },
-  onSubmit: (f) => store.list({ query: f.q || undefined, status: f.status, ip_version: f.ip_version ? Number(f.ip_version) : undefined }),
+  onSubmit: (f) => {
+    const next: SubnetFilter = { query: f.q || undefined, status: f.status, ip_version: f.ip_version ? Number(f.ip_version) : undefined }
+    const changed = JSON.stringify(next) !== JSON.stringify(filterValue)
+    filterValue = next
+    if (changed && lq.page.value !== 1) lq.resetPage()
+    else return load()
+  },
 })
 const reload = () => void filter.submit()
 async function refreshAll(): Promise<void> {
-  await Promise.all([filter.submit(), store.loadTree()])
+  await Promise.all([filter.submit(), store.loadAll(), store.loadTree()])
 }
 
 function utilPct(s: Subnet): number {
@@ -38,7 +55,7 @@ function utilPct(s: Subnet): number {
   return total > 0 ? Math.round(((s.used_addresses ?? 0) / total) * 100) : 0
 }
 const utilClass = (pct: number) => (pct >= 90 ? 'progress-error' : pct >= 75 ? 'progress-warning' : 'progress-success')
-const parentCidr = (id?: string) => store.items.find((s) => s.id === id)?.cidr ?? ''
+const parentCidr = (id?: string) => store.all.find((s) => s.id === id)?.cidr ?? ''
 
 const toNode = (n: SubnetTreeNode): TreeNode => ({ id: n.id, label: n.cidr, icon: 'mdi-ip-network-outline', badge: n.name, children: (n.children ?? []).map(toNode) })
 const tree = computed<TreeNode[]>(() => store.tree.map(toNode))
@@ -59,11 +76,13 @@ function snmpBadge(s: Subnet): { text: string; color: 'success' | 'info'; title:
     ? { text: v, color: 'success', title: 'SNMP ' + v + ' configured on this subnet' }
     : { text: v + ' inherited', color: 'info', title: `SNMP ${v} inherited from ${e.source_name} (${e.source_cidr})` }
 }
+// Sortable columns are the server's sort fields (SUBNET_LIST); CIDR sorts in
+// inet order. Utilization is computed per row and is not sortable.
 const columns: Column<Subnet>[] = [
   { key: 'name', label: 'Name', sortable: true },
   { key: 'cidr', label: 'CIDR', sortable: true },
   { key: 'parent_id', label: 'Parent', hideOnStack: true, format: (s) => parentCidr(s.parent_id) },
-  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'status', label: 'Status', width: 'sm', sortable: true },
   { key: 'snmp', label: 'SNMP', width: 'sm', hideOnStack: true, format: (s) => snmpBadge(s)?.text ?? '' },
   { key: 'utilization', label: 'Utilization', width: 'lg', format: (s) => `${utilPct(s)}% (${s.used_addresses ?? 0}/${s.total_addresses ?? 0})` },
 ]
@@ -93,7 +112,7 @@ const columns: Column<Subnet>[] = [
         </UiCard>
         <UiAlert v-if="store.error" kind="error">{{ store.error }}</UiAlert>
         <UiCard :padded="false">
-          <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="Subnets — select one to view and act on it" empty-title="No subnets match" clickable :row-attrs="(s) => ({ 'data-test': 'subnet-row-' + s.id })" data-test="subnets-table" @row-click="openSubnet($event.id)">
+          <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" :total="store.total" :page="lq.page.value" :page-size="lq.pageSize.value" :sort="lq.sort.value" caption="Subnets — select one to view and act on it" empty-title="No subnets match" clickable :row-attrs="(s) => ({ 'data-test': 'subnet-row-' + s.id })" data-test="subnets-table" @row-click="openSubnet($event.id)" @update:page="lq.setPage" @update:page-size="lq.setPageSize" @update:sort="lq.setSort">
             <template #cell-cidr="{ row }">{{ row.cidr }} <UiBadge v-if="row.ip_version === 6" size="xs">v6</UiBadge></template>
             <template #cell-snmp="{ row }"><UiBadge v-if="snmpBadge(row)" :color="snmpBadge(row)!.color" soft size="xs" :title="snmpBadge(row)!.title" data-test="snmp-badge">{{ snmpBadge(row)!.text }}</UiBadge></template>
             <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', deprecated: 'warning', deleted: 'neutral' }" /></template>

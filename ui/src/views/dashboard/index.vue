@@ -1,40 +1,51 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { UiPage, UiCard, UiStatGrid, UiStatTile, UiBarList, type BarItem } from '@go-tangra/ui'
 import { useStats } from '@/stores/stats'
 import { useSubnets } from '@/stores/subnets'
 import { useDevices } from '@/stores/devices'
 import { useScans } from '@/stores/scans'
+import type { Device } from '@/api/types'
 
 // The dashboard prefers the /stats tenant snapshot; when it is unavailable it
-// derives figures from the loaded entity lists.
+// derives figures from list totals and the device list.
 const stats = useStats()
 const subnets = useSubnets()
 const devices = useDevices()
 const scans = useScans()
+const allDevices = ref<Device[]>([])
+const scanCounts = ref({ active: 0, completed: 0 })
+async function loadScanCounts(): Promise<void> {
+  try {
+    const [pending, scanning, completed] = await Promise.all([scans.count({ status: 'pending' }), scans.count({ status: 'scanning' }), scans.count({ status: 'completed' })])
+    scanCounts.value = { active: pending + scanning, completed }
+  } catch {
+    // the scan tiles stay at zero
+  }
+}
 onMounted(() => {
   void stats.load()
-  void subnets.list()
-  void devices.list()
-  void scans.list()
+  void subnets.list({}, { page: 1, page_size: 1, sort: 'cidr', order: 'asc' })
+  void devices.lookup().then((d) => (allDevices.value = d), () => {})
+  void loadScanCounts()
 })
 const snap = computed(() => stats.snapshot)
-function tally(pick: (d: (typeof devices.items)[number]) => string | undefined): Record<string, number> {
+function tally(pick: (d: Device) => string | undefined): Record<string, number> {
   const m: Record<string, number> = {}
-  for (const d of devices.items) {
+  for (const d of allDevices.value) {
     const k = pick(d) || 'unknown'
     m[k] = (m[k] ?? 0) + 1
   }
   return m
 }
 const bars = (m: Record<string, number>, color: NonNullable<BarItem['color']>): BarItem[] => Object.entries(m).sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value, color }))
-const subnetsTotal = computed(() => snap.value?.total_subnets ?? subnets.items.length)
-const devicesTotal = computed(() => snap.value?.total_devices ?? devices.items.length)
+const subnetsTotal = computed(() => snap.value?.total_subnets ?? subnets.total)
+const devicesTotal = computed(() => snap.value?.total_devices ?? allDevices.value.length)
 const addressesUsed = computed(() => snap.value?.used_addresses ?? 0)
 const addressesTotal = computed(() => snap.value?.total_addresses ?? 0)
-const securityUpdates = computed(() => devices.items.reduce((n, d) => n + (d.security_update_count ?? 0), 0))
-const scansActive = computed(() => scans.items.filter((s) => s.status === 'scanning' || s.status === 'pending').length)
-const scansCompleted = computed(() => scans.items.filter((s) => s.status === 'completed').length)
+const securityUpdates = computed(() => allDevices.value.reduce((n, d) => n + (d.security_update_count ?? 0), 0))
+const scansActive = computed(() => scanCounts.value.active)
+const scansCompleted = computed(() => scanCounts.value.completed)
 const utilization = computed(() => {
   if (typeof snap.value?.overall_utilization === 'number') {
     const u = snap.value.overall_utilization

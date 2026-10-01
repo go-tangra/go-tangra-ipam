@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
+import { fetchAll } from '@/api/list'
+import { listOptions, pagedList } from './paged'
 import type { IPScanJob, SNMPTestResult, SplitResult, Subnet, SubnetSNMPInput, SubnetSNMPStatus, SubnetStats, SubnetTreeNode } from '@/api/types'
+
+/** Sortable fields of GET /subnets (server Spec store.SubnetList). */
+export const SUBNET_SORTS = ['cidr', 'name', 'vlan', 'location', 'status'] as const
+export const SUBNET_LIST = listOptions(SUBNET_SORTS, 'cidr', 'asc')
 
 export interface SubnetFilter {
   vlan_id?: string | undefined
@@ -10,26 +16,21 @@ export interface SubnetFilter {
   status?: string | undefined
   ip_version?: number | undefined
   query?: string | undefined
-  cursor?: string | undefined
-  limit?: number | undefined
 }
 
 export const useSubnets = defineStore('ipam-subnets', () => {
-  const items = ref<Subnet[]>([])
+  // The table page (server order) ...
+  const { items, total, params, filter, loading, error, listed, list, reload } = pagedList<Subnet, SubnetFilter>('subnets', SUBNET_LIST)
+  const refresh = async () => (listed.value ? reload() : null)
+  // ... and every subnet, for pick lists, parent names and a subnet's children.
+  const all = ref<Subnet[]>([])
   const tree = ref<SubnetTreeNode[]>([])
-  const loading = ref(false)
-  const error = ref('')
 
-  async function list(filter: SubnetFilter = {}): Promise<void> {
-    loading.value = true
-    error.value = ''
+  async function loadAll(): Promise<void> {
     try {
-      const res = await api<{ items: Subnet[] }>('GET', 'subnets', undefined, { query: { ...filter } })
-      items.value = res.items ?? []
+      all.value = await fetchAll<Subnet>('subnets', { sort: 'cidr' })
     } catch (e) {
       error.value = (e as Error).message
-    } finally {
-      loading.value = false
     }
   }
 
@@ -52,7 +53,7 @@ export const useSubnets = defineStore('ipam-subnets', () => {
 
   async function create(body: Partial<Subnet>): Promise<Subnet> {
     const s = await api<Subnet>('POST', 'subnets', body)
-    items.value = [s, ...items.value]
+    void refresh()
     return s
   }
 
@@ -65,6 +66,7 @@ export const useSubnets = defineStore('ipam-subnets', () => {
   async function remove(id: string, force = false): Promise<void> {
     await api('DELETE', 'subnets/' + id, undefined, { query: { force } })
     items.value = items.value.filter((x) => x.id !== id)
+    void refresh()
   }
 
   // scan queues a discovery job for a subnet (scan:run) and returns it at once;
@@ -100,5 +102,5 @@ export const useSubnets = defineStore('ipam-subnets', () => {
     return api<SNMPTestResult>('POST', 'subnets/' + id + '/snmp/test', { address })
   }
 
-  return { items, tree, loading, error, list, loadTree, get, stats, create, update, remove, scan, split, snmpStatus, setSnmp, clearSnmp, testSnmp }
+  return { items, total, params, filter, all, tree, loading, error, listed, list, reload, loadAll, loadTree, get, stats, create, update, remove, scan, split, snmpStatus, setSnmp, clearSnmp, testSnmp }
 })

@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/repo"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
@@ -267,6 +269,47 @@ func (s *Service) ListPackages(ctx context.Context, subj authz.Subjects, deviceI
 		return nil, err
 	}
 	return s.st.ListDevicePackages(ctx, subj.TenantID, deviceID, needsUpdate, securityOnly, manager)
+}
+
+// Page returns one page of the caller's devices matching f (store.DeviceList order).
+func (s *Service) Page(ctx context.Context, subj authz.Subjects, f store.DeviceFilter, req listquery.Request) ([]store.Device, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	return s.st.PageDevices(ctx, subj.TenantID, f, req)
+}
+
+// PageAddresses returns one page of the addresses bound to a device
+// (store.AddressList order, sealed owner cleared).
+func (s *Service) PageAddresses(ctx context.Context, subj authz.Subjects, deviceID string, req listquery.Request) ([]store.IPAddress, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	rows, total, applied, err := s.st.PageAddresses(ctx, subj.TenantID, store.AddressFilter{DeviceID: deviceID}, req)
+	if err != nil {
+		return nil, 0, req, err
+	}
+	for i := range rows {
+		rows[i].Owner = ""
+	}
+	return rows, total, applied, nil
+}
+
+// PageInterfaces returns one page of a device's NICs (store.InterfaceList order).
+func (s *Service) PageInterfaces(ctx context.Context, subj authz.Subjects, deviceID string, req listquery.Request) ([]store.DeviceInterface, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	return s.st.PageInterfaces(ctx, subj.TenantID, deviceID, req)
+}
+
+// PagePackages returns one page of a device's packages (store.PackageList
+// order) with the same filters as ListPackages.
+func (s *Service) PagePackages(ctx context.Context, subj authz.Subjects, deviceID string, needsUpdate, securityOnly *bool, manager string, req listquery.Request) ([]store.DevicePackage, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	return s.st.PageDevicePackages(ctx, subj.TenantID, deviceID, needsUpdate, securityOnly, manager, req)
 }
 
 // mapErr masks the store's sentinels into this package's own.

@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
+import { fetchPage, type ListParams, type Page } from '@/api/list'
+import { listOptions } from './paged'
+
+/** Sortable fields of a group's members (server Specs store.IPMemberList / HostMemberList). */
+export const MEMBER_LIST = listOptions(['sequence', 'name'], 'sequence', 'asc')
 import type { GroupMatch, IPGroup, IPGroupMember } from '@/api/types'
 
 export const useGroups = defineStore('ipam-ip-groups', () => {
@@ -42,9 +47,9 @@ export const useGroups = defineStore('ipam-ip-groups', () => {
     items.value = items.value.filter((x) => x.id !== id)
   }
 
-  async function members(id: string): Promise<IPGroupMember[]> {
-    const res = await api<{ items: IPGroupMember[] }>('GET', 'ip-groups/' + id + '/members')
-    return res.items ?? []
+  // members reads one page of a group's members.
+  async function members(id: string, q: ListParams): Promise<Page<IPGroupMember>> {
+    return fetchPage<IPGroupMember>('ip-groups/' + id + '/members', { ...q })
   }
 
   async function addMember(id: string, body: Partial<IPGroupMember>): Promise<IPGroupMember> {

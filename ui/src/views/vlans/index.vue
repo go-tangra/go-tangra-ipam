@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAbility } from '@casl/vue'
-import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiDataTable, UiStatusChip, UiRecordDrawer, useConfirm, type Column, type SelectOption } from '@go-tangra/ui'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiDataTable, UiStatusChip, UiRecordDrawer, useConfirm, useListQuery, type Column, type SelectOption } from '@go-tangra/ui'
 import { useZodForm, zodToFields } from '@go-tangra/ui/forms'
-import { useVlans } from '@/stores/vlans'
+import { VLAN_LIST, useVlans, type VlanFilter } from '@/stores/vlans'
 import { vlanFilterSchema, vlanSchema, VLAN_STATUSES } from '@/schemas'
 import type { Vlan } from '@/api/types'
 import { ApiError, describe } from '@/api/client'
@@ -17,14 +17,39 @@ const canUpdate = computed(() => ability.can('update', 'Vlan'))
 const canDelete = computed(() => ability.can('delete', 'Vlan'))
 const error = ref('')
 const statusOptions: SelectOption[] = VLAN_STATUSES.map((s) => ({ title: s, value: s }))
-onMounted(() => void store.list())
-const filter = useZodForm(vlanFilterSchema, { initial: { domain: '' }, onSubmit: (f) => store.list({ domain: f.domain || undefined, status: f.status }) })
-const reload = () => void filter.submit()
+// --- server paging and sorting (page / size / sort in the URL: ?vlans.page=…) ---
+const lq = useListQuery('vlans', VLAN_LIST)
+let filterValue: VlanFilter = {}
+async function load(): Promise<void> {
+  const res = await store.list(filterValue, lq.query.value)
+  if (res?.page) lq.clampTo(res.page) // a page beyond the end answers the last page
+}
+watch(lq.query, () => void load())
+onMounted(() => {
+  void load()
+  void store.loadAll()
+})
+/** Filters changed: back to page 1 (which reloads), or reload in place. */
+const filter = useZodForm(vlanFilterSchema, {
+  initial: { domain: '' },
+  onSubmit: (f) => {
+    const next: VlanFilter = { domain: f.domain || undefined, status: f.status }
+    const changed = JSON.stringify(next) !== JSON.stringify(filterValue)
+    filterValue = next
+    if (changed && lq.page.value !== 1) lq.resetPage()
+    else return load()
+  },
+})
+const reload = () => {
+  void filter.submit()
+  void store.loadAll()
+}
+// Every column but the subnet count is a server sort field (VLAN_LIST).
 const columns: Column<Vlan>[] = [
   { key: 'vlan_id', label: 'VLAN ID', width: 'sm', sortable: true },
   { key: 'name', label: 'Name', sortable: true },
-  { key: 'domain', label: 'Domain', hideOnStack: true },
-  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'domain', label: 'Domain', sortable: true, hideOnStack: true },
+  { key: 'status', label: 'Status', width: 'sm', sortable: true },
   { key: 'subnet_count', label: 'Subnets', align: 'end', format: (v) => String(v.subnet_count ?? 0) },
 ]
 
@@ -52,7 +77,7 @@ const initial = computed(() => (editing.value ? { ...editing.value } : { status:
 // VLAN ids and names are unique per tenant (whatever the domain); the server
 // answers a clash with a bare 409, so name the clashing field from the list.
 function conflictError(v: Record<string, unknown>): ApiError {
-  const others = store.items.filter((x) => x.id !== editing.value?.id)
+  const others = store.all.filter((x) => x.id !== editing.value?.id)
   const byId = others.find((x) => x.vlan_id === v.vlan_id)
   const byName = others.find((x) => x.name === v.name)
   const fields: Record<string, string> = {}
@@ -101,7 +126,7 @@ async function remove(v: Vlan): Promise<void> {
     <UiAlert v-if="error" kind="error" class="mb-3" data-test="vlan-error">{{ error }}</UiAlert>
     <UiAlert v-if="store.error" kind="error" class="mb-3">{{ store.error }}</UiAlert>
     <UiCard :padded="false">
-      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="VLANs" empty-title="No VLANs match" :clickable="canUpdate" :row-attrs="(v) => ({ 'data-test': 'vlan-row-' + v.id })" data-test="vlans-table" @row-click="edit">
+      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" :total="store.total" :page="lq.page.value" :page-size="lq.pageSize.value" :sort="lq.sort.value" caption="VLANs" empty-title="No VLANs match" :clickable="canUpdate" :row-attrs="(v) => ({ 'data-test': 'vlan-row-' + v.id })" data-test="vlans-table" @row-click="edit" @update:page="lq.setPage" @update:page-size="lq.setPageSize" @update:sort="lq.setSort">
         <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="{ reserved: 'info', deprecated: 'warning' }" /></template>
         <template v-if="canUpdate || canDelete" #actions="{ row }">
           <UiButton v-if="canUpdate" size="xs" variant="text" icon="mdi-pencil-outline" icon-only label="Edit VLAN" :data-test="'vlan-edit-' + row.id" @click.stop="edit(row)" />

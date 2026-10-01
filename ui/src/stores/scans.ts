@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
 import { api } from '@/api/client'
+import { fetchPage } from '@/api/list'
 import type { IPScanJob } from '@/api/types'
+import { listOptions, pagedList } from './paged'
+
+/** Sortable fields of GET /ip-scans (server Spec store.ScanList). */
+export const SCAN_SORTS = ['created_at', 'status', 'subnet'] as const
+export const SCAN_LIST = listOptions(SCAN_SORTS, 'created_at', 'desc')
 
 export interface ScanFilter {
   subnet_id?: string | undefined
   status?: string | undefined
-  cursor?: string | undefined
-  limit?: number | undefined
 }
 
 export interface StartScanRequest {
@@ -18,21 +21,14 @@ export interface StartScanRequest {
 }
 
 export const useScans = defineStore('ipam-scans', () => {
-  const items = ref<IPScanJob[]>([])
-  const loading = ref(false)
-  const error = ref('')
+  // The table page (newest first by default). Live scan events reload it
+  // (stores/live.ts) instead of patching rows in.
+  const { items, total, params, filter, loading, error, listed, list, reload } = pagedList<IPScanJob, ScanFilter>('ip-scans', SCAN_LIST)
+  const refresh = async () => (listed.value ? reload() : null)
 
-  async function list(filter: ScanFilter = {}): Promise<void> {
-    loading.value = true
-    error.value = ''
-    try {
-      const res = await api<{ items: IPScanJob[] }>('GET', 'ip-scans', undefined, { query: { ...filter } })
-      items.value = res.items ?? []
-    } catch (e) {
-      error.value = (e as Error).message
-    } finally {
-      loading.value = false
-    }
+  // count returns how many jobs match a filter (one-row page, total only).
+  async function count(f: ScanFilter = {}): Promise<number> {
+    return (await fetchPage<IPScanJob>('ip-scans', { ...f, page: 1, page_size: 1 })).total
   }
 
   async function get(id: string): Promise<IPScanJob> {
@@ -42,7 +38,7 @@ export const useScans = defineStore('ipam-scans', () => {
   // start enqueues an async discovery scan for a subnet (scan:run).
   async function start(body: StartScanRequest): Promise<IPScanJob> {
     const job = await api<IPScanJob>('POST', 'ip-scans', body)
-    items.value = [job, ...items.value]
+    void refresh()
     return job
   }
 
@@ -52,12 +48,5 @@ export const useScans = defineStore('ipam-scans', () => {
     return job
   }
 
-  // patch upserts a job in place from a live ipam.scan.* event.
-  function patch(job: IPScanJob): void {
-    const i = items.value.findIndex((x) => x.id === job.id)
-    if (i >= 0) items.value[i] = job
-    else items.value = [job, ...items.value]
-  }
-
-  return { items, loading, error, list, get, start, cancel, patch }
+  return { items, total, params, filter, loading, error, listed, list, reload, count, get, start, cancel }
 })

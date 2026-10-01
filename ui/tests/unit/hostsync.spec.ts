@@ -93,13 +93,19 @@ const reported = {
   guest_count: 2, hypervisor_device_id: '', virtualization_kind: '',
 }
 function deviceHandler(overrides: Record<string, unknown> = {}) {
-  return (url: string, init: RequestInit) => {
+  return (full: string, init: RequestInit) => {
+    // The device's tables are server pages (?page=…&sort=…): match the path.
+    const [url = '', query = ''] = full.split('?')
     if (init.method === 'POST' && url.endsWith('/host-sync')) return { applied: true, changes: 2, issues: [] }
     if (url.endsWith('/devices/d1')) return { ...reported, ...overrides }
     if (url.endsWith('/host-sync')) return { source: 'host_report', inventory_host_id: 'inv-1', report_state: 'reported', applied_at: '2026-09-26T10:01:00Z', trigger: 'poll', changes: 3, issues: [{ field: '<img src=x onerror=alert(1)>', reason: 'invalid', count: 1 }] }
     if (url.endsWith('/guests')) return { items: [{ guest_ref: '101', name: 'vm-a', kind: 'vm', macs: ['bc:24:11:00:00:01'], guest_device_id: 'g1', guest_device_name: 'vm-a' }, { guest_ref: '102', name: 'ct-b', kind: 'container', macs: ['bc:24:11:00:00:02'] }] }
     if (url.endsWith('/interfaces')) return { items: [{ id: 'i1', device_id: 'd1', name: 'eth0', mac_address: 'aa:bb:cc:00:00:01', interface_type: 'ethernet', report_state: 'reported', remote_device_name: 'sw1', remote_interface_id: 'p1', remote_port_name: 'Gi0/2', link_vlan: 30, link_source: 'snmp_fdb' }, { id: 'i2', device_id: 'd1', name: 'bmc', interface_type: 'management', report_state: 'not_reported' }] }
-    if (url.endsWith('/packages')) return { items: [{ name: 'openssl', current_version: '1', available_version: '2', needs_update: true, is_security_update: true }, { name: 'vim', current_version: '1', available_version: '2', needs_update: true }] }
+    if (url.endsWith('/packages')) {
+      const all = [{ name: 'openssl', current_version: '1', available_version: '2', needs_update: true, is_security_update: true }, { name: 'vim', current_version: '1', available_version: '2', needs_update: true }]
+      const items = new URLSearchParams(query).get('security_only') === 'true' ? all.filter((p) => p.is_security_update) : all
+      return { items, total: items.length, page: 1, page_size: 25, sort: 'name', order: 'asc' }
+    }
     if (url.endsWith('/addresses')) return { items: [{ id: 'a1', address: '10.0.0.5', status: 'active', address_type: 'host', report_state: 'not_reported', conflict: true, previous_device_id: 'd9' }] }
     return { items: [] }
   }

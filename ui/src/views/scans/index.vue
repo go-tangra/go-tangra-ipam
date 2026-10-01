@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { UiPage, UiAlert, UiCard, UiButton, UiDataTable, UiStatusChip, UiLiveIndicator, UiDrawer, UiForm, UiSelect, UiSwitch, useConfirm, type Column, type SelectOption } from '@go-tangra/ui'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { UiPage, UiAlert, UiCard, UiButton, UiDataTable, UiStatusChip, UiLiveIndicator, UiDrawer, UiForm, UiSelect, UiSwitch, useConfirm, useListQuery, type Column, type SelectOption } from '@go-tangra/ui'
 import { useZodForm } from '@go-tangra/ui/forms'
-import { useScans } from '@/stores/scans'
+import { SCAN_LIST, useScans } from '@/stores/scans'
 import { useSubnets } from '@/stores/subnets'
 import { useLive } from '@/stores/live'
 import { startScanSchema } from '@/schemas'
@@ -17,14 +17,23 @@ const confirm = useConfirm()
 const statusColors = { pending: 'neutral', scanning: 'info', completed: 'success', failed: 'error', cancelled: 'neutral' } as const
 const progressClass: Record<string, string> = { pending: 'progress-neutral', scanning: 'progress-info', completed: 'progress-success', failed: 'progress-error', cancelled: 'progress-neutral' }
 
+// --- server paging and sorting (page / size / sort in the URL: ?scans.page=…).
+// Live scan events reload the shown page (stores/live.ts), never prepend.
+const lq = useListQuery('scans', SCAN_LIST)
+async function load(): Promise<void> {
+  const res = await store.list({}, lq.query.value)
+  if (res?.page) lq.clampTo(res.page) // a page beyond the end answers the last page
+}
+watch(lq.query, () => void load())
+
 let release: (() => void) | null = null
 onMounted(() => {
-  void store.list()
-  void subnets.list()
+  void load()
+  void subnets.loadAll()
   release = live.connect()
 })
 onUnmounted(() => release?.())
-const subnetOptions = computed<SelectOption[]>(() => subnets.items.map((s) => ({ title: s.name + ' (' + s.cidr + ')', value: s.id })))
+const subnetOptions = computed<SelectOption[]>(() => subnets.all.map((s) => ({ title: s.name + ' (' + s.cidr + ')', value: s.id })))
 
 const startOpen = ref(false)
 const actionError = ref('')
@@ -33,7 +42,7 @@ const start = useZodForm(startScanSchema, {
   onSuccess: () => (startOpen.value = false),
 })
 function openStart(): void {
-  start.reset({ subnet_id: subnets.items[0]?.id ?? '', enable_snmp: false, enable_dns_update: false })
+  start.reset({ subnet_id: subnets.all[0]?.id ?? '', enable_snmp: false, enable_dns_update: false })
   startOpen.value = true
 }
 async function cancel(job: IPScanJob): Promise<void> {
@@ -45,10 +54,13 @@ async function cancel(job: IPScanJob): Promise<void> {
     actionError.value = describe(e)
   }
 }
-const subnetLabel = (id: string): string => subnets.items.find((x) => x.id === id)?.cidr ?? id
+const subnetLabel = (id: string): string => subnets.all.find((x) => x.id === id)?.cidr ?? id
+// Created, subnet and status are server sort fields (SCAN_LIST; subnet orders
+// by the subnet id, which groups a subnet's scans).
 const columns: Column<IPScanJob>[] = [
-  { key: 'subnet_id', label: 'Subnet', format: (j) => subnetLabel(j.subnet_id) },
-  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'created_at', label: 'Created', sortable: true, defaultDir: 'desc', hideOnStack: true, format: (j) => (j.created_at ? new Date(j.created_at).toLocaleString() : '') },
+  { key: 'subnet', label: 'Subnet', sortable: true, format: (j) => subnetLabel(j.subnet_id) },
+  { key: 'status', label: 'Status', width: 'sm', sortable: true },
   { key: 'progress', label: 'Progress', width: 'lg', format: (j) => j.progress + '%' },
   { key: 'alive_count', label: 'Alive', align: 'end', format: (j) => String(j.alive_count ?? 0) },
   { key: 'new_count', label: 'New', align: 'end', format: (j) => String(j.new_count ?? 0), hideOnStack: true },
@@ -64,7 +76,7 @@ const columns: Column<IPScanJob>[] = [
     <UiAlert v-if="store.error" kind="error" class="mb-3">{{ store.error }}</UiAlert>
     <UiAlert v-if="actionError" kind="error" class="mb-3">{{ actionError }}</UiAlert>
     <UiCard :padded="false">
-      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="Scans" empty-title="No scans yet" :row-attrs="(j) => ({ 'data-test': 'scan-row-' + j.id })" data-test="scans-table">
+      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" :total="store.total" :page="lq.page.value" :page-size="lq.pageSize.value" :sort="lq.sort.value" caption="Scans" empty-title="No scans yet" :row-attrs="(j) => ({ 'data-test': 'scan-row-' + j.id })" data-test="scans-table" @update:page="lq.setPage" @update:page-size="lq.setPageSize" @update:sort="lq.setSort">
         <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="statusColors" /></template>
         <template #cell-progress="{ row }">
           <div class="flex items-center gap-2">

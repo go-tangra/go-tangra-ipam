@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/hostreport"
@@ -152,6 +154,22 @@ func (s *Service) List(ctx context.Context, subj authz.Subjects, f store.Address
 		out = append(out, redact(a))
 	}
 	return out, nil
+}
+
+// Page returns one page of the caller's addresses matching f
+// (store.AddressList order, owner redacted), the total and the applied request.
+func (s *Service) Page(ctx context.Context, subj authz.Subjects, f store.AddressFilter, req listquery.Request) ([]store.IPAddress, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	rows, total, applied, err := s.st.PageAddresses(ctx, subj.TenantID, f, req)
+	if err != nil {
+		return nil, 0, req, err
+	}
+	for i := range rows {
+		rows[i] = redact(rows[i])
+	}
+	return rows, total, applied, nil
 }
 
 // Update replaces an address and publishes ip_address.updated. Empty fields are

@@ -1,7 +1,11 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
 import { api } from '@/api/client'
 import type { IPAddress, PingResult } from '@/api/types'
+import { listOptions, pagedList } from './paged'
+
+/** Sortable fields of GET /ip-addresses (server Spec store.AddressList). */
+export const ADDRESS_SORTS = ['address', 'hostname', 'mac', 'status', 'address_type', 'last_seen', 'created_at'] as const
+export const ADDRESS_LIST = listOptions(ADDRESS_SORTS, 'address', 'asc')
 
 export interface AddressFilter {
   subnet_id?: string | undefined
@@ -13,8 +17,6 @@ export interface AddressFilter {
   report_state?: string | undefined
   conflict?: boolean | undefined
   mac?: string | undefined
-  cursor?: string | undefined
-  limit?: number | undefined
 }
 
 export interface AllocateRequest {
@@ -32,22 +34,10 @@ export interface BulkAllocateRequest {
 }
 
 export const useAddresses = defineStore('ipam-addresses', () => {
-  const items = ref<IPAddress[]>([])
-  const loading = ref(false)
-  const error = ref('')
-
-  async function list(filter: AddressFilter = {}): Promise<void> {
-    loading.value = true
-    error.value = ''
-    try {
-      const res = await api<{ items: IPAddress[] }>('GET', 'ip-addresses', undefined, { query: { ...filter } })
-      items.value = res.items ?? []
-    } catch (e) {
-      error.value = (e as Error).message
-    } finally {
-      loading.value = false
-    }
-  }
+  // The table page (server order). Writes do not insert rows locally: the
+  // page is reloaded so a new address lands where the server's order puts it.
+  const { items, total, params, filter, loading, error, listed, list, reload } = pagedList<IPAddress, AddressFilter>('ip-addresses', ADDRESS_LIST)
+  const refresh = async () => (listed.value ? reload() : null)
 
   async function get(id: string): Promise<IPAddress> {
     return api<IPAddress>('GET', 'ip-addresses/' + id)
@@ -55,7 +45,7 @@ export const useAddresses = defineStore('ipam-addresses', () => {
 
   async function create(body: Partial<IPAddress>): Promise<IPAddress> {
     const a = await api<IPAddress>('POST', 'ip-addresses', body)
-    items.value = [a, ...items.value]
+    void refresh()
     return a
   }
 
@@ -68,21 +58,21 @@ export const useAddresses = defineStore('ipam-addresses', () => {
   async function remove(id: string): Promise<void> {
     await api('DELETE', 'ip-addresses/' + id)
     items.value = items.value.filter((x) => x.id !== id)
+    void refresh()
   }
 
   // allocate claims the next-free address in a subnet.
   async function allocate(body: AllocateRequest): Promise<IPAddress> {
     const a = await api<IPAddress>('POST', 'ip-addresses/allocate', body)
-    items.value = [a, ...items.value]
+    void refresh()
     return a
   }
 
   // bulkAllocate claims several next-free addresses at once.
   async function bulkAllocate(body: BulkAllocateRequest): Promise<IPAddress[]> {
     const res = await api<{ items: IPAddress[] }>('POST', 'ip-addresses/bulk-allocate', body)
-    const created = res.items ?? []
-    items.value = [...created, ...items.value]
-    return created
+    void refresh()
+    return res.items ?? []
   }
 
   // find looks up a single address by literal value.
@@ -101,16 +91,5 @@ export const useAddresses = defineStore('ipam-addresses', () => {
     return api<PingResult>('POST', 'ip-addresses/' + id + '/ping', {})
   }
 
-  // patch upserts an address in place from a live ipam.ip_address.* event.
-  function patch(a: IPAddress): void {
-    const i = items.value.findIndex((x) => x.id === a.id)
-    if (i >= 0) items.value[i] = a
-    else items.value = [a, ...items.value]
-  }
-
-  function drop(id: string): void {
-    items.value = items.value.filter((x) => x.id !== id)
-  }
-
-  return { items, loading, error, list, get, create, update, remove, allocate, bulkAllocate, find, suggest, ping, patch, drop }
+  return { items, total, params, filter, loading, error, listed, list, reload, get, create, update, remove, allocate, bulkAllocate, find, suggest, ping }
 })

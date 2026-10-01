@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/authz"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/events"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/ipnet"
@@ -204,6 +206,14 @@ func (s *Service) ListScanJobs(ctx context.Context, subj authz.Subjects, f store
 		return nil, err
 	}
 	return s.st.ListScanJobs(ctx, subj.TenantID, f)
+}
+
+// PageScanJobs returns one page of the caller's jobs (store.ScanList order).
+func (s *Service) PageScanJobs(ctx context.Context, subj authz.Subjects, f store.ScanFilter, req listquery.Request) ([]store.IPScanJob, int, listquery.Request, error) {
+	if err := authz.RequireTenant(subj, subj.TenantID); err != nil {
+		return nil, 0, req, err
+	}
+	return s.st.PageScanJobs(ctx, subj.TenantID, f, req)
 }
 
 // CancelScan marks a pending/running job cancelled. A running worker observes

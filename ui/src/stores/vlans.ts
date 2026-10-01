@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
+import { fetchAll } from '@/api/list'
+import { listOptions, pagedList } from './paged'
 import type { Subnet, Vlan } from '@/api/types'
+
+/** Sortable fields of GET /vlans (server Spec store.VlanList). */
+export const VLAN_SORTS = ['vlan_id', 'name', 'domain', 'status'] as const
+export const VLAN_LIST = listOptions(VLAN_SORTS, 'vlan_id', 'asc')
 
 export interface VlanFilter {
   location_id?: string | undefined
@@ -9,25 +15,19 @@ export interface VlanFilter {
   status?: string | undefined
   vlan_id_min?: number | undefined
   vlan_id_max?: number | undefined
-  cursor?: string | undefined
-  limit?: number | undefined
 }
 
 export const useVlans = defineStore('ipam-vlans', () => {
-  const items = ref<Vlan[]>([])
-  const loading = ref(false)
-  const error = ref('')
+  // The table page (server order) and every VLAN (pick lists, clash names).
+  const { items, total, params, filter, loading, error, listed, list, reload } = pagedList<Vlan, VlanFilter>('vlans', VLAN_LIST)
+  const refresh = async () => (listed.value ? reload() : null)
+  const all = ref<Vlan[]>([])
 
-  async function list(filter: VlanFilter = {}): Promise<void> {
-    loading.value = true
-    error.value = ''
+  async function loadAll(): Promise<void> {
     try {
-      const res = await api<{ items: Vlan[] }>('GET', 'vlans', undefined, { query: { ...filter } })
-      items.value = res.items ?? []
+      all.value = await fetchAll<Vlan>('vlans')
     } catch (e) {
       error.value = (e as Error).message
-    } finally {
-      loading.value = false
     }
   }
 
@@ -37,7 +37,7 @@ export const useVlans = defineStore('ipam-vlans', () => {
 
   async function create(body: Partial<Vlan>): Promise<Vlan> {
     const v = await api<Vlan>('POST', 'vlans', body)
-    items.value = [v, ...items.value]
+    void refresh()
     return v
   }
 
@@ -52,6 +52,7 @@ export const useVlans = defineStore('ipam-vlans', () => {
   async function remove(id: string, force = false): Promise<void> {
     await api('DELETE', 'vlans/' + id, undefined, { query: { force } })
     items.value = items.value.filter((x) => x.id !== id)
+    void refresh()
   }
 
   async function subnets(id: string): Promise<Subnet[]> {
@@ -59,5 +60,5 @@ export const useVlans = defineStore('ipam-vlans', () => {
     return res.items ?? []
   }
 
-  return { items, loading, error, list, get, create, update, remove, subnets }
+  return { items, total, params, filter, all, loading, error, listed, list, reload, loadAll, get, create, update, remove, subnets }
 })

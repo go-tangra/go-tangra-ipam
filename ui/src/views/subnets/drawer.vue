@@ -49,10 +49,10 @@ async function load(): Promise<void> {
   }
 }
 
-const byId = (id?: string) => (id ? store.items.find((s) => s.id === id) : undefined)
+const byId = (id?: string) => (id ? store.all.find((s) => s.id === id) : undefined)
 const parent = computed(() => byId(props.mode === 'create' ? props.parentId : subnet.value?.parent_id))
-const children = computed(() => store.items.filter((s) => subnet.value && s.parent_id === subnet.value.id).sort((a, b) => a.cidr.localeCompare(b.cidr, undefined, { numeric: true })))
-const vlanName = (id?: string) => { const v = vlans.items.find((x) => x.id === id); return v ? `${v.vlan_id} — ${v.name}` : '' }
+const children = computed(() => store.all.filter((s) => subnet.value && s.parent_id === subnet.value.id).sort((a, b) => a.cidr.localeCompare(b.cidr, undefined, { numeric: true })))
+const vlanName = (id?: string) => { const v = vlans.all.find((x) => x.id === id); return v ? `${v.vlan_id} — ${v.name}` : '' }
 const locationName = (id?: string) => locations.items.find((x) => x.id === id)?.name ?? ''
 
 function utilPct(s: Subnet): number {
@@ -86,11 +86,11 @@ const fields = computed(() =>
   zodToFields(subnetSchema, {
     name: { cols: 6 },
     cidr: { label: 'CIDR', required: true, cols: 6, placeholder: parent.value ? 'inside ' + parent.value.cidr : '10.0.0.0/24' },
-    parent_id: { label: 'Parent subnet', type: 'select', cols: 6, options: store.items.filter((s) => s.id !== subnet.value?.id).map((s) => ({ title: `${s.cidr} — ${s.name}`, value: s.id })), hint: 'Must contain this block.' },
+    parent_id: { label: 'Parent subnet', type: 'select', cols: 6, options: store.all.filter((s) => s.id !== subnet.value?.id).map((s) => ({ title: `${s.cidr} — ${s.name}`, value: s.id })), hint: 'Must contain this block.' },
     status: { cols: 6 },
     gateway: { cols: 6, placeholder: '10.0.0.1' },
     dns_servers: { label: 'DNS servers', cols: 6, placeholder: '10.0.0.53, 1.1.1.1' },
-    vlan_id: { label: 'VLAN', type: 'select', cols: 6, options: vlans.items.map((v) => ({ title: `${v.vlan_id} — ${v.name}`, value: v.id })) },
+    vlan_id: { label: 'VLAN', type: 'select', cols: 6, options: vlans.all.map((v) => ({ title: `${v.vlan_id} — ${v.name}`, value: v.id })) },
     location_id: { label: 'Location', type: 'select', cols: 6, options: locations.items.map((l) => ({ title: `${l.name} (${l.location_type})`, value: l.id })) },
   }),
 )

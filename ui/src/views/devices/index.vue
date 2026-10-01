@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiDataTable, UiStatusChip, UiBadge, UiRecordDrawer, type Column, type SelectOption } from '@go-tangra/ui'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiSelect, UiButton, UiDataTable, UiStatusChip, UiBadge, UiRecordDrawer, useListQuery, type Column, type SelectOption } from '@go-tangra/ui'
 import { useZodForm } from '@go-tangra/ui/forms'
-import { useDevices } from '@/stores/devices'
+import { DEVICE_LIST, useDevices, type DeviceFilter } from '@/stores/devices'
 import { deviceFilterSchema, deviceSchema, DEVICE_TYPES, DEVICE_STATUSES, DEVICE_SOURCES } from '@/schemas'
 import type { Device } from '@/api/types'
 import { statusColors } from './colors'
@@ -16,18 +16,38 @@ const typeOptions: SelectOption[] = DEVICE_TYPES.map((s) => ({ title: s, value: 
 const statusOptions: SelectOption[] = DEVICE_STATUSES.map((s) => ({ title: s, value: s }))
 const sourceLabels: Record<string, string> = { manual: 'manual', scan: 'scan', host_report: 'host report' }
 const sourceOptions: SelectOption[] = DEVICE_SOURCES.map((s) => ({ title: sourceLabels[s] ?? s, value: s }))
-onMounted(() => void store.list())
-const filter = useZodForm(deviceFilterSchema, { initial: { q: '' }, onSubmit: (f) => store.list({ query: f.q || undefined, device_type: f.device_type, status: f.status, source: f.source }) })
+// --- server paging and sorting (page / size / sort in the URL: ?devices.page=…) ---
+const lq = useListQuery('devices', DEVICE_LIST)
+let filterValue: DeviceFilter = {}
+async function load(): Promise<void> {
+  const res = await store.list(filterValue, lq.query.value)
+  if (res?.page) lq.clampTo(res.page) // a page beyond the end answers the last page
+}
+watch(lq.query, () => void load())
+onMounted(() => void load())
+/** Filters changed: back to page 1 (which reloads), or reload in place. */
+const filter = useZodForm(deviceFilterSchema, {
+  initial: { q: '' },
+  onSubmit: (f) => {
+    const next: DeviceFilter = { query: f.q || undefined, device_type: f.device_type, status: f.status, source: f.source }
+    const changed = JSON.stringify(next) !== JSON.stringify(filterValue)
+    filterValue = next
+    if (changed && lq.page.value !== 1) lq.resetPage()
+    else return load()
+  },
+})
 const reload = () => void filter.submit()
 const creating = ref(false)
 const fields = useDeviceFields()
 const createDevice = (v: Record<string, unknown>) => store.create(v)
+// Sortable columns are the server's sort fields (DEVICE_LIST); the model
+// column sorts by manufacturer.
 const columns: Column<Device>[] = [
   { key: 'name', label: 'Name', sortable: true },
-  { key: 'device_type', label: 'Type', width: 'sm' },
-  { key: 'model', label: 'Model', format: (d) => [d.manufacturer, d.model].filter(Boolean).join(' '), hideOnStack: true },
+  { key: 'device_type', label: 'Type', width: 'sm', sortable: true },
+  { key: 'manufacturer', label: 'Model', sortable: true, format: (d) => [d.manufacturer, d.model].filter(Boolean).join(' '), hideOnStack: true },
   { key: 'management_ip', label: 'Management IP', format: (d) => d.management_ip || d.primary_ip || '' },
-  { key: 'status', label: 'Status', width: 'sm' },
+  { key: 'status', label: 'Status', width: 'sm', sortable: true },
   { key: 'source', label: 'Source', width: 'sm', hideOnStack: true, format: (d) => sourceLabels[d.source ?? 'manual'] ?? '' },
   { key: 'updates', label: 'Updates', width: 'sm', format: (d) => [d.security_update_count ? d.security_update_count + ' sec' : '', d.package_update_count ? d.package_update_count + ' pkg' : ''].filter(Boolean).join(' ') },
   { key: 'cpu', label: 'CPU', hideOnStack: true, format: (d) => (d.hardware_summary?.cpu_cores ? `${d.hardware_summary.cpu_sockets ?? 1}× ${d.hardware_summary.cpu_cores}c/${d.hardware_summary.cpu_threads ?? 0}t` : '') },
@@ -54,7 +74,7 @@ const columns: Column<Device>[] = [
     </template>
     <UiAlert v-if="store.error" kind="error" class="mb-3">{{ store.error }}</UiAlert>
     <UiCard :padded="false">
-      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" caption="Devices" empty-title="No devices match" clickable :row-attrs="(d) => ({ 'data-test': 'device-row-' + d.id })" data-test="devices-table" @row-click="router.push({ name: 'ipam-device', params: { id: $event.id } })">
+      <UiDataTable :items="store.items" :columns="columns" :loading="store.loading" :total="store.total" :page="lq.page.value" :page-size="lq.pageSize.value" :sort="lq.sort.value" caption="Devices" empty-title="No devices match" clickable :row-attrs="(d) => ({ 'data-test': 'device-row-' + d.id })" data-test="devices-table" @row-click="router.push({ name: 'ipam-device', params: { id: $event.id } })" @update:page="lq.setPage" @update:page-size="lq.setPageSize" @update:sort="lq.setSort">
         <template #cell-status="{ row }"><UiStatusChip :status="row.status" :colors="statusColors" /></template>
         <template #cell-source="{ row }"><UiBadge v-if="row.source === 'host_report'" :color="row.report_state === 'not_reported' ? 'neutral' : 'info'" size="xs">{{ row.report_state === 'not_reported' ? 'no longer reported' : 'host report' }}</UiBadge><span v-else class="text-xs">{{ sourceLabels[row.source ?? 'manual'] }}</span></template>
         <template #cell-updates="{ row }">

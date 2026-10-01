@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiButton, UiBadge, UiTabs, UiAccordion, UiDataTable, UiStatusChip, UiEmptyState, UiToolbar, UiRecordDrawer, useConfirm, type AccordionItem, type Column, type TabItem } from '@go-tangra/ui'
+import { UiPage, UiAlert, UiCard, UiForm, UiInput, UiButton, UiBadge, UiTabs, UiAccordion, UiDataTable, UiStatusChip, UiEmptyState, UiToolbar, UiRecordDrawer, useConfirm, type AccordionItem, type Column, type TabItem, type TableSort } from '@go-tangra/ui'
 import { useZodForm, zodToFields } from '@go-tangra/ui/forms'
-import { useGroups } from '@/stores/groups'
+import { MEMBER_LIST, useGroups } from '@/stores/groups'
+import { firstPage } from '@/stores/paged'
+import type { ListParams, Page } from '@/api/list'
 import { useHostGroups } from '@/stores/hostGroups'
 import { useDevices } from '@/stores/devices'
 import { checkIpSchema, groupSchema, hostGroupMemberSchema, ipGroupMemberSchema } from '@/schemas'
-import type { GroupMatch, HostGroup, HostGroupMember, IPGroup, IPGroupMember } from '@/api/types'
+import type { Device, GroupMatch, HostGroup, HostGroupMember, IPGroup, IPGroupMember } from '@/api/types'
 import { describe } from '@/api/client'
 import { mergeEdit } from '@/api/merge'
 
@@ -17,10 +19,12 @@ const devices = useDevices()
 const confirm = useConfirm()
 const tab = ref<Kind>('ip')
 const error = ref('')
+// Every device, for the host-member pick list.
+const deviceList = ref<Device[]>([])
 onMounted(() => {
   void groups.list()
   void hostGroups.list()
-  void devices.list()
+  void devices.lookup().then((d) => (deviceList.value = d), (e) => (error.value = describe(e)))
 })
 const tabs = computed<TabItem[]>(() => [{ key: 'ip', label: 'IP groups', count: groups.items.length }, { key: 'host', label: 'Host groups', count: hostGroups.items.length }])
 const storeFor = (k: Kind) => (k === 'ip' ? groups : hostGroups)
@@ -35,15 +39,40 @@ const check = useZodForm(checkIpSchema, {
   },
 })
 
-// --- members (loaded on first open, reloaded after each change) ---
-const ipMembers = ref<Record<string, IPGroupMember[]>>({})
-const hostMembers = ref<Record<string, HostGroupMember[]>>({})
-async function loadIp(id: string): Promise<void> {
-  ipMembers.value = { ...ipMembers.value, [id]: await groups.members(id) }
+// --- members: one server page per group (loaded on first open, reloaded
+// after each change, paged and sorted by the server: MEMBER_LIST) ---
+interface MemberPage<T> {
+  rows: T[]
+  total: number
+  q: ListParams
 }
-async function loadHost(id: string): Promise<void> {
-  hostMembers.value = { ...hostMembers.value, [id]: await hostGroups.members(id) }
+const ipMembers = ref<Record<string, MemberPage<IPGroupMember>>>({})
+const hostMembers = ref<Record<string, MemberPage<HostGroupMember>>>({})
+const latest: Record<string, number> = {}
+// loadPage reads page q of a group's members into pages (the current request
+// of the group when q is omitted); a superseded response is dropped.
+async function loadPage<T>(pages: typeof ipMembers.value | typeof hostMembers.value, set: (v: Record<string, MemberPage<T>>) => void,
+  id: string, fetch: (id: string, q: ListParams) => Promise<Page<T>>, q?: ListParams): Promise<void> {
+  const query = q ?? pages[id]?.q ?? firstPage(MEMBER_LIST)
+  const mine = (latest[id] = (latest[id] ?? 0) + 1)
+  try {
+    const res = await fetch(id, query)
+    if (mine !== latest[id]) return
+    set({ ...(pages as Record<string, MemberPage<T>>), [id]: { rows: res.items, total: res.total, q: { ...query, page: res.page ?? query.page } } })
+  } catch (e) {
+    error.value = describe(e)
+  }
 }
+const loadIp = (id: string, q?: ListParams) => loadPage<IPGroupMember>(ipMembers.value, (v) => (ipMembers.value = v), id, groups.members, q)
+const loadHost = (id: string, q?: ListParams) => loadPage<HostGroupMember>(hostMembers.value, (v) => (hostMembers.value = v), id, hostGroups.members, q)
+// Table events of one group's member table: a new size or sort starts at page 1.
+type Pager = (id: string, q?: ListParams) => Promise<void>
+const curQ = (kind: Kind, id: string): ListParams => (kind === 'ip' ? ipMembers.value[id]?.q : hostMembers.value[id]?.q) ?? firstPage(MEMBER_LIST)
+const pager = (kind: Kind): Pager => (kind === 'ip' ? loadIp : loadHost)
+const setPage = (kind: Kind, id: string, page: number) => void pager(kind)(id, { ...curQ(kind, id), page })
+const setSize = (kind: Kind, id: string, page_size: number) => void pager(kind)(id, { ...curQ(kind, id), page: 1, page_size })
+const setSort = (kind: Kind, id: string, s: TableSort) => void pager(kind)(id, { ...curQ(kind, id), page: 1, sort: s.key, order: s.dir })
+const sortOf = (kind: Kind, id: string): TableSort => { const q = curQ(kind, id); return { key: q.sort, dir: q.order } }
 async function toggleIp(id: string, open: boolean): Promise<void> {
   if (open && !ipMembers.value[id]) await loadIp(id)
 }
@@ -54,11 +83,20 @@ const summary = (g: IPGroup | HostGroup) => `${g.status} · ${g.member_count ?? 
 const ipItems = computed<AccordionItem[]>(() => groups.items.map((g) => ({ key: g.id, title: g.name, subtitle: summary(g) })))
 const hostItems = computed<AccordionItem[]>(() => hostGroups.items.map((g) => ({ key: g.id, title: g.name, subtitle: summary(g) })))
 type Row<T> = T & Record<string, unknown>
-const ipRows = (id: string) => (ipMembers.value[id] ?? []) as Row<IPGroupMember>[]
-const hostRows = (id: string) => (hostMembers.value[id] ?? []) as Row<HostGroupMember>[]
-const ipCols: Column<Row<IPGroupMember>>[] = [{ key: 'sequence', label: '#', width: 'sm' }, { key: 'member_type', label: 'Type', width: 'sm' }, { key: 'value', label: 'Value' }, { key: 'description', label: 'Description', hideOnStack: true }]
-const hostCols: Column<Row<HostGroupMember>>[] = [{ key: 'sequence', label: '#', width: 'sm' }, { key: 'device_name', label: 'Device', format: (m) => m.device_name || m.device_id }, { key: 'device_type', label: 'Type', hideOnStack: true }, { key: 'device_status', label: 'Status', width: 'sm' }, { key: 'device_primary_ip', label: 'Primary IP' }]
-const nextSeq = (rows: { sequence?: number }[]) => rows.reduce((m, r) => Math.max(m, r.sequence ?? 0), 0) + 1
+const ipRows = (id: string) => (ipMembers.value[id]?.rows ?? []) as Row<IPGroupMember>[]
+const hostRows = (id: string) => (hostMembers.value[id]?.rows ?? []) as Row<HostGroupMember>[]
+// Order (#) and name are the server's sort fields; name is the member value
+// of an IP group and the device name of a host group.
+const ipCols: Column<Row<IPGroupMember>>[] = [{ key: 'sequence', label: '#', width: 'sm', sortable: true }, { key: 'member_type', label: 'Type', width: 'sm' }, { key: 'name', label: 'Value', sortable: true, format: (m) => m.value }, { key: 'description', label: 'Description', hideOnStack: true }]
+const hostCols: Column<Row<HostGroupMember>>[] = [{ key: 'sequence', label: '#', width: 'sm', sortable: true }, { key: 'name', label: 'Device', sortable: true, format: (m) => m.device_name || m.device_id }, { key: 'device_type', label: 'Type', hideOnStack: true }, { key: 'device_status', label: 'Status', width: 'sm' }, { key: 'device_primary_ip', label: 'Primary IP' }]
+// The next order number follows the group's highest one (asked of the server:
+// the visible page may not hold it).
+const nextSequence = ref(1)
+async function loadNextSequence(kind: Kind, groupId: string): Promise<void> {
+  const top: ListParams = { page: 1, page_size: 1, sort: 'sequence', order: 'desc' }
+  const res = kind === 'ip' ? await groups.members(groupId, top) : await hostGroups.members(groupId, top)
+  nextSequence.value = (res.items[0]?.sequence ?? 0) + 1
+}
 
 // --- group create / edit / delete ---
 const groupDialog = ref(false)
@@ -104,15 +142,18 @@ const ipMemberFields = zodToFields(ipGroupMemberSchema, {
 })
 const hostMemberFields = computed(() =>
   zodToFields(hostGroupMemberSchema, {
-    device_id: { label: 'Device', type: 'select', cols: 8, options: devices.items.map((d) => ({ title: `${d.name} (${d.device_type})`, value: d.id })) },
+    device_id: { label: 'Device', type: 'select', cols: 8, options: deviceList.value.map((d) => ({ title: `${d.name} (${d.device_type})`, value: d.id })) },
     sequence: { label: 'Order', cols: 4 },
   }),
 )
 async function addMember(kind: Kind, groupId: string): Promise<void> {
-  // The next order number comes from the member list, so load it if the
-  // group was never expanded.
-  if (kind === 'ip' && !ipMembers.value[groupId]) await loadIp(groupId)
-  if (kind === 'host' && !hostMembers.value[groupId]) await loadHost(groupId)
+  error.value = ''
+  try {
+    await loadNextSequence(kind, groupId)
+  } catch (e) {
+    error.value = describe(e)
+    return
+  }
   memberKind.value = kind
   memberGroup.value = groupId
   editingMember.value = null
@@ -126,7 +167,7 @@ function editMember(kind: Kind, groupId: string, m: IPGroupMember | HostGroupMem
 }
 const memberInitial = computed(() => {
   if (editingMember.value) return { ...editingMember.value }
-  const seq = nextSeq(memberKind.value === 'ip' ? ipRows(memberGroup.value) : hostRows(memberGroup.value))
+  const seq = nextSequence.value
   return memberKind.value === 'ip' ? { member_type: 'address', sequence: seq } : { sequence: seq }
 })
 async function submitMember(v: Record<string, unknown>): Promise<unknown> {
@@ -188,7 +229,7 @@ async function removeMember(kind: Kind, groupId: string, m: IPGroupMember | Host
             <UiButton size="xs" variant="text" icon="mdi-pencil-outline" @click="editGroup('ip', g)">Edit</UiButton>
             <UiButton size="xs" variant="text" color="error" icon="mdi-delete-outline" @click="removeGroup('ip', g)">Delete</UiButton>
           </UiToolbar>
-          <UiDataTable :items="ipRows(g.id)" :columns="ipCols" :loading="!ipMembers[g.id]" caption="Members" empty-title="No members">
+          <UiDataTable :items="ipRows(g.id)" :columns="ipCols" :loading="!ipMembers[g.id]" :total="ipMembers[g.id]?.total ?? 0" :page="curQ('ip', g.id).page" :page-size="curQ('ip', g.id).page_size" :sort="sortOf('ip', g.id)" caption="Members" empty-title="No members" @update:page="setPage('ip', g.id, $event)" @update:page-size="setSize('ip', g.id, $event)" @update:sort="setSort('ip', g.id, $event)">
             <template #actions="{ row }">
               <UiButton size="xs" variant="text" icon="mdi-pencil-outline" icon-only label="Edit member" @click="editMember('ip', g.id, row)" />
               <UiButton size="xs" variant="text" color="error" icon="mdi-close" icon-only label="Remove member" @click="removeMember('ip', g.id, row)" />
@@ -209,7 +250,7 @@ async function removeMember(kind: Kind, groupId: string, m: IPGroupMember | Host
             <UiButton size="xs" variant="text" icon="mdi-pencil-outline" @click="editGroup('host', g)">Edit</UiButton>
             <UiButton size="xs" variant="text" color="error" icon="mdi-delete-outline" @click="removeGroup('host', g)">Delete</UiButton>
           </UiToolbar>
-          <UiDataTable :items="hostRows(g.id)" :columns="hostCols" :loading="!hostMembers[g.id]" caption="Members" empty-title="No members">
+          <UiDataTable :items="hostRows(g.id)" :columns="hostCols" :loading="!hostMembers[g.id]" :total="hostMembers[g.id]?.total ?? 0" :page="curQ('host', g.id).page" :page-size="curQ('host', g.id).page_size" :sort="sortOf('host', g.id)" caption="Members" empty-title="No members" @update:page="setPage('host', g.id, $event)" @update:page-size="setSize('host', g.id, $event)" @update:sort="setSort('host', g.id, $event)">
             <template #actions="{ row }">
               <UiButton size="xs" variant="text" icon="mdi-pencil-outline" icon-only label="Edit member" @click="editMember('host', g.id, row)" />
               <UiButton size="xs" variant="text" color="error" icon="mdi-close" icon-only label="Remove member" @click="removeMember('host', g.id, row)" />

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/go-tangra/go-tangra/v4/listquery"
+
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/store"
 )
 
@@ -29,6 +31,25 @@ type Stats struct {
 	TotalLocations     int64            `json:"total_locations"`
 	OverallUtilization float64          `json:"overall_utilization"`
 	DevicesByType      map[string]int64 `json:"devices_by_type"`
+}
+
+// PagedLists are the list-contract variants of the lists behind the browser
+// tables (go-tangra specs/032-server-side-tables): each applies the same
+// filters as its keyset (cursor) counterpart, counts the matches, clamps req
+// to the last page and returns that page in the Spec's order (store.*List)
+// with the total and the request actually applied. The keyset lists stay for
+// the gRPC API, backup and internal callers.
+type PagedLists interface {
+	PageSubnets(ctx context.Context, tenantID string, f store.SubnetFilter, req listquery.Request) ([]store.Subnet, int, listquery.Request, error)
+	PageAddresses(ctx context.Context, tenantID string, f store.AddressFilter, req listquery.Request) ([]store.IPAddress, int, listquery.Request, error)
+	PageDevices(ctx context.Context, tenantID string, f store.DeviceFilter, req listquery.Request) ([]store.Device, int, listquery.Request, error)
+	PageVlans(ctx context.Context, tenantID string, f store.VlanFilter, req listquery.Request) ([]store.Vlan, int, listquery.Request, error)
+	PageScanJobs(ctx context.Context, tenantID string, f store.ScanFilter, req listquery.Request) ([]store.IPScanJob, int, listquery.Request, error)
+	PageIPGroupMembers(ctx context.Context, tenantID, groupID string, req listquery.Request) ([]store.IPGroupMember, int, listquery.Request, error)
+	PageHostGroupMembers(ctx context.Context, tenantID, groupID string, req listquery.Request) ([]store.HostGroupMember, int, listquery.Request, error)
+	PageInterfaces(ctx context.Context, tenantID, deviceID string, req listquery.Request) ([]store.DeviceInterface, int, listquery.Request, error)
+	PageDevicePackages(ctx context.Context, tenantID, deviceID string, needsUpdate, securityOnly *bool, manager string, req listquery.Request) ([]store.DevicePackage, int, listquery.Request, error)
+	PageGuests(ctx context.Context, tenantID, hostDeviceID string, req listquery.Request) ([]store.HypervisorGuest, int, listquery.Request, error)
 }
 
 // Store is the IPAM persistence contract. Methods are tenant-scoped; the system
@@ -154,6 +175,7 @@ type Store interface {
 	HostSyncStore
 	PortLinkStore
 	ARPStore
+	PagedLists
 }
 
 // ARPStore is the ARP-based MAC linking persistence (feature 022).

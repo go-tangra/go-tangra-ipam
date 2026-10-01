@@ -2,13 +2,18 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useAddresses } from '@/stores/addresses'
 import { useScans } from '@/stores/scans'
-import type { IPAddress, IPScanJob } from '@/api/types'
 
 // A single shared EventSource relays the module's live events through the
-// gateway. ipam.ip_address.* patches the address list in place;
-// ipam.scan.* patches the scan-jobs registry. The stream is reference-counted
-// so several views share one connection.
+// gateway. The address and scan tables are server pages, so an event does not
+// patch or prepend rows: ipam.ip_address.* and ipam.scan.* reload the page
+// being shown (the server decides whether and where the record appears). A
+// burst of events — a scan reports progress and many addresses — coalesces
+// into one reload per RELOAD_MS. The stream is reference-counted so several
+// views share one connection.
 export type Listener = (type: string, data: unknown) => void
+
+/** Events within this window share one reload of their table. */
+export const RELOAD_MS = 500
 
 const EVENTS = [
   'ipam.ip_address.created',
@@ -21,6 +26,8 @@ const EVENTS = [
 
 // Envelope mirrors the platform bus event contract
 // {id,type,source,timestamp,tenant_id,data{...}}.
+type Table = 'addresses' | 'scans'
+
 interface Envelope {
   id?: string
   type?: string
@@ -43,19 +50,28 @@ export const useLive = defineStore('ipam-live', () => {
     const env = (parsed ?? {}) as Envelope
     const data = (env.data ?? parsed) as Record<string, unknown>
 
-    if (type.startsWith('ipam.ip_address.')) {
-      const addresses = useAddresses()
-      if (type === 'ipam.ip_address.deleted') {
-        if (data && typeof data.id === 'string') addresses.drop(data.id)
-      } else if (data && typeof data.id === 'string') {
-        addresses.patch(data as unknown as IPAddress)
-      }
-    } else if (type.startsWith('ipam.scan.')) {
-      const scans = useScans()
-      const id = (data.job_id ?? data.id) as unknown
-      if (typeof id === 'string') scans.patch({ ...(data as unknown as IPScanJob), id })
-    }
+    if (type.startsWith('ipam.ip_address.')) schedule('addresses')
+    else if (type.startsWith('ipam.scan.')) schedule('scans')
     for (const l of listeners) l(type, data)
+  }
+
+  // schedule reloads a table's current page once the window of the first
+  // pending event closes; later events in the window ride along. A table
+  // that was never listed is left alone.
+  const timers: Partial<Record<Table, ReturnType<typeof setTimeout>>> = {}
+  function schedule(t: Table): void {
+    if (timers[t]) return
+    timers[t] = setTimeout(() => {
+      delete timers[t]
+      const store = t === 'addresses' ? useAddresses() : useScans()
+      if (store.listed) void store.reload()
+    }, RELOAD_MS)
+  }
+  function cancelReloads(): void {
+    for (const t of Object.keys(timers) as Table[]) {
+      clearTimeout(timers[t])
+      delete timers[t]
+    }
   }
 
   function open(): void {
@@ -81,6 +97,7 @@ export const useLive = defineStore('ipam-live', () => {
     refs = 0
     source?.close()
     source = null
+    cancelReloads()
     connected.value = false
   }
 
