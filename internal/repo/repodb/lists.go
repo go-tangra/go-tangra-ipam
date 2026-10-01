@@ -36,6 +36,22 @@ func (w *where) raw(cond string) { w.b.WriteString(cond) }
 
 func (w *where) String() string { return w.b.String() }
 
+// maxSearchLen caps a free-text search term (runes): longer terms are cut so
+// a request cannot make every row run an unbounded pattern match.
+const maxSearchLen = 200
+
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// likeTerm returns s capped to maxSearchLen runes with the LIKE wildcards
+// (and the escape character, backslash, LIKE's default) escaped, so user
+// input matches literally inside the caller's own % anchors.
+func likeTerm(s string) string {
+	if r := []rune(s); len(r) > maxSearchLen {
+		s = string(r[:maxSearchLen])
+	}
+	return likeEscaper.Replace(s)
+}
+
 // The filter builders below are shared by the keyset (cursor) lists the gRPC
 // API, backup and internal callers use and by the paged lists of the HTTP
 // list contract, so both apply exactly the same filters.
@@ -58,7 +74,7 @@ func subnetWhere(tenantID string, f store.SubnetFilter) *where {
 		w.add(" AND ip_version = $%d", f.IPVersion)
 	}
 	if f.Query != "" {
-		w.args = append(w.args, "%"+f.Query+"%")
+		w.args = append(w.args, "%"+likeTerm(f.Query)+"%")
 		fmt.Fprintf(&w.b, " AND (name ILIKE $%d OR cidr ILIKE $%d)", len(w.args), len(w.args))
 	}
 	return w
@@ -79,10 +95,10 @@ func addressWhere(tenantID string, f store.AddressFilter) *where {
 		w.add(" AND address_type = $%d", f.AddressType)
 	}
 	if f.AddressPrefix != "" {
-		w.add(" AND address LIKE $%d", f.AddressPrefix+"%")
+		w.add(" AND address LIKE $%d", likeTerm(f.AddressPrefix)+"%")
 	}
 	if f.HostnamePattern != "" {
-		w.add(" AND hostname ILIKE $%d", "%"+f.HostnamePattern+"%")
+		w.add(" AND hostname ILIKE $%d", "%"+likeTerm(f.HostnamePattern)+"%")
 	}
 	if f.ReportState != "" {
 		w.add(" AND report_state = $%d", f.ReportState)
@@ -92,7 +108,7 @@ func addressWhere(tenantID string, f store.AddressFilter) *where {
 	}
 	if f.MAC != "" {
 		// Matches the addresses_mac_hex expression index.
-		w.add(" AND regexp_replace(lower(mac_address), '[^0-9a-f]', '', 'g') LIKE $%d", "%"+f.MAC+"%")
+		w.add(" AND regexp_replace(lower(mac_address), '[^0-9a-f]', '', 'g') LIKE $%d", "%"+likeTerm(f.MAC)+"%")
 	}
 	return w
 }
@@ -121,7 +137,7 @@ func deviceWhere(tenantID string, f store.DeviceFilter) *where {
 		w.add(" AND report_state = $%d", f.ReportState)
 	}
 	if f.Query != "" {
-		w.args = append(w.args, "%"+f.Query+"%")
+		w.args = append(w.args, "%"+likeTerm(f.Query)+"%")
 		fmt.Fprintf(&w.b, " AND (name ILIKE $%d OR primary_ip ILIKE $%d)", len(w.args), len(w.args))
 	}
 	switch f.HasHardware {
@@ -180,18 +196,41 @@ func packageWhere(tenantID, deviceID string, needsUpdate, securityOnly *bool, ma
 
 // pageRows runs one page of a list contract query in tx: it counts the rows of
 // "FROM <from> WHERE <w>", clamps req to the last page and selects cols of the
-// requested page in spec order (sort expression, NULLS LAST, tie-breaker). The
-// ORDER BY is built only from spec constants and the direction enum.
+// requested page in spec order (sort expression, NULLS LAST unless the field is
+// NotNull, tie-breaker). The ORDER BY is built only from spec constants and the
+// direction enum.
 func pageRows[T any](ctx context.Context, tx pgx.Tx, cols, from string, w *where, spec listquery.Spec, req listquery.Request,
 	scan func(scanner) (T, error)) ([]T, int, listquery.Request, error) {
+	return runPage(ctx, tx, cols, from, w, spec, req, "", scan)
+}
+
+// pageRowsDeferred is pageRows for a single unaliased table whose cols carry
+// per-row subqueries (the address list's switch name and links): the page's
+// keys (spec.TieBreak) are picked by an inner query that sorts and skips
+// narrow rows (filters, tenant predicate and RLS all inside it), and cols are
+// evaluated only for those rows, re-sorted in the same order. Without this a
+// deep page evaluated the subqueries for every skipped row.
+func pageRowsDeferred[T any](ctx context.Context, tx pgx.Tx, cols, table string, w *where, spec listquery.Spec, req listquery.Request,
+	scan func(scanner) (T, error)) ([]T, int, listquery.Request, error) {
+	return runPage(ctx, tx, cols, table, w, spec, req, spec.TieBreak, scan)
+}
+
+func runPage[T any](ctx context.Context, tx pgx.Tx, cols, from string, w *where, spec listquery.Spec, req listquery.Request,
+	deferKey string, scan func(scanner) (T, error)) ([]T, int, listquery.Request, error) {
 	req = store.ListRequest(req, spec)
 	var total int
 	if err := tx.QueryRow(ctx, "SELECT count(*) FROM "+from+" WHERE "+w.String(), w.args...).Scan(&total); err != nil {
 		return nil, 0, req, err
 	}
 	req = req.Clamp(total)
-	rows, err := tx.Query(ctx, fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
-		cols, from, w.String(), req.OrderBy(spec), req.Limit(), req.Offset()), w.args...)
+	orderBy := req.OrderBy(spec)
+	q := fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
+		cols, from, w.String(), orderBy, req.Limit(), req.Offset())
+	if deferKey != "" {
+		q = fmt.Sprintf("SELECT %s FROM %s WHERE %s IN (SELECT %s FROM %s WHERE %s ORDER BY %s LIMIT %d OFFSET %d) ORDER BY %s",
+			cols, from, deferKey, deferKey, from, w.String(), orderBy, req.Limit(), req.Offset(), orderBy)
+	}
+	rows, err := tx.Query(ctx, q, w.args...)
 	if err != nil {
 		return nil, 0, req, err
 	}
@@ -229,7 +268,7 @@ func (d *DB) PageSubnets(ctx context.Context, tenantID string, f store.SubnetFil
 func (d *DB) PageAddresses(ctx context.Context, tenantID string, f store.AddressFilter, req listquery.Request) (out []store.IPAddress, total int, applied listquery.Request, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
 		var e error
-		out, total, applied, e = pageRows(ctx, tx, addrCols, "ipam_ip_addresses", addressWhere(tenantID, f), store.AddressList, req, scanAddress)
+		out, total, applied, e = pageRowsDeferred(ctx, tx, addrCols, "ipam_ip_addresses", addressWhere(tenantID, f), store.AddressList, req, scanAddress)
 		return e
 	})
 	return
@@ -295,7 +334,7 @@ func (d *DB) PageIPGroupMembers(ctx context.Context, tenantID, groupID string, r
 func (d *DB) PageHostGroupMembers(ctx context.Context, tenantID, groupID string, req listquery.Request) (out []store.HostGroupMember, total int, applied listquery.Request, err error) {
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
 		var e error
-		out, total, applied, e = pageRows(ctx, tx, hostMemberCols, "ipam_host_group_members m LEFT JOIN ipam_devices d ON d.id = m.device_id",
+		out, total, applied, e = pageRows(ctx, tx, hostMemberCols, "ipam_host_group_members m LEFT JOIN ipam_devices d ON d.tenant_id = m.tenant_id AND d.id = m.device_id",
 			newWhere("m.tenant_id=$1 AND m.host_group_id=$2", tenantID, groupID), store.HostMemberList, req, scanHostMember)
 		return e
 	})
@@ -334,7 +373,7 @@ func (d *DB) PageGuests(ctx context.Context, tenantID, hostDeviceID string, req 
 	err = d.tenant(ctx, tenantID, func(tx pgx.Tx) error {
 		var e error
 		out, total, applied, e = pageRows(ctx, tx, guestCols+", coalesce(gd.name,'')",
-			"ipam_hypervisor_guests g LEFT JOIN ipam_devices gd ON gd.id = g.guest_device_id",
+			"ipam_hypervisor_guests g LEFT JOIN ipam_devices gd ON gd.tenant_id = g.tenant_id AND gd.id = g.guest_device_id",
 			newWhere("g.tenant_id=$1 AND g.host_device_id=$2", tenantID, hostDeviceID), store.GuestList, req,
 			func(sc scanner) (store.HypervisorGuest, error) { return scanGuest(sc, true) })
 		return e
