@@ -1,0 +1,52 @@
+# ipam configuration, rendered by the gateway's add-module wizard: every
+# ${...} below was filled from the core's own configuration or the inputs
+# given in the wizard, so the issuer, trust domain and addresses match the
+# core exactly.
+#
+# Peer modules (warden for BMC credentials, inventory for the host sync, the
+# scheduler for scheduled scans) live on other hosts: add their addresses
+# under discovery.static, then enable host_sync / task_scheduler. Until then
+# power/KVM/sensors answer warden_unavailable and both features stay off.
+service_name: ipam
+trust_domain: ${TRUST_DOMAIN}
+env: production
+identity:
+  provider: provided
+mesh_enroll:
+  enabled: true
+  enroll_url: ${LCM_ENROLL_URL}
+  lcm_grpc: ${LCM_GRPC}
+  tenant_id: ${MESH_TENANT_ID}
+  token_file: /tokens/enrollment.token
+  state_file: /state/svid.json
+authz: { source: file, path: /app/policy.yaml }
+server: { grpc_addr: 0.0.0.0:9985, http_addr: 0.0.0.0:9986 }
+admin: { addr: 127.0.0.1:9820 }
+discovery:
+  static:
+    gateway: ["${GATEWAY_GRPC}"]
+    auth: ["${AUTH_GRPC}"]
+    lcm: ["${LCM_GRPC}"]
+db:
+  dsn: postgres://ipam_app:${GEN_PASSWORD_2}@ipam-db:5432/ipam?sslmode=verify-full&sslrootcert=/tls/ca.pem
+  migrate_dsn: postgres://postgres:${GEN_PASSWORD_1}@ipam-db:5432/ipam?sslmode=verify-full&sslrootcert=/tls/ca.pem
+  max_conns: 16
+# The core's event bus: ipam.* events (platform:events:<tenant>) reach the
+# browser through the gateway and drive dns's record sync.
+valkey:
+  addresses: ["${VALKEY_ADDRESS}"]
+  username: ipam
+  password: "${VALKEY_PASSWORD}"
+  allow_plaintext: false
+  ca_file: /tls/valkey-ca.pem
+kek: { source: env, env: IPAM_KEK }
+warden: { service: warden }
+scan: { max_hosts: 1024, concurrency: 50, timeout_ms: 1000, workers: 3, max_retries: 3, snmp_timeout_ms: 5000 }
+allocation: { skip_first: 0, skip_last: 0, reserved_ranges: [] }
+ipmi: { timeout_seconds: 15 }
+kvm: { token_ttl_seconds: 60, session_seconds: 3600, console_origin: "${KVM_CONSOLE_ORIGIN}" }
+events: { enabled: true }
+gateway: { service: gateway, issuer: ${GATEWAY_ISSUER} }
+limits_ipam: { max_request_bytes: 1048576, max_backup_bytes: 33554432 }
+host_sync: { enabled: false }
+task_scheduler: { enabled: false, service: scheduler }

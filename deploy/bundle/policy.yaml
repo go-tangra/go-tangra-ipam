@@ -1,0 +1,20 @@
+# Freya service-to-service policy for ipam (rendered for this core's trust
+# domain): deny by default; the gateway forwards browser traffic, dns re-reads
+# addresses named by ipam events, and the scheduler runs ipam's task types.
+version: ipam-join-1
+rules:
+  - id: gateway-forwards
+    from: ["spiffe://${TRUST_DOMAIN}/svc/gateway"]
+    to: ["ipam"]
+    operations: ["*"]
+    effect: allow
+  - id: dns-ipam-sync
+    from: ["spiffe://${TRUST_DOMAIN}/svc/dns"]
+    to: ["ipam"]
+    operations: ["/ipam.v1.IpAddressService/Get", "/ipam.v1.IpAddressService/Find", "/ipam.v1.SubnetService/Get"]
+    effect: allow
+  - id: scheduler-execute
+    from: ["spiffe://${TRUST_DOMAIN}/svc/scheduler"]
+    to: ["ipam"]
+    operations: ["/scheduler.v1.TaskExecutor/ExecuteTask"]
+    effect: allow
