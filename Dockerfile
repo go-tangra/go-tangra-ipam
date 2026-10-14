@@ -42,7 +42,10 @@ LABEL org.opencontainers.image.source="https://github.com/go-tangra/go-tangra-ip
       org.opencontainers.image.title="go-tangra-ipam" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"
-RUN apk add --no-cache ca-certificates postgresql-client libcap && adduser -D -u 10001 app
+RUN apk add --no-cache ca-certificates postgresql-client libcap && adduser -D -u 10001 app && \
+    install -d -o app -g app -m 0700 /state
+# /state holds the enrolled mesh identity; a named volume mounted there takes
+# this ownership (deploy/bundle/compose.yaml).
 COPY --from=build /out/ipamsvc /usr/local/bin/
 # CAP_NET_RAW lets the unprivileged app user open the raw ICMP socket used by
 # discovery scans without running as root.
