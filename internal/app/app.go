@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-tangra/go-tangra-lcm/sdk/v4/pkg/lcmidentity"
 	"github.com/go-tangra/go-tangra/v4"
+	"github.com/go-tangra/go-tangra/v4/helpdocs"
 
 	authv1 "github.com/go-tangra/go-tangra-auth/sdk/v4/api/proto/auth/v1"
 	"github.com/go-tangra/go-tangra-auth/sdk/v4/pkg/authclient"
@@ -27,6 +28,7 @@ import (
 	"github.com/go-tangra/go-tangra-scheduler/sdk/v4/pkg/schedulerclient"
 	schedexec "github.com/go-tangra/go-tangra-scheduler/sdk/v4/pkg/taskexec"
 
+	"github.com/go-tangra/go-tangra-ipam/v4/docs"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/addresses"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/arpcfg"
 	"github.com/go-tangra/go-tangra-ipam/v4/internal/backup"
@@ -83,6 +85,9 @@ type App struct {
 	Verifier httpapi.Verifier
 	HTTP     *httpapi.Server
 	Hub      *stream.Hub
+	// Docs is the embedded help bundle (docs/help) served to the gateway;
+	// its digest is announced at registration.
+	Docs *helpdocs.Bundle
 
 	closers []func()
 	workers []func(context.Context)
@@ -91,6 +96,11 @@ type App struct {
 // Build wires the service.
 func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error) {
 	a = &App{Cfg: cfg}
+	// The help pages ship in the binary; CI lints them, so a bundle that does
+	// not load is a broken build: refuse to start.
+	if a.Docs, err = helpdocs.Load(docs.Help(), ipammanifest.Module); err != nil {
+		return nil, fmt.Errorf("ipam: help docs: %w", err)
+	}
 	handler := o.Logger
 	if handler == nil {
 		handler = slog.NewJSONHandler(os.Stderr, nil)
@@ -270,6 +280,10 @@ func Build(ctx context.Context, cfg config.Config, o Options) (a *App, err error
 	mux := http.NewServeMux()
 	mux.Handle("/", a.HTTP.Handler())
 	a.HTTP.RegisterKVM(mux, deps) // mounts /bmc/ (token-gated KVM proxy)
+	// Help bundle for the gateway only (its verified service identity, behind
+	// the Freya security chain); mounted before the catch-all, which would
+	// otherwise shadow it.
+	a.Freya.HTTP().Handle(helpdocs.BundlePath, helpdocs.NewHandler(a.Docs, helpdocs.AllowServices(cfg.Gateway.Service)))
 	a.Freya.HTTP().HandlePrefix("/", mux)
 
 	// Service-to-service gRPC surface (ipam.v1).
@@ -391,6 +405,7 @@ func (a *App) register(ctx context.Context) {
 			continue
 		}
 		client, err = gatewayclient.New(conn, gatewayclient.Options{Manifest: man, HTTPURL: "https://" + httpEP.Host, GRPCTarget: grpcEP.Host, Logger: a.Log,
+			DocsDigest: a.Docs.Digest, // the gateway fetches the help bundle when it changes
 			OnState: func(s gatewayclient.State) {
 				a.Log.Info("gateway lease", "registered", s.Registered, "lease", s.LeaseID, "err", s.Err)
 			}})

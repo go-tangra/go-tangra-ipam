@@ -11,10 +11,10 @@ require (
 	github.com/go-tangra/go-tangra-inventory/sdk/v4 v4.2.0
 	github.com/go-tangra/go-tangra-ipam/sdk/v4 v4.0.0
 	github.com/go-tangra/go-tangra-lcm/sdk/v4 v4.1.0
-	github.com/go-tangra/go-tangra-portal/sdk/v4 v4.1.0
+	github.com/go-tangra/go-tangra-portal/sdk/v4 v4.2.0
 	github.com/go-tangra/go-tangra-scheduler/sdk/v4 v4.0.0
 	github.com/go-tangra/go-tangra-warden/sdk/v4 v4.0.0
-	github.com/go-tangra/go-tangra/v4 v4.9.2
+	github.com/go-tangra/go-tangra/v4 v4.10.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/gosnmp/gosnmp v1.43.2
 	github.com/jackc/pgx/v5 v5.11.0
