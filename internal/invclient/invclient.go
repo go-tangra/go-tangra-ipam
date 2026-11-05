@@ -215,6 +215,9 @@ type Client interface {
 	ListHostReports(ctx context.Context, tenantID string, f Filter, fn func([]Report) error) error
 	// GetHostReport returns one host's latest report.
 	GetHostReport(ctx context.Context, tenantID, hostID string) (Report, error)
+	// RefreshHost asks the host's connected agent to collect and report
+	// again; delivered is false when no agent of the host is connected.
+	RefreshHost(ctx context.Context, tenantID, hostID string) (delivered bool, err error)
 }
 
 // Fake is an in-memory Client for tests: reports per tenant, a Down switch,
@@ -226,6 +229,9 @@ type Fake struct {
 	Err      error // returned by every call when set (e.g. a coded *Error)
 	PageSize int
 	Calls    []string
+	// OnRefresh answers RefreshHost (nil: no agent connected); it runs
+	// without the lock, so it may Put the host's next report.
+	OnRefresh func(tenantID, hostID string) (bool, error)
 }
 
 // NewFake builds an empty fake.
@@ -335,6 +341,18 @@ func (f *Fake) GetHostReport(_ context.Context, tenantID, hostID string) (Report
 		return Report{}, ErrNotFound
 	}
 	return r, nil
+}
+
+// RefreshHost implements Client.
+func (f *Fake) RefreshHost(_ context.Context, tenantID, hostID string) (bool, error) {
+	f.mu.Lock()
+	err := f.failure("RefreshHost")
+	on := f.OnRefresh
+	f.mu.Unlock()
+	if err != nil || on == nil {
+		return false, err
+	}
+	return on(tenantID, hostID)
 }
 
 var _ Client = (*Fake)(nil)

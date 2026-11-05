@@ -41,6 +41,7 @@ const hypervisorName = ref('')
 const syncing = ref(false)
 const resyncing = ref(false)
 const resyncMessage = ref('')
+const resyncKind = ref<'success' | 'warning'>('success')
 const securityOnly = ref(false)
 
 // One server-paged table of the device (page / size / sort in the URL under
@@ -93,14 +94,30 @@ async function loadAll(): Promise<void> {
     error.value = describe(e)
   }
 }
-// Applies the host's latest report now (the next report would anyway).
+// Why a re-sync applied the stored report instead of a fresh one.
+const staleReason: Record<string, string> = {
+  pending: 'the agent was asked for a fresh report but has not sent it yet; it is applied automatically when it arrives',
+  agent_offline: 'the agent is not connected',
+  unavailable: 'inventory could not ask the agent for a fresh report',
+}
+
+// Asks the host's agent for a fresh report and applies it (the server waits
+// up to 20 s); otherwise applies the latest stored report and says why.
 async function resync(): Promise<void> {
   resyncing.value = true
   error.value = ''
   resyncMessage.value = ''
   try {
     const r = await hostSync.resyncDevice(id)
-    resyncMessage.value = r.changes ? `Re-synced: ${r.changes} change(s) applied` : 'Re-synced: already up to date'
+    const outcome = r.changes ? `${r.changes} change(s) applied` : 'already up to date'
+    const collected = when(r.collected_at)
+    if (r.refresh === 'fresh') {
+      resyncKind.value = 'success'
+      resyncMessage.value = `Re-synced from a fresh host report (collected ${collected}): ${outcome}`
+    } else {
+      resyncKind.value = 'warning'
+      resyncMessage.value = `Re-synced from the stored report collected ${collected} (${outcome}): ${staleReason[r.refresh] ?? 'no fresh report'}`
+    }
     await loadAll()
   } catch (e) {
     error.value = describe(e)
@@ -234,7 +251,7 @@ const addrColumns: Column<IPAddress>[] = [{ key: 'address', label: 'Address', so
       <UiButton variant="text" icon="mdi-refresh" icon-only label="Refresh" @click="loadAll" />
     </template>
     <UiAlert v-if="error" kind="error" class="mb-3">{{ error }}</UiAlert>
-    <UiAlert v-if="resyncMessage" kind="success" class="mb-3">{{ resyncMessage }}</UiAlert>
+    <UiAlert v-if="resyncMessage" :kind="resyncKind" class="mb-3" data-test="device-resync-message">{{ resyncMessage }}</UiAlert>
     <UiCard v-if="device" class="mb-4">
       <UiKeyValueTable :items="summary" :columns="2" />
       <p v-if="hardwareLine" class="mt-3 text-sm" data-test="device-hardware-summary"><span class="font-medium">Hardware</span> · {{ hardwareLine }}</p>

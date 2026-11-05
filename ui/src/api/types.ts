@@ -712,6 +712,8 @@ export interface ResyncResult {
   applied: boolean
   changes: number
   issues: HostSyncIssue[]
+  refresh: 'fresh' | 'pending' | 'agent_offline' | 'unavailable'
+  collected_at: string
 }
 
 export interface HypervisorGuest {

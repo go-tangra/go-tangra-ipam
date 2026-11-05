@@ -239,3 +239,67 @@ func TestResyncTriggerBounded(t *testing.T) {
 		t.Fatalf("trigger %d", len(st.Trigger))
 	}
 }
+
+// A re-sync asks the agent for a fresh report and applies it once it lands;
+// without one it applies the stored report and says why.
+func TestResyncAsksAgentForFreshReport(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.inv.Put(rep(tA, host1, "web-01", "10.0.0.5", t0, 1))
+	_ = f.r.Cycle(ctx)
+	d := f.device(t, tA, "web-01")
+	ad := admin(f, true)
+	ad.wait, ad.poll = 50*time.Millisecond, time.Millisecond
+
+	// No agent connected (the fake's default): the stored report.
+	res, err := ad.ResyncDevice(ctx, userA, d.ID)
+	if err != nil || res.Refresh != RefreshOffline || !res.CollectedAt.Equal(t0) {
+		t.Fatalf("offline %+v %v", res, err)
+	}
+	// Inventory cannot be asked: the stored report, not a failed re-sync.
+	f.inv.OnRefresh = func(string, string) (bool, error) { return false, &invclient.Error{Code: invclient.CodePermissionDenied} }
+	if res, err = ad.ResyncDevice(ctx, userA, d.ID); err != nil || res.Refresh != RefreshUnavailable || !res.CollectedAt.Equal(t0) {
+		t.Fatalf("unavailable %+v %v", res, err)
+	}
+	// Delivered, but the agent stays silent within the wait.
+	f.inv.OnRefresh = func(string, string) (bool, error) { return true, nil }
+	if res, err = ad.ResyncDevice(ctx, userA, d.ID); err != nil || res.Refresh != RefreshPending || !res.CollectedAt.Equal(t0) {
+		t.Fatalf("pending %+v %v", res, err)
+	}
+	// The agent reports anew: that report is the one applied.
+	t1 := t0.Add(time.Hour)
+	f.inv.OnRefresh = func(tenantID, hostID string) (bool, error) {
+		if tenantID != tA || hostID != host1 {
+			t.Errorf("refresh %s/%s", tenantID, hostID)
+		}
+		f.inv.Put(rep(tA, host1, "web-01", "10.0.0.9", t1, 2))
+		return true, nil
+	}
+	res, err = ad.ResyncDevice(ctx, userA, d.ID)
+	if err != nil || res.Refresh != RefreshFresh || !res.CollectedAt.Equal(t1) || res.Changes == 0 {
+		t.Fatalf("fresh %+v %v", res, err)
+	}
+	if _, err := f.st.FindAddress(ctx, tA, "10.0.0.9"); err != nil {
+		t.Fatalf("fresh report applied: %v", err)
+	}
+	if st, _ := f.st.GetHostSyncDeviceState(ctx, tA, d.ID); !st.CollectedAt.Equal(t1) {
+		t.Fatalf("state collected_at %v", st.CollectedAt)
+	}
+	var last store.AuditRow
+	for _, a := range f.st.Audit() {
+		if a.Action == "hostsync_resync_requested" {
+			last = a
+		}
+	}
+	if last.Detail["refresh"] != RefreshFresh {
+		t.Fatalf("audit %+v", last.Detail)
+	}
+	// A request cancelled while waiting fails instead of applying.
+	f.inv.OnRefresh = func(string, string) (bool, error) { return true, nil }
+	ad.wait = time.Minute
+	cctx, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
+	defer cancel()
+	if _, err := ad.ResyncDevice(cctx, userA, d.ID); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("cancelled: %v", err)
+	}
+}
