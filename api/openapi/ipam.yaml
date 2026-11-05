@@ -195,6 +195,11 @@ components:
         applied: { type: boolean }
         changes: { type: integer }
         issues: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/HostSyncIssue' } }
+        refresh:
+          type: string
+          enum: [fresh, pending, agent_offline, unavailable]
+          description: 'fresh: the agent reported anew and that report was applied; otherwise the latest stored report was applied (pending: asked, no new report within 20 s; agent_offline: no agent connected; unavailable: inventory could not be asked)'
+        collected_at: { type: string, format: date-time, description: 'when the applied report was collected on the host' }
     HypervisorGuest:
       type: object
       properties:
@@ -749,7 +754,7 @@ paths:
       x-freya-max-body-bytes: 1024
       parameters: [{ $ref: '#/components/parameters/csrf' }, { $ref: '#/components/parameters/id' }]
       responses:
-        '200': { description: 'latest report applied', content: { application/json: { schema: { $ref: '#/components/schemas/ResyncResult' } } } }
+        '200': { description: 'asks the agent for a fresh report (waits up to 20 s), then applies the newest report', content: { application/json: { schema: { $ref: '#/components/schemas/ResyncResult' } } } }
         '409': { description: 'not_host_reported | host_sync_disabled' }
         '503': { description: temporarily_unavailable }
   /api/ipam/v1/devices/{id}/hardware:

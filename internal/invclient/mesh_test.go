@@ -195,6 +195,10 @@ func (oversizedAPI) GetHostReport(context.Context, string, string) (inventoryHos
 	return inventoryHostReport{}, nil
 }
 
+func (oversizedAPI) RefreshInventory(context.Context, string, string) (bool, string, error) {
+	return false, "", nil
+}
+
 func TestMeshRejectsOversizedPagesAndEndlessCursors(t *testing.T) {
 	for _, endless := range []bool{false, true} {
 		m := NewMesh(func(context.Context) (grpc.ClientConnInterface, error) { return nil, nil }, time.Second, 2)

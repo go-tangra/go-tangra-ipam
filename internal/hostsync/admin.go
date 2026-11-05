@@ -31,6 +31,22 @@ const (
 	MaxFullInterval = 1440
 )
 
+// A device re-sync first asks the agent for a fresh report and waits for it
+// at most RefreshWait (inside the gateway's 30 s module timeout), polling
+// every RefreshPoll.
+const (
+	RefreshWait = 20 * time.Second
+	RefreshPoll = time.Second
+)
+
+// Re-sync refresh outcomes (ResyncResult.Refresh).
+const (
+	RefreshFresh       = "fresh"         // the agent reported anew; that report was applied
+	RefreshPending     = "pending"       // asked, but no new report within RefreshWait
+	RefreshOffline     = "agent_offline" // no agent of the host is connected
+	RefreshUnavailable = "unavailable"   // inventory could not be asked
+)
+
 // Admin is the administrator surface of the host sync (US6): settings,
 // status, re-sync and conflict clearing, scoped to the caller's tenant.
 type Admin struct {
@@ -39,11 +55,13 @@ type Admin struct {
 	runner        *Runner
 	globalEnabled bool
 	now           func() time.Time
+	wait, poll    time.Duration
 }
 
 // NewAdmin builds the admin service. globalEnabled mirrors host_sync.enabled.
 func NewAdmin(st repo.Store, inv invclient.Client, runner *Runner, globalEnabled bool) *Admin {
-	return &Admin{st: st, inv: inv, runner: runner, globalEnabled: globalEnabled, now: func() time.Time { return time.Now().UTC() }}
+	return &Admin{st: st, inv: inv, runner: runner, globalEnabled: globalEnabled, now: func() time.Time { return time.Now().UTC() },
+		wait: RefreshWait, poll: RefreshPoll}
 }
 
 // SettingsInput is the writable part of the settings.
@@ -82,9 +100,11 @@ type DeviceHostSync struct {
 
 // ResyncResult is the outcome of a device re-sync.
 type ResyncResult struct {
-	Applied bool                  `json:"applied"`
-	Changes int                   `json:"changes"`
-	Issues  []store.HostSyncIssue `json:"issues"`
+	Applied     bool                  `json:"applied"`
+	Changes     int                   `json:"changes"`
+	Issues      []store.HostSyncIssue `json:"issues"`
+	Refresh     string                `json:"refresh"`
+	CollectedAt time.Time             `json:"collected_at"`
 }
 
 func userRow(subj authz.Subjects, t audit.EventType, kind, id string, detail map[string]any, at time.Time) store.AuditRow {
@@ -195,8 +215,10 @@ func (a *Admin) hostDevice(ctx context.Context, subj authz.Subjects, deviceID st
 	return a.st.GetDevice(ctx, subj.TenantID, deviceID)
 }
 
-// ResyncDevice fetches the device's latest report and applies it now,
-// ignoring the digest shortcut (US6 scenario 3).
+// ResyncDevice asks the host's agent for a fresh report, waits a bounded
+// time for it, and applies the newest report now, ignoring the digest
+// shortcut (US6 scenario 3). Without a fresh report it applies the latest
+// stored one and says why in Refresh.
 func (a *Admin) ResyncDevice(ctx context.Context, subj authz.Subjects, deviceID string) (ResyncResult, error) {
 	d, err := a.hostDevice(ctx, subj, deviceID)
 	if err != nil {
@@ -216,19 +238,53 @@ func (a *Admin) ResyncDevice(ctx context.Context, subj authz.Subjects, deviceID 
 	if err != nil {
 		return ResyncResult{}, err
 	}
+	rep, refresh, err := a.freshReport(ctx, subj.TenantID, d.InventoryHostID, rep)
+	if err != nil {
+		return ResyncResult{}, err
+	}
 	trigger := "resync:" + subj.ActorID()
 	if len(trigger) > 80 { // ipam_hostsync_device_state.trigger bound
 		trigger = trigger[:80]
 	}
 	if err := a.st.AppendAudit(ctx, userRow(subj, audit.HostSyncResyncRequested, audit.SubjectHostSync, deviceID,
-		map[string]any{"trigger": trigger, "inventory_host_id": d.InventoryHostID}, a.now())); err != nil {
+		map[string]any{"trigger": trigger, "inventory_host_id": d.InventoryHostID, "refresh": refresh}, a.now())); err != nil {
 		return ResyncResult{}, err
 	}
 	res, err := a.runner.Apply(ctx, s, rep, trigger, store.NewID())
 	if err != nil {
 		return ResyncResult{}, err
 	}
-	return ResyncResult{Applied: res.Applied, Changes: res.Changes, Issues: res.Issues}, nil
+	return ResyncResult{Applied: res.Applied, Changes: res.Changes, Issues: res.Issues, Refresh: refresh, CollectedAt: rep.CollectedAt}, nil
+}
+
+// freshReport asks the agent to report again and polls for a report collected
+// after cur. It returns the newest report it saw and the refresh outcome; a
+// failed refresh or poll falls back to cur, only a cancelled request errs.
+func (a *Admin) freshReport(ctx context.Context, tenantID, hostID string, cur invclient.Report) (invclient.Report, string, error) {
+	delivered, err := a.inv.RefreshHost(ctx, tenantID, hostID)
+	switch {
+	case err != nil:
+		return cur, RefreshUnavailable, nil
+	case !delivered:
+		return cur, RefreshOffline, nil
+	}
+	deadline := time.NewTimer(a.wait)
+	defer deadline.Stop()
+	tick := time.NewTicker(a.poll)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return cur, "", ctx.Err()
+		case <-deadline.C:
+			return cur, RefreshPending, nil
+		case <-tick.C:
+		}
+		next, err := a.inv.GetHostReport(ctx, tenantID, hostID)
+		if err == nil && next.CollectedAt.After(cur.CollectedAt) {
+			return next, RefreshFresh, nil
+		}
+	}
 }
 
 // DeviceHostSync returns the device's provenance and last report outcome.

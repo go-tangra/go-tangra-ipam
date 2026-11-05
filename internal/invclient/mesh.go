@@ -26,6 +26,7 @@ type reportAPI interface {
 	ListReportTenants(ctx context.Context, changedSince time.Time) ([]string, time.Time, error)
 	ListHostReports(ctx context.Context, tenantID string, f inventoryclient.ReportFilter) ([]inventoryclient.HostReport, string, error)
 	GetHostReport(ctx context.Context, tenantID, hostID string) (inventoryclient.HostReport, error)
+	RefreshInventory(ctx context.Context, tenantID, hostID string) (bool, string, error)
 }
 
 // Mesh is the Client over inventory's HostReportService (SPIFFE mTLS through
@@ -157,6 +158,21 @@ func (m *Mesh) GetHostReport(ctx context.Context, tenantID, hostID string) (Repo
 		return Report{}, wrap(err)
 	}
 	return fromSDK(r), nil
+}
+
+// RefreshHost implements Client (InventoryAgentService/RefreshInventory).
+func (m *Mesh) RefreshHost(ctx context.Context, tenantID, hostID string) (bool, error) {
+	api, err := m.client(ctx)
+	if err != nil {
+		return false, err
+	}
+	cctx, cancel := context.WithTimeout(ctx, m.timeout)
+	defer cancel()
+	delivered, _, err := api.RefreshInventory(cctx, tenantID, hostID)
+	if err != nil {
+		return false, wrap(err)
+	}
+	return delivered, nil
 }
 
 func fromSDK(r inventoryclient.HostReport) Report {

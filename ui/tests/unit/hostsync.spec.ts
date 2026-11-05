@@ -92,11 +92,11 @@ const reported = {
   report_state: 'reported', last_report_at: '2026-09-26T10:00:00Z', update_status: 'updates_available', package_update_count: 12, security_update_count: 3, reboot_required: true,
   guest_count: 2, hypervisor_device_id: '', virtualization_kind: '',
 }
-function deviceHandler(overrides: Record<string, unknown> = {}) {
+function deviceHandler(overrides: Record<string, unknown> = {}, resync: Record<string, unknown> = {}) {
   return (full: string, init: RequestInit) => {
     // The device's tables are server pages (?page=…&sort=…): match the path.
     const [url = '', query = ''] = full.split('?')
-    if (init.method === 'POST' && url.endsWith('/host-sync')) return { applied: true, changes: 2, issues: [] }
+    if (init.method === 'POST' && url.endsWith('/host-sync')) return { applied: true, changes: 2, issues: [], refresh: 'fresh', collected_at: '2026-09-26T10:05:00Z', ...resync }
     if (url.endsWith('/devices/d1')) return { ...reported, ...overrides }
     if (url.endsWith('/host-sync')) return { source: 'host_report', inventory_host_id: 'inv-1', report_state: 'reported', applied_at: '2026-09-26T10:01:00Z', trigger: 'poll', changes: 3, issues: [{ field: '<img src=x onerror=alert(1)>', reason: 'invalid', count: 1 }] }
     if (url.endsWith('/guests')) return { items: [{ guest_ref: '101', name: 'vm-a', kind: 'vm', macs: ['bc:24:11:00:00:01'], guest_device_id: 'g1', guest_device_name: 'vm-a' }, { guest_ref: '102', name: 'ct-b', kind: 'container', macs: ['bc:24:11:00:00:02'] }] }
@@ -135,7 +135,24 @@ describe('device view (host sync)', () => {
     await flushPromises()
     expect(calls.some((c) => c.init.method === 'POST' && c.url.endsWith('/devices/d1/host-sync'))).toBe(true)
     expect(admin.text()).toContain('2 change(s) applied')
+    expect(admin.find('[data-test=device-resync-message]').text()).toContain('fresh host report')
     admin.unmount()
+  })
+
+  it('re-sync says when it fell back to the stored report', async () => {
+    for (const [refresh, reason] of [['pending', 'has not sent it yet'], ['agent_offline', 'not connected'], ['unavailable', 'could not ask']]) {
+      await router.push('/ipam/devices/d1')
+      fetchMock(deviceHandler({}, { refresh, changes: 0 }))
+      const w = mount(Detail, { global: withAbility([{ action: 'resync', subject: 'HostSync' }]) })
+      await flushPromises()
+      await w.find('[data-test=device-resync]').trigger('click')
+      await flushPromises()
+      const msg = w.find('[data-test=device-resync-message]').text()
+      expect(msg).toContain('stored report')
+      expect(msg).toContain('already up to date')
+      expect(msg).toContain(reason)
+      w.unmount()
+    }
   })
 
   it('interfaces show kind, BMC and not-reported badges and the switch port; guests tab lists matched and unmatched guests', async () => {

@@ -1156,6 +1156,16 @@ export interface components {
             applied?: boolean;
             changes?: number;
             issues?: components["schemas"]["HostSyncIssue"][];
+            /**
+             * @description fresh: the agent reported anew and that report was applied; otherwise the latest stored report was applied (pending: asked, no new report within 20 s; agent_offline: no agent connected; unavailable: inventory could not be asked)
+             * @enum {string}
+             */
+            refresh?: "fresh" | "pending" | "agent_offline" | "unavailable";
+            /**
+             * Format: date-time
+             * @description when the applied report was collected on the host
+             */
+            collected_at?: string;
         };
         HypervisorGuest: {
             guest_ref?: string;
@@ -2970,7 +2980,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description latest report applied */
+            /** @description asks the agent for a fresh report (waits up to 20 s), then applies the newest report */
             200: {
                 headers: {
                     [name: string]: unknown;
